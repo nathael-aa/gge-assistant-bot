@@ -1,0 +1,3 @@
+# === REQUIS POUR LE FONCTIONNEMENT (PRODUCTION DOCKER) ===
+discord.py==2.3.2
+aiohttp>=3.9.0

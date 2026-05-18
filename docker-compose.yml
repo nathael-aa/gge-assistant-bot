@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  discord-bot:
+    build: .
+    container_name: gge-assistant
+    restart: unless-stopped
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - GGE_SERVER=${GGE_SERVER:-E4K_FR1}
+      - TZ=Europe/Paris
+    volumes:
+      - .:/app
