@@ -4,24 +4,39 @@ from datetime import datetime
 from pathlib import Path
 import time
 import os
+import logging
+from logging.handlers import TimedRotatingFileHandler
+
+# Configuration du Logger pour le script indépendant
+os.makedirs('/app/logs', exist_ok=True)
+logger = logging.getLogger("ServerScanner")
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s | [%(levelname)s] | %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+file_handler = TimedRotatingFileHandler('/app/logs/server_scanner.log', when="midnight", interval=1, backupCount=14, encoding='utf-8')
+def custom_log_namer(default_name): return default_name.replace(".log.", "_") + ".log"
+file_handler.namer = custom_log_namer
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 class FullServerScanner:
     def __init__(self, config_file='/app/config.json'):
-        # 🛡️ SÉCURITÉ : On vérifie que la config existe bien
         if not os.path.exists(config_file):
-            print(f"❌ ERREUR CRITIQUE : Le fichier {config_file} est introuvable !")
+            logger.error(f"❌ ERREUR CRITIQUE : Le fichier {config_file} est introuvable !")
             exit(1)
             
         with open(config_file, 'r', encoding='utf-8') as f:
             self.config = json.load(f)
         
         self.api_url = "https://api.gge-tracker.com/api/v1"
-        self.server = self.config.get('server', 'E4K_FR1') # Valeur par défaut si oubliée
-        # Dossier de sortie
+        self.server = self.config.get('server', 'E4K_FR1')
         self.output_dir = Path('/app/data/server_scans')
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Préparation de la session HTTP
         self.session = requests.Session()
         self.headers = {
             "gge-server": self.server,
@@ -29,7 +44,7 @@ class FullServerScanner:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) GGE-Assistant/2.0"
         }
         
-        print(f"✅ Scanner initialisé pour {self.server} (via GGE-Tracker)")
+        logger.info(f"✅ Scanner initialisé pour {self.server} (via GGE-Tracker)")
 
     def get_daily_dir(self):
         today = datetime.now().strftime("%Y-%m-%d")
@@ -38,17 +53,16 @@ class FullServerScanner:
         return daily_dir
 
     def get_all_players(self):
-        print(f"\n🔍 SCAN COMPLET du serveur {self.server}")
-        print(f"   Connexion à l'API GGE-Tracker en cours...\n")
+        logger.info(f"🔍 SCAN COMPLET du serveur {self.server} - Connexion à l'API GGE-Tracker...")
         
         all_players = {}
         page = 1
         total_pages = 1
-        erreurs_suite = 0 # 🛡️ Compteur anti-boucle infinie
+        erreurs_suite = 0
         
         while page <= total_pages:
             try:
-                url = f"{self.api_url}/players?page={page}&orderBy=player_name&orderType=ASC"
+                url = f"{self.api_url}/players"
                 params = {
                     "limit": 100, 
                     "page": page,
@@ -56,7 +70,7 @@ class FullServerScanner:
                     "allianceFilter": -1,
                     "protectionFilter": -1,
                     "inactiveFilter": 1,
-                    "kingdomFilter": 999,  # INDISPENSABLE : pour scanner tous les mondes d'un coup
+                    "kingdomFilter": 999,
                     "orderBy": "might_current",
                     "orderType": "DESC"
                 }
@@ -64,11 +78,11 @@ class FullServerScanner:
                 response = self.session.get(url, headers=self.headers, params=params, timeout=15)
                 
                 if response.status_code != 200:
-                    print(f"  ❌ Erreur API ({response.status_code}): Pause de 5s...")
+                    logger.warning(f"❌ Erreur API ({response.status_code}) à la page {page}: Pause de 5s...")
                     time.sleep(5)
                     erreurs_suite += 1
                     if erreurs_suite >= 3:
-                        print(f"  ⏭️ Trop d'erreurs, on ignore la page {page}.")
+                        logger.error(f"⏭️ Trop d'erreurs, on ignore la page {page}.")
                         page += 1
                         erreurs_suite = 0
                     continue
@@ -79,8 +93,7 @@ class FullServerScanner:
                     pagination = data.get('pagination', {})
                     total_pages = pagination.get('total_pages', 1)
                     total_items = pagination.get('total_items_count', '?')
-                    print(f"  📊 {total_items} joueurs à scanner sur {total_pages} pages.")
-                    print(f"  ⏳ Cette opération peut prendre du temps. Laissez tourner...\n")
+                    logger.info(f"📊 {total_items} joueurs à scanner sur {total_pages} pages.")
                 
                 players_list = data.get('players', [])
                 if not players_list:
@@ -91,12 +104,16 @@ class FullServerScanner:
                     if not name:
                         continue
                         
+                    alliance_raw = p.get('alliance_name') or 'Sans alliance'
+                    if alliance_raw.startswith('[') and alliance_raw.endswith(']'):
+                        alliance_raw = alliance_raw.strip('[]')
+                        
                     all_players[name] = {
                         'player_id': p.get('player_id'),
                         'rank': 0, 
                         'score': 0,
                         'category': 1,
-                        'alliance': p.get('alliance_name') or 'Sans alliance',
+                        'alliance': alliance_raw,
                         'alliance_id': p.get('alliance_id'),
                         'level': p.get('level', 0),
                         'legendary_level': p.get('legendary_level', 0),
@@ -108,21 +125,21 @@ class FullServerScanner:
                 
                 if page % 50 == 0 or page == total_pages:
                     progress = (page / total_pages) * 100
-                    print(f"  📄 Page {page:>5}/{total_pages} ({progress:>5.1f}%) | {len(all_players):>6} joueurs en mémoire", flush=True)
+                    logger.info(f"📄 Page {page:>5}/{total_pages} ({progress:>5.1f}%) | {len(all_players):>6} joueurs en mémoire")
                 
                 page += 1
-                erreurs_suite = 0 # Réinitialise si la page a fonctionné
+                erreurs_suite = 0 
                 time.sleep(0.4)
                 
             except KeyboardInterrupt:
-                print(f"\n⚠️ Scan interrompu par l'utilisateur")
+                logger.warning("⚠️ Scan interrompu par l'utilisateur")
                 break
             except Exception as e:
-                print(f"  ❌ Erreur inattendue page {page}: {e}")
+                logger.error(f"❌ Erreur inattendue page {page}: {e}")
                 time.sleep(3)
                 erreurs_suite += 1
                 if erreurs_suite >= 3:
-                    print(f"  ⏭️ Abandon de la page {page} suite à 3 erreurs.")
+                    logger.error(f"⏭️ Abandon de la page {page} suite à 3 erreurs.")
                     page += 1
                     erreurs_suite = 0
         
@@ -152,47 +169,22 @@ class FullServerScanner:
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(output_data, f, indent=2, ensure_ascii=False)
         
-        file_size = filepath.stat().st_size / (1024 * 1024)
-        
-        print(f"\n💾 Résultats sauvegardés: {filepath}")
-        print(f"   📊 {len(players_data)} joueurs")
-        print(f"   💾 Taille: {file_size:.2f} MB")
-        
+        # 🛠️ Correction de la variable muette : stockage et affichage du poids du fichier
+        file_size_mb = filepath.stat().st_size / (1024 * 1024)
+        logger.info(f"💾 Résultats sauvegardés: {filepath} ({file_size_mb:.2f} Mo)")
         return filepath
     
     def run(self):
-        print(f"\n{'#'*60}")
-        print(f"#  SCAN COMPLET DU SERVEUR {self.server}")
-        print(f"{'#'*60}\n")
-        
+        logger.info(f"🚀 DEBUT DU SCAN SERVEUR COMPLET : {self.server}")
         start_time = time.time()
         players = self.get_all_players()
         
         if not players:
-            print("\n❌ Aucun joueur trouvé. L'API a peut-être refusé la connexion.")
+            logger.error("❌ Aucun joueur trouvé. L'API a peut-être refusé la connexion.")
             return None
         
         duration = time.time() - start_time
         filepath = self.save_results(players, duration)
-        
-        alliances = {}
-        for p in players.values():
-            if p['alliance'] != 'Sans alliance':
-                alliances[p['alliance']] = alliances.get(p['alliance'], 0) + 1
-        
-        top_alliances = sorted(alliances.items(), key=lambda x: x[1], reverse=True)[:5]
-        
-        print(f"\n{'='*60}")
-        print(f"✅ SCAN COMPLET TERMINÉ")
-        print(f"{'='*60}")
-        print(f"  ⏱️  Durée: {duration//60:.0f}m {duration%60:.0f}s")
-        print(f"  👥 Joueurs enregistrés: {len(players)}")
-        print(f"  🏰 Alliances actives: {len(alliances)}")
-        print(f"\n🏆 Top 5 Alliances (par nombre de membres):")
-        for i, (name, count) in enumerate(top_alliances, 1):
-            print(f"  {i}. {name}: {count} membres")
-        print(f"{'='*60}\n")
-        
         return filepath
 
 if __name__ == "__main__":

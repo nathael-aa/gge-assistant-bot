@@ -1,17 +1,23 @@
 #!/bin/bash
+cd /volume1/gge-assistant || exit 1
 
-# 1. On va dans le dossier de ton projet
-cd /volume1/gge-assistant
-
-# 2. On crée le flag dans le dossier data
+# Flag pour le bot
 touch data/scan.flag
 
-# 3. On ordonne au conteneur Docker de lancer les scripts avec SON Python dans le nouveau dossier
-echo "Lancement du server_scanner..."
-docker exec gge-discord-bot python3 scanners/server_scanner.py
+# Fonction d'alerte : si le scanner plante, on appelle notre alerter.py
+lancer_scan() {
+    local script_path=$1
+    echo "🚀 Lancement de $script_path..."
+    docker exec gge-assistant python3 "$script_path"
+    
+    if [ $? -ne 0 ]; then
+        echo "❌ Erreur détectée sur $script_path, envoi de l'alerte MP..."
+        docker exec gge-assistant python3 scanners/alerter.py "$script_path"
+    fi
+}
 
-echo "Lancement du murs_scanner..."
-docker exec gge-discord-bot python3 scanners/murs_scanner.py
+lancer_scan "scanners/server_scanner.py"
+lancer_scan "scanners/murs_scanner.py"
 
-# 4. On nettoie le flag
 rm -f data/scan.flag
+echo "✅ Routine terminée."
