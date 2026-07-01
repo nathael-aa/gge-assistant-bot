@@ -10,15 +10,17 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 import logging
-from logging.handlers import RotatingFileHandler
-import traceback
 
-# 🛠️ Import de la boîte à outils unifiée (Ajout des versions ASYNC et de MON_ID_DISCORD)
+# 🛠️ Import de la boîte à outils unifiée (Nouvelle Architecture)
 from utils import (
-    BASE_DATA_PATH, 
+    CONFIG_DIR, 
+    JOUEURS_DIR,
+    ALLIANCES_DIR,
+    t, 
     joueur_autocomplete, 
     alliance_autocomplete, 
     event_autocomplete, 
+    event_alliance_autocomplete, 
     TRACKER_EVENTS, 
     format_num, 
     get_discord_timestamp, 
@@ -33,40 +35,106 @@ from utils import (
     load_pseudos_async,
     save_pseudos_async,
     load_rivals_async,
-    save_rivals_async
+    save_rivals_async,
+    get_api_headers,     
+    get_server_config,
+    SERVER_SCAN_MINUTES
 )
 
 logger = logging.getLogger("GGE_Bot")
 radar_logger = logging.getLogger("Radar_Log")
 radar_logger.setLevel(logging.INFO)
 
-def get_tier_and_label(lvl, leg):
-    """Détermine la tranche de niveau du joueur"""
-    if leg < 300 and lvl <= 70: return "T1", "Niv 1-299"
-    if leg < 650: return "T2", "Niv 300-649"
-    if leg < 950: return "T3", "Niv 650-949"
-    return "T4", "Niv 950+"
+# 🌍 MAPPING DES NOMS D'ÉVÉNEMENTS POUR TRADUCTION
+EVENT_TRAD_KEYS = {
+    "Nomad Invasion": ("cal_ev_nomad", "Nomade"),
+    "Samurai Invasion": ("cal_ev_samurai", "Samouraï"),
+    "Bloodcrow Invasion": ("cal_ev_bloodcrow", "Corbeaux de Sang"),
+    "War of the Realms": ("cal_ev_realms", "Guerre des Royaumes"),
+    "Storm Islands": ("cal_ev_storm", "Îles Orageuses"),
+    "Aquamarine": ("cal_ev_storm", "Îles Orageuses"),
+    "Battle of Berimond": ("cal_ev_berimond", "Bérimond")
+}
+
+def get_ev_name(event_en, langue):
+    """Traduit le nom de l'événement à la volée pour l'affichage"""
+    if event_en in EVENT_TRAD_KEYS:
+        key, defaut = EVENT_TRAD_KEYS[event_en]
+        return t(langue, key, defaut=defaut)
+    return event_en
+
+def get_tier_and_label(lvl, leg, langue="fr"):
+    """Détermine la tranche de niveau du joueur (avec traduction)"""
+    if leg < 300 and lvl <= 70: return "T1", t(langue, "ev_tier_1", defaut="Niv 1-299")
+    if leg < 650: return "T2", t(langue, "ev_tier_2", defaut="Niv 300-649")
+    if leg < 950: return "T3", t(langue, "ev_tier_3", defaut="Niv 650-949")
+    return "T4", t(langue, "ev_tier_4", defaut="Niv 950+")
+
+def get_month_name(month_num_str, langue="fr"):
+    return t(langue, f"month_{month_num_str}", defaut=month_num_str)
 
 def log_rival_event(user_id, rival_name, event_type, message):
     """📝 Enregistre une trace sécurisée dans le log radar."""
     pass
 
+def _get_api_timestamp(*sources):
+    """
+    Explore de manière récursive et profonde les structures de données renvoyées par l'API.
+    Traque TOUTES les dates trouvées pour s'assurer d'extraire la plus récente.
+    """
+    dates_trouvees = []
+
+    def search_ts(obj):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                # On ajoute "date", "collected_at" et "last_collected_at" à la liste des clés traquées
+                if k in ["updated_at", "updatedAt", "last_update", "date", "collected_at", "last_collected_at"] and isinstance(v, str):
+                    # Filtre léger pour être sûr que c'est une chaîne de type date ISO (YYYY-MM-DD...)
+                    if len(v) >= 10 and v[4] == '-':
+                        dates_trouvees.append(v)
+            
+            # Descente récursive
+            for v in obj.values():
+                if isinstance(v, (dict, list)):
+                    search_ts(v)
+                    
+        elif isinstance(obj, list):
+            for item in obj:
+                if isinstance(item, (dict, list)):
+                    search_ts(item)
+
+    # On lance l'aspiration des dates sur toutes les sources fournies
+    for src in sources:
+        if src:
+            search_ts(src)
+
+    if dates_trouvees:
+        try:
+            # Magie de Python : max() sur des chaînes ISO renvoie toujours la chronologie la plus récente !
+            latest_str = max(dates_trouvees)
+            return datetime.fromisoformat(latest_str.replace('Z', '+00:00'))
+        except:
+            pass
+            
+    # Fallback de sécurité si le JSON est totalement vide de dates
+    return discord.utils.utcnow()
+
 class EventsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         
-        # 🎨 PALETTE AMÉTHYSTE ET VIOLET (Une nuance unique par commande d'événement)
-        self.clr_obj_set        = discord.Color.from_rgb(75, 0, 130)     # Indigo / Violet Profond
-        self.clr_bilan          = discord.Color.from_rgb(102, 51, 153)   # Rebecca Purple
-        self.clr_joueur_dernier = discord.Color.from_rgb(138, 43, 226)  # Violet Éclatant
-        self.clr_joueur_cumul   = discord.Color.from_rgb(153, 50, 204)  # Orchidée Sombre
-        self.clr_alliance       = discord.Color.from_rgb(186, 85, 211)  # Orchidée Médium
-        self.clr_serveur        = discord.Color.from_rgb(218, 112, 214) # Orchidée Douce
-        self.clr_rival_list     = discord.Color.from_rgb(238, 130, 238) # Violet Clair
-        self.clr_woa_historique = discord.Color.from_rgb(81, 45, 168)  # Violet Profond
-        self.clr_woa_classement = discord.Color.from_rgb(170, 0, 255)  # Violet Néon
-        self.clr_woa_bilan      = discord.Color.from_rgb(126, 87, 194) # Lavande Douce
-        self.clr_aqua           = discord.Color.from_rgb(0, 180, 216)   # Bleu Abysse / Cyan (Aquamarine)
+        # 🎨 PALETTE AMÉTHYSTE ET VIOLET
+        self.clr_obj_set        = discord.Color.from_rgb(75, 0, 130)     
+        self.clr_bilan          = discord.Color.from_rgb(102, 51, 153)   
+        self.clr_joueur_dernier = discord.Color.from_rgb(138, 43, 226)  
+        self.clr_joueur_cumul   = discord.Color.from_rgb(153, 50, 204)  
+        self.clr_alliance       = discord.Color.from_rgb(186, 85, 211)  
+        self.clr_serveur        = discord.Color.from_rgb(218, 112, 214) 
+        self.clr_rival_list     = discord.Color.from_rgb(238, 130, 238) 
+        self.clr_woa_historique = discord.Color.from_rgb(81, 45, 168)  
+        self.clr_woa_classement = discord.Color.from_rgb(170, 0, 255)  
+        self.clr_woa_bilan      = discord.Color.from_rgb(126, 87, 194) 
+        self.clr_aqua           = discord.Color.from_rgb(0, 180, 216)   
 
     async def cog_load(self):
         if not self.rival_check_task.is_running():
@@ -75,275 +143,62 @@ class EventsCog(commands.Cog):
     async def cog_unload(self):
         self.rival_check_task.cancel()
 
-    # ==========================================
-    # 🎯 DÉFINIR LES OBJECTIFS (PROPRE AU SERVEUR)
-    # ==========================================
-    @app_commands.command(name="event_objectif_set", description="Définit les objectifs de points par tranche de niveau")
-    @app_commands.guild_only() 
-    @app_commands.autocomplete(nom_event=event_autocomplete)
-    @app_commands.describe(
-        obj_t1="Objectif Niv 1-299 (Points)",
-        obj_t2="Objectif Niv 300-649 (Points)",
-        obj_t3="Objectif Niv 650-949 (Points)",
-        obj_t4="Objectif Niv 950+ (Points)"
-    )
-    async def event_objectif_set(self, interaction: discord.Interaction, nom_event: str, obj_t1: int, obj_t2: int, obj_t3: int, obj_t4: int):
-        if not interaction.user.guild_permissions.administrator and interaction.user.id != MON_ID_DISCORD:
-            return await interaction.response.send_message("<:error:1512505075220611172> Réservé aux administrateurs.", ephemeral=True)
-
-        event_keys = TRACKER_EVENTS.get(nom_event)
-        if not event_keys:
-            return await interaction.response.send_message("<:error:1512505075220611172> Événement inconnu.", ephemeral=True)
-
-        # 🔐 Sécurisé : Lecture et écriture via verrous asynchrones
-        data = await load_objectifs_async()
-        guild_id = str(interaction.guild_id) 
-        
-        if guild_id not in data:
-            data[guild_id] = {}
-            
-        data[guild_id][nom_event] = {
-            "T1": obj_t1,
-            "T2": obj_t2,
-            "T3": obj_t3,
-            "T4": obj_t4
-        }
-        await save_objectifs_async(data)
-        
-        embed = discord.Embed(title=f"<:icon_points:1512502439339888820> Objectifs mis à jour : {nom_event}", color=self.clr_obj_set)
-        embed.description = f"Paramètres enregistrés pour le serveur **{interaction.guild.name}**."
-        embed.add_field(name="Niv 1-299", value=f"**{format_num(obj_t1)}** pts", inline=True)
-        embed.add_field(name="Niv 300-649", value=f"**{format_num(obj_t2)}** pts", inline=True)
-        embed.add_field(name="Niv 650-949", value=f"**{format_num(obj_t3)}** pts", inline=True)
-        embed.add_field(name="Niv 950+", value=f"**{format_num(obj_t4)}** pts", inline=True)
-        
-        await interaction.response.send_message(embed=embed)
-
-    # ==========================================
-    # BILAN DES OBJECTIFS (PROPRE AU SERVEUR)
-    # ==========================================
-    @app_commands.command(name="event_bilan", description="Vérifie qui a atteint l'objectif d'alliance")
-    @app_commands.guild_only() 
-    @app_commands.autocomplete(nom_event=event_autocomplete)
-    @app_commands.autocomplete(alliance=alliance_autocomplete)
-    @app_commands.describe(lissage="Lisser le score sur les 3 dernières éditions de l'événement ?")
-    async def event_bilan(self, interaction: discord.Interaction, nom_event: str, alliance: str, lissage: bool = True):
-        try: await interaction.response.defer(thinking=True)
-        except: return
-
-        event_keys = TRACKER_EVENTS.get(nom_event)
-        if not event_keys:
-            return await interaction.followup.send(f"<:error:1512505075220611172> Événement inconnu.")
-
-        guild_id = str(interaction.guild_id)
-        # 🔐 Sécurisé : Chargement asynchrone protégé
-        objectifs_data = await load_objectifs_async()
-        objectifs = objectifs_data.get(guild_id, {}).get(nom_event)
-        if not objectifs:
-            return await interaction.followup.send(f"<:error:1512505075220611172> Aucun objectif défini pour **{nom_event}** sur ce serveur. Utilise `/event_objectif_set` d'abord.")
-
-        headers = {'accept': 'application/json', 'gge-server': 'E4K_FR1'}
-        safe_alliance = urllib.parse.quote(alliance)
-        
-        search_url = f"https://api.gge-tracker.com/api/v1/alliances/name/{safe_alliance}"
-        try:
-            async with self.bot.session.get(search_url, headers=headers, timeout=10) as resp:
-                if resp.status != 200: return await interaction.followup.send("<:error:1512505075220611172> Alliance introuvable via l'API.")
-                data1 = await resp.json()
-                target = data1[0] if isinstance(data1, list) and data1 else data1
-                alliance_id = target.get('alliance_id') or target.get('id')
-        except: return await interaction.followup.send("<:error:1512505075220611172> Erreur de connexion avec GGE-Tracker.")
-
-        if not alliance_id: return await interaction.followup.send("<:error:1512505075220611172> Alliance introuvable.")
-
-        stats_url = f"https://api.gge-tracker.com/api/v1/statistics/alliance/{alliance_id}"
-        try:
-            async with self.bot.session.get(stats_url, headers=headers, timeout=15) as resp:
-                if resp.status != 200: return await interaction.followup.send("<:error:1512505075220611172> Impossible de télécharger les statistiques.")
-                stats_data = await resp.json()
-        except: return await interaction.followup.send("<:error:1512505075220611172> Erreur lors du téléchargement de l'historique.")
-
-        best_history = []
-        for key in event_keys:
-            curr_history = stats_data.get("points", {}).get(key, [])
-            if curr_history:
-                best_history = curr_history
-                break
-
-        if not best_history:
-            return await interaction.followup.send(f"<:error:1512505075220611172> Aucun point enregistré pour **{alliance}** sur **{nom_event}**.")
-
-        player_dict = {}
-        alliance_members = set()
-        cache = await get_cached_data()
-        local_data = cache.get('players_data', {})
-
-        for p_name, p_info in local_data.items():
-            pid = str(p_info.get('player_id', p_info.get('id', '')))
-            if pid and not pid.endswith('164'): pid += '164'
-            
-            lvl = int(p_info.get('level', 0))
-            leg = int(p_info.get('legendary_level', 0))
-            player_dict[pid] = {"name": p_name, "lvl": lvl, "leg": leg}
-            
-            p_all_id = str(p_info.get('allianceId', p_info.get('alliance_id', '')))
-            if p_all_id and not p_all_id.endswith('164'): p_all_id += '164'
-            if p_all_id == str(alliance_id) or str(p_info.get('allianceName', '')).lower() == alliance.lower():
-                alliance_members.add(pid)
-
-        if not alliance_members:
-            return await interaction.followup.send(f"<:error:1512505075220611172> Aucun membre de cette alliance trouvé dans le scan local.")
-
-        dates_uniques = set(entry.get("date", "") for entry in best_history if entry.get("date"))
-        dts_tries = sorted([datetime.fromisoformat(d.replace('Z', '+00:00')) for d in dates_uniques])
-        
-        clusters = []
-        current_cluster = []
-        for i, dt in enumerate(dts_tries):
-            if not current_cluster:
-                current_cluster.append(dt)
-            else:
-                diff_jours = (dt - current_cluster[-1]).total_seconds() / 86400.0
-                if diff_jours > 2.0:
-                    clusters.append(current_cluster)
-                    current_cluster = [dt]
-                else:
-                    current_cluster.append(dt)
-        if current_cluster: clusters.append(current_cluster)
-
-        nb_events_cible = 3 if lissage else 1
-        target_clusters = clusters[-nb_events_cible:] if len(clusters) >= nb_events_cible else clusters
-        
-        if not target_clusters: return await interaction.followup.send("<:error:1512505075220611172> Données insuffisantes pour l'analyse.")
-
-        player_cluster_scores = {pid: [] for pid in alliance_members}
-        
-        for cluster in target_clusters:
-            start_date = cluster[0].isoformat().replace('+00:00', 'Z')
-            end_date = (cluster[-1] + timedelta(days=1)).isoformat().replace('+00:00', 'Z')
-            
-            cluster_max = {}
-            for entry in best_history:
-                d_str = entry.get("date")
-                pid = str(entry.get("player_id"))
-                pt = int(entry.get("point", 0))
-                
-                if start_date <= d_str <= end_date and pid in alliance_members:
-                    cluster_max[pid] = max(cluster_max.get(pid, 0), pt)
-            
-            for pid in alliance_members:
-                player_cluster_scores[pid].append(cluster_max.get(pid, 0))
-
-        resultats_par_tier = {"T1": [], "T2": [], "T3": [], "T4": []}
-        
-        reussites = 0
-        total_evalues = len(alliance_members)
-
-        for pid in alliance_members:
-            scores = player_cluster_scores[pid]
-            score_retenu = sum(scores) // len(scores) if scores else 0
-            
-            p_data = player_dict.get(pid, {"name": f"Inconnu_{pid[:4]}", "lvl": 0, "leg": 0})
-            tier_key, tier_label = get_tier_and_label(p_data["lvl"], p_data["leg"])
-            
-            objectif_requis = objectifs.get(tier_key, 0)
-            a_reussi = score_retenu >= objectif_requis
-            
-            if a_reussi: reussites += 1
-            
-            resultats_par_tier[tier_key].append({
-                "name": p_data["name"],
-                "score": score_retenu,
-                "requis": objectif_requis,
-                "reussi": a_reussi
-            })
-
-        mode_txt = "Moyenne lissée sur 3 événements" if lissage else "Dernier événement uniquement"
-        taux = (reussites / total_evalues) * 100 if total_evalues > 0 else 0
-        
-        embed = discord.Embed(title=f"<:stats:1512517930490003726> Bilan d'Objectifs : {alliance} - {nom_event}", color=self.clr_bilan, timestamp=discord.utils.utcnow())
-        embed.description = f"<:podium:1512523218299392131> **Mode :** {mode_txt}\n<:ranking:1512438311132729525> **Taux de réussite :** {taux:.1f}% ({reussites}/{total_evalues} membres)"
-
-        for tier_key in ["T4", "T3", "T2", "T1"]:
-            joueurs_tier = resultats_par_tier[tier_key]
-            if not joueurs_tier: continue
-            
-            joueurs_tier.sort(key=lambda x: (-int(x["reussi"]), -x["score"])) 
-            
-            lignes = []
-            for j in joueurs_tier:
-                icone = "<:star:1512573195088171088>" if j["reussi"] else "<:movements:1512526112830521637>"
-                lignes.append(f"{icone} **{j['name']}** : {format_num(j['score'])} / {format_num(j['requis'])}")
-            
-            tier_label = get_tier_and_label(0, 999 if tier_key=="T4" else 700 if tier_key=="T3" else 400 if tier_key=="T2" else 100)[1]
-            
-            chunk_txt = ""
-            for ligne in lignes:
-                if len(chunk_txt) + len(ligne) > 1000:
-                    embed.add_field(name=f"<:alliance:1512503083861540914> Tranche {tier_label}", value=chunk_txt, inline=False)
-                    chunk_txt = ligne + "\n"
-                else:
-                    chunk_txt += ligne + "\n"
-            if chunk_txt:
-                embed.add_field(name=f"<:alliance:1512503083861540914> Tranche {tier_label}", value=chunk_txt, inline=False)
-
-        setup_embed_footer(embed, interaction)
-        await interaction.followup.send(embed=embed)
-
     # =========================================
-    # COMMANDE : EVENT JOUEUR (AIGUILLAGE AUTO)
+    # COMMANDE : EVENT JOUEUR
     # ==========================================
-    @app_commands.command(name="event_joueur", description="Consulter le dernier score d'un joueur ou son historique.")
-    @app_commands.autocomplete(nom_event=event_autocomplete)
-    @app_commands.autocomplete(joueur=joueur_autocomplete)
+    @app_commands.command(name="event_player", description="View a player's latest score or history")
+    @app_commands.autocomplete(event_name=event_autocomplete)
+    @app_commands.autocomplete(player=joueur_autocomplete)
     @app_commands.choices(mode=[
-        app_commands.Choice(name="Dernier score", value="dernier"),
-        app_commands.Choice(name="Historique", value="cumul")
+        app_commands.Choice(name="Latest score", value="latest"),
+        app_commands.Choice(name="History", value="history")
     ])
-    async def event_joueur(self, interaction: discord.Interaction, nom_event: str, joueur: str, mode: app_commands.Choice[str]):
+    async def event_player(self, interaction: discord.Interaction, event_name: str, player: str, mode: app_commands.Choice[str]):
         await interaction.followup.defer(thinking=True) if interaction.response.is_done() else await interaction.response.defer(thinking=True)
+        
+        langue, serveur = await get_server_config(interaction)
+        event_trad = get_ev_name(event_name, langue)
+        lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
         
         player_id = None
         alliance_name = "Sans alliance"
-        cache = await get_cached_data()
+        cache = await get_cached_data(serveur)
         local_data = cache.get('players_data', {})
 
         for p_name, p_info in local_data.items():
-            if p_name.lower() == joueur.lower():
-                raw_id = str(p_info.get('player_id', p_info.get('id', '')))
-                player_id = raw_id + '164' if raw_id and not raw_id.endswith('164') else raw_id
-                joueur = p_name 
+            if p_name.lower() == player.lower():
+                player_id = str(p_info.get('player_id', p_info.get('id', '')))
+                player = p_name 
                 alli_raw = p_info.get('allianceName', p_info.get('alliance_id', 'Sans alliance'))
                 if isinstance(alli_raw, dict): alli_raw = alli_raw.get('name', 'Sans alliance')
                 if alli_raw and alli_raw not in ["", "None"]: alliance_name = alli_raw
                 break
 
         if not player_id:
-            return await interaction.followup.send(f"<:error:1512505075220611172> Joueur **{joueur}** introuvable dans le cache local.")
+            return await interaction.followup.send(t(langue, "ev_err_player_local", player=player, defaut=f"<:error:1512505075220611172> Joueur **{player}** introuvable dans le cache local."))
 
-        headers = {'accept': 'application/json', 'gge-server': 'E4K_FR1'}
+        headers = await get_api_headers(interaction)
         base_api = "https://api.gge-tracker.com/api/v1"
 
-        if "îles orageuses" in nom_event.lower() or "aquamarine" in nom_event.lower():
+        if "storm islands" in event_name.lower() or "aquamarine" in event_name.lower() or "orageuses" in event_name.lower():
             try:
                 async with self.bot.session.get(f"{base_api}/aquamarine/player/{player_id}", headers=headers, timeout=10) as resp:
                     if resp.status != 200:
-                        return await interaction.followup.send(f"<:error:1512505075220611172> Aucun historique Aquamarine trouvé pour **{joueur}**.")
+                        return await interaction.followup.send(t(langue, "ev_err_aqua_hist", player=player, defaut=f"<:error:1512505075220611172> Aucun historique Aquamarine trouvé pour **{player}**."))
                     snapshots = (await resp.json()).get("snapshots", [])
             except Exception as e:
                 logger.error(f"🚨 ERREUR API Aquamarine : {str(e)}")
-                return await interaction.followup.send(f"<:error:1512505075220611172> Erreur technique Aquamarine : {type(e).__name__}")
+                return await interaction.followup.send(t(langue, "ev_err_aqua_tech", type=type(e).__name__, defaut=f"<:error:1512505075220611172> Erreur technique Aquamarine : {type(e).__name__}"))
                 
             if not snapshots:
-                return await interaction.followup.send(f"<:error:1512505075220611172> **{joueur}** ne possède aucun snapshot enregistré pour l'Aquamarine.")
+                return await interaction.followup.send(t(langue, "ev_err_aqua_no_snap", player=player, defaut=f"<:error:1512505075220611172> **{player}** ne possède aucun snapshot enregistré pour l'Aquamarine."))
             
             snapshots.sort(key=lambda x: x.get('collected_at', ''), reverse=True)
             
-            if alliance_name.isdigit() or (alliance_name.endswith('164') and alliance_name[:-3].isdigit()):
-                target_aid = alliance_name if alliance_name.endswith('164') else alliance_name + '164'
+            if alliance_name.isdigit():
+                target_aid = alliance_name
                 for _, info in local_data.items():
                     curr_aid = str(info.get('allianceId', info.get('alliance_id', '')))
-                    if curr_aid and not curr_aid.endswith('164'): curr_aid += '164'
                     if curr_aid == target_aid:
                         a_name = info.get('allianceName', info.get('alliance', ''))
                         if isinstance(a_name, dict): a_name = a_name.get('name', '')
@@ -351,27 +206,22 @@ class EventsCog(commands.Cog):
                             alliance_name = a_name
                             break
 
-            if mode.value == "dernier":
+            if mode.value == "latest":
                 live = snapshots[0]
+                actualisation_dt = _get_api_timestamp(live)
                 live_metrics = {m['metric_id']: int(m['value']) for m in live.get('metrics', [])}
                 
-                pts_cargo = live_metrics.get(100, 0)
-                total_am = live_metrics.get(15, 0)
-                cargo_iles = live_metrics.get(16, 0)
-                cargo_forts = live_metrics.get(17, 0)
-                cargo_pvp_win = live_metrics.get(18, 0)
-                cargo_depense = live_metrics.get(19, 0)
-                cargo_pvp_loss = live_metrics.get(20, 0)
+                pts_cargo_str = f"{live_metrics.get(100, 0):,}".replace(",", " ")
+                total_am_str = f"{live_metrics.get(15, 0):,}".replace(",", " ")
+                cargo_iles_str = f"{live_metrics.get(16, 0):,}".replace(",", " ")
+                cargo_forts_str = f"{live_metrics.get(17, 0):,}".replace(",", " ")
+                cargo_pvp_win_str = f"{live_metrics.get(18, 0):,}".replace(",", " ")
+                cargo_depense_str = f"{live_metrics.get(19, 0):,}".replace(",", " ")
+                cargo_pvp_loss_str = f"{live_metrics.get(20, 0):,}".replace(",", " ")
 
-                pts_cargo_str = f"{pts_cargo:,}".replace(",", " ")
-                total_am_str = f"{total_am:,}".replace(",", " ")
-                cargo_iles_str = f"{cargo_iles:,}".replace(",", " ")
-                cargo_forts_str = f"{cargo_forts:,}".replace(",", " ")
-                cargo_pvp_win_str = f"{cargo_pvp_win:,}".replace(",", " ")
-                cargo_depense_str = f"{cargo_depense:,}".replace(",", " ")
-                cargo_pvp_loss_str = f"{cargo_pvp_loss:,}".replace(",", " ")
-
-                status_txt = (
+                status_txt = t(langue, "ev_aqua_live_stats", 
+                               pts=pts_cargo_str, am=total_am_str, iles=cargo_iles_str, forts=cargo_forts_str, 
+                               win=cargo_pvp_win_str, loss=cargo_pvp_loss_str, dep=cargo_depense_str, defaut=(
                     f"<:pointscargo:1512161268411273429> **Points cargo (Classement) :** {pts_cargo_str} pts\n\n"
                     f"<:aquamarinetotalcollectee:1512162700518752410> **Total aigue-marine collectées :** {total_am_str}\n"
                     f" ↳ <:aquamarineiles:1512162072249765908> *Dans les îles à ressources :* {cargo_iles_str}\n"
@@ -379,41 +229,40 @@ class EventsCog(commands.Cog):
                     f" ↳ <:aquamarinegagnerjcj:1512162488504811590> *Gagné en JcJ :* {cargo_pvp_win_str}\n"
                     f" ↳ <:aquamarineperdujcj:1512162424365646067> *Perdu en JcJ :* {cargo_pvp_loss_str}\n\n"
                     f"<:aquamarinedepenser:1512162297425039423> **Dépensé en points cargo :** {cargo_depense_str}"
-                )
+                ))
 
                 maintenant_str = discord.utils.utcnow().strftime("%Y-%m")
                 snapshot_month = live.get('collected_at', '')[:7]
                 
-                mois_fr = {"01":"Janvier", "02":"Février", "03":"Mars", "04":"Avril", "05":"Mai", "06":"Juin", 
-                           "07":"Juillet", "08":"Août", "09":"Septembre", "10":"Octobre", "11":"Novembre", "12":"Décembre"}
-                
-                title_txt = f"🎯 Score en direct de {joueur} for : {nom_event}"
+                title_txt = t(langue, "ev_aqua_title_live", player=player, event=event_trad, defaut=f"🎯 Score en direct de {player} pour : {event_trad}")
                 warning_desc = ""
                 couleur_embed = self.clr_aqua
                 
                 if snapshot_month != maintenant_str:
                     try:
                         annee_s, mois_s = snapshot_month.split("-")
-                        nom_mois_s = f"{mois_fr.get(mois_s, mois_s)} {annee_s}"
-                        title_txt = f"⚓ Score Final Édition Précédente : {joueur}"
-                        warning_desc = f"<:error:1512505075220611172> **Attention :** Ce joueur n'a pas encore lancé l'édition actuelle du mois de Juin. Affichage des archives de l'édition de **{nom_mois_s}**.\n\n"
+                        nom_mois_s = f"{get_month_name(mois_s, langue)} {annee_s}"
+                        title_txt = t(langue, "ev_aqua_title_archive", player=player, defaut=f"⚓ Score Final Édition Précédente : {player}")
+                        warning_desc = t(langue, "ev_aqua_warning_archive", mois=nom_mois_s, defaut=f"<:error:1512505075220611172> **Attention :** Ce joueur n'a pas encore lancé l'édition actuelle. Affichage des archives de l'édition de **{nom_mois_s}**.\n\n")
                         couleur_embed = discord.Color.orange()
                     except: pass
 
-                embed = discord.Embed(title=title_txt, color=couleur_embed, timestamp=discord.utils.utcnow())
-                embed.add_field(name="<:players:1512504277392953426> Profil", value=f"**Joueur :** {joueur}\n**Alliance :** {alliance_name}", inline=True)
-                embed.add_field(name="<:stats:1512517930490003726> État des Réserves Live\n\n", value=f"{warning_desc}{status_txt}", inline=False)
+                embed = discord.Embed(title=title_txt, color=couleur_embed)
+                embed.description = f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)"
+                
+                embed.add_field(name=t(langue, "ev_prof_title", defaut="<:players:1512504277392953426> Profil"), value=t(langue, "ev_prof_desc", p=player, a=alliance_name, defaut=f"**Joueur :** {player}\n**Alliance :** {alliance_name}"), inline=True)
+                embed.add_field(name=t(langue, "ev_aqua_reserves_title", defaut="<:stats:1512517930490003726> État des Réserves Live\n\n"), value=f"{warning_desc}{status_txt}", inline=False)
                 
                 latest_date = live.get('collected_at', '')
                 if latest_date:
-                    ts_r = get_discord_timestamp(latest_date, 'R')
-                    ts_t = get_discord_timestamp(latest_date, 't')
-                    embed.add_field(name="⏱️ Dernière Frappe", value=f"Relevée par l'API {ts_r} (*{ts_t}*)", inline=False)
+                    ts_r = get_discord_timestamp(latest_date, 'R', langue)
+                    ts_t = get_discord_timestamp(latest_date, 't', langue)
+                    embed.add_field(name=t(langue, "ev_aqua_last_hit_title", defaut="⏱️ Dernière Frappe"), value=t(langue, "ev_aqua_last_hit_desc", r=ts_r, t=ts_t, defaut=f"Relevée par l'API {ts_r} (*{ts_t}*)"), inline=False)
 
-                setup_embed_footer(embed, interaction)
+                await setup_embed_footer(embed, interaction, langue)
                 return await interaction.followup.send(embed=embed)
 
-            elif mode.value == "cumul":
+            elif mode.value == "history":
                 from collections import defaultdict
                 months_dict = defaultdict(list)
                 
@@ -422,17 +271,16 @@ class EventsCog(commands.Cog):
                         dt = datetime.fromisoformat(sn['collected_at'].replace('Z', '+00:00'))
                         month_key = dt.strftime("%Y-%m")
                         months_dict[month_key].append({
-                            'dt': dt,
-                            'collected_at': sn['collected_at'],
+                            'dt': dt, 'collected_at': sn['collected_at'],
                             'metrics': {m['metric_id']: int(m['value']) for m in sn.get('metrics', [])}
                         })
                     except: continue
 
                 if not months_dict:
-                    return await interaction.followup.send("<:error:1512505075220611172> Impossible d'analyser l'historique mensuel.")
+                    return await interaction.followup.send(t(langue, "ev_err_monthly_hist", defaut="<:error:1512505075220611172> Impossible d'analyser l'historique mensuel."))
 
                 sorted_months = sorted(months_dict.keys(), reverse=True)
-                total_pages = len(sorted_months)
+                actualisation_dt = _get_api_timestamp(snapshots)
                 
                 grand_total_cargo = 0
                 grand_total_am = 0
@@ -444,158 +292,130 @@ class EventsCog(commands.Cog):
                     grand_total_am += final_sn['metrics'].get(15, 0)
                     monthly_finals[m_key] = final_sn
 
-                mois_fr = {"01":"Janvier", "02":"Février", "03":"Mars", "04":"Avril", "05":"Mai", "06":"Juin", 
-                           "07":"Juillet", "08":"Août", "09":"Septembre", "10":"Octobre", "11":"Novembre", "12":"Décembre"}
-
                 embeds = []
                 for i, m_key in enumerate(sorted_months):
                     annee, mois_num = m_key.split("-")
-                    nom_mois = f"{mois_fr.get(mois_num, mois_num)} {annee}"
+                    nom_mois = f"{get_month_name(mois_num, langue)} {annee}"
                     
                     final_sn = monthly_finals[m_key]
                     m_metrics = final_sn['metrics']
                     
-                    pts_f = m_metrics.get(100, 0)
-                    am_f = m_metrics.get(15, 0)
-                    iles_f = m_metrics.get(16, 0)
-                    forts_f = m_metrics.get(17, 0)
-                    pvp_w_f = m_metrics.get(18, 0)
-                    dep_f = m_metrics.get(19, 0)
+                    gt_c = f"{grand_total_cargo:,}".replace(",", " ")
+                    gt_a = f"{grand_total_am:,}".replace(",", " ")
+                    p_f = f"{m_metrics.get(100, 0):,}".replace(",", " ")
+                    a_f = f"{m_metrics.get(15, 0):,}".replace(",", " ")
+                    i_f = f"{m_metrics.get(16, 0):,}".replace(",", " ")
+                    f_f = f"{m_metrics.get(17, 0):,}".replace(",", " ")
+                    w_f = f"{m_metrics.get(18, 0):,}".replace(",", " ")
+                    d_f = f"{m_metrics.get(19, 0):,}".replace(",", " ")
                     
-                    gt_cargo_str = f"{grand_total_cargo:,}".replace(",", " ")
-                    gt_am_str = f"{grand_total_am:,}".replace(",", " ")
-                    pts_f_str = f"{pts_f:,}".replace(",", " ")
-                    am_f_str = f"{am_f:,}".replace(",", " ")
-                    iles_f_str = f"{iles_f:,}".replace(",", " ")
-                    forts_f_str = f"{forts_f:,}".replace(",", " ")
-                    pvp_w_f_str = f"{pvp_w_f:,}".replace(",", " ")
-                    dep_f_str = f"{dep_f:,}".replace(",", " ")
+                    stats_txt = t(langue, "ev_aqua_cumul_stats", gtc=gt_c, gta=gt_a, pf=p_f, defaut=(
+                        f"🏆 **Total Historique Cargo :** {gt_c} <:aquamarinedepenser:1512162297425039423>\n"
+                        f"📈 **Total Historique Aigue-Marine :** {gt_a} <:aquamarinetotalcollectee:1512162700518752410>\n"
+                        f"📅 **Score Final de l'édition :** {p_f} <:pointscargo:1512161268411273429>"
+                    ))
                     
-                    stats_txt = (
-                        f"🏆 **Total Historique Cargo :** {gt_cargo_str} <:aquamarinedepenser:1512162297425039423>\n"
-                        f"📈 **Total Historique Aigue-Marine :** {gt_am_str} <:aquamarinetotalcollectee:1512162700518752410>\n"
-                        f"📅 **Score Final de l'édition :** {pts_f_str} <:pointscargo:1512161268411273429>"
-                    )
-                    
-                    details_txt = (
-                        f"<:aquamarinetotalcollectee:1512162700518752410> **Aigue-marine collectées :** {am_f_str}\n"
-                        f" ↳ <:aquamarineiles:1512162072249765908> *Dans les îles à ressources :* {iles_f_str}\n"
-                        f" ↳ <:aquamarineforts:1512162154890133506> *Dans les forts orageux :* {forts_f_str}\n"
-                        f" ↳ <:aquamarinegagnerjcj:1512162488504811590> *Gagné en JcJ :* {pvp_w_f_str}\n\n"
-                        f"<:aquamarinedepenser:1512162297425039423> **Dépensé en points cargo :** {dep_f_str}"
-                    )
+                    details_txt = t(langue, "ev_aqua_cumul_details", af=a_f, i_f=i_f, f_f=f_f, wf=w_f, df=d_f, defaut=(
+                        f"<:aquamarinetotalcollectee:1512162700518752410> **Aigue-marine collectées :** {a_f}\n"
+                        f" ↳ <:aquamarineiles:1512162072249765908> *Dans les îles à ressources :* {i_f}\n"
+                        f" ↳ <:aquamarineforts:1512162154890133506> *Dans les forts orageux :* {f_f}\n"
+                        f" ↳ <:aquamarinegagnerjcj:1512162488504811590> *Gagné en JcJ :* {w_f}\n\n"
+                        f"<:aquamarinedepenser:1512162297425039423> **Dépensé en points cargo :** {d_f}"
+                    ))
+
+                    title = t(langue, "ev_aqua_cumul_title", player=player, defaut=f"<:stats:1512517930490003726> Historique Îles Orageuses de {player}")
+                    overv = t(langue, "ev_aqua_cumul_overview", defaut="**<:icon_world:1512517516012814537> Vue d'ensemble historique**")
+                    arch = t(langue, "ev_aqua_cumul_archive", m=nom_mois, defaut=f"**📜 Archives de l'édition ({nom_mois})**")
 
                     embed = discord.Embed(
-                        title=f"<:stats:1512517930490003726> Historique Îles Orageuses de {joueur}",
-                        description=f"**Alliance :** {alliance_name}\n\n**<:icon_world:1512517516012814537> Vue d'ensemble historique**\n\n{stats_txt}\n\n**📜 Archives de l'édition ({nom_mois})**\n{details_txt}",
-                        color=self.clr_joueur_cumul,
-                        timestamp=discord.utils.utcnow()
+                        title=title,
+                        description=f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n**Alliance :** {alliance_name}\n\n{overv}\n\n{stats_txt}\n\n{arch}\n{details_txt}",
+                        color=self.clr_joueur_cumul
                     )
-                    
-                    try:
-                        dt_releve = datetime.fromisoformat(final_sn['collected_at'].replace('Z', '+00:00'))
-                        heure_releve = dt_releve.strftime("%d/%m/%Y à %H:%M")
-                        setup_embed_footer(embed, interaction)
-                    except:
-                        setup_embed_footer(embed, interaction)
-                        
+                    await setup_embed_footer(embed, interaction, langue)
                     embeds.append(embed)
 
-                if len(embeds) == 1: 
-                    await interaction.followup.send(embed=embeds[0])
+                if len(embeds) == 1: await interaction.followup.send(embed=embeds[0])
                 else:
                     view = PaginationView(embeds)
                     await interaction.followup.send(embed=embeds[0], view=view)
                 return
 
-        event_keys = TRACKER_EVENTS.get(nom_event)
+        event_keys = TRACKER_EVENTS.get(event_name)
         if not event_keys:
-            return await interaction.followup.send(f"<:error:1512505075220611172> Événement inconnu ou non géré par l'API.")
+            return await interaction.followup.send(t(langue, "ev_err_unsupported", defaut=f"<:error:1512505075220611172> Événement inconnu ou non géré par l'API."))
 
         try:
             async with self.bot.session.get(f"{base_api}/statistics/player/{player_id}", headers=headers, timeout=10) as resp:
-                if resp.status != 200:
-                    return await interaction.followup.send(f"<:error:1512505075220611172> Erreur API GGE-Tracker pour {joueur}.")
+                if resp.status != 200: return await interaction.followup.send(t(langue, "ev_err_api_player", player=player, defaut=f"<:error:1512505075220611172> Erreur API GGE-Tracker pour {player}."))
                 stats_data = await resp.json()
         except Exception as e:
-            logger.error(f"<:error:1512505075220611172> ERREUR API event_joueur : {type(e).__name__} - {str(e)}")
-            return await interaction.followup.send(f"<:error:1512505075220611172> Impossible de se connecter à l'API.")
+            return await interaction.followup.send(t(langue, "utils_err_api_connection", defaut="<:error:1512505075220611172> Impossible de se connecter à l'API."))
 
+        actualisation_dt = _get_api_timestamp(stats_data)
         merged_history = []
-        for key in event_keys:
-            merged_history.extend(stats_data.get("points", {}).get(key, []))
+        for key in event_keys: merged_history.extend(stats_data.get("points", {}).get(key, []))
         
         if not merged_history:
-            return await interaction.followup.send(f"<:error:1512505075220611172> **{joueur}** n'a aucun point enregistré pour l'événement **{nom_event}**.")
+            return await interaction.followup.send(t(langue, "utils_err_no_points", alliance=player, nom_event=event_trad, defaut=f"<:error:1512505075220611172> Aucun point enregistré pour **{player}** sur **{event_trad}**."))
 
         merged_history.sort(key=lambda x: x.get("date", ""))
         alliance_name = stats_data.get("alliance_name") or "Sans alliance"
 
-        sessions = []
-        current_session = []
+        sessions, current_session = [], []
         for entry in merged_history:
             d_str = entry.get("date")
             pt = int(entry.get("point", 0))
             if not d_str: continue
-            
             try:
                 dt = datetime.fromisoformat(d_str.replace('Z', '+00:00'))
-                if not current_session:
-                    current_session.append((dt, pt))
+                if not current_session: current_session.append((dt, pt))
                 else:
                     last_dt = current_session[-1][0]
                     last_pt = current_session[-1][1]
-                    
                     if pt < last_pt or (dt - last_dt).days > 3:
                         sessions.append(current_session)
                         current_session = [(dt, pt)]
-                    else:
-                        current_session.append((dt, pt))
+                    else: current_session.append((dt, pt))
             except: pass
-            
-        if current_session:
-            sessions.append(current_session)
+        if current_session: sessions.append(current_session)
 
-        if mode.value == "cumul":
+        if mode.value == "history":
             nb_events = 30
             events_joues = len(sessions)
             avertissement = ""
             if events_joues < nb_events:
-                avertissement = f"\n\n<:error:1512505075220611172> **Manque de données** : Cumul sur {nb_events} events, mais seulement **{events_joues}** ont été joués/enregistrés."
+                avertissement = t(langue, "ev_warn_missing_data", nb=nb_events, acts=events_joues, defaut=f"\n\n<:error:1512505075220611172> **Manque de données** : Cumul sur {nb_events} events, mais seulement **{events_joues}** ont été joués/enregistrés.")
                 nb_events = events_joues
                 
             recent_sessions = sessions[-nb_events:] if nb_events > 0 else []
             if not recent_sessions:
-                return await interaction.followup.send(f"<:error:1512505075220611172> Aucun historique exploitable pour calculer un cumul.")
+                return await interaction.followup.send(t(langue, "ev_err_no_usable_hist", defaut="<:error:1512505075220611172> Aucun historique exploitable pour calculer un cumul."))
 
-            scores = []
-            lignes_details = []
+            scores, lignes_details = [], []
             for i, s in enumerate(reversed(recent_sessions)):
                 max_score = max(s, key=lambda x: x[1])[1]
                 scores.append(max_score)
                 start_d = s[0][0].strftime("%d/%m/%Y")
-                lignes_details.append(f"🔹 **Event -{i+1}** ({start_d}) : **{format_num(max_score)}** pts")
+                lignes_details.append(t(langue, "ev_session_line", idx=i+1, d=start_d, s=format_num(max_score), defaut=f"🔹 **Event -{i+1}** ({start_d}) : **{format_num(max_score)}** pts"))
 
             total_score = sum(scores)
             moyenne = total_score // len(scores)
-            
             sorted_scores = sorted(scores)
             n = len(sorted_scores)
             mediane = (sorted_scores[n//2 - 1] + sorted_scores[n//2]) // 2 if n % 2 == 0 else sorted_scores[n//2]
-            
-            pire_score = sorted_scores[0]
-            meilleur_score = sorted_scores[-1]
+            pire_score, meilleur_score = sorted_scores[0], sorted_scores[-1]
 
             start_date_global = recent_sessions[0][0][0].strftime("%d/%m/%Y")
             end_date_global = recent_sessions[-1][-1][0].strftime("%d/%m/%Y")
 
-            stats_txt = (
+            stats_txt = t(langue, "ev_cumul_stats_text", t=format_num(total_score), m=format_num(moyenne), med=format_num(mediane), b=format_num(meilleur_score), w=format_num(pire_score), defaut=(
                 f"> <:podium:1512523218299392131> **TOTAL CUMULÉ : {format_num(total_score)} pts**\n"
                 f"> <:ranking:1512438311132729525> **Moyenne/Event** : {format_num(moyenne)} pts\n"
                 f"> ⚖️ **Médiane** : {format_num(mediane)} pts\n"
                 f"> 🚀 **Meilleur Score** : {format_num(meilleur_score)} pts\n"
                 f"> 📉 **Pire Score** : {format_num(pire_score)} pts"
-            )
+            ))
             
             embeds = []
             chunk_size = 15
@@ -605,11 +425,17 @@ class EventsCog(commands.Cog):
                 chunk = lignes_details[i:i+chunk_size]
                 page_actuelle = (i // chunk_size) + 1
                 
-                embed = discord.Embed(title=f"<:stats:1512517930490003726> Analyse & Historique de {joueur} pour : {nom_event}", color=self.clr_joueur_cumul, timestamp=discord.utils.utcnow())
-                embed.description = f"<:alliance:1512503083861540914> **Alliance actuelle :** [{alliance_name}]{avertissement}"
-                embed.add_field(name=f"<:stats:1512517930490003726> Bilan sur les {len(recent_sessions)} derniers events\n*(Période du {start_date_global} au {end_date_global})*", value=stats_txt, inline=False)
-                embed.add_field(name=f"Détails des sessions (Page {page_actuelle}/{nb_pages})", value="\n".join(chunk), inline=False)
-                setup_embed_footer(embed, interaction)
+                embed = discord.Embed(title=t(langue, "ev_cumul_title", player=player, event=event_trad, defaut=f"<:stats:1512517930490003726> Analyse & Historique de {player} pour : {event_trad}"), color=self.clr_joueur_cumul)
+                desc_i18n = t(langue, "ev_cumul_desc", a=alliance_name, w=avertissement, defaut=f"<:alliance:1512503083861540914> **Alliance actuelle :** [{alliance_name}]{avertissement}")
+                embed.description = f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{desc_i18n}"
+                
+                f_title1 = t(langue, "ev_cumul_field_stats", n=len(recent_sessions), start=start_date_global, end=end_date_global, defaut=f"<:stats:1512517930490003726> Bilan sur les {len(recent_sessions)} derniers events\n*(Période du {start_date_global} au {end_date_global})*")
+                embed.add_field(name=f_title1, value=stats_txt, inline=False)
+                
+                f_title2 = t(langue, "ev_session_details_page", curr=page_actuelle, tot=nb_pages, defaut=f"Détails des sessions (Page {page_actuelle}/{nb_pages})")
+                embed.add_field(name=f_title2, value="\n".join(chunk), inline=False)
+                
+                await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
 
             if len(embeds) == 1: await interaction.followup.send(embed=embeds[0])
@@ -618,8 +444,7 @@ class EventsCog(commands.Cog):
                 await interaction.followup.send(embed=embeds[0], view=view)
 
         else:
-            latest_point = 0
-            latest_date = ""
+            latest_point, latest_date = 0, ""
             for entry in merged_history:
                 d_str = entry.get("date", "")
                 pt = int(entry.get("point", 0))
@@ -628,67 +453,76 @@ class EventsCog(commands.Cog):
                     latest_point = pt
 
             if latest_point == 0:
-                return await interaction.followup.send(f"<:error:1512505075220611172> **{joueur}** est actuellement à 0 pt sur **{nom_event}**.")
+                return await interaction.followup.send(t(langue, "ev_err_zero_pt", player=player, ev=event_trad, defaut=f"<:error:1512505075220611172> **{player}** est actuellement à 0 pt sur **{event_trad}**."))
 
-            embed = discord.Embed(title=f"<:podium:1512523218299392131> Score en direct de {joueur} pour : {nom_event}", color=self.clr_joueur_dernier, timestamp=discord.utils.utcnow())
-            embed.add_field(name="<:players:1512504277392953426> Profil", value=f"**Joueur :** {joueur}\n**Alliance :** [{alliance_name}]", inline=True)
-            embed.add_field(name="<:icon_points:1512502439339888820> Score Actuel", value=f"**{format_num(latest_point)} pts**", inline=True)
+            embed = discord.Embed(title=t(langue, "ev_live_title", player=player, ev=event_trad, defaut=f"<:podium:1512523218299392131> Score en direct de {player} pour : {event_trad}"), color=self.clr_joueur_dernier)
+            embed.description = f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)"
+            
+            embed.add_field(name=t(langue, "ev_prof_title", defaut="<:players:1512504277392953426> Profil"), value=t(langue, "ev_prof_desc", p=player, a=alliance_name, defaut=f"**Joueur :** {player}\n**Alliance :** [{alliance_name}]"), inline=True)
+            embed.add_field(name=t(langue, "ev_live_score_title", defaut="<:icon_points:1512502439339888820> Score Actuel"), value=f"**{format_num(latest_point)} pts**", inline=True)
             
             if latest_date:
-                ts_r = get_discord_timestamp(latest_date, 'R')
-                ts_t = get_discord_timestamp(latest_date, 't')
-                embed.add_field(name="⏱️ Dernier relevé", value=f"Relevé par l'API {ts_r} (*{ts_t}*)", inline=False)
+                ts_r = get_discord_timestamp(latest_date, 'R', langue)
+                ts_t = get_discord_timestamp(latest_date, 't', langue)
+                embed.add_field(name=t(langue, "ev_live_last_scan_title", defaut="⏱️ Dernier relevé"), value=t(langue, "ev_aqua_last_hit_desc", r=ts_r, t=ts_t, defaut=f"Relevé par l'API {ts_r} (*{ts_t}*)"), inline=False)
                 
-            setup_embed_footer(embed, interaction)
+            await setup_embed_footer(embed, interaction, langue)
             await interaction.followup.send(embed=embed)
 
     # =========================================
     # COMMANDE : EVENT ALLIANCE
     # =========================================
-    @app_commands.command(name="event_alliance", description="Classement et participation d'une alliance sur un événement")
-    @app_commands.autocomplete(nom_event=event_autocomplete)
-    @app_commands.autocomplete(alliance=alliance_autocomplete)
-    @app_commands.choices(affichage=[
-        app_commands.Choice(name="📑 Pages interactives (Boutons)", value="pages"),
-        app_commands.Choice(name="📜 Liste complète (Message unique)", value="liste")
+    @app_commands.command(name="event_alliance", description="Ranking and participation of an alliance in an event")
+    @app_commands.autocomplete(event_name=event_alliance_autocomplete)
+    @app_commands.autocomplete(alliance_name=alliance_autocomplete)
+    @app_commands.choices(display_mode=[
+        app_commands.Choice(name="📑 Interactive pages (Buttons)", value="pages"),
+        app_commands.Choice(name="📜 Full list (Single message)", value="list")
     ])
-    async def event_alliance(self, interaction: discord.Interaction, nom_event: str, alliance: str, affichage: str = "liste"):
+    async def event_alliance(self, interaction: discord.Interaction, event_name: str, alliance_name: str, display_mode: str = "list"):
         await interaction.followup.defer(thinking=True) if interaction.response.is_done() else await interaction.response.defer(thinking=True)
         
-        event_keys = TRACKER_EVENTS.get(nom_event)
+        langue, serveur = await get_server_config(interaction)
+        event_trad = get_ev_name(event_name, langue)
+        lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
+        
+        event_keys = TRACKER_EVENTS.get(event_name)
         if not event_keys:
-            return await interaction.followup.send(f"<:error:1512505075220611172> Événement inconnu.")
+            return await interaction.followup.send(t(langue, "ev_err_unknown", defaut="<:error:1512505075220611172> Événement inconnu."))
 
-        # Appel au moteur universel
-        embed, error_or_lignes, stats_text, global_latest_str = await generer_rapport_alliance_embed(self.bot, nom_event, event_keys, alliance, self.clr_alliance)
+        embed, error_or_lignes, stats_text, global_latest_str = await generer_rapport_alliance_embed(
+            self.bot, event_trad, event_keys, alliance_name, self.clr_alliance, interaction=interaction, custom_server=serveur
+        )
         
-        if not embed:
-            # S'il n'y a pas d'embed, c'est qu'il y a eu une erreur, stockée dans error_or_lignes
-            return await interaction.followup.send(f"<:error:1512505075220611172> {error_or_lignes}")
+        if not embed: return await interaction.followup.send(f"<:error:1512505075220611172> {error_or_lignes}")
 
-        # Si l'utilisateur veut la liste brute
-        if affichage == "liste":
-            setup_embed_footer(embed, interaction)
+        if display_mode == "list":
+            # Si le mode list est appelé, la description est gérée côté utilitaire,
+            # mais on applique quand même le footer.
+            await setup_embed_footer(embed, interaction, langue)
             await interaction.followup.send(embed=embed)
-        
-        # Si l'utilisateur veut le menu interactif par boutons
         else:
-            embeds = []
-            lignes_classement = error_or_lignes
-            chunk_size = 15
-            nb_pages = max(1, (len(lignes_classement) - 1) // chunk_size + 1)
-            for i in range(0, len(lignes_classement), chunk_size):
-                chunk = lignes_classement[i:i+chunk_size]
-                emb = discord.Embed(title=f"<:alliance:1512503083861540914> {alliance} - {nom_event}", color=self.clr_alliance, timestamp=discord.utils.utcnow())
-                emb.add_field(name="<:stats:1512517930490003726> Statistiques", value=stats_text, inline=False)
-                emb.add_field(name=f"<:ranking:1512438311132729525> Classement (Page {i//chunk_size+1}/{nb_pages})", value="\n".join(chunk), inline=False)
+            if global_latest_str:
+                try: actualisation_dt = datetime.fromisoformat(global_latest_str.replace('Z', '+00:00'))
+                except: actualisation_dt = discord.utils.utcnow()
+            else:
+                actualisation_dt = discord.utils.utcnow()
                 
-                if global_latest_str:
-                    ts_r = get_discord_timestamp(global_latest_str, 'R')
-                    ts_t = get_discord_timestamp(global_latest_str, 't')
-                    emb.add_field(name="⏱️ Actualisation", value=f"Dernier relevé effectué {ts_r} (*{ts_t}*)", inline=False)
-                    
-                setup_embed_footer(emb, interaction)
+            embeds = []
+            chunk_size = 15
+            nb_pages = max(1, (len(error_or_lignes) - 1) // chunk_size + 1)
+            for i in range(0, len(error_or_lignes), chunk_size):
+                chunk = error_or_lignes[i:i+chunk_size]
+                emb = discord.Embed(title=t(langue, "ev_alli_title", a=alliance_name, ev=event_trad, defaut=f"<:alliance:1512503083861540914> {alliance_name} - {event_trad}"), color=self.clr_alliance)
+                
+                emb.description = f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)"
+                
+                emb.add_field(name=t(langue, "utils_embed_stats_title", defaut="<:stats:1512517930490003726> Statistiques"), value=stats_text, inline=False)
+                
+                f_title = t(langue, "ev_alli_page_title", i=(i//chunk_size)+1, n=nb_pages, defaut=f"<:ranking:1512438311132729525> Classement (Page {i//chunk_size+1}/{nb_pages})")
+                emb.add_field(name=f_title, value="\n".join(chunk), inline=False)
+                
+                await setup_embed_footer(emb, interaction, langue)
                 embeds.append(emb)
                 
             view = PaginationView(embeds)
@@ -697,95 +531,221 @@ class EventsCog(commands.Cog):
     # ==========================================
     # 🔗 LIAISON DU COMPTE DISCORD
     # ==========================================
-    @app_commands.command(name="set_pseudo", description="Lie ton compte Discord à ton pseudo GGE")
-    @app_commands.autocomplete(pseudo=joueur_autocomplete)
-    async def set_pseudo(self, interaction: discord.Interaction, pseudo: str):
-        # 🔐 Sécurisé : Lecture/Écriture asynchrones protégées
+    @app_commands.command(name="link_account", description="Link your Discord account to your GGE username")
+    @app_commands.autocomplete(player=joueur_autocomplete)
+    async def link_account(self, interaction: discord.Interaction, player: str):
         data = await load_pseudos_async()
-        data[str(interaction.user.id)] = pseudo
+        data[str(interaction.user.id)] = player
         await save_pseudos_async(data)
-        await interaction.response.send_message(f"<:players:1512504277392953426> Compte lié à **{pseudo}** !", ephemeral=True)
+        langue, _ = await get_server_config(interaction)
+        msg = t(langue, "ev_pseudo_linked", pseudo=player, defaut=f"<:players:1512504277392953426> Compte lié à **{player}** !")
+        await interaction.response.send_message(msg, ephemeral=True)
 
     # ==========================================
-    # 🕵️ GROUPE /RIVAL (RADAR ÉVÉNEMENT)
+    # 🕵️ GROUPE /RIVAL
     # ==========================================
-    rival_group = app_commands.Group(name="rival", description="Radar de Compétition (MP uniquement)")
+    rival_group = app_commands.Group(
+        name="rival", 
+        description="Competition Radar (MP only)",
+        allowed_contexts=app_commands.AppCommandContext(guild=False, dm_channel=True, private_channel=True) 
+    )
 
-    @rival_group.command(name="start", description="Lance ton radar de compétition")
-    @app_commands.autocomplete(nom_event=event_autocomplete)
-    async def rival_start(self, interaction: discord.Interaction, nom_event: str, seuil: int = 90):
-        if interaction.guild: return await interaction.response.send_message("<:error:1512505075220611172> À faire en **Message Privé**.", ephemeral=True)
+    @rival_group.command(name="start", description="Turn on your competition radar")
+    @app_commands.autocomplete(event_name=event_autocomplete)
+    async def rival_start(self, interaction: discord.Interaction, event_name: str, threshold: int = 90):
+        langue, serveur = await get_server_config(interaction)
+        if interaction.guild: return await interaction.response.send_message(t(langue, "ev_err_dm_only", defaut="<:error:1512505075220611172> À faire en **Message Privé**."), ephemeral=True)
         pseudos = await load_pseudos_async()
-        if str(interaction.user.id) not in pseudos: return await interaction.response.send_message("<:error:1512505075220611172> Fais `/set_pseudo` d'abord.")
+        if str(interaction.user.id) not in pseudos: return await interaction.response.send_message(t(langue, "ev_err_need_pseudo", defaut="<:error:1512505075220611172> Fais `/link_account` d'abord."))
         
-        # 🔐 Sécurisé : Modification asynchrone isolée
         data = await load_rivals_async()
-        data[str(interaction.user.id)] = {"event": nom_event, "seuil": max(50, min(99, seuil)), "rivaux": [], "last_known_scores": {}, "started_at": discord.utils.utcnow().isoformat()}
+        data[str(interaction.user.id)] = {
+            "event": event_name, 
+            "seuil": max(50, min(99, threshold)), 
+            "rivaux": [], 
+            "last_known_scores": {}, 
+            "started_at": discord.utils.utcnow().isoformat(),
+            "serveur": serveur
+        }
         await save_rivals_async(data)
-        await interaction.response.send_message(f"<:icon_analyze:1512573874150314005> Radar activé pour **{nom_event}** !")
+        
+        event_trad = get_ev_name(event_name, langue)
+        await interaction.response.send_message(t(langue, "ev_rival_started", event=event_trad, defaut=f"<:icon_analyze:1512573874150314005> Radar activé pour **{event_trad}** !"))
 
-    @rival_group.command(name="add", description="Ajoute des rivaux (Max 10)")
-    async def rival_add(self, interaction: discord.Interaction, joueur1: str, joueur2: str = None, joueur3: str = None, joueur4: str = None, joueur5: str = None):
-        if interaction.guild: return await interaction.response.send_message("<:error:1512505075220611172> En privé uniquement.", ephemeral=True)
-        # 🔐 Sécurisé : Enregistrement avec verrous
+    @rival_group.command(name="add", description="Add rivals (Max 10)")
+    async def rival_add(self, interaction: discord.Interaction, player1: str, player2: str = None, player3: str = None, player4: str = None, player5: str = None):
+        langue, _ = await get_server_config(interaction)
+        if interaction.guild: return await interaction.response.send_message(t(langue, "ev_err_dm_only", defaut="<:error:1512505075220611172> En privé uniquement."), ephemeral=True)
         data = await load_rivals_async()
         uid = str(interaction.user.id)
-        if uid not in data: return await interaction.response.send_message("<:error:1512505075220611172> Fais `/rival start` d'abord.")
-        for j in [joueur1, joueur2, joueur3, joueur4, joueur5]:
+        if uid not in data: return await interaction.response.send_message(t(langue, "ev_err_need_rival_start", defaut="<:error:1512505075220611172> Fais `/rival start` d'abord."))
+        for j in [player1, player2, player3, player4, player5]:
             if j and j not in data[uid]["rivaux"] and len(data[uid]["rivaux"]) < 10: data[uid]["rivaux"].append(j)
         await save_rivals_async(data)
-        await interaction.response.send_message("<:icon_search:1512505406474293438> Rivaux mis à jour !")
+        await interaction.response.send_message(t(langue, "ev_rival_added", defaut="<:icon_search:1512505406474293438> Rivaux mis à jour !"))
 
-    @rival_group.command(name="list", description="Affiche tes rivaux")
+    @rival_group.command(name="list", description="Show your rivals")
     async def rival_list(self, interaction: discord.Interaction):
-        if interaction.guild: return await interaction.response.send_message("<:error:1512505075220611172> En privé uniquement.", ephemeral=True)
+        langue, _ = await get_server_config(interaction)
+        if interaction.guild: return await interaction.response.send_message(t(langue, "ev_err_dm_only", defaut="<:error:1512505075220611172> En privé uniquement."), ephemeral=True)
         data = await load_rivals_async()
-        if str(interaction.user.id) not in data: return await interaction.response.send_message("🕸️ Radar inactif.")
+        if str(interaction.user.id) not in data: return await interaction.response.send_message(t(langue, "ev_rival_inactive", defaut="🕸️ Radar inactif."))
         config = data[str(interaction.user.id)]
-        embed = discord.Embed(title=f"<:icon_name:1512505444172697611> Radar Actif : {config['event']}", color=self.clr_rival_list)
-        embed.description = f"**Seuil :** {config['seuil']}%\n" + "\n".join([f"🔸 {r}" for r in config['rivaux']])
-        setup_embed_footer(embed, interaction)
+        
+        event_trad = get_ev_name(config['event'], langue)
+        title = t(langue, "ev_rival_list_title", event=event_trad, defaut=f"<:icon_name:1512505444172697611> Radar Actif : {event_trad}")
+        desc = t(langue, "ev_rival_list_desc", s=config['seuil'], defaut=f"**Seuil :** {config['seuil']}%\n") + "\n".join([f"🔸 {r}" for r in config['rivaux']])
+        
+        embed = discord.Embed(title=title, description=desc, color=self.clr_rival_list)
+        await setup_embed_footer(embed, interaction, langue)
         await interaction.response.send_message(embed=embed)
 
-    @rival_group.command(name="stop", description="Arrête le radar")
+    @rival_group.command(name="stop", description="Turn off the radar")
     async def rival_stop(self, interaction: discord.Interaction):
+        langue, _ = await get_server_config(interaction)
         data = await load_rivals_async()
         if str(interaction.user.id) in data:
             del data[str(interaction.user.id)]
             await save_rivals_async(data)
-            await interaction.response.send_message("🛑 Radar désactivé.")
+            await interaction.response.send_message(t(langue, "ev_rival_stopped", defaut="🛑 Radar désactivé."))
 
+    # ==========================================
+    # 🛰️ LE SATELLITE RIVAL
+    # ==========================================
     @tasks.loop(minutes=1)
     async def rival_check_task(self):
-        pass
+        try:
+            maintenant = discord.utils.utcnow()
+            data = await load_rivals_async()
+            if not data: return
+
+            path_users = CONFIG_DIR / 'users.json'
+            users_lang = {}
+            if os.path.exists(path_users):
+                try:
+                    with open(path_users, 'r', encoding='utf-8') as f:
+                        users_data = json.load(f)
+                        for uid, info in users_data.items():
+                            users_lang[uid] = info.get("langue", "fr")
+                except: pass
+
+            changes_detected = False
+            session = self.bot.session
+            base_api = "https://api.gge-tracker.com/api/v1"
+
+            for user_id, config in list(data.items()):
+                serveur = config.get("serveur", "E4K_FR1")
+                
+                if maintenant.minute != SERVER_SCAN_MINUTES.get(serveur, 46):
+                    continue
+
+                langue = users_lang.get(user_id, "fr")
+                headers = await get_api_headers(custom_server=serveur)
+                event_name = config.get("event")
+                threshold = config.get("seuil", 90)
+                rivaux = config.get("rivaux", [])
+                last_scores = config.get("last_known_scores", {})
+                
+                event_keys = TRACKER_EVENTS.get(event_name)
+                if not event_keys or not rivaux: continue
+
+                pseudos = await load_pseudos_async()
+                mon_pseudo = pseudos.get(user_id)
+                if not mon_pseudo: continue
+
+                async def get_score(pseudo):
+                    try:
+                        async with session.get(f"{base_api}/players/{urllib.parse.quote(pseudo)}", headers=headers, timeout=5) as r:
+                            if r.status != 200: return 0
+                            p_data = await r.json()
+                            if isinstance(p_data, list) and p_data: p_data = p_data[0]
+                            p_id = p_data.get("player_id", p_data.get("id"))
+                            if not p_id: return 0
+                            
+                        async with session.get(f"{base_api}/statistics/player/{p_id}", headers=headers, timeout=5) as r:
+                            if r.status != 200: return 0
+                            stats = await r.json()
+                            merged = []
+                            for key in event_keys: merged.extend(stats.get("points", {}).get(key, []))
+                            if not merged: return 0
+                            merged.sort(key=lambda x: x.get("date", ""))
+                            return int(merged[-1].get("point", 0))
+                    except:
+                        return 0
+
+                mon_score = await get_score(mon_pseudo)
+                
+                for rival in rivaux:
+                    score_rival = await get_score(rival)
+                    if score_rival == 0: continue
+
+                    old_score_rival = last_scores.get(rival, 0)
+                    
+                    if score_rival > old_score_rival:
+                        pourcentage = (score_rival / mon_score * 100) if mon_score > 0 else 999
+                        
+                        if pourcentage >= threshold:
+                            diff = score_rival - mon_score
+                            
+                            embeds_locales = {}
+                            for lg in ["fr", "de", "en"]:
+                                event_trad_alert = get_ev_name(event_name, lg)
+                                if diff > 0:
+                                    desc = t(lg, "ev_rival_alert_overtake", r=rival, diff=format_num(diff), s=format_num(score_rival), ms=format_num(mon_score), defaut=f"🚨 **DANGER !**\n**{rival}** vient de te dépasser avec **{format_num(diff)}** points d'avance !\n\nLui : {format_num(score_rival)} pts\nToi : {format_num(mon_score)} pts")
+                                else:
+                                    desc = t(lg, "ev_rival_alert_danger", r=rival, pct=f"{pourcentage:.1f}", s=format_num(score_rival), ms=format_num(mon_score), defaut=f"⚠️ **ATTENTION !**\n**{rival}** se rapproche dangereusement de ton score ({pourcentage:.1f}%).\n\nLui : {format_num(score_rival)} pts\nToi : {format_num(mon_score)} pts")
+                                    
+                                emb = discord.Embed(title=t(lg, "ev_rival_alert_title", ev=event_trad_alert, defaut=f"🎯 Radar Rival : {event_trad_alert}"), description=desc, color=discord.Color.red())
+                                await setup_embed_footer(emb, None, langue=lg)
+                                embeds_locales[lg] = emb
+                            
+                            try:
+                                user = self.bot.get_user(int(user_id)) or await self.bot.fetch_user(int(user_id))
+                                await user.send(embed=embeds_locales.get(langue, embeds_locales["fr"]))
+                            except: pass
+
+                        last_scores[rival] = score_rival
+                        changes_detected = True
+                
+                config["last_known_scores"] = last_scores
+
+            if changes_detected:
+                await save_rivals_async(data)
+
+        except Exception as e:
+            logger.error(f"🚨 [RIVAL TASK CRASH] : {e}")
 
     # ========================================================
     # GROUPE DE COMMANDES : ROUE DE LA FORTUNE (WOA)
     # ========================================================
-    woa = app_commands.Group(name="woa", description="Analyses et statistiques de la Roue de la Fortune")
+    woa = app_commands.Group(name="woa", description="Analysis and statistics of the Wheel of Affluence")
 
-    @woa.command(name="historique", description="Consulte l'historique des tickets dépensés par un joueur")
-    @app_commands.autocomplete(joueur=joueur_autocomplete) 
-    async def woa_historique(self, interaction: discord.Interaction, joueur: str):
+    @woa.command(name="history", description="View the history of tickets spent by a player")
+    @app_commands.autocomplete(player=joueur_autocomplete) 
+    async def woa_historique(self, interaction: discord.Interaction, player: str):
         try: await interaction.response.defer(thinking=True)
         except: return
-        headers = {'accept': 'application/json', 'gge-server': 'E4K_FR1'}
+        langue, _ = await get_server_config(interaction)
+        lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
+        
+        headers = await get_api_headers(interaction)
         session = self.bot.session 
         base_api = "https://api.gge-tracker.com/api/v1"
         try:
-            async with session.get(f"{base_api}/players/{urllib.parse.quote(joueur)}", headers=headers, timeout=8) as r:
-                if r.status != 200: return await interaction.followup.send(f"<:error:1512505075220611172> Joueur **{joueur}** introuvable.")
+            async with session.get(f"{base_api}/players/{urllib.parse.quote(player)}", headers=headers, timeout=8) as r:
+                if r.status != 200: return await interaction.followup.send(t(langue, "ev_woa_player_not_found", p=player, defaut=f"<:error:1512505075220611172> Joueur **{player}** introuvable."))
                 res_base = await r.json()
                 if isinstance(res_base, list) and res_base: res_base = res_base[0]
-                raw_id = str(res_base.get("player_id", res_base.get("id", "")))
-                player_id = raw_id + '164' if raw_id and not raw_id.endswith('164') else raw_id
-                vrai_nom = res_base.get("player_name", joueur)
+                player_id = str(res_base.get("player_id", res_base.get("id", "")))
+                vrai_nom = res_base.get("player_name", player)
 
             async with session.get(f"{base_api}/woa/events/player/{player_id}", headers=headers, timeout=8) as r:
-                if r.status != 200: return await interaction.followup.send(f"<:error:1512505075220611172> Aucun historique WoA trouvé.")
+                if r.status != 200: return await interaction.followup.send(t(langue, "ev_woa_no_hist", defaut="<:error:1512505075220611172> Aucun historique WoA trouvé."))
                 events = (await r.json()).get("events", [])
 
-            if not events: return await interaction.followup.send(f"<:error:1512505075220611172> Aucune participation enregistrée.")
+            if not events: return await interaction.followup.send(t(langue, "ev_woa_no_part", defaut="<:error:1512505075220611172> Aucune participation enregistrée."))
+
+            actualisation_dt = _get_api_timestamp(events)
 
             from collections import defaultdict
             grand_total = sum(int(ev.get('point', 0)) for ev in events)
@@ -798,36 +758,52 @@ class EventsCog(commands.Cog):
 
             embeds = []
             sorted_months = sorted(months_data.keys(), reverse=True)
-            mois_fr = {"01":"Janvier", "02":"Février", "03":"Mars", "04":"Avril", "05":"Mai", "06":"Juin", "07":"Juillet", "08":"Août", "09":"Septembre", "10":"Octobre", "11":"Novembre", "12":"Décembre"}
 
             for i, m_key in enumerate(sorted_months):
                 month_events = months_data[m_key]
                 annee, mois_num = m_key.split("-")
                 month_total = sum(e['pts'] for e in month_events)
                 best_ev = max(month_events, key=lambda x: x['pts'])
+                nom_m = get_month_name(mois_num, langue)
                 
-                stats_txt = f"🏆 **Total Historique :** {grand_total:,} <:woaticket:1512165398718583016>\n<:stats:1512517930490003726> **Total {mois_fr.get(mois_num, mois_num)} {annee} :** {month_total:,} <:woaticket:1512165398718583016>\n🚀 **Jour max :** {best_ev['pts']:,} <:woaticket:1512165398718583016> *(le {best_ev['dt'].strftime('%d/%m')})*".replace(',', ' ')
+                stats_txt = t(langue, "ev_woa_hist_stats", gt=f"{grand_total:,}".replace(',', ' '), m=nom_m, y=annee, mt=f"{month_total:,}".replace(',', ' '), mp=f"{best_ev['pts']:,}".replace(',', ' '), md=best_ev['dt'].strftime('%d/%m'), defaut=(
+                    f"🏆 **Total Historique :** {grand_total:,} <:woaticket:1512165398718583016>\n"
+                    f"<:stats:1512517930490003726> **Total {nom_m} {annee} :** {month_total:,} <:woaticket:1512165398718583016>\n"
+                    f"🚀 **Jour max :** {best_ev['pts']:,} <:woaticket:1512165398718583016> *(le {best_ev['dt'].strftime('%d/%m')})*"
+                ).replace(',', ' '))
                 
                 lignes = []
                 for ev in month_events:
                     pts_str = f"{ev['pts']:,}".replace(",", " ")
                     rank = ev['rank']
                     medal = "🥇" if rank == "1" else "🥈" if rank == "2" else "🥉" if rank == "3" else f"**#{rank}**"
-                    lignes.append(f"• **{ev['date_str']}** │ Rang {medal} ➔ **{pts_str} <:woaticket:1512165398718583016>**")
+                    lignes.append(t(langue, "ev_woa_hist_line", d=ev['date_str'], m=medal, p=pts_str, defaut=f"• **{ev['date_str']}** │ Rang {medal} ➔ **{pts_str} <:woaticket:1512165398718583016>**"))
 
-                embed = discord.Embed(title=f"<:woaicon:1512165794740572292> Historique Roue de la Fortune : {vrai_nom}", description=f"**<:stats:1512517930490003726> Vue d'ensemble**\n{stats_txt}\n\n**📜 Détails ({mois_fr.get(mois_num, mois_num)})**\n" + "\n".join(lignes), color=self.clr_woa_historique, timestamp=discord.utils.utcnow())
-                setup_embed_footer(embed, interaction)
+                title = t(langue, "ev_woa_hist_title", nom=vrai_nom, defaut=f"<:woaicon:1512165794740572292> Historique Roue de la Fortune : {vrai_nom}")
+                overv = t(langue, "ev_woa_hist_overview", defaut="**<:stats:1512517930490003726> Vue d'ensemble**")
+                det_title = t(langue, "ev_woa_hist_details", mois=nom_m, defaut=f"**📜 Détails ({nom_m})**")
+                
+                embed = discord.Embed(
+                    title=title, 
+                    description=f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{overv}\n{stats_txt}\n\n{det_title}\n" + "\n".join(lignes), 
+                    color=self.clr_woa_historique
+                )
+                await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
 
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
-        except Exception as e: await interaction.followup.send(f"<:error:1512505075220611172> Erreur technique : {e}")
+        except Exception as e: 
+            await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur technique : {e}"))
 
-    @woa.command(name="bilan", description="Affiche le bilan de consommation des tickets")
+    @woa.command(name="summary", description="Displays the ticket consumption summary")
     async def woa_bilan(self, interaction: discord.Interaction):
         try: await interaction.response.defer(thinking=True)
         except: return
-        headers = {'accept': 'application/json', 'gge-server': 'E4K_FR1'}
+        langue, _ = await get_server_config(interaction)
+        lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
+        
+        headers = await get_api_headers(interaction)
         session = self.bot.session
         base_api = "https://api.gge-tracker.com/api/v1"
         try:
@@ -842,6 +818,8 @@ class EventsCog(commands.Cog):
                     if isinstance(resp, aiohttp.ClientResponse) and resp.status == 200: all_events.extend((await resp.json()).get("events", []))
             all_events.sort(key=lambda x: x.get("date", ""), reverse=True)
             
+            actualisation_dt = _get_api_timestamp(all_events)
+            
             t_editions = len(all_events)
             t_tickets = sum(int(ev.get('total_tickets', 0)) for ev in all_events)
             t_parts = sum(int(ev.get('participants', 0)) for ev in all_events)
@@ -849,7 +827,12 @@ class EventsCog(commands.Cog):
             moy_tickets = t_tickets // t_editions if t_editions > 0 else 0
             moy_parts = t_parts // t_editions if t_editions > 0 else 0
             
-            stats_globales = f"<:stats:1512517930490003726> **Éditions :** {t_editions}\n<:woaticket:1512165398718583016> **Tickets :** {t_tickets:,}\n<:Le_Hraut_Lumbricus_2:1512573890298380388> **Participants :** {t_parts:,}\n⚖️ **Moyenne :** {moy_tickets:,} <:woaticket:1512165398718583016> / {moy_parts:,} <:Le_Hraut_Lumbricus_2:1512573890298380388>".replace(",", " ")
+            stats_globales = t(langue, "ev_woa_bilan_stats", ed=t_editions, tix=f"{t_tickets:,}".replace(","," "), pts=f"{t_parts:,}".replace(","," "), mt=f"{moy_tickets:,}".replace(","," "), mp=f"{moy_parts:,}".replace(","," "), defaut=(
+                f"<:stats:1512517930490003726> **Éditions :** {t_editions}\n"
+                f"<:woaticket:1512165398718583016> **Tickets :** {t_tickets:,}\n"
+                f"<:Le_Hraut_Lumbricus_2:1512573890298380388> **Participants :** {t_parts:,}\n"
+                f"⚖️ **Moyenne :** {moy_tickets:,} <:woaticket:1512165398718583016> / {moy_parts:,} <:Le_Hraut_Lumbricus_2:1512573890298380388>"
+            ).replace(",", " "))
             
             lignes, j_vus = [], set()
             for ev in all_events:
@@ -861,31 +844,45 @@ class EventsCog(commands.Cog):
                 tix = f"{int(ev.get('total_tickets', 0)):,}".replace(",", " ")
                 lignes.append(f"📅 **{d_str}** │ <:players:1512504277392953426> {parts} │ <:woaticket:1512165398718583016> **{tix}**")
             
+            title = t(langue, "ev_woa_bilan_title", defaut="<:woaicon:1512165794740572292> Bilan Économique : Roue d'Abondance")
+            glob = t(langue, "ev_woa_bilan_global", defaut="**<:icon_world:1512517516012814537> Statistiques Globales**")
+            det = t(langue, "ev_woa_bilan_detail", defaut="**📜 Détail des 31 dernières éditions**")
+            
             embeds = []
             for i in range(0, len(lignes), 15):
-                embed = discord.Embed(title="<:woaicon:1512165794740572292> Bilan Économique : Roue d'Abondance", description=f"**<:icon_world:1512517516012814537> Statistiques Globales**\n{stats_globales}\n\n**📜 Détail des 31 dernières éditions**\n" + "\n".join(lignes[i:i+15]), color=self.clr_woa_bilan, timestamp=discord.utils.utcnow())
-                setup_embed_footer(embed, interaction)
+                embed = discord.Embed(
+                    title=title, 
+                    description=f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{glob}\n{stats_globales}\n\n{det}\n" + "\n".join(lignes[i:i+15]), 
+                    color=self.clr_woa_bilan
+                )
+                await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
-        except Exception as e: await interaction.followup.send(f"<:error:1512505075220611172> Erreur : {e}")
+        except Exception as e: 
+            await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur : {e}"))
 
     # ========================================================
-    # 🏆 GROUPE DE COMMANDES RACINE : CLASSEMENT (TOP 100 + HEURE)
+    # 🏆 GROUPE DE COMMANDES RACINE : CLASSEMENT
     # ========================================================
-    classement = app_commands.Group(name="classement", description="Classements généraux du serveur FR1")
+    leaderboard = app_commands.Group(name="leaderboard", description="General server rankings")
 
-    @classement.command(name="woa", description="Affiche le Top 100 de la dernière Roue de la Fortune")
+    @leaderboard.command(name="woa", description="Displays the Top 100 from the latest Wheel of Affluence")
     async def classement_woa(self, interaction: discord.Interaction):
         try: await interaction.response.defer(thinking=True)
         except: return
-        headers = {'accept': 'application/json', 'gge-server': 'E4K_FR1'}
+        langue, _ = await get_server_config(interaction)
+        lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
+        
+        headers = await get_api_headers(interaction)
         session = self.bot.session
         base_api = "https://api.gge-tracker.com/api/v1"
         try:
             async with session.get(f"{base_api}/woa/events", headers=headers, timeout=8) as r:
-                if r.status != 200: return await interaction.followup.send("<:error:1512505075220611172> API indisponible.")
-                latest_date_str = (await r.json())["events"][0]["date"]
+                if r.status != 200: return await interaction.followup.send(t(langue, "ev_err_api_unavail", defaut="<:error:1512505075220611172> API indisponible."))
+                
+                woa_base_data = await r.json()
+                latest_date_str = woa_base_data["events"][0]["date"]
                 encoded_date = urllib.parse.quote(latest_date_str)
 
             async with session.get(f"{base_api}/woa/events/date/{encoded_date}?page=1", headers=headers, timeout=8) as r:
@@ -904,7 +901,7 @@ class EventsCog(commands.Cog):
                     if isinstance(resp, aiohttp.ClientResponse) and resp.status == 200:
                         all_players.extend((await resp.json()).get("players", []))
 
-            if not all_players: return await interaction.followup.send("<:error:1512505075220611172> Aucun joueur trouvé.")
+            if not all_players: return await interaction.followup.send(t(langue, "ev_err_no_players", defaut="<:error:1512505075220611172> Aucun joueur trouvé."))
 
             all_players = all_players[:100]
 
@@ -917,34 +914,36 @@ class EventsCog(commands.Cog):
                 medal = "🥇" if rang == 1 else "🥈" if rang == 2 else "🥉" if rang == 3 else f"**{rang}.**"
                 lignes.append(f"{medal} **{nom}** [{alli}] ➔ **{pts} <:woaticket:1512165398718583016>**")
 
-            heure_releve_txt = ""
-            try:
-                dt_releve = datetime.fromisoformat(latest_date_str.replace('Z', '+00:00'))
-                heure_releve_txt = f" • Relevé : {dt_releve.strftime('%d/%m/%Y à %H:%M')}"
-            except: pass
+            # 💥 FIX : On injecte la réponse du premier appel (woa_base_data) dans l'extracteur
+            # L'extracteur y trouvera facilement la clé "date" et appliquera l'horodatage de l'événement !
+            actualisation_dt = _get_api_timestamp(data_rank, woa_base_data)
 
             embeds = []
-            nb_pages_discord = max(1, (len(lignes) - 1) // 10 + 1)
             for i in range(0, len(lignes), 10):
-                embed = discord.Embed(title="Top 100 Serveur - Roue de la Fortune", color=self.clr_woa_classement, timestamp=discord.utils.utcnow())
-                embed.add_field(name="Classement global", value="\n".join(lignes[i:i+10]), inline=False)
-                setup_embed_footer(embed, interaction)
+                embed = discord.Embed(title=t(langue, "ev_class_woa_title", defaut="Top 100 Serveur - Roue de la Fortune"), color=self.clr_woa_classement)
+                embed.description = f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)"
+                embed.add_field(name=t(langue, "ev_class_global_field", defaut="Classement global"), value="\n".join(lignes[i:i+10]), inline=False)
+                await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
 
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
-        except Exception as e: await interaction.followup.send(f"<:error:1512505075220611172> Erreur : {e}")
+        except Exception as e: 
+            await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur : {e}"))
 
-    @classement.command(name="iles_orageuses", description="Affiche le Top 100 des pilleurs d'Aquamarine")
+    @leaderboard.command(name="storm_islands", description="Displays the Top 100 looters of Aquamarine")
     async def classement_iles(self, interaction: discord.Interaction):
         try: await interaction.response.defer(thinking=True)
         except: return
-        headers = {'accept': 'application/json', 'gge-server': 'E4K_FR1'}
+        langue, _ = await get_server_config(interaction)
+        lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
+        
+        headers = await get_api_headers(interaction)
         session = self.bot.session
         base_api = "https://api.gge-tracker.com/api/v1"
         try:
             async with session.get(f"{base_api}/aquamarine?page=1&order_by=100&order_dir=DESC", headers=headers, timeout=8) as r:
-                if r.status != 200: return await interaction.followup.send("<:error:1512505075220611172> API indisponible.")
+                if r.status != 200: return await interaction.followup.send(t(langue, "ev_err_api_unavail", defaut="<:error:1512505075220611172> API indisponible."))
                 data_rank = await r.json()
                 players = data_rank.get("players", [])
                 total_pages = data_rank.get("pagination", {}).get("total_pages", 1)
@@ -961,7 +960,7 @@ class EventsCog(commands.Cog):
                     if isinstance(resp, aiohttp.ClientResponse) and resp.status == 200:
                         players.extend((await resp.json()).get("players", []))
 
-            if not players: return await interaction.followup.send("<:error:1512505075220611172> Aucun joueur trouvé.")
+            if not players: return await interaction.followup.send(t(langue, "ev_err_no_players", defaut="<:error:1512505075220611172> Aucun joueur trouvé."))
 
             mois_actif = ""
             for p in players:
@@ -978,14 +977,7 @@ class EventsCog(commands.Cog):
             players = players_filtres[:100]
 
             if not players:
-                return await interaction.followup.send("<:error:1512505075220611172> Aucun joueur n'a encore débuté l'édition de ce mois-ci.")
-
-            heure_releve_txt = ""
-            if players and players[0].get("last_collected_at"):
-                try:
-                    dt_releve = datetime.fromisoformat(players[0]["last_collected_at"].replace('Z', '+00:00'))
-                    heure_releve_txt = f" • Relevé : {dt_releve.strftime('%d/%m/%Y à %H:%M')}"
-                except: pass
+                return await interaction.followup.send(t(langue, "ev_err_aqua_not_started", defaut="<:error:1512505075220611172> Aucun joueur n'a encore débuté l'édition de ce mois-ci."))
 
             lignes = []
             for r_idx, p in enumerate(players):
@@ -996,28 +988,27 @@ class EventsCog(commands.Cog):
                 medal = "🥇" if rang == 1 else "🥈" if rang == 2 else "🥉" if rang == 3 else f"**{rang}.**"
                 lignes.append(f"{medal} **{nom}** ➔ **{pts} <:pointscargo:1512161268411273429>**")
 
+            # 💥 FIX : On injecte directement l'objet `players` qui contient TOUTES les pages
+            # pour s'assurer qu'on trouve la frappe la plus récente parmi tout le serveur.
+            actualisation_dt = _get_api_timestamp(players)
+
             embeds = []
-            nb_pages_discord = max(1, (len(lignes) - 1) // 10 + 1)
-            
-            mois_fr = {"01":"Janvier", "02":"Février", "03":"Mars", "04":"Avril", "05":"Mai", "06":"Juin", 
-                       "07":"Juillet", "08":"Août", "09":"Septembre", "10":"Octobre", "11":"Novembre", "12":"Décembre"}
             annee_actuelle, mois_num_actuel = mois_actif.split("-")
-            nom_mois_actif = f"{mois_fr.get(mois_num_actuel, mois_num_actuel)} {annee_actuelle}"
+            nom_mois_actif = f"{get_month_name(mois_num_actuel, langue)} {annee_actuelle}"
+            
+            titre = t(langue, "ev_class_aqua_title", m=nom_mois_actif, defaut=f"Top 100 Serveur - Îles Orageuses ({nom_mois_actif})")
+            desc = t(langue, "ev_class_aqua_desc", t=total_items, defaut=f"Classement basé sur les points cargo de l'édition en cours.\n*Total recensé sur le serveur : {total_items} joueurs*")
 
             for i in range(0, len(lignes), 10):
-                embed = discord.Embed(
-                    title=f"Top 100 Serveur - Îles Orageuses ({nom_mois_actif})", 
-                    description=f"Classement basé sur les points cargo de l'édition en cours.\n*Total recensé sur le serveur : {total_items} joueurs*", 
-                    color=self.clr_aqua, 
-                    timestamp=discord.utils.utcnow()
-                )
-                embed.add_field(name="Classement global", value="\n".join(lignes[i:i+10]), inline=False)
-                setup_embed_footer(embed, interaction)
+                embed = discord.Embed(title=titre, description=f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{desc}", color=self.clr_aqua)
+                embed.add_field(name=t(langue, "ev_class_global_field", defaut="Classement global"), value="\n".join(lignes[i:i+10]), inline=False)
+                await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
 
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
-        except Exception as e: await interaction.followup.send(f"<:error:1512505075220611172> Erreur technique : {e}")
+        except Exception as e: 
+            await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur technique : {e}"))
 
 # 🔌 Branchement du Cog
 async def setup(bot: commands.Bot):

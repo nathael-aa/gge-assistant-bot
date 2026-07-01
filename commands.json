@@ -1,0 +1,158 @@
+[
+    {
+        "name": "help",
+        "description": "Displays the complete user manual for the GGE Assistant bot",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "status",
+        "description": "Checks the overall health status of the system (Bot, NAS Storage, GGE-Tracker API)",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "changelog",
+        "description": "Discover the latest news, fixes and improvements applied to the bot",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "contact",
+        "description": "Send a problem, bug, or suggestion directly to the developer",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "calendar",
+        "description": "Event calendar management",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "setup",
+        "description": "Configure the language and game server for this Discord or your profile",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "event_player",
+        "description": "View a player's latest score or history",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "event_alliance",
+        "description": "Ranking and participation of an alliance in an event",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "link_account",
+        "description": "Link your Discord account to your GGE username",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "rival",
+        "description": "Competition Radar (MP only)",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "woa",
+        "description": "Analysis and statistics of the Wheel of Affluence",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "leaderboard",
+        "description": "General server rankings",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "fortress",
+        "description": "Fortress Radar (Sands, Ice, Peaks)",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "alliance_scanner",
+        "description": "Analyze the enemy roster in real time (Doves, PP, Targets)",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "proximity",
+        "description": "Find the enemy castles closest to you",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "target",
+        "description": "Find legal targets according to the chosen regulations",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "hr",
+        "description": "Check if an attack between two players complies with the chosen rules.",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "compare_player",
+        "description": "Responsive comparative analysis and calculation of the hazard index",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "diplomacy",
+        "description": "Diplomatic relations management (Admin only)",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "player",
+        "description": "Detailed player profile",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "alliance",
+        "description": "Detailed profile of an alliance (Quick and paginated)",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "history",
+        "description": "Displays a player's complete history",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "alliance_might",
+        "description": "Historical Power (PP) of an alliance over X days",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "dove",
+        "description": "Check the date and time a player's protection ended",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "alliance_description",
+        "description": "View the history of the last 7 wall changes for an alliance",
+        "type": 1,
+        "options": []
+    },
+    {
+        "name": "radar",
+        "description": "Personal War Radar",
+        "type": 1,
+        "options": []
+    }
+]

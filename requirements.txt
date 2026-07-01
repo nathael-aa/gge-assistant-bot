@@ -1,5 +1,5 @@
 # === REQUIS POUR LE FONCTIONNEMENT (PRODUCTION DOCKER) ===
-discord.py==2.3.2
+discord.py>=2.4.0
 aiohttp>=3.9.0
 requests
 beautifulsoup4

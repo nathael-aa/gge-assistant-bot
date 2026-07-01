@@ -6,17 +6,92 @@ import asyncio
 import aiohttp
 import urllib.parse
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from utils import alliance_autocomplete, setup_embed_footer, BASE_DATA_PATH, format_num, generer_rapport_alliance_embed, TRACKER_EVENTS
+# 🛠️ Import de la boîte à outils
+from utils import (
+    alliance_autocomplete, 
+    setup_embed_footer, 
+    CONFIG_DIR, 
+    format_num, 
+    generer_rapport_alliance_embed, 
+    TRACKER_EVENTS,
+    get_server_config, 
+    t 
+)
 
 logger = logging.getLogger("GGE_Bot")
 
-CALENDRIER_FILE = BASE_DATA_PATH / 'calendrier_config.json'
+CALENDRIER_FILE = CONFIG_DIR / 'calendrier.json'
+
+# ==========================================
+# 🛠️ CLASSE DE NAVIGATION UI (BOUTONS)
+# ==========================================
+class CalendarNavView(discord.ui.View):
+    def __init__(self, embeds_dict, current_page, langue="fr"):
+        super().__init__(timeout=None)
+        self.embeds = embeds_dict
+        self.current_page = current_page
+        self.langue = langue
+
+        self.btn_past = discord.ui.Button(label=t(langue, "cal_btn_past", defaut="◀️ Historique"), custom_id="cal_past")
+        self.btn_past.callback = self.callback_past
+
+        self.btn_main = discord.ui.Button(label=t(langue, "cal_btn_main", defaut="⏺️ Actuels & À venir"), custom_id="cal_main")
+        self.btn_main.callback = self.callback_main
+
+        self.btn_future = discord.ui.Button(label=t(langue, "cal_btn_future", defaut="▶️ À venir (Uniquement)"), custom_id="cal_future")
+        self.btn_future.callback = self.callback_future
+
+        self.add_item(self.btn_past)
+        self.add_item(self.btn_main)
+        self.add_item(self.btn_future)
+
+        self.update_buttons()
+
+    def update_buttons(self):
+        for child in self.children:
+            if child.custom_id == f"cal_{self.current_page}":
+                child.disabled = True
+                child.style = discord.ButtonStyle.primary
+            else:
+                child.disabled = False
+                child.style = discord.ButtonStyle.secondary
+
+    async def callback_past(self, interaction: discord.Interaction):
+        self.current_page = "past"
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.embeds["past"], view=self)
+
+    async def callback_main(self, interaction: discord.Interaction):
+        self.current_page = "main"
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.embeds["main"], view=self)
+
+    async def callback_future(self, interaction: discord.Interaction):
+        self.current_page = "future"
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.embeds["future"], view=self)
+
+# ==========================================
+# 🌍 FONCTION POUR DÉTECTER LA LANGUE ET LE SERVEUR
+# ==========================================
+async def get_guild_lang_and_server(guild_id_str: str):
+    langue, serveur = "fr", "E4K_FR1"
+    path = CONFIG_DIR / 'serveurs.json'
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if guild_id_str in data:
+                    langue = data[guild_id_str].get("langue", "fr")
+                    serveur = data[guild_id_str].get("gge_server", "E4K_FR1")
+        except: pass
+    return langue, serveur
 
 async def load_calendrier_async():
     if not CALENDRIER_FILE.exists():
@@ -34,27 +109,69 @@ async def save_calendrier_async(data):
     with open(CALENDRIER_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-class CalendrierCog(commands.GroupCog, group_name="calendrier", group_description="Gestion du calendrier des événements"):
+class CalendrierCog(commands.GroupCog, group_name="calendar", group_description="Event calendar management"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.cached_events = []
         self.last_scrape_time = None
+        # 💥 NOUVEAU : On utilise name_key et name_default pour l'i18n
         self.event_mapping = {
-            "samurai invasion": {"name": "Samouraï", "emoji": "<:samurai:1512430844935929868>", "color": 0xE17055, "tracker_name": "Samouraïs", "start": "11:00", "end": "09:00"},
-            "nomad invasion": {"name": "Nomade", "emoji": "<:nomads:1512431070719774750>", "color": 0xF1C40F, "tracker_name": "Nomades", "start": "11:00", "end": "09:00"},
-            "bloodcrow invasion": {"name": "Corbeaux de Sang", "emoji": "<:bloodcrow:1512430942990368928>", "color": 0x2C3E50, "tracker_name": "Corbeaux de Sang", "start": "11:00", "end": "09:00"},
-            "war of the realms": {"name": "Guerre des Royaumes", "emoji": "<:war_realms:1512573773658980504>", "color": 0xC0392B, "tracker_name": "Guerre des Royaumes", "start": "11:00", "end": "09:00"},
-            "berimond": {"name": "Berimond", "emoji": "<:berimond:1512430901756428390>", "color": 0x2980B9, "tracker_name": "Bataille de Bérimond", "start": "11:00", "end": "09:00"},
-            "bladecoast": {"name": "Côte Tranchante", "emoji": "<:bladecoast:1514704235894407399>", "color": 0x16A085, "tracker_name": None, "start": "11:00", "end": "09:00"},
-            "rift raid": {"name": "Raid de la Faille", "emoji": "<:riftraid:1514704237206966272>", "color": 0x8E44AD, "tracker_name": None, "start": "11:00", "end": "09:00"},
-            "grand tournament": {"name": "Grand Tournoi", "emoji": "<:grandtournament:1514704234128343040>", "color": 0xD35400, "tracker_name": None, "start": "11:00", "end": "09:00"},
-            "beyond the horizon": {"name": "Au-delà de l'horizon", "emoji": "<:beyondthehorizonicon:1512573808379301919>", "color": 0x1ABC9C, "tracker_name": None, "start": "11:00", "end": "00:40"},
-            "outer realms": {"name": "Royaumes extérieurs", "emoji": "<:outerrealmsicon:1512573734404231329>", "color": 0x34495E, "tracker_name": None, "start": "11:00", "end": "00:40"},
-            "imperial patronage": {"name": "Patronage impérial", "emoji": "<:patronage:1514704230106140874>", "color": 0xF39C12, "tracker_name": None, "start": "11:00", "end": "09:00"},
-            "grand nobility contest": {"name": "Grand concours de noblesse", "emoji": "<:ltpe:1514704228801708052>", "color": 0x7F8C8D, "tracker_name": None, "start": "11:00", "end": "09:00"}
+            "samurai invasion": {"name_key": "cal_ev_samurai", "name_default": "Samouraï", "emoji": "<:samurai:1512430844935929868>", "color": 0xE17055, "tracker_name": "Samouraïs", "start": "11:00", "end": "09:00"},
+            "nomad invasion": {"name_key": "cal_ev_nomad", "name_default": "Nomade", "emoji": "<:nomads:1512431070719774750>", "color": 0xF1C40F, "tracker_name": "Nomades", "start": "11:00", "end": "09:00"},
+            "bloodcrow invasion": {"name_key": "cal_ev_bloodcrow", "name_default": "Corbeaux de Sang", "emoji": "<:bloodcrow:1512430942990368928>", "color": 0x2C3E50, "tracker_name": "Corbeaux de Sang", "start": "11:00", "end": "09:00"},
+            "war of the realms": {"name_key": "cal_ev_realms", "name_default": "Guerre des Royaumes", "emoji": "<:war_realms:1512573773658980504>", "color": 0xC0392B, "tracker_name": "Guerre des Royaumes", "start": "11:00", "end": "09:00"},
+            "berimond": {"name_key": "cal_ev_berimond", "name_default": "Bérimond", "emoji": "<:berimond:1512430901756428390>", "color": 0x2980B9, "tracker_name": "Bataille de Bérimond", "start": "11:00", "end": "08:30"},
+            "bladecoast": {"name_key": "cal_ev_bladecoast", "name_default": "Côte Tranchante", "emoji": "<:bladecoast:1514704235894407399>", "color": 0x16A085, "tracker_name": None, "start": "11:00", "end": "09:00"},
+            "rift raid": {"name_key": "cal_ev_rift", "name_default": "Raid de la Faille", "emoji": "<:riftraid:1514704237206966272>", "color": 0x8E44AD, "tracker_name": None, "start": "11:00", "end": "09:00"},
+            "grand tournament": {"name_key": "cal_ev_tournament", "name_default": "Grand Tournoi", "emoji": "<:grandtournament:1514704234128343040>", "color": 0xD35400, "tracker_name": None, "start": "11:00", "end": "12:30"},
+            "beyond the horizon": {"name_key": "cal_ev_horizon", "name_default": "Au-delà de l'horizon", "emoji": "<:beyondthehorizonicon:1512573808379301919>", "color": 0x1ABC9C, "tracker_name": None, "start": "11:00", "end": "00:40"},
+            "outer realms": {"name_key": "cal_ev_outer", "name_default": "Royaumes extérieurs", "emoji": "<:outerrealmsicon:1512573734404231329>", "color": 0x34495E, "tracker_name": None, "start": "11:00", "end": "00:40"},
+            "imperial patronage": {"name_key": "cal_ev_patronage", "name_default": "Patronage impérial", "emoji": "<:patronage:1514704230106140874>", "color": 0xF39C12, "tracker_name": None, "start": "11:00", "end": "09:30"},
+            "grand nobility contest": {"name_key": "cal_ev_nobility", "name_default": "Grand concours de noblesse", "emoji": "<:ltpe:1514704228801708052>", "color": 0x7F8C8D, "tracker_name": None, "start": "11:00", "end": "09:00"}
         }
 
+    async def load_cache_from_file(self):
+        data = await load_calendrier_async()
+        saved_events = data.get("cached_events", [])
+        events_actifs = []
+        maintenant = datetime.now()
+        limite_retention = maintenant - timedelta(days=30)
+        
+        seen_uids = set() 
+        
+        for ev in saved_events:
+            try:
+                start_dt = datetime.fromisoformat(ev["start"])
+                end_dt = datetime.fromisoformat(ev["end"])
+                
+                if end_dt >= limite_retention:
+                    uid = f"{ev['key']}_{int(start_dt.timestamp())}"
+                    if uid not in seen_uids:
+                        events_actifs.append({"key": ev["key"], "start": start_dt, "end": end_dt})
+                        seen_uids.add(uid)
+            except Exception as e:
+                logger.error(f"Erreur lecture date: {e}")
+                
+        self.cached_events = events_actifs
+        logger.info(f"📂 [Calendrier] {len(self.cached_events)} événements chargés (doublons purgés).")
+
+    async def save_cache_to_file(self):
+        data = await load_calendrier_async()
+        serialized = []
+        
+        for ev in self.cached_events:
+            serialized.append({
+                "key": ev["key"],
+                "start": ev["start"].isoformat(),
+                "end": ev["end"].isoformat()
+            })
+            
+        data["cached_events"] = serialized
+        await save_calendrier_async(data)
+
     async def cog_load(self):
+        await self.load_cache_from_file()
+        
         if not self.check_newshub_calendar_task.is_running():
             self.check_newshub_calendar_task.start()
 
@@ -64,29 +181,34 @@ class CalendrierCog(commands.GroupCog, group_name="calendrier", group_descriptio
     # ==========================================
     # ⚙️ COMMANDES DE CONFIGURATION DU SUIVI
     # ==========================================
-    @app_commands.command(name="setup", description="Définit le salon où seront envoyées les alertes du calendrier")
-    @app_commands.describe(salon="Le salon textuel pour les événements")
+    @app_commands.command(name="setup", description="Defines the room where calendar alerts will be sent")
+    @app_commands.describe(channel="The text-based event lounge")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
-    async def c_setup(self, interaction: discord.Interaction, salon: discord.TextChannel):
+    async def c_setup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         await interaction.response.defer(ephemeral=True)
+        langue, _ = await get_server_config(interaction)
+        
         data = await load_calendrier_async()
         guild_id = str(interaction.guild_id)
         
         if guild_id not in data["guilds"]:
             data["guilds"][guild_id] = {"channel_id": None, "tracked_alliances": []}
             
-        data["guilds"][guild_id]["channel_id"] = salon.id
+        data["guilds"][guild_id]["channel_id"] = channel.id
         await save_calendrier_async(data)
         
-        await interaction.followup.send(f"✅ Le salon des annonces d'événements a été défini sur {salon.mention}.")
+        msg = t(langue, "cal_setup_success", salon=channel.mention, defaut=f"✅ Le salon des annonces d'événements a été défini sur {channel.mention}.")
+        await interaction.followup.send(msg)
 
-    @app_commands.command(name="suivre", description="Ajoute une alliance au rapport automatique de fin d'événement")
-    @app_commands.autocomplete(alliance=alliance_autocomplete)
-    @app_commands.describe(alliance="Nom de l'alliance à suivre")
+    @app_commands.command(name="track", description="Adds an alliance to the automatic end-of-event report")
+    @app_commands.autocomplete(alliance_name=alliance_autocomplete)
+    @app_commands.describe(alliance_name="Name of the alliance to follow")
     @app_commands.guild_only()
-    async def c_track(self, interaction: discord.Interaction, alliance: str):
+    async def c_track(self, interaction: discord.Interaction, alliance_name: str):
         await interaction.response.defer(ephemeral=True)
+        langue, _ = await get_server_config(interaction)
+        
         data = await load_calendrier_async()
         guild_id = str(interaction.guild_id)
         
@@ -94,77 +216,105 @@ class CalendrierCog(commands.GroupCog, group_name="calendrier", group_descriptio
             data["guilds"][guild_id] = {"channel_id": None, "tracked_alliances": []}
             
         tracked = data["guilds"][guild_id]["tracked_alliances"]
-        if alliance.lower() in [a.lower() for a in tracked]:
-            return await interaction.followup.send(f"<:error:1512505075220611172> L'alliance **{alliance}** est déjà dans la liste de suivi de ce serveur.")
+        if alliance_name.lower() in [a.lower() for a in tracked]:
+            msg = t(langue, "cal_track_already", alliance=alliance_name, defaut=f"<:error:1512505075220611172> L'alliance **{alliance_name}** est déjà dans la liste de suivi de ce serveur.")
+            return await interaction.followup.send(msg)
             
-        tracked.append(alliance)
+        tracked.append(alliance_name)
         await save_calendrier_async(data)
-        await interaction.followup.send(f"✅ L'alliance **{alliance}** a été ajoutée ! Ses résultats seront envoyés à la fin des événements majeurs.")
+        msg_success = t(langue, "cal_track_success", alliance=alliance_name, defaut=f"✅ L'alliance **{alliance_name}** a été ajoutée ! Ses résultats seront envoyés à la fin des événements majeurs.")
+        await interaction.followup.send(msg_success)
 
-    @app_commands.command(name="retirer", description="Retire une alliance du rapport de fin d'événement")
-    @app_commands.autocomplete(alliance=alliance_autocomplete)
-    @app_commands.describe(alliance="Nom de l'alliance à retirer")
+    @app_commands.command(name="untrack", description="Remove one alliance from the end-of-event report")
+    @app_commands.autocomplete(alliance_name=alliance_autocomplete)
+    @app_commands.describe(alliance_name="Name of the alliance to be withdrawn")
     @app_commands.guild_only()
-    async def c_untrack(self, interaction: discord.Interaction, alliance: str):
+    async def c_untrack(self, interaction: discord.Interaction, alliance_name: str):
         await interaction.response.defer(ephemeral=True)
+        langue, _ = await get_server_config(interaction)
+        
         data = await load_calendrier_async()
         guild_id = str(interaction.guild_id)
         
         if guild_id not in data["guilds"]:
-            return await interaction.followup.send("<:error:1512505075220611172> Aucune configuration trouvée pour ce serveur.")
+            msg_err = t(langue, "cal_untrack_no_config", defaut="<:error:1512505075220611172> Aucune configuration trouvée pour ce serveur.")
+            return await interaction.followup.send(msg_err)
             
         tracked = data["guilds"][guild_id]["tracked_alliances"]
-        if alliance.lower() not in [a.lower() for a in tracked]:
-            return await interaction.followup.send(f"<:error:1512505075220611172> L'alliance **{alliance}** n'est pas dans la liste de suivi.")
+        if alliance_name.lower() not in [a.lower() for a in tracked]:
+            msg_not_found = t(langue, "cal_untrack_not_found", alliance=alliance_name, defaut=f"<:error:1512505075220611172> L'alliance **{alliance_name}** n'est pas dans la liste de suivi.")
+            return await interaction.followup.send(msg_not_found)
             
-        data["guilds"][guild_id]["tracked_alliances"] = [a for a in tracked if a.lower() != alliance.lower()]
+        data["guilds"][guild_id]["tracked_alliances"] = [a for a in tracked if a.lower() != alliance_name.lower()]
         await save_calendrier_async(data)
-        await interaction.followup.send(f"❌ L'alliance **{alliance}** a été retirée de la liste de suivi.")
+        
+        msg_success = t(langue, "cal_untrack_success", alliance=alliance_name, defaut=f"❌ L'alliance **{alliance_name}** a été retirée de la liste de suivi.")
+        await interaction.followup.send(msg_success)
 
-    @app_commands.command(name="actuelle", description="Affiche le calendrier complet des événements du mois")
-    async def c_mois(self, interaction: discord.Interaction):
+    # ==========================================
+    # 📆 COMMANDE CURRENT (NAVIGATION INTÉGRÉE)
+    # ==========================================
+    @app_commands.command(name="current", description="Displays the complete calendar of events")
+    async def c_current(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=False)
+        langue, _ = await get_server_config(interaction)
         
+        events = getattr(self, "cached_events", [])
+        
+        if not events:
+            msg_err = t(langue, "cal_actuelle_error", defaut="<:error:1512505075220611172> Le calendrier est en cours de synchronisation ou vide. Réessayez dans une minute.")
+            return await interaction.followup.send(msg_err)
+
         maintenant = datetime.now()
         
-        # 🛠️ LA PROTECTION : La commande manuelle utilise le cache elle aussi !
-        if not self.cached_events or self.last_scrape_time is None or (maintenant - self.last_scrape_time).total_seconds() > 7200:
-            nouveaux_events = await self.parse_live_calendar()
-            if nouveaux_events:
-                self.cached_events = nouveaux_events
-                self.last_scrape_time = maintenant
-            else:
-                if not self.cached_events:
-                    return await interaction.followup.send("<:error:1512505075220611172> Impossible de récupérer le calendrier officiel pour le moment.")
+        events_past = []
+        events_main = []
+        events_future = []
 
-        events = self.cached_events
-            
-        events.sort(key=lambda x: x["start"])
+        events_tries = sorted(events, key=lambda x: x["start"])
         
-        lignes_calendrier = []
-        for ev in events:
-            meta = self.event_mapping[ev["key"]]
+        for ev in events_tries:
+            meta = self.event_mapping.get(ev["key"])
+            if not meta:
+                continue
+                
             ts_start = int(ev["start"].timestamp())
             ts_end = int(ev["end"].timestamp())
             
-            lignes_calendrier.append(f"{meta['emoji']} **{meta['name']}** : <t:{ts_start}:d> ➔ <t:{ts_end}:d>")
+            # 💥 NOUVEAU : Traduction à la volée du nom de l'événement
+            nom_event_traduit = t(langue, meta["name_key"], defaut=meta["name_default"])
+            ligne = f"{meta['emoji']} **{nom_event_traduit}** : <t:{ts_start}:d> ➔ <t:{ts_end}:d>"
             
-        # 🕒 Création du timestamp pour le dernier scan
-        ts_last_scan = int(self.last_scrape_time.timestamp()) if self.last_scrape_time else int(maintenant.timestamp())
+            if ev["end"] < maintenant:
+                events_past.append(ligne)
+            else:
+                events_main.append(ligne)
+                if ev["start"] > maintenant:
+                    events_future.append(ligne)
+            
+        last_scrape = getattr(self, "last_scrape_time", None)
+        ts_last_scan = int(last_scrape.timestamp()) if last_scrape else int(datetime.now().timestamp())
         
-        # 🛠️ CORRECTION : On utilise un + classique au lieu de la f-string pour l'antislash
-        texte_description = f"<:info:1512502828193808537> Dernière mise à jour : <t:{ts_last_scan}:R>\n\n" + "\n".join(lignes_calendrier)
+        texte_maj = t(langue, "cal_last_update", ts_last_scan=ts_last_scan, defaut=f"<:info:1512502828193808537> Dernière mise à jour : <t:{ts_last_scan}:R>")
+        empty_txt = t(langue, "cal_empty_cat", defaut="*Aucun événement dans cette catégorie pour le moment.*")
+
+        async def build_embed(titre, liste_lignes, color): # 💥 Ajout de 'async'
+            desc = f"{texte_maj}\n\n" + ("\n".join(liste_lignes) if liste_lignes else empty_txt)
+            emb = discord.Embed(title=titre, description=desc, color=color)
+            await setup_embed_footer(emb, interaction, langue) # 💥 Maintenant ça passe !
+            return emb
+
+        embeds_dict = {
+            "past": await build_embed(t(langue, "cal_title_past", defaut="⏳ Événements Passés (30 derniers jours)"), events_past, 0x95A5A6),
+            "main": await build_embed(t(langue, "cal_title_main", defaut="📅 Événements Actuels & À venir"), events_main, 0x3498DB),
+            "future": await build_embed(t(langue, "cal_title_future", defaut="🚀 Événements Futurs Uniquement"), events_future, 0x2ECC71)
+        }
             
-        embed = discord.Embed(
-            title="📅 Calendrier des Événements",
-            description=texte_description,
-            color=0x3498DB
-        )
-        setup_embed_footer(embed, interaction)
-        await interaction.followup.send(embed=embed)
+        view = CalendarNavView(embeds_dict, "main", langue)
+        await interaction.followup.send(embed=embeds_dict["main"], view=view)
 
     # ==========================================
-    # 🕵️‍♂️ MOTEUR D'EXTRACTION HTML (BS4)
+    # 🕵️‍♂️ MOTEUR D'EXTRACTION HTML (BS4 LECTURE PLATE)
     # ==========================================
     async def parse_live_calendar(self):
         url = "https://communityhub.goodgamestudios.com/newshube4k"
@@ -178,22 +328,28 @@ class CalendrierCog(commands.GroupCog, group_name="calendrier", group_descriptio
                 soup = BeautifulSoup(html_content, 'html.parser')
                 
                 found_events = []
+                seen_signatures = set()
                 current_year = datetime.now().year
-                paragraphs = soup.find_all('p')
                 
-                for idx, p in enumerate(paragraphs):
-                    text = p.get_text().strip().lower()
+                strings = list(soup.stripped_strings)
+                current_event = None
+                
+                for text in strings:
+                    text_lower = text.lower()
                     
-                    matched_key = next((key for key in self.event_mapping.keys() if key in text), None)
-                    
-                    if matched_key and idx + 1 < len(paragraphs):
-                        date_text = paragraphs[idx + 1].get_text().strip()
-                        matches = re.findall(r"(\d{2}/\d{2})\s*-\s*(\d{2}/\d{2})", date_text)
+                    matched_key = next((key for key in self.event_mapping.keys() if key in text_lower), None)
+                    if matched_key:
+                        current_event = matched_key
                         
+                    if current_event:
+                        matches = re.findall(r"(\d{2}[/.-]\d{2})\s*(?:-|à|to|au)\s*(\d{2}[/.-]\d{2})", text_lower)
                         for start_str, end_str in matches:
                             try:
-                                h_start = self.event_mapping[matched_key]["start"]
-                                h_end = self.event_mapping[matched_key]["end"]
+                                start_str = start_str.replace('.', '/').replace('-', '/')
+                                end_str = end_str.replace('.', '/').replace('-', '/')
+                                
+                                h_start = self.event_mapping[current_event]["start"]
+                                h_end = self.event_mapping[current_event]["end"]
                                 
                                 start_dt = datetime.strptime(f"{start_str}/{current_year} {h_start}", "%d/%m/%Y %H:%M")
                                 end_dt = datetime.strptime(f"{end_str}/{current_year} {h_end}", "%d/%m/%Y %H:%M")
@@ -201,35 +357,46 @@ class CalendrierCog(commands.GroupCog, group_name="calendrier", group_descriptio
                                 if end_dt < start_dt:
                                     end_dt = end_dt.replace(year=current_year + 1)
                                     
-                                found_events.append({"key": matched_key, "start": start_dt, "end": end_dt})
-                            except:
+                                uid = f"{current_event}_{int(start_dt.timestamp())}"
+                                if uid not in seen_signatures:
+                                    found_events.append({"key": current_event, "start": start_dt, "end": end_dt})
+                                    seen_signatures.add(uid)
+                            except Exception:
                                 continue
+                                
                 return found_events
         except Exception as e:
             logger.error(f"❌ [Calendrier] Erreur BS4 : {e}")
             return []
 
-    # ==========================================
-    # 🛰️ LA TÂCHE DE FOND
-    # ==========================================
     @tasks.loop(minutes=1)
     async def check_newshub_calendar_task(self):
         maintenant = datetime.now()
         
-        # 🛠️ LE CACHE : On ne scrape le site web que si on ne l'a pas fait depuis 2 heures (7200 secondes)
-        if not self.cached_events or self.last_scrape_time is None or (maintenant - self.last_scrape_time).total_seconds() > 7200:
+        if getattr(self, "last_scrape_time", None) is None or (maintenant - self.last_scrape_time).total_seconds() > 7200:
             nouveaux_events = await self.parse_live_calendar()
+            
+            limite_retention = maintenant - timedelta(days=30)
+            events_actifs = [ev for ev in getattr(self, "cached_events", []) if ev["end"] >= limite_retention]
+            
             if nouveaux_events:
-                self.cached_events = nouveaux_events
-                self.last_scrape_time = maintenant
-                logger.info(f"🔄 [Calendrier] Cache mis à jour avec {len(nouveaux_events)} événements.")
-            else:
-                # Si le site bug (ou si l'IP est encore bannie), on utilise ce qu'on avait gardé en mémoire !
-                if not self.cached_events:
-                    return
+                ids_existants = {f"{ev['key']}_{int(ev['start'].timestamp())}" for ev in events_actifs}
+                
+                for nev in nouveaux_events:
+                    uid_nev = f"{nev['key']}_{int(nev['start'].timestamp())}"
+                    if uid_nev not in ids_existants:
+                        events_actifs.append(nev)
+                        ids_existants.add(uid_nev)
+            
+            self.cached_events = events_actifs
+            self.last_scrape_time = maintenant
+            
+            await self.save_cache_to_file()
+            logger.info(f"🔄 [Calendrier] Cache mis à jour et sauvegardé : {len(self.cached_events)} événements actifs/récents.")
 
-        # On utilise la mémoire du bot au lieu de refaire une requête HTML
-        events = self.cached_events
+        events = getattr(self, "cached_events", [])
+        if not events:
+            return
 
         data = await load_calendrier_async()
         notified = data.get("notified", [])
@@ -243,17 +410,10 @@ class CalendrierCog(commands.GroupCog, group_name="calendrier", group_descriptio
 
             # 🟢 DÉBUT D'ÉVÉNEMENT (11h00)
             if maintenant >= ev["start"] and uid_start not in notified:
-                logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT DÉBUT de {meta['name']}")
+                logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT DÉBUT de {meta['name_default']}")
                 
                 if ev["start"].date() == maintenant.date():
                     ts_fin = int(ev["end"].timestamp())
-                    embed_start = discord.Embed(
-                        title=f"{meta['emoji']} DÉBUT D'ÉVÉNEMENT : {meta['name']}",
-                        description=f"L'heure a sonné ! Un nouvel événement vient d'ouvrir ses portes sur nos terres.\n\n"
-                                    f"⏳ **Fermeture prévue** : <t:{ts_fin}:f> (<t:{ts_fin}:R>)",
-                        color=meta["color"]
-                    )
-                    setup_embed_footer(embed_start, None)
                     
                     for guild_id, g_info in data.get("guilds", {}).items():
                         channel_id = g_info.get("channel_id")
@@ -264,6 +424,21 @@ class CalendrierCog(commands.GroupCog, group_name="calendrier", group_descriptio
                                 except: pass
                             
                             if channel:
+                                langue, _ = await get_guild_lang_and_server(str(guild_id))
+                                
+                                # 💥 NOUVEAU : On traduit le nom avant de l'envoyer
+                                nom_traduit = t(langue, meta["name_key"], defaut=meta["name_default"])
+                                
+                                titre_start = t(langue, "cal_event_start_title", emoji=meta['emoji'], name=nom_traduit, defaut=f"{meta['emoji']} DÉBUT D'ÉVÉNEMENT : {nom_traduit}")
+                                desc_start = t(langue, "cal_event_start_desc", ts_fin=ts_fin, defaut=f"L'heure a sonné ! Un nouvel événement vient d'ouvrir ses portes sur nos terres.\n\n⏳ **Fermeture prévue** : <t:{ts_fin}:f> (<t:{ts_fin}:R>)")
+                                
+                                embed_start = discord.Embed(
+                                    title=titre_start,
+                                    description=desc_start,
+                                    color=meta["color"]
+                                )
+                                await setup_embed_footer(embed_start, None, langue)
+                                
                                 try: await channel.send(embed=embed_start)
                                 except: pass
 
@@ -272,7 +447,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendrier", group_descriptio
 
             # 🔴 FIN D'ÉVÉNEMENT (09h00)
             if maintenant >= ev["end"] and uid_end not in notified:
-                logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT FIN de {meta['name']}")
+                logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT FIN de {meta['name_default']}")
                 
                 if ev["end"].date() == maintenant.date():
                     for guild_id, g_info in data.get("guilds", {}).items():
@@ -284,12 +459,20 @@ class CalendrierCog(commands.GroupCog, group_name="calendrier", group_descriptio
                                 except: pass
 
                             if channel:
+                                langue, serveur_cible = await get_guild_lang_and_server(str(guild_id))
+                                
+                                # 💥 NOUVEAU : On traduit le nom
+                                nom_traduit = t(langue, meta["name_key"], defaut=meta["name_default"])
+                                
+                                titre_end = t(langue, "cal_event_end_title", name=nom_traduit, defaut=f"🛑 FIN D'ÉVÉNEMENT : {nom_traduit}")
+                                desc_end = t(langue, "cal_event_end_desc", defaut="Le calme revient sur le serveur. L'événement est officiellement terminé !")
+                                
                                 embed_end = discord.Embed(
-                                    title=f"🛑 FIN D'ÉVÉNEMENT : {meta['name']}",
-                                    description=f"Le calme revient sur le serveur. L'événement est officiellement terminé !",
+                                    title=titre_end,
+                                    description=desc_end,
                                     color=0x2C3E50
                                 )
-                                setup_embed_footer(embed_end, None)
+                                await setup_embed_footer(embed_end, None, langue)
                                 try: await channel.send(embed=embed_end)
                                 except: pass
 
@@ -298,15 +481,17 @@ class CalendrierCog(commands.GroupCog, group_name="calendrier", group_descriptio
                                     event_keys = TRACKER_EVENTS.get(meta["tracker_name"])
                                     if event_keys:
                                         for alliance_nom in tracked:
+                                            # 💥 NOUVEAU : On passe le nom_traduit au rapporteur
                                             embed_rapport, error, _, _ = await generer_rapport_alliance_embed(
-                                                self.bot, meta['name'], event_keys, alliance_nom, meta['color']
+                                                self.bot, nom_traduit, event_keys, alliance_nom, meta['color'], custom_server=serveur_cible
                                             )
                                             if embed_rapport:
-                                                setup_embed_footer(embed_rapport, None)
+                                                await setup_embed_footer(embed_rapport, None, langue)
                                                 try: await channel.send(embed=embed_rapport)
                                                 except: pass
                                             else:
-                                                try: await channel.send(f"⚠️ Erreur de rapport pour **{alliance_nom}** : {error}")
+                                                err_msg = t(langue, "cal_report_error", alliance=alliance_nom, error=error, defaut=f"⚠️ Erreur de rapport pour **{alliance_nom}** : {error}")
+                                                try: await channel.send(err_msg)
                                                 except: pass
 
                 notified.append(uid_end)

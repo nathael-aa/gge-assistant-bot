@@ -1,8 +1,0 @@
-{
-  "api_url": "https://empire-api.fly.dev",
-  "server": "E4K_FR1",
-  "save_formats": [
-    "json"
-  ],
-  "data_directory": "data"
-}
