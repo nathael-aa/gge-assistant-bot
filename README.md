@@ -25,19 +25,20 @@ Le bot fait tourner des scripts d'arrière-plan (via auto_pa_daily.sh) pour anal
 
 ```text
 gge-assistant/
-├── cogs/                  # Modules de commandes Discord
+├── cogs/                # Modules de commandes Discord
+│   ├── admin.py
 │   ├── aide.py
+│   ├── calendrier.py
 │   ├── events.py
 │   ├── forteresses.py
 │   ├── guerre.py
+│   ├── line_bridge.py
 │   ├── profils.py
-│   ├── radar.py
-│   └── sanctions.py
+│   └── radar.py
 ├── scanners/              # Scripts d'analyse automatique de l'API GGE-Tracker
 │   ├── __init__.py
-│   ├── alliance_scanner.py
+│   ├── alerter.py
 │   ├── murs_scanner.py
-│   ├── player_scanner.py
 │   └── server_scanner.py
 ├── data/                  # 🔒 Données locales (Ignoré par Git)
 ├── logs/                  # 🔒 Journaux d'activité (Ignoré par Git)
