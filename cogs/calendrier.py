@@ -12,7 +12,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-# 🛠️ Import de la boîte à outils
 from utils import (
     alliance_autocomplete, 
     setup_embed_footer, 
@@ -114,7 +113,6 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
         self.bot = bot
         self.cached_events = []
         self.last_scrape_time = None
-        # 💥 NOUVEAU : On utilise name_key et name_default pour l'i18n
         self.event_mapping = {
             "samurai invasion": {"name_key": "cal_ev_samurai", "name_default": "Samouraï", "emoji": "<:samurai:1512430844935929868>", "color": 0xE17055, "tracker_name": "Samouraïs", "start": "11:00", "end": "09:00"},
             "nomad invasion": {"name_key": "cal_ev_nomad", "name_default": "Nomade", "emoji": "<:nomads:1512431070719774750>", "color": 0xF1C40F, "tracker_name": "Nomades", "start": "11:00", "end": "09:00"},
@@ -281,7 +279,6 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             ts_start = int(ev["start"].timestamp())
             ts_end = int(ev["end"].timestamp())
             
-            # 💥 NOUVEAU : Traduction à la volée du nom de l'événement
             nom_event_traduit = t(langue, meta["name_key"], defaut=meta["name_default"])
             ligne = f"{meta['emoji']} **{nom_event_traduit}** : <t:{ts_start}:d> ➔ <t:{ts_end}:d>"
             
@@ -298,10 +295,10 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
         texte_maj = t(langue, "cal_last_update", ts_last_scan=ts_last_scan, defaut=f"<:info:1512502828193808537> Dernière mise à jour : <t:{ts_last_scan}:R>")
         empty_txt = t(langue, "cal_empty_cat", defaut="*Aucun événement dans cette catégorie pour le moment.*")
 
-        async def build_embed(titre, liste_lignes, color): # 💥 Ajout de 'async'
+        async def build_embed(titre, liste_lignes, color):
             desc = f"{texte_maj}\n\n" + ("\n".join(liste_lignes) if liste_lignes else empty_txt)
             emb = discord.Embed(title=titre, description=desc, color=color)
-            await setup_embed_footer(emb, interaction, langue) # 💥 Maintenant ça passe !
+            await setup_embed_footer(emb, interaction, langue)
             return emb
 
         embeds_dict = {
@@ -408,7 +405,6 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             uid_start = f"{ev['key']}_{ev['start'].strftime('%Y-%m-%d')}_start"
             uid_end = f"{ev['key']}_{ev['end'].strftime('%Y-%m-%d')}_end"
 
-            # 🟢 DÉBUT D'ÉVÉNEMENT (11h00)
             if maintenant >= ev["start"] and uid_start not in notified:
                 logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT DÉBUT de {meta['name_default']}")
                 
@@ -426,7 +422,6 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                             if channel:
                                 langue, _ = await get_guild_lang_and_server(str(guild_id))
                                 
-                                # 💥 NOUVEAU : On traduit le nom avant de l'envoyer
                                 nom_traduit = t(langue, meta["name_key"], defaut=meta["name_default"])
                                 
                                 titre_start = t(langue, "cal_event_start_title", emoji=meta['emoji'], name=nom_traduit, defaut=f"{meta['emoji']} DÉBUT D'ÉVÉNEMENT : {nom_traduit}")
@@ -461,7 +456,6 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                             if channel:
                                 langue, serveur_cible = await get_guild_lang_and_server(str(guild_id))
                                 
-                                # 💥 NOUVEAU : On traduit le nom
                                 nom_traduit = t(langue, meta["name_key"], defaut=meta["name_default"])
                                 
                                 titre_end = t(langue, "cal_event_end_title", name=nom_traduit, defaut=f"🛑 FIN D'ÉVÉNEMENT : {nom_traduit}")
@@ -481,7 +475,6 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                     event_keys = TRACKER_EVENTS.get(meta["tracker_name"])
                                     if event_keys:
                                         for alliance_nom in tracked:
-                                            # 💥 NOUVEAU : On passe le nom_traduit au rapporteur
                                             embed_rapport, error, _, _ = await generer_rapport_alliance_embed(
                                                 self.bot, nom_traduit, event_keys, alliance_nom, meta['color'], custom_server=serveur_cible
                                             )

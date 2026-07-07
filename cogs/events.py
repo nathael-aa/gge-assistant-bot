@@ -11,7 +11,6 @@ from discord import app_commands
 from discord.ext import commands, tasks
 import logging
 
-# 🛠️ Import de la boîte à outils unifiée (Nouvelle Architecture)
 from utils import (
     CONFIG_DIR, 
     JOUEURS_DIR,
@@ -45,7 +44,6 @@ logger = logging.getLogger("GGE_Bot")
 radar_logger = logging.getLogger("Radar_Log")
 radar_logger.setLevel(logging.INFO)
 
-# 🌍 MAPPING DES NOMS D'ÉVÉNEMENTS POUR TRADUCTION
 EVENT_TRAD_KEYS = {
     "Nomad Invasion": ("cal_ev_nomad", "Nomade"),
     "Samurai Invasion": ("cal_ev_samurai", "Samouraï"),
@@ -87,13 +85,10 @@ def _get_api_timestamp(*sources):
     def search_ts(obj):
         if isinstance(obj, dict):
             for k, v in obj.items():
-                # On ajoute "date", "collected_at" et "last_collected_at" à la liste des clés traquées
                 if k in ["updated_at", "updatedAt", "last_update", "date", "collected_at", "last_collected_at"] and isinstance(v, str):
-                    # Filtre léger pour être sûr que c'est une chaîne de type date ISO (YYYY-MM-DD...)
                     if len(v) >= 10 and v[4] == '-':
                         dates_trouvees.append(v)
             
-            # Descente récursive
             for v in obj.values():
                 if isinstance(v, (dict, list)):
                     search_ts(v)
@@ -103,27 +98,124 @@ def _get_api_timestamp(*sources):
                 if isinstance(item, (dict, list)):
                     search_ts(item)
 
-    # On lance l'aspiration des dates sur toutes les sources fournies
     for src in sources:
         if src:
             search_ts(src)
 
     if dates_trouvees:
         try:
-            # Magie de Python : max() sur des chaînes ISO renvoie toujours la chronologie la plus récente !
             latest_str = max(dates_trouvees)
             return datetime.fromisoformat(latest_str.replace('Z', '+00:00'))
         except:
             pass
             
-    # Fallback de sécurité si le JSON est totalement vide de dates
     return discord.utils.utcnow()
+
+class AquamarineSelectView(discord.ui.View):
+    def __init__(self, interaction, player, alliance_name, actualisation_dt, langue, clr, sorted_months, monthly_finals, gt_cargo, gt_am):
+        super().__init__(timeout=180)
+        self.interaction = interaction
+        self.player = player
+        self.alliance_name = alliance_name
+        self.actualisation_dt = actualisation_dt
+        self.langue = langue
+        self.clr = clr
+        self.sorted_months = sorted_months
+        self.monthly_finals = monthly_finals
+        self.gt_cargo = gt_cargo
+        self.gt_am = gt_am
+        
+        # --- Création des options du menu déroulant ---
+        options = []
+        for i, m_key in enumerate(sorted_months[:25]):
+            annee, mois_num = m_key.split("-")
+            nom_mois = f"{get_month_name(mois_num, langue)} {annee}"
+            
+            options.append(discord.SelectOption(label=nom_mois, value=m_key, default=(i==0), emoji="📅"))
+            
+        placeholder_txt = t(langue, "ev_aqua_select_placeholder", defaut="Sélectionnez un mois...")
+        self.select = discord.ui.Select(placeholder=placeholder_txt, options=options)
+        self.select.callback = self.on_select
+        self.add_item(self.select)
+        
+        self.current_month = sorted_months[0]
+
+    async def on_select(self, interaction: discord.Interaction):
+        self.current_month = self.select.values[0]
+        
+        for opt in self.select.options:
+            opt.default = (opt.value == self.current_month)
+            
+        embed = await self.generate_embed(self.current_month)
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def generate_embed(self, month_key):
+        annee, mois_num = month_key.split("-")
+        nom_mois = f"{get_month_name(mois_num, self.langue)} {annee}"
+        
+        final_sn = self.monthly_finals[month_key]
+        m_metrics = final_sn['metrics']
+        
+        gt_c = f"{self.gt_cargo:,}".replace(",", " ")
+        gt_a = f"{self.gt_am:,}".replace(",", " ")
+        
+        p_f = f"{m_metrics.get(100, 0):,}".replace(",", " ")
+        a_f = f"{m_metrics.get(15, 0):,}".replace(",", " ")
+        i_f = f"{m_metrics.get(16, 0):,}".replace(",", " ")
+        f_f = f"{m_metrics.get(17, 0):,}".replace(",", " ")
+        w_f = f"{m_metrics.get(18, 0):,}".replace(",", " ")
+        d_f = f"{m_metrics.get(19, 0):,}".replace(",", " ")
+
+        lbl_date = t(self.langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
+
+        profil_desc = t(self.langue, "ev_prof_desc", p=self.player, a=self.alliance_name, defaut=f"**Joueur :** {self.player}\n**Alliance :** {self.alliance_name}")
+
+        embed = discord.Embed(
+            title=t(self.langue, "ev_aqua_cumul_title", player=self.player, defaut=f"<:stats:1512517930490003726> Historique Îles Orageuses de {self.player}"),
+            description=f"{lbl_date} <t:{int(self.actualisation_dt.timestamp())}:F> (<t:{int(self.actualisation_dt.timestamp())}:R>)\n\n{profil_desc}\n",
+            color=self.clr
+        )
+        
+        stats_globales = t(self.langue, "ev_aqua_cumul_stats", gtc=gt_c, gta=gt_a, pf=p_f, defaut=(
+            f"🏆 **Total Historique Cargo :** `{gt_c}` <:aquamarinedepenser:1512162297425039423>\n"
+            f"📈 **Total Historique Aigue-Marine :** `{gt_a}` <:aquamarinetotalcollectee:1512162700518752410>"
+        ))
+
+        if "`" not in stats_globales:
+            stats_globales = stats_globales.replace(gt_c, f"`{gt_c}`").replace(gt_a, f"`{gt_a}`")
+
+        embed.add_field(
+            name=t(self.langue, "ev_aqua_cumul_overview", defaut="**<:icon_world:1512517516012814537> Vue d'ensemble historique**"),
+            value=stats_globales,
+            inline=False
+        )
+        
+        details_txt = t(self.langue, "ev_aqua_cumul_details", pf=p_f, af=a_f, i_f=i_f, f_f=f_f, wf=w_f, df=d_f, defaut=(
+            f"**Score Final Cargo :** `{p_f}` <:pointscargo:1512161268411273429>\n\n"
+            f"<:aquamarinetotalcollectee:1512162700518752410> **Aigue-marine collectées :** `{a_f}`\n"
+            f" ↳ <:aquamarineiles:1512162072249765908> *Dans les îles à ressources :* `{i_f}`\n"
+            f" ↳ <:aquamarineforts:1512162154890133506> *Dans les forts orageux :* `{f_f}`\n"
+            f" ↳ <:aquamarinegagnerjcj:1512162488504811590> *Gagné en JcJ :* `{w_f}`\n\n"
+            f"<:aquamarinedepenser:1512162297425039423> **Dépensé en points cargo :** `{d_f}`"
+        ))
+        
+        for val in [p_f, a_f, i_f, f_f, w_f, d_f]:
+            if val and f"`{val}`" not in details_txt:
+                details_txt = details_txt.replace(val, f"`{val}`")
+
+        embed.add_field(
+            name=t(self.langue, "ev_aqua_cumul_archive", m=nom_mois, defaut=f"**📜 Archives de l'édition ({nom_mois})**"),
+            value=details_txt,
+            inline=False
+        )
+        
+        await setup_embed_footer(embed, self.interaction, self.langue)
+        return embed
 
 class EventsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         
-        # 🎨 PALETTE AMÉTHYSTE ET VIOLET
         self.clr_obj_set        = discord.Color.from_rgb(75, 0, 130)     
         self.clr_bilan          = discord.Color.from_rgb(102, 51, 153)   
         self.clr_joueur_dernier = discord.Color.from_rgb(138, 43, 226)  
@@ -144,7 +236,7 @@ class EventsCog(commands.Cog):
         self.rival_check_task.cancel()
 
     # =========================================
-    # COMMANDE : EVENT JOUEUR
+    # COMMANDE : EVENT PLAYER
     # ==========================================
     @app_commands.command(name="event_player", description="View a player's latest score or history")
     @app_commands.autocomplete(event_name=event_autocomplete)
@@ -287,58 +379,26 @@ class EventsCog(commands.Cog):
                 monthly_finals = {}
                 
                 for m_key in sorted_months:
-                    final_sn = max(months_dict[m_key], key=lambda x: x['dt'])
+                    final_sn = max(months_dict[m_key], key=lambda x: x['metrics'].get(100, 0))
                     grand_total_cargo += final_sn['metrics'].get(100, 0)
                     grand_total_am += final_sn['metrics'].get(15, 0)
                     monthly_finals[m_key] = final_sn
 
-                embeds = []
-                for i, m_key in enumerate(sorted_months):
-                    annee, mois_num = m_key.split("-")
-                    nom_mois = f"{get_month_name(mois_num, langue)} {annee}"
-                    
-                    final_sn = monthly_finals[m_key]
-                    m_metrics = final_sn['metrics']
-                    
-                    gt_c = f"{grand_total_cargo:,}".replace(",", " ")
-                    gt_a = f"{grand_total_am:,}".replace(",", " ")
-                    p_f = f"{m_metrics.get(100, 0):,}".replace(",", " ")
-                    a_f = f"{m_metrics.get(15, 0):,}".replace(",", " ")
-                    i_f = f"{m_metrics.get(16, 0):,}".replace(",", " ")
-                    f_f = f"{m_metrics.get(17, 0):,}".replace(",", " ")
-                    w_f = f"{m_metrics.get(18, 0):,}".replace(",", " ")
-                    d_f = f"{m_metrics.get(19, 0):,}".replace(",", " ")
-                    
-                    stats_txt = t(langue, "ev_aqua_cumul_stats", gtc=gt_c, gta=gt_a, pf=p_f, defaut=(
-                        f"🏆 **Total Historique Cargo :** {gt_c} <:aquamarinedepenser:1512162297425039423>\n"
-                        f"📈 **Total Historique Aigue-Marine :** {gt_a} <:aquamarinetotalcollectee:1512162700518752410>\n"
-                        f"📅 **Score Final de l'édition :** {p_f} <:pointscargo:1512161268411273429>"
-                    ))
-                    
-                    details_txt = t(langue, "ev_aqua_cumul_details", af=a_f, i_f=i_f, f_f=f_f, wf=w_f, df=d_f, defaut=(
-                        f"<:aquamarinetotalcollectee:1512162700518752410> **Aigue-marine collectées :** {a_f}\n"
-                        f" ↳ <:aquamarineiles:1512162072249765908> *Dans les îles à ressources :* {i_f}\n"
-                        f" ↳ <:aquamarineforts:1512162154890133506> *Dans les forts orageux :* {f_f}\n"
-                        f" ↳ <:aquamarinegagnerjcj:1512162488504811590> *Gagné en JcJ :* {w_f}\n\n"
-                        f"<:aquamarinedepenser:1512162297425039423> **Dépensé en points cargo :** {d_f}"
-                    ))
-
-                    title = t(langue, "ev_aqua_cumul_title", player=player, defaut=f"<:stats:1512517930490003726> Historique Îles Orageuses de {player}")
-                    overv = t(langue, "ev_aqua_cumul_overview", defaut="**<:icon_world:1512517516012814537> Vue d'ensemble historique**")
-                    arch = t(langue, "ev_aqua_cumul_archive", m=nom_mois, defaut=f"**📜 Archives de l'édition ({nom_mois})**")
-
-                    embed = discord.Embed(
-                        title=title,
-                        description=f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n**Alliance :** {alliance_name}\n\n{overv}\n\n{stats_txt}\n\n{arch}\n{details_txt}",
-                        color=self.clr_joueur_cumul
-                    )
-                    await setup_embed_footer(embed, interaction, langue)
-                    embeds.append(embed)
-
-                if len(embeds) == 1: await interaction.followup.send(embed=embeds[0])
-                else:
-                    view = PaginationView(embeds)
-                    await interaction.followup.send(embed=embeds[0], view=view)
+                view = AquamarineSelectView(
+                    interaction=interaction,
+                    player=player,
+                    alliance_name=alliance_name,
+                    actualisation_dt=actualisation_dt,
+                    langue=langue,
+                    clr=self.clr_joueur_cumul,
+                    sorted_months=sorted_months,
+                    monthly_finals=monthly_finals,
+                    gt_cargo=grand_total_cargo,
+                    gt_am=grand_total_am
+                )
+                
+                embed = await view.generate_embed(sorted_months[0])
+                await interaction.followup.send(embed=embed, view=view)
                 return
 
         event_keys = TRACKER_EVENTS.get(event_name)
@@ -363,12 +423,15 @@ class EventsCog(commands.Cog):
         alliance_name = stats_data.get("alliance_name") or "Sans alliance"
 
         sessions, current_session = [], []
+        CUTOFF_DATE = datetime.fromisoformat('2026-06-30T22:40:00+00:00')
         for entry in merged_history:
             d_str = entry.get("date")
             pt = int(entry.get("point", 0))
             if not d_str: continue
             try:
                 dt = datetime.fromisoformat(d_str.replace('Z', '+00:00'))
+                if dt > CUTOFF_DATE:
+                    continue
                 if not current_session: current_session.append((dt, pt))
                 else:
                     last_dt = current_session[-1][0]
@@ -497,8 +560,6 @@ class EventsCog(commands.Cog):
         if not embed: return await interaction.followup.send(f"<:error:1512505075220611172> {error_or_lignes}")
 
         if display_mode == "list":
-            # Si le mode list est appelé, la description est gérée côté utilitaire,
-            # mais on applique quand même le footer.
             await setup_embed_footer(embed, interaction, langue)
             await interaction.followup.send(embed=embed)
         else:
@@ -766,11 +827,23 @@ class EventsCog(commands.Cog):
                 best_ev = max(month_events, key=lambda x: x['pts'])
                 nom_m = get_month_name(mois_num, langue)
                 
-                stats_txt = t(langue, "ev_woa_hist_stats", gt=f"{grand_total:,}".replace(',', ' '), m=nom_m, y=annee, mt=f"{month_total:,}".replace(',', ' '), mp=f"{best_ev['pts']:,}".replace(',', ' '), md=best_ev['dt'].strftime('%d/%m'), defaut=(
-                    f"🏆 **Total Historique :** {grand_total:,} <:woaticket:1512165398718583016>\n"
-                    f"<:stats:1512517930490003726> **Total {nom_m} {annee} :** {month_total:,} <:woaticket:1512165398718583016>\n"
-                    f"🚀 **Jour max :** {best_ev['pts']:,} <:woaticket:1512165398718583016> *(le {best_ev['dt'].strftime('%d/%m')})*"
-                ).replace(',', ' '))
+                f_gt = f"{grand_total:,}".replace(',', ' ')
+                f_mt = f"{month_total:,}".replace(',', ' ')
+                f_mp = f"{best_ev['pts']:,}".replace(',', ' ')
+                f_md = best_ev['dt'].strftime('%d/%m')
+
+                stats_txt = t(langue, "ev_woa_hist_stats", 
+                              gt=f_gt, grand_total=f_gt,
+                              m=nom_m, mois=nom_m,
+                              y=annee, annee=annee, 
+                              mt=f_mt, month_total=f_mt,
+                              mp=f_mp, max_points=f_mp,
+                              md=f_md, max_date=f_md,
+                              defaut=(
+                                f"🏆 **Total Historique :** {f_gt} <:woaticket:1512165398718583016>\n"
+                                f"<:stats:1512517930490003726> **Total {nom_m} {annee} :** {f_mt} <:woaticket:1512165398718583016>\n"
+                                f"🚀 **Jour max :** {f_mp} <:woaticket:1512165398718583016> *(le {f_md})*"
+                              ))
                 
                 lignes = []
                 for ev in month_events:
@@ -863,7 +936,7 @@ class EventsCog(commands.Cog):
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur : {e}"))
 
     # ========================================================
-    # 🏆 GROUPE DE COMMANDES RACINE : CLASSEMENT
+    # 🏆 GROUPE DE COMMANDES RACINE : LEADERBOARD
     # ========================================================
     leaderboard = app_commands.Group(name="leaderboard", description="General server rankings")
 
@@ -914,8 +987,6 @@ class EventsCog(commands.Cog):
                 medal = "🥇" if rang == 1 else "🥈" if rang == 2 else "🥉" if rang == 3 else f"**{rang}.**"
                 lignes.append(f"{medal} **{nom}** [{alli}] ➔ **{pts} <:woaticket:1512165398718583016>**")
 
-            # 💥 FIX : On injecte la réponse du premier appel (woa_base_data) dans l'extracteur
-            # L'extracteur y trouvera facilement la clé "date" et appliquera l'horodatage de l'événement !
             actualisation_dt = _get_api_timestamp(data_rank, woa_base_data)
 
             embeds = []
@@ -988,8 +1059,6 @@ class EventsCog(commands.Cog):
                 medal = "🥇" if rang == 1 else "🥈" if rang == 2 else "🥉" if rang == 3 else f"**{rang}.**"
                 lignes.append(f"{medal} **{nom}** ➔ **{pts} <:pointscargo:1512161268411273429>**")
 
-            # 💥 FIX : On injecte directement l'objet `players` qui contient TOUTES les pages
-            # pour s'assurer qu'on trouve la frappe la plus récente parmi tout le serveur.
             actualisation_dt = _get_api_timestamp(players)
 
             embeds = []
@@ -1010,6 +1079,6 @@ class EventsCog(commands.Cog):
         except Exception as e: 
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur technique : {e}"))
 
-# 🔌 Branchement du Cog
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(EventsCog(bot))

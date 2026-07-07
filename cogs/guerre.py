@@ -14,7 +14,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-# 🛠️ Import de la boîte à outils unifiée
 from utils import (
     BASE_DATA_PATH, 
     ALLIANCES_DIR,  
@@ -78,13 +77,10 @@ def _get_api_timestamp(*sources):
     def search_ts(obj):
         if isinstance(obj, dict):
             for k, v in obj.items():
-                # On ajoute "date", "collected_at" et "last_collected_at" à la liste des clés traquées
                 if k in ["updated_at", "updatedAt", "last_update", "date", "collected_at", "last_collected_at"] and isinstance(v, str):
-                    # Filtre léger pour être sûr que c'est une chaîne de type date ISO (YYYY-MM-DD...)
                     if len(v) >= 10 and v[4] == '-':
                         dates_trouvees.append(v)
             
-            # Descente récursive
             for v in obj.values():
                 if isinstance(v, (dict, list)):
                     search_ts(v)
@@ -94,20 +90,17 @@ def _get_api_timestamp(*sources):
                 if isinstance(item, (dict, list)):
                     search_ts(item)
 
-    # On lance l'aspiration des dates sur toutes les sources fournies
     for src in sources:
         if src:
             search_ts(src)
 
     if dates_trouvees:
         try:
-            # Magie de Python : max() sur des chaînes ISO renvoie toujours la chronologie la plus récente !
             latest_str = max(dates_trouvees)
             return datetime.fromisoformat(latest_str.replace('Z', '+00:00'))
         except:
             pass
             
-    # Fallback de sécurité si le JSON est totalement vide de dates
     return discord.utils.utcnow()
 
 # ========================================================
@@ -125,7 +118,6 @@ class CiblePaginationView(discord.ui.View):
         self.ruleset = ruleset
         self.langue = langue
         
-        # 🌍 Traduction dynamique des boutons
         self.btn_prev.label = t(langue, "guerre_btn_prev", defaut="◀️ Page Précédente")
         self.btn_next.label = t(langue, "guerre_btn_next", defaut="Page Suivante ▶️")
         self.btn_rerun.label = t(langue, "guerre_btn_rerun", defaut="🔄 Relancer une vague")
@@ -263,10 +255,8 @@ class GuerreCog(commands.Cog):
                 color=self.clr_scanner
             )
             
-            # Récupération du texte i18n
             desc_i18n = t(langue, "guerre_scan_desc", act=len(members), pro=len(colombes), vul=len(cibles_libres), tp=titre_page, defaut=f"<:players:1512504277392953426> **Membres Actifs :** {len(members)}\n<:peace:1512503935892586566> **Sous protection :** {len(colombes)}\n<:cible:1512573711134490775> **Cibles vulnérables :** {len(cibles_libres)}\n\n**{titre_page}**")
             
-            # Ajout de la ligne d'actualisation explicite
             lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
             embed.description = f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{desc_i18n}"
             
@@ -299,7 +289,7 @@ class GuerreCog(commands.Cog):
             await interaction.followup.send(embed=embeds[0], view=view)
 
     # ==========================================
-    # 📍 COMMANDE : PROXIMITÉ
+    # 📍 COMMANDE : PROXIMITY
     # ==========================================
     @app_commands.command(name="proximity", description="Find the enemy castles closest to you")
     @app_commands.autocomplete(my_player=joueur_autocomplete)
@@ -448,7 +438,7 @@ class GuerreCog(commands.Cog):
             await interaction.followup.send(embed=embeds[0], view=view)
 
     # ==========================================
-    # 🎯 COMMANDE : CIBLE
+    # 🎯 COMMANDE : TARGET
     # ==========================================
     @app_commands.command(name="target", description="Find legal targets according to the chosen regulations")
     @app_commands.autocomplete(attacker=joueur_autocomplete)
@@ -629,7 +619,6 @@ class GuerreCog(commands.Cog):
             })
 
             if not pool_candidats:
-                # 💥 FIX : On traduit le nom de la règle proprement
                 nom_regle_raw = rules.get("nom", ruleset.upper())
                 nom_regle = t(langue, nom_regle_raw, defaut=nom_regle_raw)
             
@@ -718,7 +707,6 @@ class GuerreCog(commands.Cog):
                     active_affichage = tranche.get("affichage", active_affichage)
                     break
         
-        # 👑 RÉSOLUTION DES CLÉS DU REGLEMENT VIA t()
         key_feu = active_affichage.get("feu_min_soldats")
         txt_feu = t(langue, key_feu, defaut=str(key_feu)) if key_feu else t(langue, "guerre_regle_none", defaut="Non défini")
         
@@ -996,7 +984,6 @@ class GuerreCog(commands.Cog):
 
         affichage = config.get("affichage", rules.get("affichage", {}))
         
-        # 👑 RÉSOLUTION DES CLÉS DU REGLEMENT VIA t()
         key_ap = affichage.get("ap_regle")
         txt_ap = t(langue, key_ap, defaut=str(key_ap)) if key_ap else t(langue, "guerre_regle_none", defaut="Non défini")
         
@@ -1025,7 +1012,6 @@ class GuerreCog(commands.Cog):
         embed.add_field(name=t(langue, "guerre_hr_field_atk", a=a_name, defaut=f"⚔️ Attaquant : {a_name}"), value=f"<:icon_alliance:1512573872774451210> {a_alli_txt}\n<:lvl:1512571152524906596> Lvl {a_lvl}/{a_leg} (Palier {a_tier})\n<:pp2:1512571027119538335> {format_num(a_pp)} PP", inline=True)
         embed.add_field(name=t(langue, "guerre_hr_field_def", d=d_name, defaut=f"🛡️ Défenseur : {d_name}"), value=f"<:icon_alliance:1512573872774451210> {d_alli_txt}\n<:lvl:1512571152524906596> Lvl {d_lvl}/{d_leg} (Palier {d_tier})\n<:pp2:1512571027119538335> {format_num(d_pp)} PP", inline=True)
         
-        # 💥 FIX : Ajout des variables de distance/différence et de fraîcheur dans la traduction
         lbl_dist_data = t(langue, "guerre_cible_field_dist", defaut="Distance :")
         lbl_diff_data = t(langue, "guerre_hr_field_diff", defaut="Différence :")
         lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
@@ -1280,7 +1266,6 @@ class GuerreCog(commands.Cog):
         p1_lvl, p2_lvl = f"{p1['lvl']}(L.{p1['leg']})", f"{p2['lvl']}(L.{p2['leg']})"
         p1_rnk, p2_rnk = f"#{p1['rang']}", f"#{p2['rang']}"
 
-        # 💥 FIX : Remplacement des en-têtes en dur par des traductions
         lbl_alli_s = t(langue, "ev_short_alli", defaut="Alli.")
         lbl_pa_s = t(langue, "ev_short_puiss_alli", defaut="Puiss. Alli")
         lbl_niv_s = t(langue, "ev_short_niv", defaut="Niv.")
@@ -1299,7 +1284,6 @@ class GuerreCog(commands.Cog):
 
         lbl_f1 = t(langue, "guerre_comp_f1", defaut="<:players:1512504277392953426> Fiche d'Identité Générale")
         
-        # 💥 FIX CRASH : L'argument manquant `p2_rnk` a été rajouté à `build_row` !
         embed.add_field(name=lbl_f1, value=f"```\n{build_row(lbl_alli_s, p1_all, am_1, p2_all, am_2)}\n{build_row(lbl_pa_s, format_num(p1['alli_might']), '', format_num(p2['alli_might']), '')}\n{build_row(lbl_niv_s, p1_lvl, lvl_1, p2_lvl, lvl_2)}\n{build_row(lbl_rang_s, p1_rnk, rnk_1, p2_rnk, rnk_2)}\n```", inline=False)
 
         lbl_f2 = t(langue, "guerre_comp_f2", defaut="<:2_:1512574740915818527> Axe Militaire & Robustesse")
@@ -1322,7 +1306,7 @@ class GuerreCog(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     # ==========================================
-    # 🤝 GROUPE DE COMMANDES : DIPLOMATIE
+    # 🤝 GROUPE DE COMMANDES : DIPLOMACY
     # ==========================================
     diplo_group = app_commands.Group(
         name="diplomacy", 

@@ -9,7 +9,6 @@ import sys
 import logging
 from logging.handlers import TimedRotatingFileHandler
 
-# Configuration du Logger
 os.makedirs('/app/logs/serveur', exist_ok=True)
 logger = logging.getLogger("ServerScanner")
 logger.setLevel(logging.INFO)
@@ -158,13 +157,11 @@ class FullServerScanner:
         file_size_mb = filepath.stat().st_size / (1024 * 1024)
         logger.info(f"💾 Résultats sauvegardés: {filepath} ({file_size_mb:.2f} Mo)")
         
-        # 💥 On écrit un fichier flag pour dire au bot Discord qu'il peut mettre à jour sa RAM !
         flag_file = Path('/app/data/scan.flag')
         with open(flag_file, 'w') as f: f.write(serveur)
         
         return filepath
 
-    # 🧹 NOUVEAU : Fonction de nettoyage automatique du NAS !
     def nettoyer_vieux_fichiers(self, jours=14):
         logger.info(f"🧹 Démarrage du nettoyage des archives de plus de {jours} jours...")
         now = time.time()
@@ -182,7 +179,6 @@ class FullServerScanner:
                     except Exception as e:
                         logger.error(f"❌ Erreur lors de la suppression de {filepath}: {e}")
                         
-        # Nettoyage des dossiers vides
         for dirpath in sorted(self.base_output_dir.rglob('*'), key=lambda p: len(p.parts), reverse=True):
             if dirpath.is_dir() and not any(dirpath.iterdir()):
                 try: dirpath.rmdir()
@@ -192,11 +188,9 @@ class FullServerScanner:
     
     def run(self, serveur_cible=None):
         if serveur_cible:
-            # 🚀 MODE URGENCE : Lancé par le bot pour un serveur spécifique
             servers_to_scan = [serveur_cible]
             logger.info(f"🚀 LANCEMENT D'URGENCE POUR : {serveur_cible}")
         else:
-            # 🕰️ MODE ROUTINE : Lancé par le NAS à 3h du matin
             servers_to_scan = self.get_active_servers()
             logger.info(f"🚀 DÉMARRAGE DU MULTI-SCAN QUOTIDIEN : {len(servers_to_scan)} serveur(s) : {', '.join(servers_to_scan)}")
         
@@ -213,18 +207,15 @@ class FullServerScanner:
                 duration = time.time() - start_time
                 self.save_results(players, duration, self.server)
             
-            # ⏳ PAUSE INTELLIGENTE (Uniquement si on est en mode routine avec plusieurs serveurs)
             if not serveur_cible and index < len(servers_to_scan) - 1:
                 logger.info(f"⏳ Scan de {srv} terminé. Pause de 2 minutes...")
                 time.sleep(120)
                 
-        # 🧹 À la fin du scan global, on passe le balai !
         if not serveur_cible:
             self.nettoyer_vieux_fichiers(jours=14)
 
 if __name__ == "__main__":
     scanner = FullServerScanner()
-    # 💡 L'astuce magique : si le bot ajoute un argument (ex: python3 server_scanner.py E4K_DE1)
     if len(sys.argv) > 1:
         serveur_demande = sys.argv[1]
         scanner.run(serveur_cible=serveur_demande)

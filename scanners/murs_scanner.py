@@ -10,7 +10,6 @@ from datetime import datetime
 from urllib.parse import quote
 from logging.handlers import TimedRotatingFileHandler
 
-# 🛠️ Configuration du Logger
 os.makedirs('/app/logs/murs', exist_ok=True)
 logger = logging.getLogger("MursScanner")
 logger.setLevel(logging.INFO)
@@ -36,7 +35,6 @@ class MursScanner:
             "Accept": "application/json"
         })
         
-        # 🌍 Mapping des zones pour l'API fly.dev (PC & MOBILE)
         self.fly_zones = {
             "E4K_FR1": "EmpirefourkingdomsExGG_2",
             "INT3": "EmpireEx_43",
@@ -76,7 +74,6 @@ class MursScanner:
     def scan_murs_serveur(self, serveur):
         logger.info(f"🚀 Extraction des murs pour le serveur : {serveur}")
         
-        # 🛑 VÉRIFICATION ZONE : On s'assure d'avoir la bonne adresse de serveur API
         zone_api = self.fly_zones.get(serveur)
         if not zone_api:
             logger.error(f"❌ La zone API fly.dev pour {serveur} n'est pas configurée dans self.fly_zones. Scan ignoré.")
@@ -114,9 +111,7 @@ class MursScanner:
                 
             raw_aid = str(aid_val)
             if a_name and a_name != "Sans alliance":
-                # 💥 LA SÉCURITÉ UNIVERSELLE :
-                # GGE-Tracker ajoute TOUJOURS un code serveur à 3 chiffres à la fin des IDs d'alliances.
-                # On coupe ces 3 chiffres pour retrouver l'ID natif (ex: 242061 -> 242).
+
                 if len(raw_aid) > 3:
                     real_aid = raw_aid[:-3]
                 else:

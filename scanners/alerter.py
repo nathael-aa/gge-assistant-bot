@@ -6,11 +6,8 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-# Charge les variables d'environnement (du fichier .env)
-# Utile si tu testes le script manuellement hors docker
 load_dotenv()
 
-# On récupère le token
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 async def envoyer_alerte():
@@ -27,7 +24,6 @@ async def envoyer_alerte():
             user = await bot.fetch_user(1166375576685265040)
             script_nom = sys.argv[1] if len(sys.argv) > 1 else "Inconnu"
             
-            # 🛠️ NOUVEAU : On déduit le dossier en fonction du nom du script
             dossier = "general"
             if "server" in script_nom.lower(): dossier = "serveur"
             elif "murs" in script_nom.lower(): dossier = "murs"

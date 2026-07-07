@@ -9,7 +9,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-# Import des outils partagés depuis la boîte à outils
 from utils import (
     MON_ID_DISCORD, 
     BOT_VERSION,       
@@ -29,7 +28,7 @@ logger = logging.getLogger("GGE_Bot")
 class AdminCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.admin_lang = "fr" # Langue forcée pour le panel admin
+        self.admin_lang = "fr"
 
     # ==========================================
     # 🔄 SYNCHRONISATION DES COMMANDES
@@ -62,14 +61,12 @@ class AdminCog(commands.Cog):
         self.bot.maintenance_mode = not self.bot.maintenance_mode
         await save_maintenance_async(self.bot.maintenance_mode)
         
-        # Sécurité sur la langue admin
         langue = getattr(self, "admin_lang", "fr")
         
         if self.bot.maintenance_mode:
             msg = t(langue, "admin_maint_on", defaut="🚧 **Mode Maintenance : 🔴 ACTIVÉ**\n*Le bot ignore toutes les commandes Slash.*")
             await ctx.send(msg)
             
-            # 💥 Identique à bot.py
             statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
             activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
             await self.bot.change_presence(activity=activity, status=discord.Status.dnd)
@@ -77,7 +74,6 @@ class AdminCog(commands.Cog):
             msg = t(langue, "admin_maint_off", defaut="🚧 **Mode Maintenance : 🟢 DÉSACTIVÉ**\n*Le bot est de nouveau accessible à tous.*")
             await ctx.send(msg)
             
-            # 💥 Identique à bot.py
             activity = discord.Activity(type=discord.ActivityType.watching, name="/setup ➔ /help")
             await self.bot.change_presence(activity=activity, status=discord.Status.online)
 
@@ -257,7 +253,6 @@ class AdminCog(commands.Cog):
         from utils import BASE_DIR, LOCALES_DIR, charger_langues
         
         # 1. Scanner le code Python pour extraire les clés exactes
-        # Cette regex cherche spécifiquement la syntaxe : t(langue, "ma_cle", ...)
         pattern = re.compile(r'\bt\s*\(\s*[^,]+,\s*["\']([a-zA-Z0-9_]+)["\']')
         cles_utilisees = set()
         
@@ -268,7 +263,7 @@ class AdminCog(commands.Cog):
                     with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
                         cles_utilisees.update(pattern.findall(f.read()))
                         
-        # 2. Ajouter manuellement les clés dynamiques (qui n'apparaissent pas en dur dans le code)
+        # 2. Ajouter manuellement les clés dynamiques
         for i in range(1, 13): 
             cles_utilisees.add(f"month_{i:02d}")
             
@@ -281,7 +276,7 @@ class AdminCog(commands.Cog):
         
         log_msg = []
         
-        # 3. Traitement de FR.JSON (Le fichier Maître)
+        # 3. Traitement de FR.JSON
         fr_file = LOCALES_DIR / 'fr.json'
         if not fr_file.exists():
             return await ctx.send("❌ Impossible de trouver `fr.json`.")
@@ -304,7 +299,7 @@ class AdminCog(commands.Cog):
             
         log_msg.append(f"🇫🇷 **fr.json** : {len(manquantes_fr)} ajoutées, {len(inutiles_fr)} supprimées.")
         
-        # 4. Traitement des autres langues (en, de) par rapport au fichier Maître
+        # 4. Traitement des autres langues (en, de) par rapport au fichier
         for lang in ['en', 'de']:
             lang_file = LOCALES_DIR / f'{lang}.json'
             if not lang_file.exists(): continue
@@ -317,7 +312,6 @@ class AdminCog(commands.Cog):
             l_inutiles = l_existantes - set(fr_data.keys())
             
             for c in l_manquantes: 
-                # On insère le texte FR avec le tag TODO pour aider la traduction
                 texte_aide = fr_data[c]
                 lang_data[c] = f"[TODO] {texte_aide}" if texte_aide != "[TODO] Texte manquant" else "[TODO] Texte manquant"
                 
@@ -364,13 +358,11 @@ class AdminCog(commands.Cog):
 
         # Création du fichier CSV en mémoire
         output = io.StringIO()
-        writer = csv.writer(output, delimiter=';') # Le point-virgule est mieux géré par l'Excel européen
+        writer = csv.writer(output, delimiter=';')
         
-        # En-têtes des colonnes
         writer.writerow(['Clé (NE PAS TOUCHER)', 'Texte Français (RÉFÉRENCE)', f'Traduction ({langue_cible.upper()})', 'Variables obligatoires'])
         
         for cle, texte_fr in fr_data.items():
-            # Extraire les variables ex: {joueur}, {a}
             variables = re.findall(r'\{[a-zA-Z0-9_]+\}', texte_fr)
             vars_str = ", ".join(variables) if variables else "Aucune"
             
@@ -378,9 +370,8 @@ class AdminCog(commands.Cog):
             
             writer.writerow([cle, texte_fr, texte_cible, vars_str])
             
-        # Conversion pour l'envoi sur Discord
         output.seek(0)
-        file_bytes = io.BytesIO(output.getvalue().encode('utf-8-sig')) # utf-8-sig force Excel à bien lire les accents
+        file_bytes = io.BytesIO(output.getvalue().encode('utf-8-sig'))
         discord_file = discord.File(fp=file_bytes, filename=f"traduction_{langue_cible}.csv")
         
         embed = discord.Embed(

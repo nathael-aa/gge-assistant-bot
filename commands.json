@@ -30,6 +30,12 @@
         "options": []
     },
     {
+        "name": "rank",
+        "description": "Live event analysis and rankings",
+        "type": 1,
+        "options": []
+    },
+    {
         "name": "setup",
         "description": "Configure the language and game server for this Discord or your profile",
         "type": 1,

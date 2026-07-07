@@ -4,10 +4,11 @@ logs/
 
 # Les fichiers de configuration secrets
 .env
-utils.py
 
 # Fichiers système et Python
 __pycache__/
+cogs/__pycache__
+cogs/line_bridge.py
 scanners/__pycache__
 *.pyc
 .DS_Store

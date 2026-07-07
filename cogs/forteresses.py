@@ -7,12 +7,11 @@ import aiohttp
 import urllib.parse
 import traceback
 from datetime import datetime, timedelta
-from collections import Counter  # 💥 CORRECTIF : Import rajouté ici !
+from collections import Counter
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-# 🛠️ Import de la boîte à outils unifiée (Nouvelle Architecture)
 from utils import (
     JOUEURS_DIR,     
     CONFIG_DIR,      
@@ -23,8 +22,8 @@ from utils import (
     save_dungeons_async,
     get_cached_data,
     PaginationView,
-    get_server_config,   # 🛠️ NOUVEAU
-    get_api_headers      # 🛠️ NOUVEAU
+    get_server_config,
+    get_api_headers
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -70,7 +69,7 @@ def _get_api_timestamp(*sources):
 # ==========================================
 class FortressActionView(discord.ui.View):
     def __init__(self, cog, user_id: str, cibles: list, joueur: str, serveur: str, langue: str = "fr"):
-        super().__init__(timeout=7200) # ⏳ Délai de 2 heures maximum (7200 secondes)
+        super().__init__(timeout=7200)
         self.cog = cog
         self.user_id = user_id
         self.cibles = cibles
@@ -78,7 +77,6 @@ class FortressActionView(discord.ui.View):
         self.serveur = serveur
         self.langue = langue
 
-        # Création dynamique des boutons pour gérer la traduction facilement
         self.btn_verify = discord.ui.Button(
             style=discord.ButtonStyle.secondary, 
             label=t(langue, "fort_btn_verify", defaut="🔍 Vérifier ces cibles"),
@@ -115,8 +113,8 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         super().__init__()
         
         # 🎨 PALETTE VERT RADAR / EMERAUDE
-        self.clr_activation = discord.Color.from_rgb(0, 204, 153) # 📡 Menthe Éclatante (Écran d'activation)
-        self.clr_attente = discord.Color.from_rgb(61, 140, 107)    # 📭 Vert Sauge / De gris (Écran calme plat)
+        self.clr_activation = discord.Color.from_rgb(0, 204, 153) 
+        self.clr_attente = discord.Color.from_rgb(61, 140, 107)
 
     async def cog_load(self):
         if not self.dungeon_spy_task.is_running():
@@ -202,7 +200,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             info["notified"] = notified
             maintenant = discord.utils.utcnow()
             freq = info.get("frequence_minutes", 5)
-            # On repousse le prochain scan auto pour éviter de spammer juste après le clic
             info["next_scan"] = (maintenant + timedelta(minutes=freq)).isoformat().replace('+00:00', 'Z')
             data["sessions"][user_id] = info
             await save_dungeons_async(data)
@@ -227,7 +224,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         """Réorganise les cibles pour regrouper les coordonnées proches visuellement."""
         if not cibles: return []
         
-        # On sépare par royaume pour ne pas lier des cibles de mondes différents
         from collections import defaultdict
         by_kid = defaultdict(list)
         for c in cibles:
@@ -235,16 +231,13 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             
         result = []
         for kid, items in by_kid.items():
-            # On garde le premier élément intact (le plus proche ou le plus urgent)
             current = items.pop(0)
             result.append(current)
             
-            # On cherche en boucle le voisin le plus proche pour tracer un chemin
             while items:
                 best_idx = 0
                 best_dist = float('inf')
                 for i, candidate in enumerate(items):
-                    # Distance mathématique (Pythagore) entre X et Y
                     dist_sq = (current['x'] - candidate['x'])**2 + (current['y'] - candidate['y'])**2
                     if dist_sq < best_dist:
                         best_dist = dist_sq
@@ -317,7 +310,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             cibles_dispo.sort(key=lambda c: c["dist"] if c["dist"] != -1.0 else 99999)
             cibles_a_envoyer = cibles_dispo[:10]
             
-            # 💥 TRI SPATIAL DES CIBLES LIBRES
             cibles_a_envoyer = self.sort_targets_by_path(cibles_a_envoyer)
             
             sessions_modifiees = False
@@ -408,7 +400,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             status_label = t(langue, "fort_status_anticip", defaut="🔴 Verrouillée pendant")
 
         if cibles_finales:
-            # 💥 TRI SPATIAL DES CIBLES EN ATTENTE
             cibles_finales = self.sort_targets_by_path(cibles_finales)
 
             sessions_modifiees = False
@@ -441,7 +432,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
     @app_commands.describe(
         player="The player's username to center the search on",
         ice="Monitor the Everwinter Glacier? (Default: False)",
-        sands="Monitor the Burning Sands? (Default: False)", # 💥 FIX : "sands" et non "sards"
+        sands="Monitor the Burning Sands? (Default: False)",
         peaks="Monitor the Fire Peaks? (Default: False)"
     )
     async def f_scan(
@@ -468,7 +459,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             err_msg = t(langue, "fort_err_no_realms", defaut="<:error:1512505075220611172> Tu as laissé tous les mondes sur `False`. Active au moins un royaume !")
             return await interaction.followup.send(err_msg, ephemeral=False)
 
-        # 🔐 Sécurisé : Lecture asynchrone avec verrou
         data = await load_dungeons_async()
         nb_sessions_actives = len(data.get("sessions", {}))
         freq_val = min(20, 5 + (nb_sessions_actives // 3))
@@ -613,7 +603,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             logger.error(f"🚨 [FORTERESSES CRASH] : {traceback.format_exc()}")
 
     # ==========================================
-    # 📜 Forteresses : HISTORIQUE DES ATTAQUES
+    # 📜 Forteresses : HISTORY
     # ==========================================
     @app_commands.command(name="history", description="View a player's fortress attack history (up to 365 days)")
     @app_commands.autocomplete(player=joueur_autocomplete)
@@ -626,7 +616,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         base_api = "https://api.gge-tracker.com/api/v1"
         lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
 
-        # 1. Résolution du joueur
         player_id = None
         vrai_nom = player
         cache = await get_cached_data(serveur)
@@ -652,7 +641,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         if not player_id:
             return await interaction.followup.send(t(langue, "ev_woa_player_not_found", p=player, defaut=f"<:error:1512505075220611172> Joueur **{player}** introuvable sur le serveur {serveur}."))
 
-        # 2. Récupération de l'historique des forteresses (365 jours)
         url_history = f"{base_api}/dungeons/player/{player_id}?lastDays=365"
         try:
             async with self.bot.session.get(url_history, headers=headers, timeout=12) as r:
@@ -667,13 +655,10 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         if not dungeons:
             return await interaction.followup.send(t(langue, "fort_hist_empty", p=vrai_nom, defaut=f"📭 **{vrai_nom}** n'a attaqué aucune forteresse enregistrée durant l'année écoulée."))
 
-        # Extraction du timestamp
         actualisation_dt = _get_api_timestamp(data)
 
-        # 3. Calcul des Statistiques
         total_hits = len(dungeons)
         
-        # Royaume préféré et Comptage
         dict_royaumes = {
             1: t(langue, "fort_realm_sands", defaut="Sables <:dungeon1:1512573842277794062>"), 
             2: t(langue, "fort_realm_ice", defaut="Glaces <:dungeon2:1512573843267518546>"), 
@@ -681,7 +666,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         }
         kid_counts = Counter(d.get("kid") for d in dungeons if d.get("kid"))
         
-        # 💥 NOUVEAU : Calcul des gains estimés en Rubis
         total_rubies = (kid_counts.get(1, 0) * 280) + (kid_counts.get(2, 0) * 50) + (kid_counts.get(3, 0) * 370)
         rubies_str = f"{total_rubies:,}".replace(",", " ")
         
@@ -689,7 +673,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         royaume_prefere = dict_royaumes.get(best_kid, f"Monde {best_kid}")
         pct_kid = (best_kid_count / total_hits) * 100
 
-        # Jour le plus actif
         date_counts = Counter(d.get("attacked_at", "")[:10] for d in dungeons if d.get("attacked_at"))
         best_date_str, best_date_count = date_counts.most_common(1)[0]
         try:
@@ -698,8 +681,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         except:
             jour_actif_str = best_date_str
 
-        # Formatage des stats en texte
-        # 💥 FIX : Ajout de rub=rubies_str et format de substitution
         stats_desc = t(langue, "fort_hist_stats", 
             tot=total_hits, 
             rp=royaume_prefere, 
@@ -716,7 +697,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             )
         )
 
-        # 4. Formatage de la liste (Triée de la plus récente à la plus ancienne)
         dungeons.sort(key=lambda x: x.get("attacked_at", ""), reverse=True)
         
         lignes = []
@@ -736,9 +716,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                 
             lignes.append(f"🔹 {date_fmt} │ {realm_str} ` {x}:{y} `")
 
-        # 5. Création des pages (Embeds)
         embeds = []
-        # On définit une taille de chunk plus petite pour être sûr de ne pas dépasser
         chunk_size = 10 
         nb_pages = max(1, (len(lignes) - 1) // chunk_size + 1)
 
@@ -751,7 +729,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             embed = discord.Embed(title=title, color=self.clr_attente)
             embed.description = f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{stats_desc}"
             
-            # Gestion du découpage du champ "Registre"
             field_value = ""
             for ligne in chunk:
                 if len(field_value) + len(ligne) + 1 > 1000:
@@ -764,7 +741,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             await setup_embed_footer(embed, interaction, langue)
             embeds.append(embed)
 
-        # 6. Envoi
         if len(embeds) == 1:
             await interaction.followup.send(embed=embeds[0])
         else:

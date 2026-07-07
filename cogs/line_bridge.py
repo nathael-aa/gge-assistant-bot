@@ -7,7 +7,6 @@ from aiohttp import web
 import discord
 from discord.ext import commands
 
-# 🛠️ On importe nos outils depuis utils.py (Nouvelle Architecture)
 from utils import (
     t, 
     get_server_config, 
@@ -19,9 +18,9 @@ logger = logging.getLogger("GGE_Bot")
 # ========================================================
 # ⚙️ CONFIGURATION DES SALONS ET RÔLES
 # ========================================================
-LOG_CHANNEL_ID = 1507879126172831744      # Salon "Tous les Logs"
-INFO_CHANNEL_ID = 1507438409684090921     # Salon "Infos & @everyone"
-ATTACK_CHANNEL_ID = 1507438545063776407   # Salon "Alerte Attaque"
+LOG_CHANNEL_ID = 1507879126172831744      
+INFO_CHANNEL_ID = 1507438409684090921     
+ATTACK_CHANNEL_ID = 1507438545063776407   
 
 NOTIFICATION_ROLE_ID = 1507436182575780050 
 WEBHOOK_PORT = 8089
@@ -33,7 +32,6 @@ class AlertButtonView(discord.ui.View):
     def __init__(self, role_id: int, langue: str = "fr"):
         super().__init__(timeout=None)
         self.role_id = role_id
-        # 🌍 Traduction dynamique du bouton à la création
         self.trigger_alert.label = t(langue, "line_btn_alert_init", defaut="🚨 Déclencher l'Alerte")
 
     @discord.ui.button(style=discord.ButtonStyle.danger, custom_id="trigger_attack_alert")
@@ -49,7 +47,6 @@ class AlertButtonView(discord.ui.View):
 class EveryoneButtonView(discord.ui.View):
     def __init__(self, langue: str = "fr"):
         super().__init__(timeout=None)
-        # 🌍 Traduction dynamique du bouton à la création
         self.trigger_everyone.label = t(langue, "line_btn_every_init", defaut="🔔 Mentionner tout le monde")
 
     @discord.ui.button(style=discord.ButtonStyle.primary, custom_id="trigger_everyone_alert")
@@ -73,12 +70,9 @@ class LineBridgeCog(commands.Cog):
         self.runner = None
 
     async def cog_load(self):
-        # 🔄 Enregistrement des vues pour qu'elles restent actives même après un redémarrage du bot
-        # (On utilise la langue FR par défaut au démarrage pour le cache interne de Discord)
         self.bot.add_view(AlertButtonView(role_id=NOTIFICATION_ROLE_ID, langue="fr"))
         self.bot.add_view(EveryoneButtonView(langue="fr"))
         
-        # Lancement du serveur HTTP
         await self.start_http_server()
 
     async def cog_unload(self):
@@ -109,7 +103,6 @@ class LineBridgeCog(commands.Cog):
                     line_msg = event["message"]["text"]
                     msg_lower = line_msg.lower()
                     
-                    # 🌍 DÉTECTION DE LA LANGUE DU SERVEUR
                     langue = "fr"
                     log_chan = self.bot.get_channel(LOG_CHANNEL_ID)
                     if log_chan and hasattr(log_chan, "guild"):
@@ -121,12 +114,10 @@ class LineBridgeCog(commands.Cog):
                                     langue = data_srv.get(str(log_chan.guild.id), {}).get("langue", "fr")
                         except: pass
                     
-                    # 1. SALON LOGS : Tout envoyer ici (brut)
                     if log_chan:
                         msg_log = t(langue, "line_log_msg", msg=line_msg, defaut=f"📥 **Log Line** : {line_msg}")
                         await log_chan.send(msg_log)
 
-                    # 2. SALON INFOS : Si @all ET 🔥
                     if "@all" in msg_lower and "🔥" in msg_lower:
                         info_chan = self.bot.get_channel(INFO_CHANNEL_ID)
                         if info_chan:
@@ -135,7 +126,6 @@ class LineBridgeCog(commands.Cog):
                             view = EveryoneButtonView(langue=langue)
                             await info_chan.send(embed=embed, view=view)
 
-                    # 3. SALON ATTAQUE : Si mot-clé alerte (off, attaque, attack, angriff, attacco)
                     if any(mot in msg_lower for mot in ["off","raid","attaque","attack", "attacke", "angriff", "attacco"]):
                         atk_chan = self.bot.get_channel(ATTACK_CHANNEL_ID)
                         if atk_chan:

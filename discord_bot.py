@@ -12,7 +12,6 @@ from logging.handlers import TimedRotatingFileHandler
 import discord
 from discord.ext import commands, tasks
 
-# 🛠️ On importe nos constantes et outils depuis la boîte à outils
 from utils import TOKEN, BOT_VERSION, MON_ID_DISCORD, load_maintenance, load_blocks_async, get_cached_data, CACHE, charger_langues, CONFIG_DIR, get_server_config, t
 
 # ==========================================
@@ -62,7 +61,7 @@ class GGEAssistantBot(commands.Bot):
                 cmd_data = {
                     "name": cmd.name,
                     "description": cmd.description,
-                    "type": 1, # 1 = Chat Input (Slash Command)
+                    "type": 1,
                     "options": self.serialize_options(cmd.options) if hasattr(cmd, 'options') else []
                 }
                 payload.append(cmd_data)
@@ -99,6 +98,7 @@ class GGEAssistantBot(commands.Bot):
             "cogs.admin", 
             "cogs.aide", 
             "cogs.calendrier", 
+            "cogs.classement",
             "cogs.config", 
             "cogs.events", 
             "cogs.forteresses", 
@@ -114,7 +114,6 @@ class GGEAssistantBot(commands.Bot):
             except Exception as e:
                 logger.error(f"❌ Erreur {ext} : {e}")
 
-        # On synchronise les commandes après avoir chargé les Cogs
         await self.tree.sync()
         self.export_commands_json()
         if not self.flag_watcher_task.is_running():
@@ -125,7 +124,6 @@ class GGEAssistantBot(commands.Bot):
         charger_langues()
         logger.info(f"✅ Bot connecté en tant que {self.user} (ID: {self.user.id})")
         
-        # 1. Définir le statut (pastille) et l'activité
         if self.maintenance_mode:
             statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
             activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
@@ -134,7 +132,6 @@ class GGEAssistantBot(commands.Bot):
             activity = discord.Activity(type=discord.ActivityType.watching, name="/setup ➔ /help")
             target_status = discord.Status.online # 🟢 Pastille verte (En ligne)
 
-        # 2. Appliquer les deux paramètres
         await self.change_presence(activity=activity, status=target_status)
         
         logger.info(f"📡 Statut mis à jour : {activity.name} | Pastille : {target_status}")
@@ -155,7 +152,6 @@ class GGEAssistantBot(commands.Bot):
                 logger.info("🔄 [Watcher] Fichier scan.flag effacé ! Fin des écritures détectée. Actualisation de la RAM...")
                 self.scan_flag_detected = False
                 try:
-                    # On force l'expiration temporelle de tous les caches serveurs
                     for srv in CACHE:
                         CACHE[srv]['last_refresh'] = 0 
                     logger.info("✅ [Watcher] Le cache mémoire sera réactualisé à la prochaine commande.")
@@ -168,7 +164,6 @@ class GGEAssistantBot(commands.Bot):
     async def global_interaction_check(self, interaction: discord.Interaction) -> bool:
         cmd_name = interaction.command.qualified_name if interaction.command else interaction.data.get("name", "inconnue")
         
-        # 💥 RÉCUPÉRATION DE LA LANGUE POUR LE VIDEUR
         langue, _ = await get_server_config(interaction)
         
         # --- 1. SYSTÈME DE LOGS ---

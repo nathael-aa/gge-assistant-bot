@@ -11,7 +11,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-# 🛠️ On importe nos variables partagées (Nouvelle Architecture)
 from utils import (
     BASE_DATA_PATH, 
     CONFIG_DIR,
@@ -26,7 +25,7 @@ from utils import (
     get_discord_timestamp,
     get_server_config,   
     get_api_headers,
-    SERVER_SCAN_MINUTES  # 💥 Le dictionnaire des minutes par serveur !
+    SERVER_SCAN_MINUTES
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -205,7 +204,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     logger.error(f"Erreur MP à {user_id} : {e}")
 
     # ==========================================
-    # 🕵️‍♂️ COMMANDES : RADAR JOUEUR
+    # 🕵️‍♂️ COMMANDES : RADAR PLAYER
     # ==========================================
     @app_commands.command(name="add", description="Add a player to your personal radar (Limit: 25 followed)")
     @app_commands.autocomplete(player=joueur_autocomplete)
@@ -419,7 +418,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             await interaction.followup.send(msg)
 
     # ==========================================
-    # 📋 COMMANDE : LISTE GLOBALE
+    # 📋 COMMANDE : LIST GLOBAL
     # ==========================================
     @app_commands.command(name="list", description="Display your personal radar (Players & Alliances)")
     async def s_list(self, interaction: discord.Interaction):
@@ -513,7 +512,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             
             if not players and not alliances_trackees: return
 
-            # 🌍 CHARGEMENT DES LANGUES UTILISATEURS (Pour MP)
             path_users = CONFIG_DIR / 'users.json'
             users_lang = {}
             if os.path.exists(path_users):
@@ -534,7 +532,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 for a_id, a_info in list(alliances_trackees.items()):
                     serveur = a_info.get("serveur", "E4K_FR1")
                     
-                    # 💥 FILTRAGE TEMPOREL DYNAMIQUE PAR SERVEUR
                     if maintenant.minute != SERVER_SCAN_MINUTES.get(serveur, 46):
                         continue
 
@@ -564,7 +561,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                             "rank": int(m.get('alliance_rank', 8))
                                         }
 
-                                # 🔹 Modification de Nom
                                 if new_name != old_name:
                                     embeds_locales = {}
                                     for lg in ["fr", "de", "en"]:
@@ -595,7 +591,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                     if pid not in new_members_dict:
                                         sorties.append(m_info)
 
-                                # 🔹 Nouveau Chef
                                 if new_leader:
                                     embeds_locales = {}
                                     for lg in ["fr", "de", "en"]:
@@ -604,7 +599,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                         embeds_locales[lg] = embed
                                     await self.envoyer_alerte_privee(abonnes_alliance, "infos", embeds_locales, users_lang)
 
-                                # 🔹 Entrées/Sorties
                                 if entrees or sorties:
                                     embeds_locales = {}
                                     for lg in ["fr", "de", "en"]:
@@ -618,7 +612,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                         embeds_locales[lg] = embed
                                     await self.envoyer_alerte_privee(abonnes_alliance, "mouvements", embeds_locales, users_lang)
 
-                                # 🔹 Rangs & Grades
                                 if rangs_changes:
                                     embeds_locales = {}
                                     for lg in ["fr", "de", "en"]:
@@ -648,7 +641,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             for p_id, info in list(players.items()):
                 serveur = info.get("serveur", "E4K_FR1")
                 
-                # 💥 FILTRAGE TEMPOREL DYNAMIQUE PAR SERVEUR
                 if maintenant.minute != SERVER_SCAN_MINUTES.get(serveur, 46):
                     continue
 
@@ -658,7 +650,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 abonnes = info.get("abonnes", {})
                 if not abonnes: continue 
                 
-                # 🔹 Changements d'Alliance
                 try:
                     url_alli = f"https://api.gge-tracker.com/api/v1/updates/players/{p_id}/alliances"
                     async with session.get(url_alli, headers=headers, timeout=5) as r:
@@ -680,7 +671,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                     changes_detected = True
                 except: pass
 
-                # 🔹 Changements de Pseudo
                 try:
                     url_name = f"https://api.gge-tracker.com/api/v1/updates/players/{p_id}/names"
                     async with session.get(url_name, headers=headers, timeout=5) as r:
@@ -702,7 +692,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                     changes_detected = True
                 except: pass
 
-                # 🔹 Déménagements
                 try:
                     url_pos = f"https://api.gge-tracker.com/api/v1/server/movements?page=1&castleType=1&movementType=3&search={urllib.parse.quote(player)}&searchType=player"
                     async with session.get(url_pos, headers=headers, timeout=5) as r:
@@ -722,7 +711,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                     changes_detected = True
                 except: pass
 
-                # 🔹 Puissance & Protection Colombe
                 try:
                     url_player = f"https://api.gge-tracker.com/api/v1/players/{urllib.parse.quote(player)}"
                     async with session.get(url_player, headers=headers, timeout=5) as r:

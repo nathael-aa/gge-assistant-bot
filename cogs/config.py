@@ -53,7 +53,7 @@ GGE_SERVERS = {
     "E4K_HANT1": False, "E4K_BR1": False, "E4K_WORLD2": False,
     
     # 💻 Serveurs PC (Navigateur) Supportés
-    "FR1": False, "DE1": False, "INT1": False, "INT2": False, "INT3": True,
+    "FR1": True, "DE1": False, "INT1": False, "INT2": False, "INT3": True,
     "WORLD1": False, "WORLD2": True, "GLOBAL": False, "ES1": False, "ES2": False,
     "IT1": False, "TR1": False, "NL1": False, "HU1": False, "HU2": False,
     "PL1": False, "PT1": False, "SK1": False, "SKN1": False, "RU1": False,
@@ -80,14 +80,12 @@ class ConfigCog(commands.Cog):
     # 🔍 AUTOCOMPLÉTION DES SERVEURS GGE
     # ==========================================
     async def server_autocomplete(self, interaction: discord.Interaction, current: str):
-        # 🟢 On récupère la langue pour garder l'affichage traduit
         langue, _ = await get_server_config(interaction)
         
         lbl_ok = t(langue, "config_supported", defaut="🟢 Pris en charge")
         lbl_ko = t(langue, "config_unsupported", defaut="🔴 Non pris en charge")
         lbl_unk = t(langue, "config_unknown", defaut="❓ Inconnu")
 
-        # On crée deux paniers distincts
         choix_vert = []
         choix_rouge = []
         
@@ -112,11 +110,11 @@ class ConfigCog(commands.Cog):
         """Déclenche un scan asynchrone si le dossier du serveur n'existe pas encore. Retourne True si déclenché."""
         dossier_serveur = Path(f"/app/data/server_scans/{serveur_upper}")
         if dossier_serveur.exists():
-            return False # Le dossier existe déjà, pas besoin de scanner
+            return False
 
         async def scan_urgence_background(srv):
             flag = Path('/app/data/scan.flag')
-            flag.touch(exist_ok=True) # On pose le flag pour bloquer la RAM
+            flag.touch(exist_ok=True)
             try:
                 # 1. Scan serveur (On attend qu'il finisse avant de passer aux murs)
                 proc1 = await asyncio.create_subprocess_exec("python3", "scanners/server_scanner.py", srv, cwd="/app")
@@ -127,7 +125,7 @@ class ConfigCog(commands.Cog):
             except Exception as e:
                 print(f"❌ Erreur lors du scan d'urgence : {e}")
             finally:
-                if flag.exists(): flag.unlink() # On retire le flag (ce qui va mettre à jour la RAM du bot)
+                if flag.exists(): flag.unlink()
 
         # On lance la tâche asynchrone en arrière-plan
         self.bot.loop.create_task(scan_urgence_background(serveur_upper))
@@ -155,18 +153,15 @@ class ConfigCog(commands.Cog):
     async def c_setup(self, interaction: discord.Interaction, scope: app_commands.Choice[str], language: app_commands.Choice[str], server: str):
         est_sur_serveur = interaction.guild is not None
 
-        # Vérification si l'utilisateur veut configurer le serveur Discord
         if scope.value == "server":
             if not est_sur_serveur:
                 msg_err = t(language.value, "config_err_not_guild", defaut="❌ **Erreur** : Impossible de configurer un serveur depuis les Messages Privés.")
                 return await interaction.response.send_message(msg_err, ephemeral=True)
                 
-            # 💥 CORRECTION : Tu as désormais un passe-droit absolu si c'est toi qui lances la commande !
             if not interaction.user.guild_permissions.manage_guild and interaction.user.id != MON_ID_DISCORD:
                 msg_perm = t(language.value, "config_err_perm", defaut="❌ **Erreur** : Tu dois posséder la permission 'Gérer le serveur' pour configurer le bot ici.")
                 return await interaction.response.send_message(msg_perm, ephemeral=True)
                 
-        # On masque la réponse si c'est un réglage personnel, on l'affiche si c'est pour le serveur
         await interaction.response.defer(ephemeral=(scope.value == "personal"))
         
         serveur_upper = server.upper()
@@ -176,15 +171,13 @@ class ConfigCog(commands.Cog):
             msg_erreur = t(language.value, "error_unsupported_server", serveur=serveur_upper, defaut=f"❌ **Erreur** : Le serveur `{serveur_upper}` n'est pas pris en charge par l'API pour le moment. Veuillez choisir un serveur avec la pastille 🟢.")
             return await interaction.followup.send(msg_erreur)
         
-        # Traitement selon le choix
         if scope.value == "server":
-            # 🏢 Configuration du Serveur Discord
             guild_id = str(interaction.guild_id)
             data = await load_serveurs_config()
             data[guild_id] = {
                 "nom_serveur_discord": interaction.guild.name,
-                "langue": language.value,     # ⚠️ On garde les clés originales pour ne pas casser les fichiers
-                "gge_server": serveur_upper   # ⚠️ On garde les clés originales
+                "langue": language.value,
+                "gge_server": serveur_upper
             }
             await save_serveurs_config(data)
             
@@ -197,8 +190,8 @@ class ConfigCog(commands.Cog):
             data = await load_users_config()
             data[user_id] = {
                 "nom_discord": interaction.user.name,
-                "langue": language.value,     # ⚠️ On garde les clés originales
-                "gge_server": serveur_upper   # ⚠️ On garde les clés originales
+                "langue": language.value,
+                "gge_server": serveur_upper
             }
             await save_users_config(data)
             

@@ -4,29 +4,27 @@ import json
 import logging
 import shutil
 import aiohttp
-from pathlib import Path  # 💥 Remonté ici pour être dispo partout
+from pathlib import Path
 from datetime import datetime, timedelta
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-# 🛠️ On importe nos outils depuis utils.py avec la nouvelle architecture
 from utils import (
     BOT_VERSION, 
-    CONFIG_DIR,        # Pour le changelog
-    JOUEURS_DIR,       # Pour les contacts
+    CONFIG_DIR,
+    JOUEURS_DIR,
     PaginationView, 
     MON_ID_DISCORD, 
     get_file_lock, 
     setup_embed_footer,
     get_api_headers,
-    get_server_config, # 🛠️ Remplacement de la fonction locale
-    t                  # Notre moteur de traduction
+    get_server_config,
+    t
 )
 
 logger = logging.getLogger("GGE_Bot")
 
-# 📂 Mise à jour des chemins vers les nouveaux dossiers
 CONTACTS_FILE = JOUEURS_DIR / 'contacts.json'
 CHANGELOG_FILE = CONFIG_DIR / 'changelog.json'
 
@@ -38,7 +36,6 @@ class MenuAideView(discord.ui.View):
         super().__init__(timeout=7200)
         self.embeds = embeds
         
-        # 🌍 Traduction dynamique des boutons à l'initialisation
         self.btn_home.label = t(langue, "aide_btn_sommaire", defaut="Sommaire")
         self.btn_1.label = t(langue, "aide_btn_aide", defaut="Aide")
         self.btn_2.label = t(langue, "aide_btn_events", defaut="Events")
@@ -50,7 +47,6 @@ class MenuAideView(discord.ui.View):
     async def update_menu(self, interaction: discord.Interaction, page: int):
         await interaction.response.edit_message(embed=self.embeds[page], view=self)
 
-    # Ligne 1 : Sommaire + Cogs 1, 2, 3
     @discord.ui.button(emoji="<:listitem:1512573892596858960>", style=discord.ButtonStyle.success, row=0)
     async def btn_home(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.update_menu(interaction, 0)
@@ -67,7 +63,6 @@ class MenuAideView(discord.ui.View):
     async def btn_3(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.update_menu(interaction, 3)
 
-    # Ligne 2 : Cogs 4, 5, 6
     @discord.ui.button(emoji="<:2_:1512574740915818527>", style=discord.ButtonStyle.primary, row=1)
     async def btn_4(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.update_menu(interaction, 4)
@@ -89,12 +84,10 @@ class ChangelogSelect(discord.ui.Select):
         self.cog = cog
         
         options = []
-        # Discord limite à 25 options max dans un menu déroulant
         for i, patch in enumerate(patches[:25]): 
             version = patch.get("version", "Unknown Version")
             date = patch.get("date", "Unknown Date")
             
-            # L'option la plus récente a un emoji différent
             emoji = "✨" if i == 0 else "📜"
             
             options.append(discord.SelectOption(
@@ -112,11 +105,9 @@ class ChangelogSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # On récupère l'index de la version sélectionnée
         selected_index = int(self.values[0])
         selected_patch = self.patches[selected_index]
         
-        # On génère le nouvel embed et on met à jour le message
         embed = self.cog.build_changelog_embed(selected_patch)
         await interaction.response.edit_message(embed=embed, view=self.view)
 
@@ -132,7 +123,6 @@ class AideCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         
-        # 🎨 CHARTE GRAPHIQUE OFFICIELLE DES COGS
         self.clr_sommaire    = discord.Color.from_rgb(255, 215, 0)  
         self.clr_aide        = discord.Color.from_rgb(244, 196, 48) 
         self.clr_events      = discord.Color.from_rgb(138, 43, 226) 
@@ -146,7 +136,7 @@ class AideCog(commands.Cog):
         self.clr_contact   = self.clr_aide
 
     # ==========================================
-    # 📖 COMMANDE : AIDE
+    # 📖 COMMANDE : HELP
     # ==========================================
     @app_commands.command(name="help", description="Displays the complete user manual for the GGE Assistant bot")
     async def aide_commande(self, interaction: discord.Interaction):
@@ -246,12 +236,11 @@ class AideCog(commands.Cog):
             "• `/radar alliance remove [alliance_name]`\n> Coupe la surveillance globale sur l'alliance."), inline=False)
         embeds.append(embed6)
 
-        # 🌍 On passe la langue à la vue pour les boutons
         view = MenuAideView(embeds, langue=langue)
         await interaction.followup.send(embed=embeds[0], view=view)
 
     # ==========================================
-    # 📡 COMMANDE : STATUT SYSTÈME
+    # 📡 COMMANDE : STATUS
     # ==========================================
     @app_commands.command(name="status", description="Checks the overall health status of the system (Bot, NAS Storage, GGE-Tracker API)")
     async def statut_commande(self, interaction: discord.Interaction):
@@ -386,7 +375,7 @@ class AideCog(commands.Cog):
 
         embed = discord.Embed(
             title=f"🚀 Update Notes : {version}",
-            color=discord.Color.blurple(), # Une belle couleur par défaut
+            color=discord.Color.blurple(),
             timestamp=discord.utils.utcnow()
         )
         
@@ -397,13 +386,11 @@ class AideCog(commands.Cog):
             line = line.strip()
             if not line: continue
             
-            # Ajoute une puce si la ligne n'en a pas déjà une
             if not any(line.startswith(c) for c in ['🔹', '•', '-', '*', '🚀', '🛠️', '⚙️', '🟢', '❌', '⚠️', '📈', '✨', '🪙']):
                 lignes_propres.append(f"🔹 {line}")
             else:
                 lignes_propres.append(line)
 
-        # On saute une ligne entre chaque point pour aérer la lecture
         description = "\n\n".join(lignes_propres) if lignes_propres else "*No details provided for this update.*"
         
         embed.description = description
@@ -464,7 +451,7 @@ class AideCog(commands.Cog):
             await interaction.followup.send(embed=embed_err)
 
     # ==========================================
-    # 📩 COMMANDE : CONTACT / RECOMMANDATIONS
+    # 📩 COMMANDE : CONTACT
     # ==========================================
     @app_commands.command(name="contact", description="Send a problem, bug, or suggestion directly to the developer")
     @app_commands.describe(message="Write your problem or suggestion in detail here")
@@ -477,7 +464,6 @@ class AideCog(commands.Cog):
         logger.info(f"📩 [Contact] Nouveau message de {interaction.user.name} ({interaction.user.id})")
         maintenant_iso = discord.utils.utcnow().isoformat().replace('+00:00', 'Z')
         
-        # 🔐 Sécurisé : Utilisation du gestionnaire de verrou asynchrone
         async with get_file_lock(CONTACTS_FILE):
             try:
                 tickets_existants = []
@@ -512,7 +498,7 @@ class AideCog(commands.Cog):
             embed_mp.add_field(name="<:players:1512504277392953426> Expéditeur", value=f"**{interaction.user.name}** (`{interaction.user.id}`)", inline=True)
             embed_mp.add_field(name="<:castles:1512574693859786822> Provenance", value=f"*{nouveau_ticket['serveur']}*", inline=True)
             embed_mp.add_field(name="<:memberlist:1512572899360378971> Message", value=f"```text\n{message}\n```", inline=False)
-            await setup_embed_footer(embed_mp, interaction, "fr") # Toujours en FR pour toi
+            await setup_embed_footer(embed_mp, interaction, "fr")
 
             await developpeur.send(embed=embed_mp)
             
@@ -524,7 +510,5 @@ class AideCog(commands.Cog):
         succ_msg = t(langue, "contact_success", defaut="<:players:1512504277392953426> **Merci !** Ton message a bien été enregistré et transmis au développeur.")
         await interaction.followup.send(succ_msg)
 
-
-# 🔌 Fonction de chargement du module
 async def setup(bot: commands.Bot):
     await bot.add_cog(AideCog(bot))

@@ -41,7 +41,6 @@ for root, dirs, files in os.walk(DOSSIER_A_SCANNER):
                     continue
                     
                 # 2. ENLEVER LES COMMENTAIRES (#)
-                # On coupe la ligne au premier '#' et on ne garde que ce qui est avant
                 ligne_sans_commentaires = line.split('#')[0].strip()
                 
                 if not ligne_sans_commentaires:

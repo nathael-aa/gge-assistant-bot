@@ -13,7 +13,6 @@ from discord import app_commands
 from discord.ext import commands
 import aiohttp
 
-# 🛠️ On importe nos outils depuis utils.py
 from utils import (
     BASE_DATA_PATH, 
     CONFIG_DIR,
@@ -132,7 +131,6 @@ class ProfilsCog(commands.Cog):
         self.bot = bot
         self.bdd_chemin = BASE_DATA_PATH / "bdd_items_gge.json"
         
-        # 🎨 PALETTE CYAN & BLEU PÉTROLE
         self.clr_joueur      = discord.Color.from_rgb(0, 163, 204)  
         self.clr_alliance    = discord.Color.from_rgb(0, 115, 153)  
         self.clr_historique  = discord.Color.from_rgb(0, 77, 102)   
@@ -140,7 +138,7 @@ class ProfilsCog(commands.Cog):
         self.clr_colombe     = discord.Color.from_rgb(0, 180, 216)  
 
     # ========================================================
-    # 👑 COMMANDE : JOUEUR
+    # 👑 COMMANDE : PLAYER
     # ========================================================
     @app_commands.command(name="player", description="Detailed player profile")
     @app_commands.autocomplete(player=joueur_autocomplete)
@@ -167,7 +165,6 @@ class ProfilsCog(commands.Cog):
                 await interaction.followup.send(t(langue, "prof_err_empty_data", defaut="<:error:1512505075220611172> Données vides."))
                 return
 
-            # --- RÉCUPÉRATION DES DONNÉES CLASSIQUES ET NOUVELLES ---
             main_pts = int(data.get('main_points', 0))
             honor_pts = int(data.get('honor', 0))
             might_all_time = int(data.get('might_all_time', 0))
@@ -176,7 +173,6 @@ class ProfilsCog(commands.Cog):
             loot_all_time = int(data.get('loot_all_time', 0))
             peace = data.get('peace_disabled_at')
 
-            # --- GESTION DE LA COLOMBE ---
             txt_colombe = ""
             if peace and peace != "null":
                 try:
@@ -204,13 +200,12 @@ class ProfilsCog(commands.Cog):
             alliance_display = f"**{alliance_name}**{role_txt}" if alliance_name != txt_sans_alliance else f"**{txt_sans_alliance}**"
 
             outposts = data.get('outposts', [])
-            type_emojis = {1: "<:squarecastle:1512573757426892911>", 3: "<:squarecapital:1512573756243972237>", 4: "<:squareoutpost:1512573761583579228>", 10: "<:date:1512573832375042340>", 12: "<:dungeons:1512574697223753798>", 22: "<:castle22:1512573821520183347>", 23: "<:castle23:1512573823118086174>", 24: "<:aquamarine_16:1512573724786950346>", 26: "<:castle26:1512573824086835280>"}
+            type_emojis = {1: "<:squarecastle:1512573757426892911>", 3: "<:squarecapital:1512573756243972237>", 4: "<:squareoutpost:1512573761583579228>", 10: "<:date:1512573832375042340>", 12: "<:castle12:1521949211850182686>", 22: "<:castle22:1512573821520183347>", 23: "<:castle23:1512573823118086174>", 24: "<:aquamarine_16:1512573724786950346>", 26: "<:castle26:1512573824086835280>"}
             sort_priority = {1: 0, 4: 1, 12: 2, 3: 3, 22: 4, 23: 5, 24: 7, 26: 6}
             
             if outposts:
                 outposts.sort(key=lambda x: (sort_priority.get(int(x.get('type', 99)), 99), x.get('world_id', 0)))
 
-            # Extraction de la date
             collected = full_json.get('collected_at', discord.utils.utcnow())
             if not isinstance(collected, datetime):
                 collected = discord.utils.utcnow()
@@ -219,21 +214,18 @@ class ProfilsCog(commands.Cog):
             embed_title = t(langue, "prof_joueur_title", n=data.get('name', player), defaut=f"<:players:1512504277392953426> Profil de {data.get('name', player)}")
             embed = discord.Embed(title=embed_title, color=self.clr_joueur)
             
-            # Injection de la date dans la description
             embed.description = f"{lbl_date} <t:{ts}:F> (<t:{ts}:R>)"
             
-            # --- AFFICHAGE DES INFORMATIONS (Design Dashboard) ---
             info_title = t(langue, "prof_info_title", defaut="<:info:1512502828193808537> Informations Générales")
             unk_id = t(langue, "prof_unknown", defaut="Inconnu")
             
-            # Formatage de la colombe
-            status_txt = t(langue, "prof_status_combat", defaut="⚔️ **Statut :** Prêt au combat")
+            status_txt = t(langue, "prof_status_combat", defaut="⚔️ **Statut :** Attaque possible")
             if peace and peace != "null":
                 try:
                     dt_peace = datetime.fromisoformat(peace.replace('Z', '+00:00'))
                     if dt_peace > discord.utils.utcnow():
                         ts_peace = int(dt_peace.timestamp())
-                        status_txt = t(langue, "prof_status_peace", tp=ts_peace, defaut=f"<:peace:1512503935892586566> **Colombe :** Jusqu'à <t:{ts_peace}:R> (<t:{ts_peace}:t>)")
+                        status_txt = t(langue, "prof_status_peace", tp=ts_peace, defaut=f"<:peace:1512503935892586566> **Colombe :** Jusqu'au <t:{ts_peace}:R> (<t:{ts_peace}:t>)")
                 except: pass
 
             info_val = (
@@ -243,31 +235,28 @@ class ProfilsCog(commands.Cog):
             )
             embed.add_field(name=info_title, value=info_val, inline=True)
             
-            # --- AFFICHAGE DES STATISTIQUES ---
             rank_title = t(langue, "prof_rank_title", defaut="<:empirerankings:1512574698301423847> Statistiques")
             rank_desc = (
-                f"<:might:1512574615422107818> **Puissance :** {main_pts:,} *(Max: {might_all_time:,})*\n"
-                f"<:honor2:1512573861521260544> **Honneur :** {honor_pts:,} *(Max: {max_honor:,})*\n"
-                f"<:loot:1512439015570276553> **Pillage/J. :** {loot_current:,} *(Max: {loot_all_time:,})*"
+                f"<:might:1512574615422107818> **Puissance :** {main_pts:,} (Max: `{might_all_time:,}`)\n"
+                f"<:honor2:1512573861521260544> **Honneur :** {honor_pts:,} (Max: `{max_honor:,}`)\n"
+                f"<:loot:1512439015570276553> **Pillage :** {loot_current:,} (Max: `{loot_all_time:,}`)"
             ).replace(",", " ") 
             
             embed.add_field(name=rank_title, value=rank_desc, inline=True)
             
-            # --- ALLIANCE ---
             alli_title = t(langue, "prof_alli_title", defaut="<:alliances:1512574688415580242> Alliance")
-            embed.add_field(name=alli_title, value=f"{alliance_display}\n\u200b", inline=False) # \u200b pour aérer un peu
+            embed.add_field(name=alli_title, value=f"{alliance_display}", inline=False)
             
-            # --- POSITIONS (Avec Noms Personnalisés !) ---
             if outposts:
                 coords_txt = ""
                 for op in outposts[:10]:
-                    emoji = type_emojis.get(int(op.get('type', 99)), "🗺️")
-                    w_emoji = op.get('world_emoji', "🗺️") # <--- L'émoji du monde
+                    emoji = type_emojis.get(int(op.get('type', 99)), "?")
+                    w_emoji = op.get('world_emoji', "🗺️") 
                     
                     c_name = op.get('custom_name')
                     display_name = f"**{c_name}**" if c_name else f"*{op['type_label']}*"
-                        
-                    coords_txt += f"{emoji} {display_name} {w_emoji} `{op['coords_x']}:{op['coords_y']}`\n"
+                    
+                    coords_txt += f"{w_emoji} [{emoji}] {display_name} ➔ `{op['coords_x']}:{op['coords_y']}`\n"
                     
                 if len(outposts) > 10: 
                     coords_txt += t(langue, "prof_pos_others", count=(len(outposts) - 10), defaut=f"*... et {len(outposts) - 10} autres positions.*\n") + "\n"
@@ -316,6 +305,7 @@ class ProfilsCog(commands.Cog):
             23: t(langue, "prof_castle_23", defaut="Tour Royale"), 24: t(langue, "prof_castle_24", defaut="Ile aux Ressources"), 
             26: t(langue, "prof_castle_26", defaut="Monument")
         }
+
         worlds = {
             0: t(langue, "prof_world_0", defaut="Le Grand Empire"), 1: t(langue, "prof_world_1", defaut="Les Sables Brûlants"),
             2: t(langue, "prof_world_2", defaut="Glacier Éternel"), 3: t(langue, "prof_world_3", defaut="Pics du Feu"), 
@@ -323,11 +313,11 @@ class ProfilsCog(commands.Cog):
         }
 
         world_emojis = {
-            0: "<:dungeon0:1512573840704671775>", # Le Grand Empire (Utilise ton émoji pour le grand empire)
-            1: "<:dungeon1:1512573842277794062>",   # Sables Brûlants
-            2: "<:dungeon2:1512573843267518546>",   # Glacier Éternel
-            3: "<:dungeon3:1512573844538396692>",    # Pics du Feu
-            4: "<:dungeon4:1512573845737963722>"     # Îles Orageuses
+            0: "<:dungeon0:1512573840704671775>",
+            1: "<:dungeon1:1512573842277794062>",
+            2: "<:dungeon2:1512573843267518546>",
+            3: "<:dungeon3:1512573844538396692>",
+            4: "<:dungeon4:1512573845737963722>"
         }
 
         
@@ -342,7 +332,6 @@ class ProfilsCog(commands.Cog):
         if not session: return None
             
         try:
-            # 1. Base Info
             async with session.get(search_url, headers=headers, timeout=15) as response:
                 if response.status != 200: return None
                 basic_info = await response.json()
@@ -353,13 +342,11 @@ class ProfilsCog(commands.Cog):
             player_id = basic_info.get('player_id')
             if not player_id: return None
             
-            # 2. Stats Info
             stats_url = f"{api_url}/statistics/ranking/player/{player_id}"
             async with session.get(stats_url, headers=headers, timeout=15) as stats_response:
                 stats_data = {}
                 if stats_response.status == 200: stats_data = await stats_response.json()
 
-            # 3. NOUVEAU : Récupération des IDs de châteaux et de leurs noms (En parallèle !)
             castle_names_map = {}
             search_castles_url = f"{api_url}/castle/search/{safe_name}"
             
@@ -369,7 +356,6 @@ class ProfilsCog(commands.Cog):
                         c_data = await c_response.json()
                         if isinstance(c_data, list):
                             
-                            # Fonction interne pour fetch un seul château avec le KINGDOM ID
                             async def fetch_castle_name(castle_id, kingdom_id, cx, cy):
                                 analysis_url = f"{api_url}/castle/analysis/{castle_id}?kingdomId={kingdom_id}"
                                 try:
@@ -386,21 +372,19 @@ class ProfilsCog(commands.Cog):
                                             if c_name:
                                                 return (int(cx), int(cy)), c_name
                                 except Exception as e:
-                                    pass # Échec silencieux, on gardera le nom par défaut
+                                    pass
                                 return None, None
 
-                            # Préparation des tâches asynchrones
                             tasks = []
                             for c in c_data:
                                 c_id = c.get('id')
-                                k_id = c.get('kingdomId') # <-- L'information cruciale !
+                                k_id = c.get('kingdomId')
                                 cx = c.get('positionX')
                                 cy = c.get('positionY')
                                 
                                 if c_id is not None and k_id is not None and cx is not None and cy is not None:
                                     tasks.append(fetch_castle_name(c_id, k_id, int(cx), int(cy)))
                             
-                            # Lancement simultané pour une vitesse maximale
                             if tasks:
                                 results = await asyncio.gather(*tasks)
                                 for coords, name in results:
@@ -416,12 +400,13 @@ class ProfilsCog(commands.Cog):
             for c in stats_data.get('castles', []):
                 if len(c) >= 3:
                     t_id = c[2]
-                    cx, cy = int(c[0]), int(c[1]) 
+                    cx, cy = int(c[0]), int(c[1])
                     struct = {
                         'world_id': 0, 'coords_x': cx, 'coords_y': cy,
                         'type': t_id, 'world_label': worlds.get(0, worlds[0]),
+                        'world_emoji': world_emojis.get(0, "?"),
                         'type_label': castle_types.get(t_id, f"{txt_unk_castle} ({t_id})"),
-                        'custom_name': castle_names_map.get((cx, cy)) 
+                        'custom_name': castle_names_map.get((cx, cy))
                     }
                     if t_id == 10: vassal_villages.append(struct)
                     else: outposts.append(struct)
@@ -431,11 +416,9 @@ class ProfilsCog(commands.Cog):
                     w_id, t_id = c[0], c[3]
                     cx, cy = int(c[1]), int(c[2])
                     struct = {
-                        'world_id': w_id, 
-                        'coords_x': cx, 'coords_y': cy,
-                        'type': t_id, 
-                        'world_label': worlds.get(w_id, f"{txt_unk_world} ({w_id})"),
-                        'world_emoji': world_emojis.get(w_id, "🗺️"),
+                        'world_id': w_id, 'coords_x': cx, 'coords_y': cy,
+                        'type': t_id, 'world_label': worlds.get(w_id, f"{txt_unk_world} ({w_id})"),
+                        'world_emoji': world_emojis.get(w_id, "?"),
                         'type_label': castle_types.get(t_id, f"{txt_unk_castle} ({t_id})"),
                         'custom_name': castle_names_map.get((cx, cy))
                     }
@@ -448,6 +431,7 @@ class ProfilsCog(commands.Cog):
                     struct = {
                         'world_id': w_id, 'coords_x': v[1], 'coords_y': v[2],
                         'type': 10, 'world_label': worlds.get(w_id, f"{txt_unk_world} ({w_id})"),
+                        'world_emoji': world_emojis.get(w_id, "?"),
                         'type_label': castle_types.get(10, t(langue, "prof_castle_10", defaut="Village à Ressource"))
                     }
                     vassal_villages.append(struct)
@@ -511,7 +495,6 @@ class ProfilsCog(commands.Cog):
             members = []
             collected_time = None
             
-            # --- PLAN A : L'API EN DIRECT ---
             try:
                 api_data = await self._get_alliance_full_data(alliance_name, interaction, langue=langue)
                 
@@ -529,7 +512,6 @@ class ProfilsCog(commands.Cog):
             except Exception as e:
                 logger.warning(f"[Profils - Alliance] API inaccessible, passage au Plan B... ({e})")
 
-            # --- PLAN B : LE CACHE LOCAL ---
             if not is_live:
                 player_files = list((BASE_DATA_PATH / 'server_scans' / serveur).rglob('server_*.json'))
                 local_data = {}
@@ -588,7 +570,6 @@ class ProfilsCog(commands.Cog):
             if not members:
                 return await interaction.followup.send(t(langue, "prof_alli_ghost", alli=alliance_name, defaut=f"<:error:1512505075220611172> L'alliance **{alliance_name}** semble vide."))
 
-            # Timestamp extraction
             if isinstance(collected_time, str):
                 try: collected_time = datetime.fromisoformat(collected_time.replace('Z', '+00:00'))
                 except: collected_time = discord.utils.utcnow()
@@ -599,7 +580,6 @@ class ProfilsCog(commands.Cog):
             suffixe_cache = " *(Plan B activé)*" if not is_live else ""
             str_date_header = f"{lbl_date} <t:{ts}:F> (<t:{ts}:R>){suffixe_cache}\n\n"
 
-            # --- AFFICHAGE PAGINÉ ---
             embeds = []
             rank_emojis = {0: "<:0_:1512574737677684818>", 1: "<:1_:1512574739208470640>", 2: "<:2_:1512574740915818527>", 3: "<:3_:1512574742245412874>", 4: "<:4_:1512574743369224303>", 5: "<:5_:1512574744501817515>", 6: "<:6_:1512574745617498172>", 7: "<:7_:1512574746989039839>", 8: "<:8_:1512574748356251691>", 9: "<:9_:1512574749430120519>"}
             chunk_size = 15
@@ -748,7 +728,7 @@ class ProfilsCog(commands.Cog):
         }
 
     # ========================================================
-    # 📜 COMMANDE : HISTORIQUE
+    # 📜 COMMANDE : HISTORY
     # ========================================================
     @app_commands.command(name="history", description="Displays a player's complete history")
     @app_commands.autocomplete(player=joueur_autocomplete)
@@ -812,7 +792,6 @@ class ProfilsCog(commands.Cog):
         unk_val = t(langue, "prof_hist_unknown", defaut="*Inconnu*")
         no_alli_val = t(langue, "prof_hist_no_alli", defaut="*Sans alliance*")
 
-        # 💥 NOUVEAU : En-tête de date pour la description
         if isinstance(actualisation_dt, str):
             try: actualisation_dt = datetime.fromisoformat(actualisation_dt.replace('Z', '+00:00'))
             except: actualisation_dt = discord.utils.utcnow()
@@ -880,7 +859,7 @@ class ProfilsCog(commands.Cog):
         await interaction.followup.send(embed=embeds_dict[view.current_cat][0], view=view)
 
     # ========================================================
-    # 📈 COMMANDE : HISTORIQUE ALLIANCE PP
+    # 📈 COMMANDE : HISTORIQUE ALLIANCE MIGHT
     # ========================================================
     @app_commands.command(name="alliance_might", description="Historical Power (PP) of an alliance over X days")
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
@@ -1027,7 +1006,7 @@ class ProfilsCog(commands.Cog):
             await interaction.followup.send(embed=embeds[0], view=view)
 
     # ========================================================
-    # 🕊️ COMMANDE : VÉRIFIER LA COLOMBE
+    # 🕊️ COMMANDE : DOVE
     # ========================================================
     @app_commands.command(name="dove", description="Check the date and time a player's protection ended")
     @app_commands.autocomplete(player=joueur_autocomplete)
