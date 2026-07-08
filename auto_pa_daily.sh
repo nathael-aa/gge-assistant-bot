@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /volume1/gge-assistant || exit 1
+cd /home/nathael/gge-assistant-bot || exit 1
 
 echo "======================================================"
 echo "🌍 DÉMARRAGE DE LA ROUTINE MULTI-SERVEURS QUOTIDIENNE"
