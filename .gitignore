@@ -12,3 +12,8 @@ cogs/line_bridge.py
 scanners/__pycache__
 *.pyc
 .DS_Store
+
+# Autres
+mots_cles_non_trad.py
+commands.json
+cogs/line_bridge.py
