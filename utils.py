@@ -172,7 +172,7 @@ def get_file_lock(filepath):
 # ==========================================
 # 🔧 Footer global
 # ==========================================
-BOT_VERSION = "GGE Assistant • Version 1.1.0"
+BOT_VERSION = "GGE Assistant • Version 1.1.1"
 
 async def setup_embed_footer(embed: discord.Embed, interaction: discord.Interaction = None, langue: str = "fr", custom_server: str = None):
     txt = BOT_VERSION
@@ -322,7 +322,7 @@ async def save_surveillance_async(data):
 # ==========================================
 class PaginationView(discord.ui.View):
     def __init__(self, embeds):
-        super().__init__(timeout=None)
+        super().__init__(timeout=7200)
         self.embeds = embeds
         self.current_page = 0
     @discord.ui.button(label="◀️", style=discord.ButtonStyle.secondary)

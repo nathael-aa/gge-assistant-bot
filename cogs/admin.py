@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import urllib.parse
+import asyncio
 from datetime import datetime, timedelta
 import discord
 from discord import app_commands
@@ -29,6 +30,59 @@ class AdminCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.admin_lang = "fr"
+
+    # ==========================================
+    # 🆘 MENU D'AIDE ADMINISTRATEUR
+    # ==========================================
+    @commands.command(name="ahelp", aliases=["admin_help", "adminhelp"], hidden=True)
+    async def admin_help(self, ctx):
+        """[CACHÉE] !ahelp : Affiche le récapitulatif des commandes admin."""
+        if ctx.author.id != MON_ID_DISCORD: return
+
+        embed = discord.Embed(
+            title="🛠️ Panneau de Contrôle Administrateur",
+            description="Voici la liste de tes commandes secrètes (utilisables avec le préfixe `!`).",
+            color=discord.Color.dark_red()
+        )
+
+        # Catégorie Système & Scripts
+        embed.add_field(
+            name="⚙️ Système & Scripts",
+            value="`!sync` ➔ Synchronise les commandes Slash.\n"
+                  "`!m` ➔ Active/Désactive le mode maintenance.\n"
+                  "`!scan_manuel` ➔ Lance `auto_pa_daily.sh` en fond.\n"
+                  "`!log [date]` ➔ Télécharge les logs (ex: *today, hier, 2026-07-08*).",
+            inline=False
+        )
+
+        # Catégorie Sécurité (Videur)
+        embed.add_field(
+            name="⛔ Videur & Modération",
+            value="`!ban_cmd [cmd] [raison]` ➔ Désactive une commande.\n"
+                  "`!unban_cmd [cmd]` ➔ Réactive une commande.\n"
+                  "`!ban_user [@user] [cmd ou ALL]` ➔ Restreint un utilisateur.\n"
+                  "`!unban_user [@user] [cmd ou ALL]` ➔ Lève la restriction.",
+            inline=False
+        )
+
+        # Catégorie Gestion des Serveurs
+        embed.add_field(
+            name="🤖 Serveurs Discord",
+            value="`!bot_servers` ➔ Liste les serveurs utilisant le bot.\n"
+                  "`!bot_leave [ID]` ➔ Force le bot à quitter un serveur.",
+            inline=False
+        )
+
+        # Catégorie Traductions
+        embed.add_field(
+            name="🌐 Traductions (i18n)",
+            value="`!i18n_sync` ➔ Scanne le code et met à jour les `.json`.\n"
+                  "`!i18n_export [lang]` ➔ Génère un `.csv` pour les traducteurs.",
+            inline=False
+        )
+
+        embed.set_footer(text="Ces commandes sont invisibles pour les utilisateurs normaux.")
+        await ctx.send(embed=embed)
 
     # ==========================================
     # 🔄 SYNCHRONISATION DES COMMANDES
@@ -196,6 +250,43 @@ class AdminCog(commands.Cog):
         except Exception as e:
             msg = t(self.admin_lang, "admin_leave_error", error=str(e), defaut=f"❌ Erreur : {e}")
             await ctx.send(msg)
+
+    # ==========================================
+    # 🚀 DÉCLENCHEMENT MANUEL DES SCANNERS (NOUVEAU)
+    # ==========================================
+    @commands.command(name="scan_manuel", hidden=True)
+    async def scan_manuel(self, ctx):
+        """[CACHÉE] !scan_manuel : Lance manuellement le script auto_pa_daily.sh."""
+        if ctx.author.id != MON_ID_DISCORD: return
+
+        # Utilisation de BASE_DIR pour toujours pointer à la racine du projet
+        script_path = BASE_DIR / "auto_pa_daily.sh"
+
+        if not script_path.is_file():
+            return await ctx.send(f"❌ **Erreur :** Le fichier `{script_path}` est introuvable.")
+
+        msg = await ctx.send("⏳ **Lancement des scanners en cours...**")
+
+        try:
+            # Lancement asynchrone pour ne pas paralyser le bot pendant le scan
+            process = await asyncio.create_subprocess_shell(
+                f"bash {script_path}",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            await msg.edit(content="🚀 **Scanners lancés avec succès !**\nLe script `auto_pa_daily.sh` tourne actuellement en arrière-plan.\n*Regarde dans le terminal ou tes logs pour suivre l'avancement.*")
+            
+            # Attente de la fin du script pour consigner le résultat dans la console
+            stdout, stderr = await process.communicate()
+            
+            if process.returncode != 0:
+                logger.error(f"[ERREUR SCANNER] Le script s'est terminé avec une erreur :\n{stderr.decode()}")
+            else:
+                logger.info(f"[SUCCÈS SCANNER] Les scanners manuels lancés par {ctx.author.name} sont terminés.")
+                
+        except Exception as e:
+            await msg.edit(content=f"⚠️ **Une erreur est survenue lors du lancement :**\n```py\n{e}\n```")
 
     # ==========================================
     # 📜 EXTRACTION DU JOURNAL SYSTÈME (LOGS)

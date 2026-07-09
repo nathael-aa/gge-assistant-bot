@@ -105,7 +105,6 @@ class GGEAssistantBot(commands.Bot):
             "cogs.guerre", 
             "cogs.profils", 
             "cogs.radar",
-            "cogs.line_bridge"
         ]
         for ext in extensions:
             try:

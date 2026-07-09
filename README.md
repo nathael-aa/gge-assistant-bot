@@ -65,7 +65,7 @@ Véritable bot Discord autonome, il intègre un arsenal complet d'outils de rens
 Le projet est structuré de manière modulaire, séparant la logique Discord des scripts d'analyse de fond.
 
 ```text
-gge-assistant/
+gge-assistant-bot/
 ├── cogs/                  # Modules Discord (Commandes /slash triées par thèmes)
 │   ├── admin.py, aide.py, classement.py, radar.py, guerre.py, profils.py...
 ├── scanners/              # Scripts d'analyse asynchrones (API GGE-Tracker)
@@ -83,7 +83,7 @@ gge-assistant/
 ├── logs/                  # 🔒 Journaux d'activité organisés par processus
 ├── auto_pa_daily.sh       # Script de déclenchement des tâches cron/scanners
 ├── discord_bot.py         # Point d'entrée principal (Initialisation du bot)
-├── docker-compose.yml     # Orchestration des conteneurs
+├── docker-compose.yaml     # Orchestration des conteneurs
 ├── Dockerfile             # Construction de l'image de l'application
 ├── requirements.txt       # Dépendances Python (discord.py, aiohttp, etc.)
 └── utils.py               # Fonctions utilitaires partagées

@@ -1,19 +1,32 @@
-# Les dossiers de données locales (NAS)
-data/
+# DATA
+data/alliances/diplomatie.json
+data/configs/blocks.json
+data/configs/calendrier.json
+data/configs/maintenance.json
+data/configs/rival_radar.json
+data/configs/serveurs.json
+data/configs/surveillance.json
+data/configs/users.json
+data/joueurs/
+data/murs_scans/
+data/server_scans/
+
+# LOG
 logs/
+
+#SCANNERS
+scanners/__pycache__
+
+#COGS
+cogs/__pycache__
 
 # Les fichiers de configuration secrets
 .env
 
 # Fichiers système et Python
 __pycache__/
-cogs/__pycache__
-cogs/line_bridge.py
-scanners/__pycache__
 *.pyc
 .DS_Store
 
 # Autres
-mots_cles_non_trad.py
 commands.json
-cogs/line_bridge.py
