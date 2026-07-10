@@ -29,17 +29,14 @@ class MursScanner:
     def __init__(self):
         self.base_data_path = Path(os.getenv('DATA_PATH', '/app/data'))
         self.serveurs_config_path = self.base_data_path / 'configs' / 'serveurs.json'
+        
+        self.rankings_config_path = self.base_data_path / 'configs' / 'rankings_config.json'
+        
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "application/json"
         })
-        
-        self.fly_zones = {
-            "E4K_FR1": "EmpirefourkingdomsExGG_2",
-            "INT3": "EmpireEx_43",
-            "WORLD2": "EmpireEx_49"
-        }
 
     def get_active_servers(self):
         active_servers = set()
@@ -74,12 +71,27 @@ class MursScanner:
     def scan_murs_serveur(self, serveur):
         logger.info(f"🚀 Extraction des murs pour le serveur : {serveur}")
         
-        zone_api = self.fly_zones.get(serveur)
+        # 🔍 1. Récupération dynamique de la zone API depuis rankings_config.json
+        zone_api = None
+        if self.rankings_config_path.exists():
+            try:
+                with open(self.rankings_config_path, 'r', encoding='utf-8') as f:
+                    rankings_config = json.load(f)
+                    
+                    # On gère le cas où la config est soit une chaîne directe, soit un dictionnaire imbriqué
+                    srv_data = rankings_config.get(serveur)
+                    if isinstance(srv_data, dict):
+                        zone_api = srv_data.get("network") or srv_data.get("fly_zone") or srv_data.get("zone")
+                    elif isinstance(srv_data, str):
+                        zone_api = srv_data
+            except Exception as e:
+                logger.error(f"❌ Erreur lors de la lecture de {self.rankings_config_path.name} : {e}")
+
         if not zone_api:
-            logger.error(f"❌ La zone API fly.dev pour {serveur} n'est pas configurée dans self.fly_zones. Scan ignoré.")
+            logger.error(f"❌ La zone API pour {serveur} est introuvable dans {self.rankings_config_path.name}. Scan ignoré.")
             return
         
-        # 1. Lecture du dernier scan serveur correspondant
+        # 2. Lecture du dernier scan serveur correspondant
         try:
             scans_dir = self.base_data_path / 'server_scans' / serveur
             if not scans_dir.exists():
@@ -98,7 +110,7 @@ class MursScanner:
             logger.error(f"❌ Erreur lecture serveur {serveur}: {e}")
             return
 
-        # 2. Cartographie des Alliances
+        # 3. Cartographie des Alliances
         alliances_map = {}
         for p_info in players_data.values():
             a_obj = p_info.get('alliance')
@@ -111,7 +123,6 @@ class MursScanner:
                 
             raw_aid = str(aid_val)
             if a_name and a_name != "Sans alliance":
-
                 if len(raw_aid) > 3:
                     real_aid = raw_aid[:-3]
                 else:
@@ -121,7 +132,7 @@ class MursScanner:
 
         logger.info(f"🎯 {len(alliances_map)} alliances uniques trouvées sur {serveur}.")
 
-        # 3. Extraction de l'API Fly.dev
+        # 4. Extraction de l'API Fly.dev
         murs_data = {}
         count = 0
         
@@ -147,7 +158,7 @@ class MursScanner:
             except: pass
             time.sleep(0.2)
 
-        # 4. Sauvegarde dans les bons sous-dossiers
+        # 5. Sauvegarde dans les bons sous-dossiers
         out_dir = self.base_data_path / 'murs_scans' / serveur
         today = datetime.now().strftime("%Y-%m-%d")
         daily_dir = out_dir / today

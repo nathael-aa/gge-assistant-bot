@@ -8,24 +8,8 @@ services:
     env_file:
       - .env
     environment:
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
       - GGE_SERVER=${GGE_SERVER:-E4K_FR1}
       - DATA_PATH=/app/data
       - TZ=Europe/Paris
     volumes:
       - .:/app
-    ports:
-      - "8089:8089"
-
-  ngrok:
-    image: ngrok/ngrok:latest
-    container_name: gge-assistant-tunnel
-    restart: always
-    command:
-      - "http"
-      - "discord-bot:8089"
-      - "--url=https://overture-quirk-cattail.ngrok-free.dev"
-    environment:
-      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
-    depends_on:
-      - discord-bot

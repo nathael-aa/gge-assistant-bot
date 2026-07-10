@@ -58,7 +58,7 @@ GGE_SERVERS = {
     "IT1": False, "TR1": False, "NL1": False, "HU1": False, "HU2": False,
     "PL1": False, "PT1": False, "SK1": False, "SKN1": False, "RU1": False,
     "RO1": False, "BG1": False, "GB1": True, "BR1": False, "US1": True,
-    "AU1": False, "JP1": False, "IN1": False, "CN1": False, "GR1": False,
+    "AU1": False, "JP1": False, "IN1": False, "CN1": False, "GR1": True,
     "SA1": False, "AE1": False, "EG1": False, "ARAB1": False, "ASIA": False,
     "HANT1": False, "PARTNER_SP3": False,
     
