@@ -267,7 +267,7 @@ class AideCog(commands.Cog):
         ))
         embed.add_field(name=t(langue, "statut_bot_title", defaut="🤖 Bot Discord"), value=bot_txt, inline=False)
 
-        # 💾 2. DIAGNOSTIC STOCKAGE LOCAL (NAS) & AGENT DE SCAN
+        # 💾 2. DIAGNOSTIC STOCKAGE SERVEUR
         try:
             total, used, free = shutil.disk_usage("/app/data")
             total_gb = total / (1024**3)
