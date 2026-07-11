@@ -29,7 +29,7 @@ class MursScanner:
     def __init__(self):
         self.base_data_path = Path(os.getenv('DATA_PATH', '/app/data'))
         self.serveurs_config_path = self.base_data_path / 'configs' / 'serveurs.json'
-        
+        self.users_config_path = self.base_data_path / 'configs' / 'users.json'
         self.rankings_config_path = self.base_data_path / 'configs' / 'rankings_config.json'
         
         self.session = requests.Session()
@@ -40,6 +40,8 @@ class MursScanner:
 
     def get_active_servers(self):
         active_servers = set()
+        
+        # 🏢 1. Lecture des configurations de serveurs Discord (Guilds)
         if self.serveurs_config_path.exists():
             try:
                 with open(self.serveurs_config_path, 'r', encoding='utf-8') as f:
@@ -47,8 +49,23 @@ class MursScanner:
                     for guild_id, config in data.items():
                         srv = config.get("gge_server")
                         if srv: active_servers.add(srv)
-            except: pass
-        if not active_servers: active_servers.add("E4K_FR1")
+            except Exception as e: 
+                logger.error(f"⚠️ Erreur lecture serveurs.json : {e}")
+                
+        # 👤 2. Lecture des configurations individuelles (Users)
+        if hasattr(self, 'users_config_path') and self.users_config_path.exists():
+            try:
+                with open(self.users_config_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    for user_id, config in data.items():
+                        srv = config.get("gge_server")
+                        if srv: active_servers.add(srv)
+            except Exception as e:
+                logger.error(f"⚠️ Erreur lecture users.json : {e}")
+
+        if not active_servers: 
+            active_servers.add("E4K_FR1")
+            
         return list(active_servers)
 
     def nettoyer_vieux_fichiers(self, jours=14):
@@ -78,18 +95,21 @@ class MursScanner:
                 with open(self.rankings_config_path, 'r', encoding='utf-8') as f:
                     rankings_config = json.load(f)
                     
-                    # On gère le cas où la config est soit une chaîne directe, soit un dictionnaire imbriqué
-                    srv_data = rankings_config.get(serveur)
-                    if isinstance(srv_data, dict):
-                        zone_api = srv_data.get("network") or srv_data.get("fly_zone") or srv_data.get("zone")
-                    elif isinstance(srv_data, str):
-                        zone_api = srv_data
+                    # On cible la clé "servers" du JSON
+                    servers_dict = rankings_config.get("servers", {})
+                    
+                    # On convertit le nom reçu en minuscules (ex: "GR1" devient "gr1")
+                    serveur_lower = serveur.lower()
+                    
+                    # 1ère tentative : on cherche directement le nom (ex: "e4k_gr1" ou "fr1")
+                    zone_api = servers_dict.get(serveur_lower)
+                    
+                    # 2ème tentative : si on reçoit juste "gr1", on tente de rajouter "e4k_" devant
+                    if not zone_api and not serveur_lower.startswith("e4k_"):
+                        zone_api = servers_dict.get(f"e4k_{serveur_lower}")
+                        
             except Exception as e:
                 logger.error(f"❌ Erreur lors de la lecture de {self.rankings_config_path.name} : {e}")
-
-        if not zone_api:
-            logger.error(f"❌ La zone API pour {serveur} est introuvable dans {self.rankings_config_path.name}. Scan ignoré.")
-            return
         
         # 2. Lecture du dernier scan serveur correspondant
         try:

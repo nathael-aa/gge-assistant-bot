@@ -27,8 +27,10 @@ logger.addHandler(console_handler)
 class FullServerScanner:
     def __init__(self):
         self.api_url = "https://api.gge-tracker.com/api/v1"
-        self.base_output_dir = Path('/app/data/server_scans')
-        self.serveurs_config_path = Path('/app/data/configs/serveurs.json')
+        data_path = os.getenv('DATA_PATH', '/app/data')
+        self.base_output_dir = Path(data_path) / 'server_scans'
+        self.serveurs_config_path = Path(data_path) / 'configs' / 'serveurs.json'
+        self.users_config_path = Path(data_path) / 'configs' / 'users.json'
         self.session = requests.Session()
         self.server = None 
         self.headers = {
@@ -38,6 +40,7 @@ class FullServerScanner:
 
     def get_active_servers(self):
         active_servers = set()
+
         if self.serveurs_config_path.exists():
             try:
                 with open(self.serveurs_config_path, 'r', encoding='utf-8') as f:
@@ -47,7 +50,16 @@ class FullServerScanner:
                         if srv: active_servers.add(srv)
             except Exception as e:
                 logger.error(f"❌ Erreur lecture serveurs.json : {e}")
-        
+
+        if hasattr(self, 'users_config_path') and self.users_config_path.exists():
+            try:
+                with open(self.users_config_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    for user_id, config in data.items():
+                        srv = config.get("gge_server")
+                        if srv: active_servers.add(srv)
+            except Exception as e:
+                logger.error(f"⚠️ Erreur lecture users.json : {e}")
         if not active_servers:
             active_servers.add("E4K_FR1")
             

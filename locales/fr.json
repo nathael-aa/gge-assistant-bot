@@ -60,6 +60,8 @@
   "aide_p2_v4": "• `/woa history [player]`\n> Consulte l'historique des tickets dépensés.\n\n• `/woa summary`\n> Affiche l'activité économique globale du serveur.",
   "aide_p2_v5": "• `/rival start [event_name] [threshold]` / `/rival stop`\n> Active ou désactive le radar secret en MP.\n\n• `/rival add [player]` / `/rival list`\n> Gère tes cibles de rival en direct.",
   "aide_p2_v6": "• `/calendar setup [channel]`\n> Permets de choisir le channel ou seront envoyés les informations d'événements.\n\n• `/calendrier track [alliance_name]`\n> Permet de suivre une alliance sur les événements.\n\n• `/calendrier untrack [alliance_name]`\n> Retire une alliance du suivi événement.\n\n• `/calendrier current`\n> Renvoie les événements ayant lieu ce mois.",
+  "aide_p2_g7": "<:ranking:1512438311132729525> Groupe de commandes /rank",
+  "aide_p2_v7": "• `/rank player` / `/rank alliance`\n> Classement global et statistiques (Joueur ou Alliance).\n\n• `/rank event [event_name]`\n> Classements des événements (Nomades, Corbeaux, Étrangers, Samouraïs).\n\n• `/rank gacha [event_name]`\n> Classements des évents spéciaux (Banquet, Lune Creuse, Flora...)\n\n• `/rank league [league_name]`\n> Classements des Ligues (Saison, Ligue du Royaume).\n\n• `/rank realms [realm_name]`\n> Classements des mondes (Royaumes Extérieurs, Horizon).\n\n• `/rank statistique [stat_name]`\n> Classements globaux (Honneur, Puissance, Pillage, Légendaire).",
   "aide_p3_f1": "> Recherche automatique en cascade des forteresses prêtes.",
   "aide_p3_f2": "> Interrompt la session de recherche active.",
   "aide_p3_title": "<:fortresses:1512574700839239892> 3. Module Forteresses",

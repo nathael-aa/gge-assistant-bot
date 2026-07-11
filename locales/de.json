@@ -60,6 +60,8 @@
   "aide_p2_v4": "• `/woa history [player]`\n> Sieh dir die Historie der ausgegebenen Tickets an.\n\n• `/woa summary`\n> Zeigt die gesamte wirtschaftliche Aktivität des Servers an.",
   "aide_p2_v5": "• `/rival start [event_name] [threshold]` / `/rival stop`\n> Aktiviert oder deaktiviert das geheime Radar per DM.\n\n• `/rival add [player]` / `/rival list`\n> Verwalte deine Rivalen-Ziele live.",
   "aide_p2_v6": "• `/calendar setup [channel]`\n> Ermöglicht die Wahl des Kanals, in dem Event-Informationen gesendet werden.\n\n• `/calendrier track [alliance_name]`\n> Ermöglicht das Verfolgen einer Allianz bei Events.\n\n• `/calendrier untrack [alliance_name]`\n> Entfernt eine Allianz aus der Event-Verfolgung.\n\n• `/calendrier current`\n> Zeigt die Events, die in diesem Monat stattfinden.",
+  "aide_p2_g7": "<:ranking:1512438311132729525> Befehlsgruppe /rank",
+  "aide_p2_v7": "• `/rank player` / `/rank alliance`\n> Globale Platzierung und Statistiken (Spieler oder Allianz).\n\n• `/rank event [event_name]`\n> Event-Rankings (Nomaden, Blutkrähen, Fremde, Samurai).\n\n• `/rank gacha [event_name]`\n> Spezial-Event-Rankings (Bankett, Hohler Mond, Flora...)\n\n• `/rank league [league_name]`\n> Liga-Rankings (Saison, Königreichs-Liga).\n\n• `/rank realms [realm_name]`\n> Welten-Rankings (Außenwelten, Horizont).\n\n• `/rank statistic [stat_name]`\n> Globale Rankings (Ehre, Macht, Plünderung, Legendär).",
   "aide_p3_f1": "> Automatische, kaskadierende Suche nach verfügbaren Festungen.",
   "aide_p3_f2": "> Beendet die aktive Suchsitzung.",
   "aide_p3_title": "<:fortresses:1512574700839239892> 3. Festungs-Modul",

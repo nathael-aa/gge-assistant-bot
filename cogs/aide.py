@@ -190,6 +190,13 @@ class AideCog(commands.Cog):
             "• `/calendar track [alliance_name]`\n> Permet de suivre une alliance sur les événements.\n\n"
             "• `/calendar untrack [alliance_name]`\n> Retire une alliance du suivi événement.\n\n"
             "• `/calendar current`\n> Renvoie les événements ayant lieu ce mois."), inline=False)
+        embed2.add_field(name=t(langue, "aide_p2_g7", defaut="<:ranking:1512438311132729525> Groupe de commandes /rank"), value=t(langue, "aide_p2_v7", defaut=
+            "• `/rank player` / `/rank alliance`\n> Classement global et statistiques (Joueur ou Alliance).\n\n"
+            "• `/rank event [event_name]`\n> Classements des événements (Nomades, Corbeaux, Étrangers, Samouraïs).\n\n"
+            "• `/rank gacha [event_name]`\n> Classements des évents spéciaux (Banquet, Lune Creuse, Flora...)\n\n"
+            "• `/rank league [league_name]`\n> Classements des Ligues (Saison, Ligue du Royaume).\n\n"
+            "• `/rank realms [realm_name]`\n> Classements des mondes (Royaumes Extérieurs, Horizon).\n\n"
+            "• `/rank statistique [stat_name]`\n> Classements globaux (Honneur, Puissance, Pillage, Légendaire)."), inline=False)
         embeds.append(embed2)
 
         # 📑 PAGE 3 : COG FORTERESSES

@@ -60,6 +60,8 @@
   "aide_p2_v4": "• `/woa history [player]`\n> Check the history of tickets spent.\n\n• `/woa summary`\n> Shows the server's overall economic activity.",
   "aide_p2_v5": "• `/rival start [event_name] [threshold]` / `/rival stop`\n> Enables or disables the secret radar in DMs.\n\n• `/rival add [player]` / `/rival list`\n> Manage your rival targets live.",
   "aide_p2_v6": "• `/calendar setup [channel]`\n> Lets you choose the channel where event information will be sent.\n\n• `/calendrier track [alliance_name]`\n> Lets you track an alliance's event results.\n\n• `/calendrier untrack [alliance_name]`\n> Removes an alliance from event tracking.\n\n• `/calendrier current`\n> Returns the events happening this month.",
+  "aide_p2_g7": "<:ranking:1512438311132729525> Command group /rank",
+  "aide_p2_v7": "• `/rank player` / `/rank alliance`\n> Global ranking and statistics (Player or Alliance).\n\n• `/rank event [event_name]`\n> Event rankings (Nomads, Bloodcrows, Foreigners, Samurais).\n\n• `/rank gacha [event_name]`\n> Special event rankings (King's Banquet, Hollow Moon, Flora...)\n\n• `/rank league [league_name]`\n> League rankings (Season, Kingdom League).\n\n• `/rank realms [realm_name]`\n> Realm rankings (Outer Realms, Beyond the Horizon).\n\n• `/rank statistic [stat_name]`\n> Global rankings (Honor, Might, Plunder, Legendary).",
   "aide_p3_f1": "> Automatic cascading search for available fortresses.",
   "aide_p3_f2": "> Stops the active search session.",
   "aide_p3_title": "<:fortresses:1512574700839239892> 3. Fortresses Module",
