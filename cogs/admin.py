@@ -252,38 +252,51 @@ class AdminCog(commands.Cog):
             await ctx.send(msg)
 
     # ==========================================
-    # 🚀 DÉCLENCHEMENT MANUEL DES SCANNERS (NOUVEAU)
+    # 🚀 DÉCLENCHEMENT MANUEL DES SCANNERS
     # ==========================================
     @commands.command(name="scan_manuel", hidden=True)
     async def scan_manuel(self, ctx):
-        """[CACHÉE] !scan_manuel : Lance manuellement le script auto_pa_daily.sh."""
+        """[CACHÉE] !scan_manuel : Lance manuellement les scanners Python."""
         if ctx.author.id != MON_ID_DISCORD: return
 
-        # Utilisation de BASE_DIR pour toujours pointer à la racine du projet
-        script_path = BASE_DIR / "auto_pa_daily.sh"
-
-        if not script_path.is_file():
-            return await ctx.send(f"❌ **Erreur :** Le fichier `{script_path}` est introuvable.")
-
-        msg = await ctx.send("⏳ **Lancement des scanners en cours...**")
+        msg = await ctx.send("⏳ **Lancement des scanners en cours...** (Cela peut prendre plusieurs minutes)")
 
         try:
-            # Lancement asynchrone pour ne pas paralyser le bot pendant le scan
-            process = await asyncio.create_subprocess_shell(
-                f"bash {script_path}",
+            # On lance directement les scripts Python (le bot est déjà dans l'environnement Docker)
+            # 1. Scanner de serveurs
+            process_serveur = await asyncio.create_subprocess_shell(
+                "python3 /app/scanners/server_scanner.py",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
             
-            await msg.edit(content="🚀 **Scanners lancés avec succès !**\nLe script `auto_pa_daily.sh` tourne actuellement en arrière-plan.\n*Regarde dans le terminal ou tes logs pour suivre l'avancement.*")
+            # 2. Scanner de murs
+            process_murs = await asyncio.create_subprocess_shell(
+                "python3 /app/scanners/murs_scanner.py",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
             
-            # Attente de la fin du script pour consigner le résultat dans la console
-            stdout, stderr = await process.communicate()
+            await msg.edit(content="🚀 **Scanners lancés avec succès !**\nLes scripts tournent en arrière-plan.\n*Je te préviendrai quand ils auront terminé.*")
             
-            if process.returncode != 0:
-                logger.error(f"[ERREUR SCANNER] Le script s'est terminé avec une erreur :\n{stderr.decode()}")
+            # Attente de la fin des deux scripts pour consigner le résultat
+            stdout_srv, stderr_srv = await process_serveur.communicate()
+            stdout_murs, stderr_murs = await process_murs.communicate()
+            
+            # Vérification des erreurs
+            erreurs = False
+            if process_serveur.returncode != 0:
+                logger.error(f"[ERREUR SCANNER SERVEUR] :\n{stderr_srv.decode()}")
+                erreurs = True
+            if process_murs.returncode != 0:
+                logger.error(f"[ERREUR SCANNER MURS] :\n{stderr_murs.decode()}")
+                erreurs = True
+                
+            if erreurs:
+                await ctx.send("⚠️ **Les scanners ont terminé, mais des erreurs ont été détectées.** (Vérifie les logs du bot)")
             else:
                 logger.info(f"[SUCCÈS SCANNER] Les scanners manuels lancés par {ctx.author.name} sont terminés.")
+                await ctx.send("✅ **Tous les scanners sont terminés avec succès !**")
                 
         except Exception as e:
             await msg.edit(content=f"⚠️ **Une erreur est survenue lors du lancement :**\n```py\n{e}\n```")
