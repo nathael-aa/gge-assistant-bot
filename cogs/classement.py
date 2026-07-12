@@ -23,7 +23,7 @@ class ClassementCog(commands.Cog):
         self.bot = bot
         self.logger = logging.getLogger("GGEAssistant")
         self.ranking_api_url = "https://empire-api.fly.dev"
-        self.config_path = "data/configs/rankings_config.json"
+        self.config_path = "data/configs/configuration.json"
         
         self.servers_map = {}
         self.event_ids = {}

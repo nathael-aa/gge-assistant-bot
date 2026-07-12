@@ -22,10 +22,10 @@ from utils import (
     setup_embed_footer,
     load_surveillance_async,
     save_surveillance_async,
+    load_configuration_async,
     get_discord_timestamp,
     get_server_config,   
-    get_api_headers,
-    SERVER_SCAN_MINUTES
+    get_api_headers
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -499,12 +499,10 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
     async def radar_spy_task(self):
         try:
             maintenant = discord.utils.utcnow()
-            current_hour_key = maintenant.strftime("%Y-%m-%d-%H")
 
-            if maintenant.minute != 46 and self.last_scan_hour == current_hour_key:
-                return
-
-            self.last_scan_hour = current_hour_key
+            # 🔄 1. Lecture ultra-propre avec ta nouvelle fonction
+            config_data = await load_configuration_async()
+            server_scan_minutes = config_data.get("scan_minutes", {})
 
             data = await load_surveillance_async()
             players = data.get("players", {})
@@ -530,9 +528,22 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             # ==========================================
             if alliances_trackees:
                 for a_id, a_info in list(alliances_trackees.items()):
-                    serveur = a_info.get("serveur", "E4K_FR1")
+                    serveur = a_info.get("serveur", "E4K_FR1").upper()
                     
-                    if maintenant.minute != SERVER_SCAN_MINUTES.get(serveur, 46):
+                    # ⏱️ Récupération propre de la minute (46 par défaut)
+                    minute_cible = server_scan_minutes.get(serveur)
+                    if minute_cible is None:
+                        minute_cible = 46
+                    
+                    # 🔄 Fenêtre de tir élargie (heure pile + 3 essais)
+                    minutes_valides = [
+                        minute_cible,
+                        (minute_cible + 5) % 60,
+                        (minute_cible + 10) % 60,
+                        (minute_cible + 15) % 60
+                    ]
+                    
+                    if maintenant.minute not in minutes_valides:
                         continue
 
                     headers = await get_api_headers(custom_server=serveur)
@@ -639,16 +650,30 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             # --- ÉTAPE 2 : ANALYSE DES JOUEURS ---
             # ==========================================
             for p_id, info in list(players.items()):
-                serveur = info.get("serveur", "E4K_FR1")
+                # On applique exactement la même logique ici pour les joueurs
+                serveur = info.get("serveur", "E4K_FR1").upper()
                 
-                if maintenant.minute != SERVER_SCAN_MINUTES.get(serveur, 46):
+                # ⏱️ Récupération propre de la minute (46 par défaut)
+                minute_cible = server_scan_minutes.get(serveur)
+                if minute_cible is None:
+                    minute_cible = 46
+                    
+                # 🔄 Fenêtre de tir élargie (heure pile + 3 essais)
+                minutes_valides = [
+                    minute_cible,
+                    (minute_cible + 5) % 60,
+                    (minute_cible + 10) % 60,
+                    (minute_cible + 15) % 60
+                ]
+                    
+                if maintenant.minute not in minutes_valides:
                     continue
 
                 headers = await get_api_headers(custom_server=serveur)
                 
                 player = info["name"]
                 abonnes = info.get("abonnes", {})
-                if not abonnes: continue 
+                if not abonnes: continue
                 
                 try:
                     url_alli = f"https://api.gge-tracker.com/api/v1/updates/players/{p_id}/alliances"

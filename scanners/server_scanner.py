@@ -29,38 +29,59 @@ class FullServerScanner:
         self.api_url = "https://api.gge-tracker.com/api/v1"
         data_path = os.getenv('DATA_PATH', '/app/data')
         self.base_output_dir = Path(data_path) / 'server_scans'
-        self.serveurs_config_path = Path(data_path) / 'configs' / 'serveurs.json'
-        self.users_config_path = Path(data_path) / 'configs' / 'users.json'
+        
+        self.configuration_path = Path(data_path) / 'configs' / 'configuration.json'
+        
         self.session = requests.Session()
         self.server = None 
         self.headers = {
             "Accept": "application/json",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) GGE-Assistant/2.0"
         }
+        
+        # 🚨 ALARMES DISCORD (Remplace par ton URL de Webhook)
+        self.webhook_url = "https://discord.com/api/webhooks/1525853187280474222/Y4fycCy0IW019tZCMhGOdJzS1vqg7wSYn1ZEhtVO2o9Atuwr8ek-zieIsN9kG86Ndlcq"
+
+    def send_discord_alert(self, title, description, color=16711680):
+        """Envoie une notification sur Discord via Webhook"""
+        if not getattr(self, 'webhook_url', None) or self.webhook_url == "https://discord.com/api/webhooks/1525853187280474222/Y4fycCy0IW019tZCMhGOdJzS1vqg7wSYn1ZEhtVO2o9Atuwr8ek-zieIsN9kG86Ndlcq":
+            return
+            
+        try:
+            payload = {
+                "embeds": [{
+                    "title": title,
+                    "description": description,
+                    "color": color,
+                    "timestamp": datetime.utcnow().isoformat()
+                }]
+            }
+            requests.post(self.webhook_url, json=payload, timeout=5)
+        except Exception as e:
+            logger.error(f"❌ Impossible d'envoyer l'alerte Discord : {e}")
 
     def get_active_servers(self):
         active_servers = set()
 
-        if self.serveurs_config_path.exists():
+        if self.configuration_path.exists():
             try:
-                with open(self.serveurs_config_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    for guild_id, config in data.items():
-                        srv = config.get("gge_server")
-                        if srv: active_servers.add(srv)
+                with open(self.configuration_path, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                    
+                # 🔄 Lecture de la nouvelle section "active_servers"
+                servers_status = config_data.get("active_servers", {})
+                
+                # On ajoute le serveur uniquement si sa valeur est True
+                for srv_name, is_active in servers_status.items():
+                    if is_active is True:
+                        active_servers.add(srv_name.upper())
+                        
             except Exception as e:
-                logger.error(f"❌ Erreur lecture serveurs.json : {e}")
+                logger.error(f"❌ Erreur lecture configuration.json : {e}")
 
-        if hasattr(self, 'users_config_path') and self.users_config_path.exists():
-            try:
-                with open(self.users_config_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    for user_id, config in data.items():
-                        srv = config.get("gge_server")
-                        if srv: active_servers.add(srv)
-            except Exception as e:
-                logger.error(f"⚠️ Erreur lecture users.json : {e}")
+        # Sécurité de secours au cas où le fichier est cassé
         if not active_servers:
+            logger.warning("⚠️ Aucun serveur actif trouvé. Fallback sur E4K_FR1.")
             active_servers.add("E4K_FR1")
             
         return list(active_servers)
@@ -96,6 +117,7 @@ class FullServerScanner:
                     erreurs_suite += 1
                     if erreurs_suite >= 3:
                         logger.error(f"⏭️ Trop d'erreurs, on ignore la page {page}.")
+                        self.send_discord_alert("⚠️ Alerte Scanner (API Instable)", f"Serveur : **{self.server}**\nTrop d'erreurs API à la suite. La page {page} a été ignorée. Le scan sera incomplet.", 16753920) # Orange
                         page += 1
                         erreurs_suite = 0
                     continue
@@ -144,6 +166,7 @@ class FullServerScanner:
                 erreurs_suite += 1
                 if erreurs_suite >= 3:
                     logger.error(f"⏭️ Abandon de la page {page} suite à 3 erreurs.")
+                    self.send_discord_alert("⚠️ Alerte Scanner (API Instable)", f"Serveur : **{self.server}**\nTrop d'erreurs inattendues à la suite. La page {page} a été ignorée. Le scan sera incomplet.", 16753920) # Orange
                     page += 1
                     erreurs_suite = 0
         
@@ -174,7 +197,7 @@ class FullServerScanner:
         
         return filepath
 
-    def nettoyer_vieux_fichiers(self, jours=14):
+    def nettoyer_vieux_fichiers(self, jours=3):
         logger.info(f"🧹 Démarrage du nettoyage des archives de plus de {jours} jours...")
         now = time.time()
         fichiers_supprimes = 0
@@ -199,32 +222,41 @@ class FullServerScanner:
         logger.info(f"✅ Nettoyage terminé : {fichiers_supprimes} anciens fichiers supprimés.")
     
     def run(self, serveur_cible=None):
-        if serveur_cible:
-            servers_to_scan = [serveur_cible]
-            logger.info(f"🚀 LANCEMENT D'URGENCE POUR : {serveur_cible}")
-        else:
-            servers_to_scan = self.get_active_servers()
-            logger.info(f"🚀 DÉMARRAGE DU MULTI-SCAN QUOTIDIEN : {len(servers_to_scan)} serveur(s) : {', '.join(servers_to_scan)}")
-        
-        for index, srv in enumerate(servers_to_scan):
-            self.server = srv
-            self.headers["gge-server"] = self.server 
-            
-            start_time = time.time()
-            players = self.get_all_players()
-            
-            if not players:
-                logger.error(f"❌ Aucun joueur trouvé pour {self.server}.")
+        try:
+            if serveur_cible:
+                servers_to_scan = [serveur_cible]
+                logger.info(f"🚀 LANCEMENT D'URGENCE POUR : {serveur_cible}")
             else:
-                duration = time.time() - start_time
-                self.save_results(players, duration, self.server)
+                servers_to_scan = self.get_active_servers()
+                logger.info(f"🚀 DÉMARRAGE DU MULTI-SCAN QUOTIDIEN : {len(servers_to_scan)} serveur(s) : {', '.join(servers_to_scan)}")
             
-            if not serveur_cible and index < len(servers_to_scan) - 1:
-                logger.info(f"⏳ Scan de {srv} terminé. Pause de 2 minutes...")
-                time.sleep(120)
+            for index, srv in enumerate(servers_to_scan):
+                self.server = srv
+                self.headers["gge-server"] = self.server 
                 
-        if not serveur_cible:
-            self.nettoyer_vieux_fichiers(jours=14)
+                start_time = time.time()
+                players = self.get_all_players()
+                
+                if not players:
+                    logger.error(f"❌ Aucun joueur trouvé pour {self.server}.")
+                    self.send_discord_alert("❌ Échec Critique du Scanner", f"Le scan de la base de données pour le serveur **{self.server}** a totalement échoué (0 joueur trouvé). L'API Tracker est peut-être hors ligne.", 16711680) # Rouge
+                else:
+                    duration = time.time() - start_time
+                    self.save_results(players, duration, self.server)
+                    # Alerte verte optionnelle (tu peux la commenter si c'est trop de spam sur Discord)
+                    # self.send_discord_alert("✅ Scan Terminé", f"Le serveur **{self.server}** a été mis à jour avec succès.\n👥 Joueurs enregistrés : **{len(players)}**\n⏱️ Durée : {round(duration, 1)}s", 65280)
+                
+                if not serveur_cible and index < len(servers_to_scan) - 1:
+                    logger.info(f"⏳ Scan de {srv} terminé. Pause de 15 secondes...")
+                    time.sleep(15)
+                    
+            if not serveur_cible:
+                self.nettoyer_vieux_fichiers(jours=3)
+                self.send_discord_alert("✅ Multi-Scan Quotidien Terminé", f"Tous les serveurs actifs ({len(servers_to_scan)}) ont été mis à jour dans la base de données.", 65280)
+                
+        except Exception as e:
+            logger.error(f"🚨 CRASH FATAL DU SCRIPT : {e}")
+            self.send_discord_alert("🚨 CRASH DU SCANNER", f"Le script `server_scanner.py` a planté de manière inattendue :\n```py\n{e}\n```", 16711680)
 
 if __name__ == "__main__":
     scanner = FullServerScanner()

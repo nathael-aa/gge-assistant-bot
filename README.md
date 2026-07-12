@@ -70,13 +70,11 @@ gge-assistant-bot/
 │   ├── admin.py, aide.py, classement.py, radar.py, guerre.py, profils.py...
 ├── scanners/              # Scripts d'analyse asynchrones (API GGE-Tracker)
 │   ├── alerter.py
-│   ├── murs_scanner.py
 │   └── server_scanner.py
 ├── data/                  # 🔒 Bases de données JSON locales & archives
 │   ├── alliances/         # Règlements et diplomaties
 │   ├── configs/           # Configurations bot, serveurs, calendrier
 │   ├── joueurs/           # Pseudos liés et sessions
-│   ├── murs_scans/        # Archives quotidiennes des murs (E4K_FR1, INT3, WORLD2...)
 │   └── server_scans/      # Captures globales des serveurs
 ├── locales/               # Fichiers de traduction (i18n)
 │   ├── en.json, fr.json, de.json

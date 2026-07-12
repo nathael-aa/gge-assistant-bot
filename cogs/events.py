@@ -31,13 +31,13 @@ from utils import (
     generer_rapport_alliance_embed,
     load_objectifs_async,
     save_objectifs_async,
+    load_configuration_async,
     load_pseudos_async,
     save_pseudos_async,
     load_rivals_async,
     save_rivals_async,
-    get_api_headers,     
-    get_server_config,
-    SERVER_SCAN_MINUTES
+    get_api_headers,
+    get_server_config
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -677,6 +677,11 @@ class EventsCog(commands.Cog):
     async def rival_check_task(self):
         try:
             maintenant = discord.utils.utcnow()
+
+            # 🔄 1. Lecture ultra-propre avec ta nouvelle fonction
+            config_data = await load_configuration_async()
+            server_scan_minutes = config_data.get("scan_minutes", {})
+
             data = await load_rivals_async()
             if not data: return
 
@@ -695,9 +700,22 @@ class EventsCog(commands.Cog):
             base_api = "https://api.gge-tracker.com/api/v1"
 
             for user_id, config in list(data.items()):
-                serveur = config.get("serveur", "E4K_FR1")
+                serveur = config.get("serveur", "E4K_FR1").upper()
                 
-                if maintenant.minute != SERVER_SCAN_MINUTES.get(serveur, 46):
+                # ⏱️ Récupération propre de la minute (46 par défaut)
+                minute_cible = server_scan_minutes.get(serveur)
+                if minute_cible is None:
+                    minute_cible = 46
+                
+                # 🔄 Fenêtre de tir élargie (heure pile + 3 essais)
+                minutes_valides = [
+                    minute_cible,
+                    (minute_cible + 5) % 60,
+                    (minute_cible + 10) % 60,
+                    (minute_cible + 15) % 60
+                ]
+                
+                if maintenant.minute not in minutes_valides:
                     continue
 
                 langue = users_lang.get(user_id, "fr")

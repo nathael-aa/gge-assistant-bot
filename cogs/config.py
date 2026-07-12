@@ -7,7 +7,7 @@ from discord.ext import commands
 import asyncio
 from pathlib import Path
 
-from utils import CONFIG_DIR, t, get_server_config, MON_ID_DISCORD
+from utils import CONFIG_DIR, t, get_server_config, MON_ID_DISCORD, load_configuration_async
 
 # ==========================================
 # 💾 SAUVEGARDE CONFIG SERVEURS
@@ -43,35 +43,6 @@ async def save_users_config(data):
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-# 🌍 LISTE DES SERVEURS GGE (Mise à jour via API officielle)
-
-GGE_SERVERS = {
-
-    # 📱 Serveurs E4K (Mobiles) Supportés
-    "E4K_FR1": True, "E4K_DE1": False, "E4K_DE2": False, "E4K_US1": False,
-    "E4K_INT2": False, "E4K_CN1": False, "E4K_GB1": False, "E4K_RU1": False,
-    "E4K_HANT1": False, "E4K_BR1": False, "E4K_WORLD2": False,
-    
-    # 💻 Serveurs PC (Navigateur) Supportés
-    "FR1": True, "DE1": False, "INT1": False, "INT2": False, "INT3": True,
-    "WORLD1": False, "WORLD2": True, "GLOBAL": False, "ES1": False, "ES2": False,
-    "IT1": False, "TR1": False, "NL1": False, "HU1": False, "HU2": False,
-    "PL1": False, "PT1": False, "SK1": False, "SKN1": False, "RU1": False,
-    "RO1": False, "BG1": False, "GB1": True, "BR1": False, "US1": True,
-    "AU1": False, "JP1": False, "IN1": False, "CN1": False, "GR1": True,
-    "SA1": False, "AE1": False, "EG1": False, "ARAB1": False, "ASIA": False,
-    "HANT1": False, "PARTNER_SP3": False,
-    
-    # 🔴 Autres serveurs E4K (Non supportés par le tracker pour le moment)
-    "E4K_ES1": False, "E4K_PL1": False, "E4K_IT1": False, "E4K_TR1": False,
-    "E4K_NL1": False, "E4K_PT1": False, "E4K_GR1": False, "E4K_RO1": False,
-    "E4K_HU1": False, "E4K_CZ1": False, "E4K_SK1": False, "E4K_BG1": False,
-    "E4K_HR1": False, "E4K_SE1": False, "E4K_NO1": False, "E4K_FI1": False,
-    "E4K_DK1": False, "E4K_JP1": False, "E4K_KR1": False, "E4K_TW1": False,
-    "E4K_INT1": False
-
-}
-
 class ConfigCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -89,7 +60,11 @@ class ConfigCog(commands.Cog):
         choix_vert = []
         choix_rouge = []
         
-        for srv, is_supported in GGE_SERVERS.items():
+        # 🔄 Lecture dynamique depuis configuration.json
+        config_data = await load_configuration_async()
+        active_servers = config_data.get("active_servers", {})
+        
+        for srv, is_supported in active_servers.items():
             if current.lower() in srv.lower():
                 if is_supported:
                     choix_vert.append(app_commands.Choice(name=f"{srv} ({lbl_ok})", value=srv))
@@ -165,7 +140,10 @@ class ConfigCog(commands.Cog):
         await interaction.response.defer(ephemeral=(scope.value == "personal"))
         
         serveur_upper = server.upper()
-        is_supported = GGE_SERVERS.get(serveur_upper, False)
+
+        config_data = await load_configuration_async()
+        active_servers = config_data.get("active_servers", {})
+        is_supported = active_servers.get(serveur_upper, False)
         
         if not is_supported:
             msg_erreur = t(language.value, "error_unsupported_server", serveur=serveur_upper, defaut=f"❌ **Erreur** : Le serveur `{serveur_upper}` n'est pas pris en charge par l'API pour le moment. Veuillez choisir un serveur avec la pastille 🟢.")

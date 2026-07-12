@@ -259,47 +259,23 @@ class AdminCog(commands.Cog):
         """[CACHÉE] !scan_manuel : Lance manuellement les scanners Python."""
         if ctx.author.id != MON_ID_DISCORD: return
 
-        msg = await ctx.send("⏳ **Lancement des scanners en cours...** (Cela peut prendre plusieurs minutes)")
+        msg = await ctx.send("⏳ **Lancement manuel des scanners...** (Scan Serveur puis Murs)")
 
         try:
-            # On lance directement les scripts Python (le bot est déjà dans l'environnement Docker)
             # 1. Scanner de serveurs
-            process_serveur = await asyncio.create_subprocess_shell(
-                "python3 /app/scanners/server_scanner.py",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+            logger.info(f"🚀 Lancement manuel du ServerScanner par {ctx.author.name}")
+            process_serveur = await asyncio.create_subprocess_exec(
+                "python3", "/app/scanners/server_scanner.py"
             )
-            
-            # 2. Scanner de murs
-            process_murs = await asyncio.create_subprocess_shell(
-                "python3 /app/scanners/murs_scanner.py",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            await msg.edit(content="🚀 **Scanners lancés avec succès !**\nLes scripts tournent en arrière-plan.\n*Je te préviendrai quand ils auront terminé.*")
-            
-            # Attente de la fin des deux scripts pour consigner le résultat
-            stdout_srv, stderr_srv = await process_serveur.communicate()
-            stdout_murs, stderr_murs = await process_murs.communicate()
-            
-            # Vérification des erreurs
-            erreurs = False
+            await process_serveur.wait()
+
             if process_serveur.returncode != 0:
-                logger.error(f"[ERREUR SCANNER SERVEUR] :\n{stderr_srv.decode()}")
-                erreurs = True
-            if process_murs.returncode != 0:
-                logger.error(f"[ERREUR SCANNER MURS] :\n{stderr_murs.decode()}")
-                erreurs = True
-                
-            if erreurs:
-                await ctx.send("⚠️ **Les scanners ont terminé, mais des erreurs ont été détectées.** (Vérifie les logs du bot)")
-            else:
-                logger.info(f"[SUCCÈS SCANNER] Les scanners manuels lancés par {ctx.author.name} sont terminés.")
-                await ctx.send("✅ **Tous les scanners sont terminés avec succès !**")
+                await ctx.send("❌ **Erreur dans le Scanner Serveur.** Scan des murs annulé.")
+                return
                 
         except Exception as e:
-            await msg.edit(content=f"⚠️ **Une erreur est survenue lors du lancement :**\n```py\n{e}\n```")
+            logger.error(f"❌ Erreur critique scan manuel : {e}")
+            await ctx.send(f"⚠️ **Erreur lors de l'exécution :**\n```py\n{e}\n```")
 
     # ==========================================
     # 📜 EXTRACTION DU JOURNAL SYSTÈME (LOGS)

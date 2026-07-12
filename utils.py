@@ -84,19 +84,6 @@ async def get_api_headers(interaction: discord.Interaction = None, custom_server
     }
 
 # ==========================================
-# ⏱️ TIMING DE SCAN PAR SERVEUR (API GGE-Tracker)
-# ==========================================
-SERVER_SCAN_MINUTES = {
-    "E4K_FR1": 46,
-    "FR1": 13,
-    "WORLD2": 8,
-    "INT3": 3,
-    "GB1": 42,
-    "US1": 10,
-    "GR1": 37,
-}
-
-# ==========================================
 # 🌍 MOTEUR DE TRADUCTION (i18n)
 # ==========================================
 _translations = {}
@@ -218,6 +205,25 @@ async def save_maintenance_async(etat):
 # ==========================================
 # 💾 GESTION DES FICHIERS JSON (Accès Sécurisés)
 # ==========================================
+
+async def load_configuration_async():
+    """Charge le fichier principal de configuration (serveurs, minutes, events...)."""
+    path = CONFIG_DIR / 'configuration.json'
+    async with get_file_lock(path):
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"❌ Erreur de lecture de configuration.json : {e}")
+        return {"servers": {}, "scan_minutes": {}}
+
+async def save_configuration_async(data):
+    """Sauvegarde le fichier principal de configuration."""
+    path = CONFIG_DIR / 'configuration.json'
+    async with get_file_lock(path):
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
 
 async def load_blocks_async():
     path = CONFIG_DIR / 'blocks.json'
