@@ -11,5 +11,6 @@ services:
       - GGE_SERVER=${GGE_SERVER:-E4K_FR1}
       - DATA_PATH=/app/data
       - TZ=Europe/Paris
+    user: "1001:1001"
     volumes:
       - .:/app
