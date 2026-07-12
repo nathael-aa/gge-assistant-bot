@@ -161,6 +161,9 @@ class GGEAssistantBot(commands.Bot):
     # 🛑 LE VIDEUR UNIQUE ET UNIVERSEL
     # ==========================================
     async def global_interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.type == discord.InteractionType.autocomplete:
+            return True
+
         cmd_name = interaction.command.qualified_name if interaction.command else interaction.data.get("name", "inconnue")
         
         langue, _ = await get_server_config(interaction)
@@ -180,34 +183,24 @@ class GGEAssistantBot(commands.Bot):
         except Exception as e:
             logger.error(f"⚠️ Erreur lors de l'écriture du log : {e}")
 
-        # --- 2. VÉRIFICATION DE LA CONFIGURATION (SERVEURS ET DMs) ---
+        # --- 2. VÉRIFICATION DE LA CONFIGURATION (PERSONNELLE UNIQUEMENT) ---
         commandes_libres = ["setup", "help", "contact", "changelog"]
         
         if cmd_name not in commandes_libres:
             config_ok = False
             
-            # Vérif 1 : Config personnelle de l'utilisateur (Priorité absolue)
+            # On vérifie uniquement le profil du joueur
             fichier_users = CONFIG_DIR / 'users.json'
             if fichier_users.exists():
                 with open(fichier_users, 'r', encoding='utf-8') as f:
                     if str(interaction.user.id) in json.load(f):
                         config_ok = True
             
-            # Vérif 2 : Config du Serveur Discord (si on est sur un serveur et pas de config perso)
-            if not config_ok and interaction.guild:
-                fichier_serveurs = CONFIG_DIR / 'serveurs.json'
-                if fichier_serveurs.exists():
-                    with open(fichier_serveurs, 'r', encoding='utf-8') as f:
-                        if str(interaction.guild_id) in json.load(f):
-                            config_ok = True
-            
-            # Si aucune configuration n'est trouvée du tout
+            # Si le joueur n'est pas dans users.json
             if not config_ok:
                 if interaction.type == discord.InteractionType.application_command:
-                    if interaction.guild:
-                        msg = t(langue, "bot_err_config_server", defaut="❌ **Configuration Requise**\nCe serveur n'est pas configuré. Tu dois d'abord utiliser la commande `/setup` (Portée: Personnel) pour créer ton profil, ou demander à un admin de configurer le serveur.")
-                    else:
-                        msg = t(langue, "bot_err_config_dm", defaut="❌ **Configuration Requise**\nPour utiliser le bot en Message Privé, tu dois d'abord configurer ton profil.\nTape la commande `/setup` (Portée: Personnel) pour choisir ton serveur GGE.")
+                    # Le </setup:0> créera un lien cliquable natif sur Discord !
+                    msg = t(langue, "bot_err_config_dm", defaut="⚠️ **Halte là !**\nTu n'as pas encore configuré ton profil personnel. Utilise la commande </setup:0> pour définir ton serveur et ta langue avant d'utiliser le bot.")
                     await interaction.response.send_message(msg, ephemeral=True)
                 return False
 
