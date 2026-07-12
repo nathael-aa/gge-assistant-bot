@@ -140,6 +140,9 @@ class AdminCog(commands.Cog):
         if ctx.author.id != MON_ID_DISCORD: return
         data = await load_blocks_async()
         cmd_clean = command.replace("/", "").strip()
+        if "global_commands" not in data:
+            data["global_commands"] = {}
+
         data["global_commands"][cmd_clean] = reason
         await save_blocks_async(data)
         
@@ -173,6 +176,9 @@ class AdminCog(commands.Cog):
         uid = str(user.id)
         cmd_clean = command.replace("/", "").strip()
         
+        if "blocked_users" not in data:
+            data["blocked_users"] = {}
+            
         if uid not in data["blocked_users"]: 
             data["blocked_users"][uid] = {}
             
