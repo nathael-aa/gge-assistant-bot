@@ -192,9 +192,6 @@ class FullServerScanner:
         file_size_mb = filepath.stat().st_size / (1024 * 1024)
         logger.info(f"💾 Résultats sauvegardés: {filepath} ({file_size_mb:.2f} Mo)")
         
-        flag_file = Path('/app/data/scan.flag')
-        with open(flag_file, 'w') as f: f.write(serveur)
-        
         return filepath
 
     def nettoyer_vieux_fichiers(self, jours=3):
