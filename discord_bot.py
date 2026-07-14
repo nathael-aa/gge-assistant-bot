@@ -136,6 +136,17 @@ class GGEAssistantBot(commands.Bot):
         logger.info(f"📡 Statut mis à jour : {activity.name} | Pastille : {target_status}")
 
     # ==========================================
+    # 📥 SUIVI DES AJOUTS / RETRAITS DU BOT
+    # ==========================================
+    async def on_guild_join(self, guild: discord.Guild):
+        """Déclenché quand le bot est ajouté sur un nouveau serveur."""
+        logger.info(f"🎉 [NOUVEAU SERVEUR] Le bot a rejoint '{guild.name}' (ID: {guild.id}) | Membres : {guild.member_count}")
+
+    async def on_guild_remove(self, guild: discord.Guild):
+        """Déclenché quand le bot est expulsé ou quitte un serveur."""
+        logger.warning(f"👋 [DÉPART SERVEUR] Le bot a été retiré de '{guild.name}' (ID: {guild.id})")
+
+    # ==========================================
     # 🛰️ BOUCLE DE VEILLE DE FIN DE SCAN (scan.flag)
     # ==========================================
     @tasks.loop(seconds=15)

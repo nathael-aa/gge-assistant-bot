@@ -76,22 +76,6 @@ class CalendarNavView(discord.ui.View):
         self.update_buttons()
         await interaction.response.edit_message(embed=self.embeds["future"], view=self)
 
-# ==========================================
-# 🌍 FONCTION POUR DÉTECTER LA LANGUE ET LE SERVEUR
-# ==========================================
-async def get_guild_lang_and_server(guild_id_str: str):
-    langue, serveur = "fr", "E4K_FR1"
-    path = CONFIG_DIR / 'serveurs.json'
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                if guild_id_str in data:
-                    langue = data[guild_id_str].get("langue", "fr")
-                    serveur = data[guild_id_str].get("gge_server", "E4K_FR1")
-        except: pass
-    return langue, serveur
-
 async def load_calendrier_async():
     if not CALENDRIER_FILE.exists():
         return {"guilds": {}, "notified": []}
@@ -176,27 +160,36 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
     async def cog_unload(self):
         self.check_newshub_calendar_task.cancel()
 
-    # ==========================================
-    # ⚙️ COMMANDES DE CONFIGURATION DU SUIVI
-    # ==========================================
     @app_commands.command(name="setup", description="Defines the room where calendar alerts will be sent")
-    @app_commands.describe(channel="The text-based event lounge")
+    @app_commands.describe(
+        channel="The text-based event lounge",
+        server="The Goodgame Empire server for this Discord",
+        langue="Language for the automated messages"
+    )
+    @app_commands.choices(langue=[
+        app_commands.Choice(name="🇫🇷 Français", value="fr"),
+        app_commands.Choice(name="🇬🇧 English", value="en"),
+        app_commands.Choice(name="🇩🇪 Deutsch", value="de")
+    ])
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
-    async def c_setup(self, interaction: discord.Interaction, channel: discord.TextChannel):
+    async def c_setup(self, interaction: discord.Interaction, channel: discord.TextChannel, server: str, langue: app_commands.Choice[str]):
         await interaction.response.defer(ephemeral=True)
-        langue, _ = await get_server_config(interaction)
         
         data = await load_calendrier_async()
         guild_id = str(interaction.guild_id)
+        serveur_upper = server.upper()
         
         if guild_id not in data["guilds"]:
             data["guilds"][guild_id] = {"channel_id": None, "tracked_alliances": []}
             
         data["guilds"][guild_id]["channel_id"] = channel.id
+        data["guilds"][guild_id]["gge_server"] = serveur_upper
+        data["guilds"][guild_id]["langue"] = langue.value
+        
         await save_calendrier_async(data)
         
-        msg = t(langue, "cal_setup_success", salon=channel.mention, defaut=f"✅ Le salon des annonces d'événements a été défini sur {channel.mention}.")
+        msg = t(langue.value, "cal_setup_success", salon=channel.mention, defaut=f"✅ Le salon des alertes a été défini sur {channel.mention} pour le serveur **{serveur_upper}**.")
         await interaction.followup.send(msg)
 
     @app_commands.command(name="track", description="Adds an alliance to the automatic end-of-event report")
@@ -420,7 +413,8 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                 except: pass
                             
                             if channel:
-                                langue, _ = await get_guild_lang_and_server(str(guild_id))
+                                langue = g_info.get("langue", "fr")
+                                serveur_cible = g_info.get("gge_server", "E4K_FR1")
                                 
                                 nom_traduit = t(langue, meta["name_key"], defaut=meta["name_default"])
                                 
@@ -454,7 +448,8 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                 except: pass
 
                             if channel:
-                                langue, serveur_cible = await get_guild_lang_and_server(str(guild_id))
+                                langue = g_info.get("langue", "fr")
+                                serveur_cible = g_info.get("gge_server", "E4K_FR1")
                                 
                                 nom_traduit = t(langue, meta["name_key"], defaut=meta["name_default"])
                                 
