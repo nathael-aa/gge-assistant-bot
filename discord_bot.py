@@ -39,6 +39,51 @@ print("\n" + "█"*60 + "\n" + "█" + " "*18 + "NOUVEAU DÉMARRAGE DU BOT" + " 
 logger.info("🟢 Démarrage du système de logs...")
 
 # ==========================================
+# 💌 MESSAGE DE BIENVENUE INTERACTIF
+# ==========================================
+class WelcomeView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    def get_welcome_embed(self, lang="fr"):
+        # On va chercher les traductions dans les JSON via la fonction t()
+        title = t(lang, "welcome_title", defaut="🏰 Welcome to GGE Assistant!")
+        desc = t(lang, "welcome_desc", defaut="Here is how to get started:")
+        
+        embed = discord.Embed(title=title, description=desc, color=0x0B1D51)
+        
+        embed.add_field(
+            name=t(lang, "welcome_step1_title", defaut="1️⃣ Configuration"), 
+            value=t(lang, "welcome_step1_desc", defaut="Use </setup:0> to configure your profile."), 
+            inline=False
+        )
+        embed.add_field(
+            name=t(lang, "welcome_step2_title", defaut="2️⃣ Tools"), 
+            value=t(lang, "welcome_step2_desc", defaut="Type </help:0> to see all commands."), 
+            inline=False
+        )
+        embed.add_field(
+            name=t(lang, "welcome_step3_title", defaut="3️⃣ Calendar"), 
+            value=t(lang, "welcome_step3_desc", defaut="Use </calendar setup:0> to get alerts."), 
+            inline=False
+        )
+        
+        embed.set_footer(text=t(lang, "welcome_footer", defaut="Select your language below."))
+        return embed
+
+    @discord.ui.button(label="Français", emoji="🇫🇷", style=discord.ButtonStyle.secondary, custom_id="welc_fr")
+    async def btn_fr(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=self.get_welcome_embed("fr"))
+
+    @discord.ui.button(label="English", emoji="🇬🇧", style=discord.ButtonStyle.secondary, custom_id="welc_en")
+    async def btn_en(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=self.get_welcome_embed("en"))
+
+    @discord.ui.button(label="Deutsch", emoji="🇩🇪", style=discord.ButtonStyle.secondary, custom_id="welc_de")
+    async def btn_de(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=self.get_welcome_embed("de"))
+
+# ==========================================
 # 🤖 CLASSE PRINCIPALE DU BOT
 # ==========================================
 class GGEAssistantBot(commands.Bot):
@@ -118,6 +163,8 @@ class GGEAssistantBot(commands.Bot):
         if not self.flag_watcher_task.is_running():
             self.flag_watcher_task.start()
             logger.info("🛰️ [Tasks] flag_watcher_task initialisée dans le setup_hook.")
+            
+        self.add_view(WelcomeView())
 
     async def on_ready(self):
         charger_langues()
@@ -141,6 +188,23 @@ class GGEAssistantBot(commands.Bot):
     async def on_guild_join(self, guild: discord.Guild):
         """Déclenché quand le bot est ajouté sur un nouveau serveur."""
         logger.info(f"🎉 [NOUVEAU SERVEUR] Le bot a rejoint '{guild.name}' (ID: {guild.id}) | Membres : {guild.member_count}")
+        
+        channel_to_send = guild.system_channel
+        
+        if not channel_to_send or not channel_to_send.permissions_for(guild.me).send_messages:
+            for channel in guild.text_channels:
+                if channel.permissions_for(guild.me).send_messages:
+                    channel_to_send = channel
+                    break
+                    
+        if channel_to_send:
+            view = WelcomeView()
+            embed_initial = view.get_welcome_embed("en")
+            
+            try:
+                await channel_to_send.send(embed=embed_initial, view=view)
+            except Exception as e:
+                logger.error(f"❌ Impossible d'envoyer le message de bienvenue sur {guild.name} : {e}")
 
     async def on_guild_remove(self, guild: discord.Guild):
         """Déclenché quand le bot est expulsé ou quitte un serveur."""

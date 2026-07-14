@@ -217,9 +217,35 @@ class AdminCog(commands.Cog):
     async def admin_serveurs(self, ctx):
         """[CACHÉE] !bot_servers : Liste les serveurs Discord sur lesquels le bot est présent."""
         if ctx.author.id != MON_ID_DISCORD: return
+        
         serveurs = self.bot.guilds
         nb_serveurs = len(serveurs)
-        liste_serveurs = [f"• **{g.name}** (ID: `{g.id}`) - *{g.member_count} membres*" for g in serveurs]
+        
+        # 1. Trier les serveurs par date d'ajout (du plus récent au plus ancien)
+        from datetime import datetime # Assure-toi que c'est importé en haut de ton fichier
+        serveurs_tries = sorted(
+            serveurs, 
+            key=lambda g: g.me.joined_at if g.me and g.me.joined_at else datetime.min, 
+            reverse=True
+        )
+
+        # 2. Créer la liste avec les nouvelles infos
+        liste_serveurs = []
+        for g in serveurs_tries:
+            # Date d'ajout du bot
+            if g.me and g.me.joined_at:
+                ts = int(g.me.joined_at.timestamp())
+                date_str = f"<t:{ts}:d>"
+            else:
+                date_str = "Inconnue"
+            
+            # Propriétaire du serveur
+            proprio = f"{g.owner.name}" if g.owner else "Inconnu"
+                
+            # Format d'affichage compact et riche
+            ligne = f"• **{g.name}** (`{g.id}`) | 👑 {proprio} | 👥 {g.member_count} | 📥 {date_str}"
+            liste_serveurs.append(ligne)
+            
         texte_serveurs = "\n".join(liste_serveurs)
 
         trunc_msg = t(self.admin_lang, "admin_servers_trunc", defaut="\n\n... *(Liste tronquée)*")

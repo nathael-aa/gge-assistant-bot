@@ -1414,5 +1414,42 @@ class GuerreCog(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+    # ==========================================
+    # 👻 ANTI-SUPPRESSION POUR i18n_sync
+    # Ce code n'est jamais exécuté. Il sert juste à forcer 
+    # le scanner à garder les clés dynamiques de reglements.json
+    # ==========================================
+    def _keep_json_translations_alive():
+        # Noms des règlements
+        t("fr", "rules_name_cdr")
+        t("fr", "rules_name_eternity")
+        t("fr", "rules_name_sog")
+
+        # Cooldowns
+        t("fr", "rules_cd_1week")
+        t("fr", "rules_cd_72h")
+        t("fr", "rules_cd_24h_losses")
+        t("fr", "rules_cd_none")
+
+        # Limites d'attaques
+        t("fr", "rules_max_3fulls")
+        t("fr", "rules_max_5fulls")
+
+        # Troupes (Feu)
+        t("fr", "rules_fire_5k")
+        t("fr", "rules_fire_20k")
+        t("fr", "rules_fire_50k")
+
+        # Cibles AP
+        t("fr", "rules_ap_gt_30m")
+        t("fr", "rules_ap_multi_top150")
+        t("fr", "rules_ap_none")
+
+        # Interdictions
+        t("fr", "rules_interdit_cdr_low")
+        t("fr", "rules_interdit_cdr_high")
+        t("fr", "rules_interdit_ete_high")
+        t("fr", "rules_interdit_sog")
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(GuerreCog(bot))
