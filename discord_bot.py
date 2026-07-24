@@ -276,7 +276,7 @@ class GGEAssistantBot(commands.Bot):
             # Affichera : "Participe à ⚔️ 12 GGE servers"
             discord.Activity(type=discord.ActivityType.competing, name=f"⚔️ {nb_gge_serveurs} GGE servers"),
             
-            # Affichera : "Joue à 🚀 Version 1.0.3"
+            # Affichera : "Joue à 🚀 Version 1.1.1"
             discord.Activity(type=discord.ActivityType.playing, name=f"🚀 {BOT_VERSION}")
         ]
 
