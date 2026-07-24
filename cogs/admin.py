@@ -50,6 +50,7 @@ class AdminCog(commands.Cog):
             name="⚙️ Système & Scripts",
             value="`!sync` ➔ Synchronise les commandes Slash.\n"
                   "`!m` ➔ Active/Désactive le mode maintenance.\n"
+                  "`!setstatus [msg]` ➔ Ajoute/retire un statut personnalisé.\n"
                   "`!scan_manuel` ➔ Lance `auto_pa_daily.sh` en fond.\n"
                   "`!log [date]` ➔ Télécharge les logs (ex: *today, hier, 2026-07-08*).",
             inline=False
@@ -352,6 +353,27 @@ class AdminCog(commands.Cog):
         except Exception as e:
             msg = t(self.admin_lang, "admin_log_error", error=str(e), defaut=f"❌ Erreur lors de la lecture des logs : {e}")
             await ctx.send(msg)
+
+    # ==========================================
+    # Statut depuis discord
+    # ==========================================
+    @commands.command(name="setstatus")
+    async def setstatus(self, ctx, *, message: str = None):
+        """[Admin] Ajoute ou retire un message de statut personnalisé."""
+        from utils import MON_ID_DISCORD
+        
+        # Sécurité : On vérifie que c'est bien toi. 
+        # Si ce n'est pas toi, le bot ignore silencieusement (pas de message d'erreur).
+        if ctx.author.id != MON_ID_DISCORD:
+            return 
+
+        # On modifie la variable du bot en direct
+        self.bot.custom_status = message
+
+        if message:
+            await ctx.send(f"✅ Message ajouté à la rotation des statuts :\n> `{message}`")
+        else:
+            await ctx.send("🗑️ Le message personnalisé a été retiré de la rotation.")
 
     # ==========================================
     # 🧹 NETTOYAGE ET SYNCHRONISATION I18N

@@ -97,6 +97,9 @@ class GGEAssistantBot(commands.Bot):
         self.tree.interaction_check = self.global_interaction_check
         self.scan_flag_detected = False
 
+        self.status_index = 0
+        self.custom_status = None
+
     def export_commands_json(self):
         """Exporte uniquement le 'Slash Command Payload' minimal requis."""
         try:
@@ -157,12 +160,18 @@ class GGEAssistantBot(commands.Bot):
                 logger.info(f"✅ Module {ext} chargé.")
             except Exception as e:
                 logger.error(f"❌ Erreur {ext} : {e}")
+            
 
         await self.tree.sync()
         self.export_commands_json()
+        
         if not self.flag_watcher_task.is_running():
             self.flag_watcher_task.start()
             logger.info("🛰️ [Tasks] flag_watcher_task initialisée dans le setup_hook.")
+            
+        if not self.status_task.is_running():
+            self.status_task.start()
+            logger.info("🛰️ [Tasks] status_task initialisée dans le setup_hook.")
             
         self.add_view(WelcomeView())
 
@@ -231,6 +240,60 @@ class GGEAssistantBot(commands.Bot):
                     logger.info("✅ [Watcher] Le cache mémoire sera réactualisé à la prochaine commande.")
                 except Exception as e:
                     logger.error(f"❌ [Watcher] Échec : {e}")
+
+    # ==========================================
+    # 🔄 BOUCLE DE ROTATION DES STATUTS
+    # ==========================================
+    @tasks.loop(seconds=30)
+    async def status_task(self):
+        # Si le bot est en maintenance, on fige le statut sur la maintenance !
+        if self.maintenance_mode:
+            statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
+            activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
+            await self.change_presence(activity=activity, status=discord.Status.dnd)
+            return
+
+        # 1. Calculs en direct
+        nb_serveurs = len(self.guilds)
+        nb_membres = sum(guild.member_count for guild in self.guilds if guild.member_count)
+        dossier_serveurs = Path('/app/data/server_scans')
+        if dossier_serveurs.exists():
+            nb_gge_serveurs = sum(1 for d in dossier_serveurs.iterdir() if d.is_dir())
+        else:
+            nb_gge_serveurs = 0
+
+        # 2. Liste de tes statuts tournants
+        statuts = [
+            # Affichera : "Écoute ⚙️ /setup | Start here"
+            discord.Activity(type=discord.ActivityType.listening, name="⚙️ /setup | Start here"),
+            
+            # Affichera : "Regarde 📖 /help | All commands"
+            discord.Activity(type=discord.ActivityType.watching, name="📖 /help | All commands"),
+            
+            # Affichera : "Regarde 🌍 15 servers | 👥 3500 users"
+            discord.Activity(type=discord.ActivityType.watching, name=f"🌍 {nb_serveurs} servers | 👥 {nb_membres} users"),
+            
+            # Affichera : "Participe à ⚔️ 12 GGE servers"
+            discord.Activity(type=discord.ActivityType.competing, name=f"⚔️ {nb_gge_serveurs} GGE servers"),
+            
+            # Affichera : "Joue à 🚀 Version 1.0.3"
+            discord.Activity(type=discord.ActivityType.playing, name=f"🚀 {BOT_VERSION}")
+        ]
+
+        if self.custom_status:
+            # On le met en mode "Joue à" suivi de ton message (ex: Joue à ⚠️ Commande /radar HS)
+            statuts.append(discord.Activity(type=discord.ActivityType.playing, name=self.custom_status))
+
+        # 3. Choix du statut et incrémentation
+        activity = statuts[self.status_index % len(statuts)]
+        self.status_index += 1
+
+        # 4. Envoi à Discord
+        await self.change_presence(activity=activity, status=discord.Status.online)
+
+    @status_task.before_loop
+    async def before_status_task(self):
+        await self.wait_until_ready()
 
     # ==========================================
     # 🛑 LE VIDEUR UNIQUE ET UNIVERSEL
@@ -373,7 +436,8 @@ class GGEAssistantBot(commands.Bot):
         return True
 
     async def close(self):
-        self.flag_watcher_task.cancel()  
+        self.flag_watcher_task.cancel()
+        self.status_task.cancel()
         if self.session: 
             await self.session.close()
         await super().close()
