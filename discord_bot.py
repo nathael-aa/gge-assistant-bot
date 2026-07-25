@@ -12,7 +12,7 @@ from logging.handlers import TimedRotatingFileHandler
 import discord
 from discord.ext import commands, tasks
 
-from utils import TOKEN, BOT_VERSION, MON_ID_DISCORD, load_maintenance, load_blocks_async, get_cached_data, CACHE, charger_langues, CONFIG_DIR, get_server_config, t
+from utils import TOKEN, TOPGG_TOKEN, BOT_VERSION, MON_ID_DISCORD, load_maintenance, load_blocks_async, get_cached_data, CACHE, charger_langues, CONFIG_DIR, get_server_config, t
 
 # ==========================================
 # ⚙️ INITIALISATION DU BOT ET DES LOGS
@@ -173,6 +173,10 @@ class GGEAssistantBot(commands.Bot):
             self.status_task.start()
             logger.info("🛰️ [Tasks] status_task initialisée dans le setup_hook.")
             
+        if not self.topgg_update_task.is_running():
+            self.topgg_update_task.start()
+            logger.info("🛰️ [Tasks] topgg_update_task initialisée dans le setup_hook.")
+
         self.add_view(WelcomeView())
 
     async def on_ready(self):
@@ -293,6 +297,36 @@ class GGEAssistantBot(commands.Bot):
 
     @status_task.before_loop
     async def before_status_task(self):
+        await self.wait_until_ready()
+
+    # ==========================================
+    # 📈 SYNCHRONISATION TOP.GG
+    # ==========================================
+    @tasks.loop(minutes=30)
+    async def topgg_update_task(self):
+        """Envoie le nombre de serveurs Discord à Top.gg toutes les 30 minutes."""
+        if not TOPGG_TOKEN:
+            return
+
+        # Top.gg demande le nombre de serveurs Discord (guilds), pas les serveurs GGE
+        serveurs_count = len(self.guilds)
+        
+        url = f"https://top.gg/api/bots/{self.user.id}/stats"
+        headers = {"Authorization": TOPGG_TOKEN}
+        payload = {"server_count": serveurs_count}
+
+        try:
+            # On utilise self.session qui est déjà initialisé dans ton setup_hook
+            async with self.session.post(url, headers=headers, json=payload) as response:
+                if response.status == 200:
+                    logger.info(f"📈 [Top.gg] Mise à jour réussie : {serveurs_count} serveurs.")
+                else:
+                    logger.warning(f"⚠️ [Top.gg] Erreur HTTP {response.status} lors de la mise à jour.")
+        except Exception as e:
+            logger.error(f"❌ [Top.gg] Erreur de connexion : {e}")
+
+    @topgg_update_task.before_loop
+    async def before_topgg_task(self):
         await self.wait_until_ready()
 
     # ==========================================
