@@ -302,7 +302,7 @@ class GGEAssistantBot(commands.Bot):
     # ==========================================
     # 📈 SYNCHRONISATION TOP.GG
     # ==========================================
-    @tasks.loop(minutes=30)
+    @tasks.loop(minutes=3600)
     async def topgg_update_task(self):
         """Envoie le nombre de serveurs Discord à Top.gg toutes les 30 minutes."""
         if not TOPGG_TOKEN:
