@@ -666,7 +666,7 @@ class ClassementCog(commands.Cog):
         EVENT_MAP = {
             "realms_current": {"name": t(langue, "cal_ev_realms_current", defaut="Royaumes Extérieurs (En cours)"), "emoji": "<:outerrealmsicon:1512573734404231329>"},
             "realms_finished": {"name": t(langue, "cal_ev_realms_finished", defaut="Royaumes Extérieurs (Terminé)"), "emoji": "<:outerrealmsicon:1512573734404231329>"},
-            "horizon": {"name": t(langue, "cal_ev_horizon", defaut="Au-delà de l'Horizon"), "emoji": "<:beyondthehorizonicon:1512573808379301919>"}
+            "horizon": {"name": t(langue, "cal_ev_horizon", defaut="Au-delà de l'Horizon"), "emoji": "<:bth:1512574690441302026>"}
         }
         ev_info = EVENT_MAP.get(evenement, {"name": evenement.capitalize(), "emoji": "<:events:1512574699555782666>"})
         
@@ -1228,10 +1228,10 @@ class ClassementCog(commands.Cog):
             "alliance_samurais": {"name": t(langue, "cal_ev_samurai", defaut="Invasion des Samouraïs"), "emoji": "<:samurai:1512430844935929868>", "color": discord.Color(0xd43c27)},
             "alliance_bloodcrows": {"name": t(langue, "cal_ev_bloodcrow", defaut="Corbeaux de Sang"), "emoji": "<:bloodcrow:1512430942990368928>", "color": discord.Color(0x670111)},
             "alliance_league": {"name": t(langue, "cal_ev_league", defaut="Ligue du Royaume"), "emoji": "<:league:1523402089873539192>", "color": discord.Color(0x004d25)},
-            "alliance_horizon": {"name": t(langue, "cal_ev_horizon", defaut="Au-delà de l'Horizon"), "emoji": "<:beyondthehorizonicon:1512573808379301919>", "color": discord.Color(0x4a7160)}
+            "alliance_horizon": {"name": t(langue, "cal_ev_horizon", defaut="Au-delà de l'Horizon"), "emoji": "<:bth:1512574690441302026>", "color": discord.Color(0x4a7160)}
         }
         
-        cat_info = CAT_MAP.get(categorie, {"name": categorie.capitalize(), "emoji": "<:alliances:1512574688415580242>", "color": discord.Color.gold()})
+        cat_info = CAT_MAP.get(categorie, {"name": categorie.capitalize(), "emoji": "<:alliance_icon:1512574688415580242>", "color": discord.Color.gold()})
         embed_color = cat_info["color"]
         
         tranche = 1

@@ -172,7 +172,7 @@ class StormsCog(commands.Cog):
             embeds = []
             items_par_page = 15
             total_pages = (len(forts_filtres) - 1) // items_par_page + 1
-            titre_base = t(langue, "cmd_storm_forts_title", defaut="<:fort:1533175610636243024> Available Storm Forts")
+            titre_base = t(langue, "cmd_storm_forts_title", defaut="<:aquamarineforts:1533175610636243024> Available Storm Forts")
             
             # Petit ajout : Affichage de la date d'actualisation
             last_update = f"\n*<:time:1512573766096654458> Last refreshed: <t:{int(datetime.now().timestamp())}:T>*"
@@ -313,7 +313,7 @@ class StormsCog(commands.Cog):
             embeds = []
             items_par_page = 15
             total_pages = (len(isles) - 1) // items_par_page + 1
-            titre_base = t(langue, "cmd_storm_isles_title", defaut="<:island:1533175666915278931> Storm Islands")
+            titre_base = t(langue, "cmd_storm_isles_title", defaut="<:aquamarineiles:1512162072249765908> Storm Islands")
             
             last_update = f"\n*<:refresh:1533433306610274425> Last refreshed: <t:{int(datetime.now().timestamp())}:T>*"
 
@@ -459,8 +459,8 @@ class StormsCog(commands.Cog):
         desc = (
             f"**Last Scan:** {scan_str}\n"
             f"**Covered Radius:** {data.get('scan_radius', 0)} tiles\n\n"
-            f"<:fort:1533175610636243024> **Tracked Forts:** {data.get('forts_count', 0):,}\n"
-            f"<:island:1533175666915278931> **Tracked Isles:** {data.get('isles_count', 0):,}"
+            f"<:aquamarineforts:1533175610636243024> **Tracked Forts:** {data.get('forts_count', 0):,}\n"
+            f"<:aquamarineiles:1512162072249765908> **Tracked Isles:** {data.get('isles_count', 0):,}"
         )
         
         embed.description = desc
@@ -543,7 +543,7 @@ class StormsCog(commands.Cog):
                 emb = alert["embed"]
                 emb.color = discord.Color.red()
                 # On met à jour le titre pour indiquer que c'est apparu
-                emb.title = "<:island:1533175666915278931> Island Spawned!"
+                emb.title = "<:aquamarineiles:1512162072249765908> Island Spawned!"
                 try:
                     await alert["message"].edit(embed=emb)
                 except Exception:
@@ -645,7 +645,7 @@ class StormsCog(commands.Cog):
                     x, y = isle.get("position_x"), isle.get("position_y")
                     
                     msg_content = f"{ping_role}" if should_ping else None
-                    titre = t(langue, "alert_storm_title", defaut="<:island:1533175666915278931> Island Respawning Soon!")
+                    titre = t(langue, "alert_storm_title", defaut="<:aquamarineiles:1512162072249765908> Island Respawning Soon!")
                     
                     # ⏱️ FORMAT PRÉCIS : Ajout de :T pour l'heure exacte (avec secondes) et :R pour le compte à rebours
                     desc = t(langue, "alert_storm_desc", name=res_nom, ts=int(ts), x=x, y=y, defaut=f"**{res_nom}** will spawn at **<t:{int(ts)}:T>** (<t:{int(ts)}:R>)\n<:compass:1512504625364729987> Coords: `{x}:{y}`")
@@ -714,15 +714,3 @@ class StormsCog(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(StormsCog(bot))
-    
-    # --- AJOUT TEMPORAIRE POUR FORCER LA MISE À JOUR ---
-    try:
-        # On force Discord à enregistrer les commandes spécifiquement pour ton serveur de test
-        guild = discord.Object(id=1342424613660921908)
-        await bot.tree.sync(guild=guild)
-        
-        # On force aussi une synchro globale pour "effacer" l'ancienne version publique
-        await bot.tree.sync()
-        logger.info("✅ Commandes synchronisées de force pour le serveur de test !")
-    except Exception as e:
-        logger.error(f"❌ Erreur de synchronisation : {e}")

@@ -37,13 +37,13 @@ class CalendarNavView(discord.ui.View):
         self.current_page = current_page
         self.langue = langue
 
-        self.btn_past = discord.ui.Button(label=t(langue, "cal_btn_past", defaut="◀️ Historique"), custom_id="cal_past")
+        self.btn_past = discord.ui.Button(label=t(langue, "cal_btn_past", defaut="<:lastpage:1533554126984581283> Historique"), custom_id="cal_past")
         self.btn_past.callback = self.callback_past
 
         self.btn_main = discord.ui.Button(label=t(langue, "cal_btn_main", defaut="⏺️ Actuels & À venir"), custom_id="cal_main")
         self.btn_main.callback = self.callback_main
 
-        self.btn_future = discord.ui.Button(label=t(langue, "cal_btn_future", defaut="▶️ À venir (Uniquement)"), custom_id="cal_future")
+        self.btn_future = discord.ui.Button(label=t(langue, "cal_btn_future", defaut="<:nextpage:1533554128230420590> À venir (Uniquement)"), custom_id="cal_future")
         self.btn_future.callback = self.callback_future
 
         self.add_item(self.btn_past)
@@ -98,18 +98,18 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
         self.cached_events = []
         self.last_scrape_time = None
         self.event_mapping = {
-            "samurai invasion": {"name_key": "cal_ev_samurai", "name_default": "Samouraï", "emoji": "<:samurai:1512430844935929868>", "color": 0xE17055, "tracker_name": "Samouraïs", "start": "11:00", "end": "09:00"},
-            "nomad invasion": {"name_key": "cal_ev_nomad", "name_default": "Nomade", "emoji": "<:nomads:1512431070719774750>", "color": 0xF1C40F, "tracker_name": "Nomades", "start": "11:00", "end": "09:00"},
-            "bloodcrow invasion": {"name_key": "cal_ev_bloodcrow", "name_default": "Corbeaux de Sang", "emoji": "<:bloodcrow:1512430942990368928>", "color": 0x2C3E50, "tracker_name": "Corbeaux de Sang", "start": "11:00", "end": "09:00"},
-            "war of the realms": {"name_key": "cal_ev_realms", "name_default": "Guerre des Royaumes", "emoji": "<:war_realms:1512573773658980504>", "color": 0xC0392B, "tracker_name": "Guerre des Royaumes", "start": "11:00", "end": "09:00"},
-            "berimond": {"name_key": "cal_ev_berimond", "name_default": "Bérimond", "emoji": "<:berimond:1512430901756428390>", "color": 0x2980B9, "tracker_name": "Bataille de Bérimond", "start": "11:00", "end": "08:30"},
-            "bladecoast": {"name_key": "cal_ev_bladecoast", "name_default": "Côte Tranchante", "emoji": "<:bladecoast:1514704235894407399>", "color": 0x16A085, "tracker_name": None, "start": "11:00", "end": "09:00"},
-            "rift raid": {"name_key": "cal_ev_rift", "name_default": "Raid de la Faille", "emoji": "<:riftraid:1514704237206966272>", "color": 0x8E44AD, "tracker_name": None, "start": "11:00", "end": "09:00"},
-            "grand tournament": {"name_key": "cal_ev_tournament", "name_default": "Grand Tournoi", "emoji": "<:grandtournament:1514704234128343040>", "color": 0xD35400, "tracker_name": None, "start": "11:00", "end": "12:10"},
-            "beyond the horizon": {"name_key": "cal_ev_horizon", "name_default": "Au-delà de l'horizon", "emoji": "<:beyondthehorizonicon:1512573808379301919>", "color": 0x1ABC9C, "tracker_name": None, "start": "11:00", "end": "00:40"},
-            "outer realms": {"name_key": "cal_ev_outer", "name_default": "Royaumes extérieurs", "emoji": "<:outerrealmsicon:1512573734404231329>", "color": 0x34495E, "tracker_name": None, "start": "11:00", "end": "00:40"},
-            "imperial patronage": {"name_key": "cal_ev_patronage", "name_default": "Patronage impérial", "emoji": "<:patronage:1514704230106140874>", "color": 0xF39C12, "tracker_name": None, "start": "11:00", "end": "09:30"},
-            "grand nobility contest": {"name_key": "cal_ev_nobility", "name_default": "Grand concours de noblesse", "emoji": "<:ltpe:1514704228801708052>", "color": 0x7F8C8D, "tracker_name": None, "start": "11:00", "end": "09:00"}
+            "samurai invasion": {"name_key": "cal_ev_samurai", "name_default": "Samouraï", "emoji": "<:samurai:1512430844935929868>", "color": 0xbf0000, "tracker_name": "Samouraïs", "start": "11:00", "end": "09:00"},
+            "nomad invasion": {"name_key": "cal_ev_nomad", "name_default": "Nomade", "emoji": "<:nomads:1512431070719774750>", "color": 0xedc951, "tracker_name": "Nomades", "start": "11:00", "end": "09:00"},
+            "bloodcrow invasion": {"name_key": "cal_ev_bloodcrow", "name_default": "Corbeaux de Sang", "emoji": "<:bloodcrow:1512430942990368928>", "color": 0xedc951, "tracker_name": "Corbeaux de Sang", "start": "11:00", "end": "09:00"},
+            "war of the realms": {"name_key": "cal_ev_realms", "name_default": "Guerre des Royaumes", "emoji": "<:war_realms:1512573773658980504>", "color": 0xa69eb0, "tracker_name": "Guerre des Royaumes", "start": "11:00", "end": "09:00"},
+            "berimond": {"name_key": "cal_ev_berimond", "name_default": "Bérimond", "emoji": "<:berimond:1512430901756428390>", "color": 0x4b86b4, "tracker_name": "Bataille de Bérimond", "start": "11:00", "end": "08:30"},
+            "bladecoast": {"name_key": "cal_ev_bladecoast", "name_default": "Côte Tranchante", "emoji": "<:bladecoast:1514704235894407399>", "color": 0xbfb5b2, "tracker_name": None, "start": "11:00", "end": "09:00"},
+            "rift raid": {"name_key": "cal_ev_rift", "name_default": "Raid de la Faille", "emoji": "<:riftraid:1514704237206966272>", "color": 0xfb2e01, "tracker_name": None, "start": "11:00", "end": "09:00"},
+            "grand tournament": {"name_key": "cal_ev_tournament", "name_default": "Grand Tournoi", "emoji": "<:grandtournament:1514704234128343040>", "color": 0x03396c, "tracker_name": None, "start": "11:00", "end": "12:10"},
+            "beyond the horizon": {"name_key": "cal_ev_horizon", "name_default": "Au-delà de l'horizon", "emoji": "<:bth:1512574690441302026>", "color": 0x006666, "tracker_name": None, "start": "11:00", "end": "00:40"},
+            "outer realms": {"name_key": "cal_ev_outer", "name_default": "Royaumes extérieurs", "emoji": "<:outerrealmsicon:1512573734404231329>", "color": 0xffe28a, "tracker_name": None, "start": "11:00", "end": "00:40"},
+            "imperial patronage": {"name_key": "cal_ev_patronage", "name_default": "Patronage impérial", "emoji": "<:patronage:1514704230106140874>", "color": 0xe8702a, "tracker_name": None, "start": "11:00", "end": "09:30"},
+            "grand nobility contest": {"name_key": "cal_ev_nobility", "name_default": "Grand concours de noblesse", "emoji": "<:ltpe:1514704228801708052>", "color": 0xe8702a, "tracker_name": None, "start": "11:00", "end": "09:00"}
         }
 
     async def load_cache_from_file(self):
@@ -285,7 +285,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
         last_scrape = getattr(self, "last_scrape_time", None)
         ts_last_scan = int(last_scrape.timestamp()) if last_scrape else int(datetime.now().timestamp())
         
-        texte_maj = t(langue, "cal_last_update", ts_last_scan=ts_last_scan, defaut=f"<:info:1512502828193808537> Dernière mise à jour : <t:{ts_last_scan}:R>")
+        texte_maj = t(langue, "cal_last_update", ts_last_scan=ts_last_scan, defaut=f"<:Information:1533430015264555099> Dernière mise à jour : <t:{ts_last_scan}:R>")
         empty_txt = t(langue, "cal_empty_cat", defaut="*Aucun événement dans cette catégorie pour le moment.*")
 
         async def build_embed(titre, liste_lignes, color):
@@ -459,7 +459,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                 embed_end = discord.Embed(
                                     title=titre_end,
                                     description=desc_end,
-                                    color=0x2C3E50
+                                    color=0x2e4045
                                 )
                                 await setup_embed_footer(embed_end, None, langue)
                                 try: await channel.send(embed=embed_end)

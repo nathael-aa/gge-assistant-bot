@@ -118,8 +118,8 @@ class CiblePaginationView(discord.ui.View):
         self.ruleset = ruleset
         self.langue = langue
         
-        self.btn_prev.label = t(langue, "guerre_btn_prev", defaut="◀️ Page Précédente")
-        self.btn_next.label = t(langue, "guerre_btn_next", defaut="Page Suivante ▶️")
+        self.btn_prev.label = t(langue, "guerre_btn_prev", defaut="<:lastpage:1533554126984581283> Page Précédente")
+        self.btn_next.label = t(langue, "guerre_btn_next", defaut="Page Suivante <:nextpage:1533554128230420590>")
         self.btn_rerun.label = t(langue, "guerre_btn_rerun", defaut="🔄 Relancer une vague")
         self.update_buttons()
 
@@ -247,7 +247,7 @@ class GuerreCog(commands.Cog):
         chunk_size = 10 
         
         lignes_colombes = [f"<:peace:1512503935892586566> **{c['name']}** ({format_num(c['pp'])} PP) ➔ Fin: <t:{c['fin']}:R>" for c in colombes]
-        lignes_cibles = [f"<:cible:1512573711134490775> **{c['name']}** ➔ **{format_num(c['pp'])} PP**" for c in cibles_libres]
+        lignes_cibles = [f"\<:attaque:1512570903886692474> **{c['name']}** ➔ **{format_num(c['pp'])} PP**" for c in cibles_libres]
 
         async def creer_base_embed(titre_page):
             embed = discord.Embed(
@@ -255,7 +255,7 @@ class GuerreCog(commands.Cog):
                 color=self.clr_scanner
             )
             
-            desc_i18n = t(langue, "guerre_scan_desc", act=len(members), pro=len(colombes), vul=len(cibles_libres), tp=titre_page, defaut=f"<:players:1512504277392953426> **Membres Actifs :** {len(members)}\n<:peace:1512503935892586566> **Sous protection :** {len(colombes)}\n<:cible:1512573711134490775> **Cibles vulnérables :** {len(cibles_libres)}\n\n**{titre_page}**")
+            desc_i18n = t(langue, "guerre_scan_desc", act=len(members), pro=len(colombes), vul=len(cibles_libres), tp=titre_page, defaut=f"<:players:1512504277392953426> **Membres Actifs :** {len(members)}\n<:peace:1512503935892586566> **Sous protection :** {len(colombes)}\n\<:attaque:1512570903886692474> **Cibles vulnérables :** {len(cibles_libres)}\n\n**{titre_page}**")
             
             lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
             embed.description = f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{desc_i18n}"
@@ -404,7 +404,7 @@ class GuerreCog(commands.Cog):
             page_num = (i // chunk_size) + 1
             
             embed = discord.Embed(
-                title=t(langue, "guerre_prox_title", a=enemy_alliance, defaut=f"<:cible:1512573711134490775> Cibles de Proximité : {enemy_alliance}"), 
+                title=t(langue, "guerre_prox_title", a=enemy_alliance, defaut=f"\<:attaque:1512570903886692474> Cibles de Proximité : {enemy_alliance}"), 
                 color=self.clr_proximite
             )
             
@@ -417,7 +417,7 @@ class GuerreCog(commands.Cog):
             lbl_coords = t(langue, "guerre_prox_field_coords", defaut="Coords :")
             lbl_pp = t(langue, "guerre_prox_field_pp", defaut="Puissance :")
             lbl_col_yes = t(langue, "guerre_prox_colombe", defaut="<:peace:1512503935892586566> **SOUS COLOMBE**")
-            lbl_col_no = t(langue, "guerre_prox_vuln", defaut="<:cible:1512573711134490775> **VULNÉRABLE**")
+            lbl_col_no = t(langue, "guerre_prox_vuln", defaut="\<:attaque:1512570903886692474> **VULNÉRABLE**")
 
             for j, tg in enumerate(chunk):
                 index_global = i + j + 1
@@ -927,7 +927,7 @@ class GuerreCog(commands.Cog):
                                 desc_mur = str(desc).lower()
                                 mot_trouve = next((mot for mot in ["repos", "deuil", "hospitalisé"] if mot in desc_mur), None)
                                 if mot_trouve: 
-                                    avertissements.append(t(langue, "guerre_hr_diplo_wall", m=mot_trouve.capitalize(), defaut=f"<:alliances:1512574688415580242> **Mur d'alliance** : Mot-clé sensible détecté (**{mot_trouve.capitalize()}**)."))
+                                    avertissements.append(t(langue, "guerre_hr_diplo_wall", m=mot_trouve.capitalize(), defaut=f"<:alliance_icon:1512574688415580242> **Mur d'alliance** : Mot-clé sensible détecté (**{mot_trouve.capitalize()}**)."))
                                 break
             except: pass
 
@@ -1026,7 +1026,7 @@ class GuerreCog(commands.Cog):
         lbl_ap = t(langue, "guerre_hr_lbl_ap", defaut="Cibles AP :")
         lbl_troops = t(langue, "guerre_hr_lbl_troops", defaut="Min. Soldats (Si feu) :")
         
-        embed.add_field(name=t(langue, "guerre_hr_field_cond_title", defaut="<:667420141394329610:1512573711134490775> Conditions de l'attaque"), value=f"<:Porteurs_de_bouclier:1512574622271279114> {lbl_att} **{txt_max_att}**\n<:castle4:1512573820752498839> {lbl_ap} **{txt_ap}**\n<:troop:1512573768893989015> {lbl_troops} **{min_troops}**", inline=False)
+        embed.add_field(name=t(langue, "guerre_hr_field_cond_title", defaut="\<:attaque:1512570903886692474> Conditions de l'attaque"), value=f"<:Porteurs_de_bouclier:1512574622271279114> {lbl_att} **{txt_max_att}**\n<:castle4:1512573820752498839> {lbl_ap} **{txt_ap}**\n<:troop:1512573768893989015> {lbl_troops} **{min_troops}**", inline=False)
         
         if diplo_privee: embed.add_field(name=t(langue, "guerre_hr_diplo_priv_title", defaut="<:4_:1512574743369224303> Sécurité Diplomatique"), value=t(langue, "guerre_hr_diplo_priv_val", defaut="La diplomatie de l'attaquant est gérée par un autre serveur. Liens d'alliance ignorés."), inline=False)
         await setup_embed_footer(embed, interaction, langue)

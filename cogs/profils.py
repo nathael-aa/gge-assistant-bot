@@ -106,7 +106,7 @@ class HistoriqueView(discord.ui.View):
     async def btn_pseudo(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "pseudo")
 
-    @discord.ui.button(emoji="<:alliances:1512574688415580242>", row=0)
+    @discord.ui.button(emoji="<:alliance_icon:1512574688415580242>", row=0)
     async def btn_alliance(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "alliance")
 
@@ -114,12 +114,12 @@ class HistoriqueView(discord.ui.View):
     async def btn_position(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "position")
 
-    @discord.ui.button(label="◀️", style=discord.ButtonStyle.blurple, row=1)
+    @discord.ui.button(label="<:lastpage:1533554126984581283>", style=discord.ButtonStyle.blurple, row=1)
     async def btn_prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = max(0, self.current_page - 1)
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][self.current_page], view=self)
 
-    @discord.ui.button(label="▶️", style=discord.ButtonStyle.blurple, row=1)
+    @discord.ui.button(label="<:nextpage:1533554128230420590>", style=discord.ButtonStyle.blurple, row=1)
     async def btn_next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = min(len(self.embeds_dict[self.current_cat]) - 1, self.current_page + 1)
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][self.current_page], view=self)
@@ -216,7 +216,7 @@ class ProfilsCog(commands.Cog):
             
             embed.description = f"{lbl_date} <t:{ts}:F> (<t:{ts}:R>)"
             
-            info_title = t(langue, "prof_info_title", defaut="<:info:1512502828193808537> Informations Générales")
+            info_title = t(langue, "prof_info_title", defaut="<:Information:1533430015264555099> Informations Générales")
             unk_id = t(langue, "prof_unknown", defaut="Inconnu")
             
             status_txt = t(langue, "prof_status_combat", defaut="⚔️ **Statut :** Attaque possible")
@@ -244,7 +244,7 @@ class ProfilsCog(commands.Cog):
             
             embed.add_field(name=rank_title, value=rank_desc, inline=True)
             
-            alli_title = t(langue, "prof_alli_title", defaut="<:alliances:1512574688415580242> Alliance")
+            alli_title = t(langue, "prof_alli_title", defaut="<:alliance_icon:1512574688415580242> Alliance")
             embed.add_field(name=alli_title, value=f"{alliance_display}", inline=False)
             
             if outposts:
@@ -589,11 +589,11 @@ class ProfilsCog(commands.Cog):
                 chunk = members[i:i+chunk_size]
                 page_actuelle = (i // chunk_size) + 1
                 
-                embed_title = t(langue, "prof_alli_embed_title", a=alliance_name, defaut=f"<:alliances:1512574688415580242> Alliance : {alliance_name}")
+                embed_title = t(langue, "prof_alli_embed_title", a=alliance_name, defaut=f"<:alliance_icon:1512574688415580242> Alliance : {alliance_name}")
                 embed = discord.Embed(title=embed_title, color=self.clr_alliance)
                 embed.description = str_date_header.strip()
                 
-                info_title = t(langue, "prof_info_title", defaut="<:info:1512502828193808537> Informations")
+                info_title = t(langue, "prof_info_title", defaut="<:Information:1533430015264555099> Informations")
                 info_desc = t(langue, "prof_alli_info_desc", l=leader_name, c=len(members), id=target_alliance_id, defaut=f"**Chef** : {leader_name}\n**Membres** : {len(members)} / 65")
                 embed.add_field(name=info_title, value=info_desc, inline=True)
                 
@@ -784,7 +784,7 @@ class ProfilsCog(commands.Cog):
 
         categories = [
             {"key": "pseudo", "title": t(langue, "prof_hist_cat_pseudo", defaut="Historique des Pseudos"), "emoji": "<:renames:1512574708913143858>", "json_key": "updates"},
-            {"key": "alliance", "title": t(langue, "prof_hist_cat_alliance", defaut="Historique des Alliances"), "emoji": "<:alliances:1512574688415580242>", "json_key": "updates"},
+            {"key": "alliance", "title": t(langue, "prof_hist_cat_alliance", defaut="Historique des Alliances"), "emoji": "<:alliance_icon:1512574688415580242>", "json_key": "updates"},
             {"key": "position", "title": t(langue, "prof_hist_cat_position", defaut="Historique des Positions"), "emoji": "<:compass:1512504625364729987>", "json_key": "movements"}
         ]
 

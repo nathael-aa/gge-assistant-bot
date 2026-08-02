@@ -5,6 +5,7 @@ import json
 import logging
 import urllib.parse
 import asyncio
+import re
 from datetime import datetime, timedelta
 import discord
 from discord import app_commands
@@ -25,6 +26,8 @@ from utils import (
 )
 
 logger = logging.getLogger("GGE_Bot")
+
+EMOJI_REGEX = re.compile(r"<(a?):([a-zA-Z0-9_]+):([0-9]+)>")
 
 class AdminCog(commands.Cog):
     def __init__(self, bot):
@@ -71,6 +74,14 @@ class AdminCog(commands.Cog):
             name="🤖 Serveurs Discord",
             value="`!bot_servers` ➔ Liste les serveurs utilisant le bot.\n"
                   "`!bot_leave [ID]` ➔ Force le bot à quitter un serveur.",
+            inline=False
+        )
+
+        # Catégorie Code & Emojis
+        embed.add_field(
+            name="🛠️ Code & Emojis",
+            value="`!emojis_list` ➔ Liste tous les émojis utilisés dans le code.\n"
+                  "`!emojis_replace [old] [new]` ➔ Remplace un émoji dans tout le code.",
             inline=False
         )
 
@@ -514,6 +525,131 @@ class AdminCog(commands.Cog):
             color=discord.Color.blue()
         )
         await ctx.send(embed=embed, file=discord_file)
+
+    # ==========================================
+    # 🔎 LISTE DES EMOJIS DU CODE
+    # ==========================================
+    @commands.command(name="emojis_list", hidden=True)
+    async def emojis_list(self, ctx):
+        """[CACHÉE] !emojis_list : Scan le code pour trouver tous les émojis utilisés."""
+        if ctx.author.id != MON_ID_DISCORD: return
+
+        msg_wait = await ctx.send("⏳ **Scan du code en cours...**")
+        
+        emojis_found = {}
+        # Dossiers à ignorer pour accélérer le scan
+        exclude_dirs = [".git", "__pycache__", "venv", "logs", "data"]
+
+        for root, dirs, files in os.walk(BASE_DIR):
+            # Filtrer les dossiers exclus
+            dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
+            
+            for file in files:
+                if file.endswith((".py", ".json", ".sh")):
+                    filepath = os.path.join(root, file)
+                    try:
+                        with open(filepath, "r", encoding="utf-8") as f:
+                            content = f.read()
+                            matches = EMOJI_REGEX.findall(content)
+                            for match in matches:
+                                animated, name, emoji_id = match
+                                full_emoji = f"<{animated}:{name}:{emoji_id}>"
+                                
+                                # Pour l'affichage plus propre, on ne garde que le chemin relatif
+                                rel_path = os.path.relpath(filepath, BASE_DIR)
+                                
+                                if full_emoji not in emojis_found:
+                                    emojis_found[full_emoji] = set()
+                                emojis_found[full_emoji].add(rel_path)
+                    except Exception:
+                        pass
+
+        if not emojis_found:
+            return await msg_wait.edit(content="❌ Aucun émoji trouvé dans le code source.")
+
+        report_lines = ["=== RAPPORT DES EMOJIS UTILISÉS DANS LE CODE ===\n"]
+        for emoji, paths in sorted(emojis_found.items()):
+            report_lines.append(f"{emoji} :")
+            for path in sorted(paths):
+                report_lines.append(f"  └─ {path}")
+            report_lines.append("")
+
+        file_content = "\n".join(report_lines)
+        file_buffer = io.BytesIO(file_content.encode('utf-8'))
+        discord_file = discord.File(fp=file_buffer, filename="emojis_report.txt")
+
+        await msg_wait.delete()
+        await ctx.send(
+            f"✅ **Scan terminé !** J'ai trouvé **{len(emojis_found)}** émojis uniques dans le code source.", 
+            file=discord_file
+        )
+
+    # ==========================================
+    # ♻️ CHERCHER / REMPLACER STRICT (PARADE ULTIME ANTI-DISCORD)
+    # ==========================================
+    @commands.command(name="replace_raw", hidden=True)
+    async def replace_raw(self, ctx, old_text: str, new_text: str):
+        """[CACHÉE] !replace_raw [ancien] [nouveau] : Remplacement strict de texte."""
+        if ctx.author.id != MON_ID_DISCORD: return
+
+        # 1. On nettoie les guillemets ou backticks
+        old_text = old_text.strip('`"')
+        new_text = new_text.strip('`"')
+
+        # 2. 🛡️ L'ASTUCE ULTIME : on convertit les crochets en vrais chevrons !
+        old_text = old_text.replace('[', '<').replace(']', '>')
+        new_text = new_text.replace('[', '<').replace(']', '>')
+
+        msg_wait = await ctx.send(f"⏳ **Remplacement strict en cours...**\nRecherche de `{old_text}` ➔ `{new_text}`")
+        
+        exclude_dirs = [".git", "__pycache__", "venv", "logs", "data"]
+        occurrences = 0
+        fichiers_modifies = []
+
+        for root, dirs, files in os.walk(BASE_DIR):
+            dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
+            
+            for file in files:
+                if file.endswith((".py", ".json", ".sh")):
+                    filepath = os.path.join(root, file)
+                    try:
+                        with open(filepath, "r", encoding="utf-8") as f:
+                            content = f.read()
+
+                        if old_text in content:
+                            count = content.count(old_text)
+                            new_content = content.replace(old_text, new_text)
+                            
+                            with open(filepath, "w", encoding="utf-8") as f:
+                                f.write(new_content)
+                                
+                            occurrences += count
+                            fichiers_modifies.append(os.path.relpath(filepath, BASE_DIR))
+                    except Exception:
+                        pass
+
+        if occurrences == 0:
+            return await msg_wait.edit(content=f"⚠️ Le texte exact `{old_text}` n'a été trouvé **nulle part** dans le code.")
+
+        embed = discord.Embed(
+            title="♻️ Remplacement brut terminé !",
+            description=f"Le code a été modifié avec succès.\n\n"
+                        f"**Recherché :** `{old_text}`\n"
+                        f"**Nouveau :** `{new_text}`\n"
+                        f"**Occurrences remplacées :** {occurrences}\n"
+                        f"**Fichiers affectés :** {len(fichiers_modifies)}",
+            color=discord.Color.blue()
+        )
+        
+        liste_fichiers = "\n".join([f"`{f}`" for f in fichiers_modifies])
+        if len(liste_fichiers) > 1024:
+            liste_fichiers = liste_fichiers[:1000] + "\n... (liste tronquée)"
+            
+        embed.add_field(name="Fichiers modifiés", value=liste_fichiers, inline=False)
+        embed.set_footer(text="⚠️ N'oublie pas de commit sur ton NAS et de relancer le bot !")
+        
+        await msg_wait.delete()
+        await ctx.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(AdminCog(bot))

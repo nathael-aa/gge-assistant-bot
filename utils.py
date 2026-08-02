@@ -171,7 +171,7 @@ def get_file_lock(filepath):
 # ==========================================
 # 🔧 Footer global
 # ==========================================
-BOT_VERSION = "GGE Assistant • Version 1.1.3"
+BOT_VERSION = "GGE Assistant • Version 1.1.4"
 
 async def setup_embed_footer(embed: discord.Embed, interaction: discord.Interaction = None, langue: str = "fr", custom_server: str = None):
     txt = BOT_VERSION
@@ -354,11 +354,11 @@ class PaginationView(discord.ui.View):
         super().__init__(timeout=7200)
         self.embeds = embeds
         self.current_page = 0
-    @discord.ui.button(label="◀️", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="<:lastpage:1533554126984581283>", style=discord.ButtonStyle.secondary)
     async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = max(0, self.current_page - 1)
         await interaction.response.edit_message(embed=self.embeds[self.current_page])
-    @discord.ui.button(label="▶️", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="<:nextpage:1533554128230420590>", style=discord.ButtonStyle.secondary)
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = min(len(self.embeds) - 1, self.current_page + 1)
         await interaction.response.edit_message(embed=self.embeds[self.current_page])

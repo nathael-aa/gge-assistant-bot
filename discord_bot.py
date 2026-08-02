@@ -47,23 +47,23 @@ class WelcomeView(discord.ui.View):
         super().__init__(timeout=None)
 
     def get_welcome_embed(self, lang="fr"):
-        title = t(lang, "welcome_title", defaut="🏰 Welcome to GGE Assistant!")
+        title = t(lang, "welcome_title", defaut="<:guides:1533429318947045616> Welcome to GGE Assistant!")
         desc = t(lang, "welcome_desc", defaut="Here is how to get started:")
         
         embed = discord.Embed(title=title, description=desc, color=0x0B1D51)
         
         embed.add_field(
-            name=t(lang, "welcome_step1_title", defaut="1️⃣ Configuration"), 
+            name=t(lang, "welcome_step1_title", defaut="<:one:1533556309838790796> Configuration"), 
             value=t(lang, "welcome_step1_desc", defaut="Use </setup:0> to configure your profile."), 
             inline=False
         )
         embed.add_field(
-            name=t(lang, "welcome_step2_title", defaut="2️⃣ Tools"), 
+            name=t(lang, "welcome_step2_title", defaut="<:two:1533556308723109999> Tools"), 
             value=t(lang, "welcome_step2_desc", defaut="Type </help:0> to see all commands."), 
             inline=False
         )
         embed.add_field(
-            name=t(lang, "welcome_step3_title", defaut="3️⃣ Calendar"), 
+            name=t(lang, "welcome_step3_title", defaut="<:three:1533556307511087144> Calendar"), 
             value=t(lang, "welcome_step3_desc", defaut="Use </calendar setup:0> to get alerts."), 
             inline=False
         )
@@ -332,7 +332,7 @@ class GGEAssistantBot(commands.Bot):
                         elif "value" in opt: params.append(f"{opt.get('name')}: {opt.get('value')}")
                 extract_options(interaction.data.get("options", []))
                 options_txt = f" | ⚙️ [{', '.join(params)}]" if params else ""
-                logger.info(f"▶️ [COMMANDE] {interaction.user.name} a lancé `/{cmd_name}` sur [{lieu}]{options_txt}")
+                logger.info(f"<:nextpage:1533554128230420590> [COMMANDE] {interaction.user.name} a lancé `/{cmd_name}` sur [{lieu}]{options_txt}")
         except Exception as e:
             logger.error(f"⚠️ Erreur lors de l'écriture du log : {e}")
 

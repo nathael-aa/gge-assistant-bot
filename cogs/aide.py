@@ -150,7 +150,7 @@ class AideCog(commands.Cog):
         embed2.add_field(name=t(langue, "aide_p2_g1", defaut="<:cartography:1512574691766964386> Configuration & Général"), value=t(langue, "aide_p2_v1", defaut=
             "• `/link_account [player]`\n> Lie un compte Discord à un pseudo de jeu GGE.\n\n"
             "• `/server`\n> Affiche les statistiques du serveur GGE et le Top 15 Alliances."), inline=False)
-        embed2.add_field(name=t(langue, "aide_p2_g2", defaut="<:gt:1512574701807997119> Suivi des Scores"), value=t(langue, "aide_p2_v2", defaut=
+        embed2.add_field(name=t(langue, "aide_p2_g2", defaut="<:grandtournament:1514704234128343040> Suivi des Scores"), value=t(langue, "aide_p2_v2", defaut=
             "• `/event player [event_name] [player] [mode: latest/total]`\n> Affiche le score live ou le cumul d'un joueur.\n\n"
             "• `/event alliance [event_name] [alliance_name] [display_mode]`\n> Génère le classement interne complet des membres.\n\n"), inline=False)
         embed2.add_field(name=t(langue, "aide_p2_g3", defaut="<:ranking:1512438311132729525> Groupe de commandes /leaderboard"), value=t(langue, "aide_p2_v3", defaut=
@@ -159,7 +159,7 @@ class AideCog(commands.Cog):
         embed2.add_field(name=t(langue, "aide_p2_g4", defaut="<:woaicon:1512165794740572292> Groupe de commandes /woa"), value=t(langue, "aide_p2_v4", defaut=
             "• `/woa history [player]`\n> Consulte l'historique des tickets dépensés.\n\n"
             "• `/woa summary`\n> Affiche l'activité économique globale du serveur."), inline=False)
-        embed2.add_field(name=t(langue, "aide_p2_g5", defaut="<:cible:1512573711134490775> Groupe de commandes /rival"), value=t(langue, "aide_p2_v5", defaut=
+        embed2.add_field(name=t(langue, "aide_p2_g5", defaut="\<:attaque:1512570903886692474> Groupe de commandes /rival"), value=t(langue, "aide_p2_v5", defaut=
             "• `/rival start [event_name] [threshold]` / `/rival stop`\n> Active ou désactive le radar secret en MP.\n\n"
             "• `/rival add [players]` / `/rival list`\n> Gère tes cibles de rival en direct."), inline=False)
         embed2.add_field(name=t(langue, "aide_p2_g6", defaut="<:events:1512574699555782666> Groupe de commandes Calendar"), value=t(langue, "aide_p2_v6", defaut=
@@ -204,11 +204,11 @@ class AideCog(commands.Cog):
 
         # 📑 PAGE 6 : COG RADAR
         embed6 = discord.Embed(title=t(langue, "aide_p6_title", defaut="<:icon_analyze:1512573874150314005> 6. Module Radar Personnel"), color=self.clr_radar)
-        embed6.add_field(name=t(langue, "aide_p6_g1", defaut="<:info:1512502828193808537> Surveillance Individuelle"), value=t(langue, "aide_p6_v1", defaut=
+        embed6.add_field(name=t(langue, "aide_p6_g1", defaut="<:Information:1533430015264555099> Surveillance Individuelle"), value=t(langue, "aide_p6_v1", defaut=
             "• `/radar add [player] (reason)`\n> Place une cible sous surveillance étroite (Alertes MP).\n\n"
             "• `/radar remove [player]`\n> Retire un joueur de ta surveillance personnelle.\n\n"
             "• `/radar list`\n> Tableau de bord centralisé de tous tes suivis actifs."), inline=False)
-        embed6.add_field(name=t(langue, "aide_p6_g2", defaut="<:info:1512502828193808537> Sous-groupe /radar alliance"), value=t(langue, "aide_p6_v2", defaut=
+        embed6.add_field(name=t(langue, "aide_p6_g2", defaut="<:Information:1533430015264555099> Sous-groupe /radar alliance"), value=t(langue, "aide_p6_v2", defaut=
             "• `/radar alliance add [alliance_name] (reason)`\n> Alerte MP si Entrée, Sortie, Promotion ou Rétrogradation.\n\n"
             "• `/radar alliance remove [alliance_name]`\n> Coupe la surveillance globale sur l'alliance."), inline=False)
         embeds.append(embed6)
@@ -356,7 +356,7 @@ class AideCog(commands.Cog):
         langue, _ = await get_server_config(interaction)
 
         embed = discord.Embed(
-            title=t(langue, "cmd_support_title", defaut="<:info:1512502828193808537> Support & Communauté"),
+            title=t(langue, "cmd_support_title", defaut="<:Information:1533430015264555099> Support & Communauté"),
             description=t(langue, "cmd_support_desc", defaut="Vous avez une question, une suggestion ou vous avez trouvé un bug ? Rejoignez le serveur Discord officiel de **GGE Assistant** !"),
             color=self.clr_support
         )

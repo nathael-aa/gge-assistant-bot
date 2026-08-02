@@ -858,9 +858,9 @@ class EventsCog(commands.Cog):
                               mp=f_mp, max_points=f_mp,
                               md=f_md, max_date=f_md,
                               defaut=(
-                                f"🏆 **Total Historique :** {f_gt} <:woaticket:1512165398718583016>\n"
-                                f"<:stats:1512517930490003726> **Total {nom_m} {annee} :** {f_mt} <:woaticket:1512165398718583016>\n"
-                                f"🚀 **Jour max :** {f_mp} <:woaticket:1512165398718583016> *(le {f_md})*"
+                                f"🏆 **Total Historique :** {f_gt} <:woa_points:1512573716259668098>\n"
+                                f"<:stats:1512517930490003726> **Total {nom_m} {annee} :** {f_mt} <:woa_points:1512573716259668098>\n"
+                                f"🚀 **Jour max :** {f_mp} <:woa_points:1512573716259668098> *(le {f_md})*"
                               ))
                 
                 lignes = []
@@ -868,7 +868,7 @@ class EventsCog(commands.Cog):
                     pts_str = f"{ev['pts']:,}".replace(",", " ")
                     rank = ev['rank']
                     medal = "🥇" if rank == "1" else "🥈" if rank == "2" else "🥉" if rank == "3" else f"**#{rank}**"
-                    lignes.append(t(langue, "ev_woa_hist_line", d=ev['date_str'], m=medal, p=pts_str, defaut=f"• **{ev['date_str']}** │ Rang {medal} ➔ **{pts_str} <:woaticket:1512165398718583016>**"))
+                    lignes.append(t(langue, "ev_woa_hist_line", d=ev['date_str'], m=medal, p=pts_str, defaut=f"• **{ev['date_str']}** │ Rang {medal} ➔ **{pts_str} <:woa_points:1512573716259668098>**"))
 
                 title = t(langue, "ev_woa_hist_title", nom=vrai_nom, defaut=f"<:woaicon:1512165794740572292> Historique Roue de la Fortune : {vrai_nom}")
                 overv = t(langue, "ev_woa_hist_overview", defaut="**<:stats:1512517930490003726> Vue d'ensemble**")
@@ -920,9 +920,9 @@ class EventsCog(commands.Cog):
             
             stats_globales = t(langue, "ev_woa_bilan_stats", ed=t_editions, tix=f"{t_tickets:,}".replace(","," "), pts=f"{t_parts:,}".replace(","," "), mt=f"{moy_tickets:,}".replace(","," "), mp=f"{moy_parts:,}".replace(","," "), defaut=(
                 f"<:stats:1512517930490003726> **Éditions :** {t_editions}\n"
-                f"<:woaticket:1512165398718583016> **Tickets :** {t_tickets:,}\n"
+                f"<:woa_points:1512573716259668098> **Tickets :** {t_tickets:,}\n"
                 f"<:Le_Hraut_Lumbricus_2:1512573890298380388> **Participants :** {t_parts:,}\n"
-                f"⚖️ **Moyenne :** {moy_tickets:,} <:woaticket:1512165398718583016> / {moy_parts:,} <:Le_Hraut_Lumbricus_2:1512573890298380388>"
+                f"⚖️ **Moyenne :** {moy_tickets:,} <:woa_points:1512573716259668098> / {moy_parts:,} <:Le_Hraut_Lumbricus_2:1512573890298380388>"
             ).replace(",", " "))
             
             lignes, j_vus = [], set()
@@ -933,7 +933,7 @@ class EventsCog(commands.Cog):
                 j_vus.add(d_str)
                 parts = f"{int(ev.get('participants', 0)):,}".replace(",", " ")
                 tix = f"{int(ev.get('total_tickets', 0)):,}".replace(",", " ")
-                lignes.append(f"📅 **{d_str}** │ <:players:1512504277392953426> {parts} │ <:woaticket:1512165398718583016> **{tix}**")
+                lignes.append(f"📅 **{d_str}** │ <:players:1512504277392953426> {parts} │ <:woa_points:1512573716259668098> **{tix}**")
             
             title = t(langue, "ev_woa_bilan_title", defaut="<:woaicon:1512165794740572292> Bilan Économique : Roue d'Abondance")
             glob = t(langue, "ev_woa_bilan_global", defaut="**<:icon_world:1512517516012814537> Statistiques Globales**")
@@ -1003,7 +1003,7 @@ class EventsCog(commands.Cog):
                 pts = f"{int(p.get('point', 0)):,}".replace(",", " ")
                 alli = p.get("alliance_name") or "Sans alliance"
                 medal = "🥇" if rang == 1 else "🥈" if rang == 2 else "🥉" if rang == 3 else f"**{rang}.**"
-                lignes.append(f"{medal} **{nom}** [{alli}] ➔ **{pts} <:woaticket:1512165398718583016>**")
+                lignes.append(f"{medal} **{nom}** [{alli}] ➔ **{pts} <:woa_points:1512573716259668098>**")
 
             actualisation_dt = _get_api_timestamp(data_rank, woa_base_data)
 
