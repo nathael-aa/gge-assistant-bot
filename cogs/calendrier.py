@@ -37,13 +37,13 @@ class CalendarNavView(discord.ui.View):
         self.current_page = current_page
         self.langue = langue
 
-        self.btn_past = discord.ui.Button(label=t(langue, "cal_btn_past", defaut="<:lastpage:1533554126984581283> Historique"), custom_id="cal_past")
+        self.btn_past = discord.ui.Button(label=t(langue, "cal_btn_past", defaut="⏮️ Historique"), custom_id="cal_past")
         self.btn_past.callback = self.callback_past
 
         self.btn_main = discord.ui.Button(label=t(langue, "cal_btn_main", defaut="⏺️ Actuels & À venir"), custom_id="cal_main")
         self.btn_main.callback = self.callback_main
 
-        self.btn_future = discord.ui.Button(label=t(langue, "cal_btn_future", defaut="<:nextpage:1533554128230420590> À venir (Uniquement)"), custom_id="cal_future")
+        self.btn_future = discord.ui.Button(label=t(langue, "cal_btn_future", defaut="⏭️ À venir (Uniquement)"), custom_id="cal_future")
         self.btn_future.callback = self.callback_future
 
         self.add_item(self.btn_past)
