@@ -49,36 +49,36 @@ class MenuAideView(discord.ui.View):
         await interaction.response.edit_message(embed=self.embeds[page], view=self)
 
     # --- LIGNE 1 (row=0) ---
-    @discord.ui.button(emoji="<:castles:1512574693859786822>", style=discord.ButtonStyle.success, row=0)
+    @discord.ui.button(emoji="🏰", style=discord.ButtonStyle.success, row=0)
     async def btn_home(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.update_menu(interaction, 0) # Page 0: Sommaire
 
-    @discord.ui.button(emoji="<:parameters:1512573735390154986>", style=discord.ButtonStyle.primary, row=0)
+    @discord.ui.button(emoji="⚙️", style=discord.ButtonStyle.primary, row=0)
     async def btn_aide(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.update_menu(interaction, 1) # Page 1: Aide
 
-    @discord.ui.button(emoji="<:events:1512574699555782666>", style=discord.ButtonStyle.primary, row=0)
+    @discord.ui.button(emoji="📅", style=discord.ButtonStyle.primary, row=0)
     async def btn_events(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.update_menu(interaction, 2) # Page 2: Events
 
-    @discord.ui.button(emoji="<:ranking:1512438311132729525>", style=discord.ButtonStyle.primary, row=0)
+    @discord.ui.button(emoji="🏆", style=discord.ButtonStyle.primary, row=0)
     async def btn_rank(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.update_menu(interaction, 7) # Page 7: Rank
 
     # --- LIGNE 2 (row=1) ---
-    @discord.ui.button(emoji="<:renames:1512574708913143858>", style=discord.ButtonStyle.primary, row=1)
+    @discord.ui.button(emoji="👥", style=discord.ButtonStyle.primary, row=1)
     async def btn_profils(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.update_menu(interaction, 5) # Page 5: Profils
 
-    @discord.ui.button(emoji="<:2_:1512574740915818527>", style=discord.ButtonStyle.primary, row=1)
+    @discord.ui.button(emoji="⚔️", style=discord.ButtonStyle.primary, row=1)
     async def btn_guerre(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.update_menu(interaction, 4) # Page 4: Guerre
 
-    @discord.ui.button(emoji="<:icon_analyze:1512573874150314005>", style=discord.ButtonStyle.primary, row=1)
+    @discord.ui.button(emoji="📡", style=discord.ButtonStyle.primary, row=1)
     async def btn_radar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.update_menu(interaction, 6) # Page 6: Radar
 
-    @discord.ui.button(emoji="<:fortresses:1512574700839239892>", style=discord.ButtonStyle.primary, row=1)
+    @discord.ui.button(emoji="🏯", style=discord.ButtonStyle.primary, row=1)
     async def btn_fort(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.update_menu(interaction, 3) # Page 3: Forteresses
 

@@ -17,7 +17,7 @@
     "E4K_HU1": false, "E4K_CZ1": false, "E4K_SK1": false, "E4K_BG1": false,
     "E4K_HR1": false, "E4K_SE1": false, "E4K_NO1": false, "E4K_FI1": false,
     "E4K_DK1": false, "E4K_JP1": false, "E4K_KR1": false, "E4K_TW1": false,
-    "E4K_INT1": false, "CZ1": false, "HIS1": false, "LT1": false, "E4K_SKN1": false,
+    "E4K_INT1": false, "CZ1": true, "HIS1": false, "LT1": false, "E4K_SKN1": false,
     "E4K_HIS1": false, "E4K_PH1": false, "E4K_AR1": false, "E4K_MX1": false,
     "E4K_ARAB1": false, "E4K_IN1": false, "E4K_ID1": false, "E4K_ASIA1": false,
     "E4K_US2": false, "E4K_RU2": false, "E4K_INT3": false, "E4K_INT4": false, "E4K_WORLD1": false
