@@ -27,51 +27,69 @@ for directory in [CONFIG_DIR, JOUEURS_DIR, ALLIANCES_DIR, LOCALES_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
 # ==========================================
+# 🧠 CACHE RAM POUR ÉVITER LE RÉVEIL DU NAS
+# ==========================================
+USERS_CONFIG_CACHE = None
+GUILDS_CONFIG_CACHE = None
+BLOCKS_CACHE = None
+
+def clear_config_cache():
+    """Fonction à appeler dans ton /setup pour forcer la mise à jour de la RAM"""
+    global USERS_CONFIG_CACHE, GUILDS_CONFIG_CACHE
+    USERS_CONFIG_CACHE = None
+    GUILDS_CONFIG_CACHE = None
+
+# ==========================================
 # 🌍 GESTION DYNAMIQUE DES SERVEURS ET LANGUES
 # ==========================================
 async def get_server_config(interaction: discord.Interaction):
-    """
-    Récupère la configuration (langue, serveur GGE).
-    Priorité 1 : Le profil personnel de l'utilisateur (users.json)
-    Priorité 2 : Le serveur Discord où la commande est tapée (serveurs.json)
-    Priorité 3 : Valeurs par défaut (fr, E4K_FR1)
-    """
+    global USERS_CONFIG_CACHE, GUILDS_CONFIG_CACHE
+    
     default_lang = "fr"
     default_server = "E4K_FR1"
     
-    try:
+    # 1. On charge TOUS les utilisateurs en RAM une seule fois
+    if USERS_CONFIG_CACHE is None:
         path_users = CONFIG_DIR / 'users.json'
         if path_users.exists():
-            with open(path_users, 'r', encoding='utf-8') as f:
-                users_data = json.load(f)
-                
-            user_id = str(interaction.user.id)
-            if user_id in users_data:
-                u_lang = users_data[user_id].get("langue", default_lang)
-                u_srv = users_data[user_id].get("gge_server", default_server)
-                return u_lang, u_srv
-    except: pass
+            try:
+                with open(path_users, 'r', encoding='utf-8') as f:
+                    USERS_CONFIG_CACHE = json.load(f)
+            except:
+                USERS_CONFIG_CACHE = {}
+        else:
+            USERS_CONFIG_CACHE = {}
+            
+    # Vérification ultra-rapide dans la RAM
+    user_id = str(interaction.user.id)
+    if user_id in USERS_CONFIG_CACHE:
+        u_lang = USERS_CONFIG_CACHE[user_id].get("langue", default_lang)
+        u_srv = USERS_CONFIG_CACHE[user_id].get("gge_server", default_server)
+        return u_lang, u_srv
 
+    # 2. On charge TOUS les serveurs en RAM une seule fois
     if interaction.guild:
-        try:
+        if GUILDS_CONFIG_CACHE is None:
             path_guilds = CONFIG_DIR / 'serveurs.json'
             if path_guilds.exists():
-                with open(path_guilds, 'r', encoding='utf-8') as f:
-                    guilds_data = json.load(f)
-                    
-                guild_id = str(interaction.guild.id)
-                if guild_id in guilds_data:
-                    g_lang = guilds_data[guild_id].get("langue", default_lang)
-                    g_srv = guilds_data[guild_id].get("gge_server", default_server)
-                    return g_lang, g_srv
-        except: pass
+                try:
+                    with open(path_guilds, 'r', encoding='utf-8') as f:
+                        GUILDS_CONFIG_CACHE = json.load(f)
+                except:
+                    GUILDS_CONFIG_CACHE = {}
+            else:
+                GUILDS_CONFIG_CACHE = {}
+                
+        guild_id = str(interaction.guild.id)
+        if guild_id in GUILDS_CONFIG_CACHE:
+            g_lang = GUILDS_CONFIG_CACHE[guild_id].get("langue", default_lang)
+            g_srv = GUILDS_CONFIG_CACHE[guild_id].get("gge_server", default_server)
+            return g_lang, g_srv
 
     return default_lang, default_server
 
 async def get_api_headers(interaction: discord.Interaction = None, custom_server: str = None):
-    """Génère les headers HTTP avec le bon serveur cible."""
     server = "E4K_FR1"
-    
     if custom_server:
         server = custom_server
     elif interaction:
@@ -89,9 +107,7 @@ async def get_api_headers(interaction: discord.Interaction = None, custom_server
 _translations = {}
 
 def charger_langues():
-    """Charge tous les fichiers .json du dossier locales en mémoire RAM"""
     _translations.clear()
-    
     if not LOCALES_DIR.exists():
         logger.warning(f"Le dossier des langues n'existe pas : {LOCALES_DIR}")
         return
@@ -106,7 +122,6 @@ def charger_langues():
             logger.error(f"❌ Erreur lors du chargement de {fichier.name} : {e}")
 
 def t(langue: str, cle: str, defaut: str = None, **kwargs) -> str:
-    """Traduit une clé dans la langue demandée avec prise en charge d'un texte par défaut"""
     dico = _translations.get(langue, _translations.get('fr', {}))
     texte = dico.get(cle, defaut if defaut else f"[{cle}_MANQUANT]")
     
@@ -116,7 +131,6 @@ def t(langue: str, cle: str, defaut: str = None, **kwargs) -> str:
         except KeyError as e:
             logger.warning(f"Variable {e} manquante pour la traduction de la clé '{cle}'")
             return texte
-            
     return texte
 
 # ==========================================
@@ -131,19 +145,14 @@ CACHE = {}
 TRACKER_EVENTS = {
     "Nomades": ["player_event_nomad_history"],
     "Nomad Invasion": ["player_event_nomad_history"],
-    
     "Samouraïs": ["player_event_samurai_history"],
     "Samurai Invasion": ["player_event_samurai_history"],
-    
     "Corbeaux de Sang": ["player_event_bloodcrow_history"],
     "Bloodcrow Invasion": ["player_event_bloodcrow_history"],
-    
     "Guerre des Royaumes": ["player_event_war_realms_history"],
     "War of the Realms": ["player_event_war_realms_history"],
-    
     "Îles Orageuses": ["aquamarine"],
     "Storm Islands": ["aquamarine"],
-    
     "Bataille de Bérimond": ["player_event_berimond_invasion_history", "player_event_berimond_kingdom_history"],
     "Battle of Berimond": ["player_event_berimond_invasion_history", "player_event_berimond_kingdom_history"]
 }
@@ -158,24 +167,23 @@ def get_file_lock(filepath):
     if path_key not in FILE_LOCKS:
         FILE_LOCKS[path_key] = asyncio.Lock()
     return FILE_LOCKS[path_key]
+
 # ==========================================
 # 🔧 Footer global
 # ==========================================
-BOT_VERSION = "GGE Assistant • Version 1.1.1"
+BOT_VERSION = "GGE Assistant • Version 1.1.3"
 
 async def setup_embed_footer(embed: discord.Embed, interaction: discord.Interaction = None, langue: str = "fr", custom_server: str = None):
     txt = BOT_VERSION
-    
     if custom_server:
         txt += f" • {custom_server}"
     elif interaction:
         _, server = await get_server_config(interaction)
         txt += f" • {server}"
-        
     embed.set_footer(text=txt)
 
 # ==========================================
-# 🔧 MAINTENANCE (Sync & Async)
+# 🔧 MAINTENANCE & CACHES JSON
 # ==========================================
 def load_maintenance():
     path = CONFIG_DIR / 'maintenance.json'
@@ -184,75 +192,49 @@ def load_maintenance():
             with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f).get("maintenance_mode", False)
         except Exception as e:
-            logger.warning(f"Impossible de lire le fichier de maintenance : {e}")
+            logger.error(f"❌ Impossible de lire maintenance.json : {e}")
     return False
 
-async def load_maintenance_async():
-    path = CONFIG_DIR / 'maintenance.json'
+async def load_blocks_async():
+    global BLOCKS_CACHE
+    if BLOCKS_CACHE is not None:
+        return BLOCKS_CACHE
+        
+    path = CONFIG_DIR / 'blocks.json'
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
                 with open(path, 'r', encoding='utf-8') as f:
-                    return json.load(f).get("maintenance_mode", False)
-            except: pass
-    return False
+                    BLOCKS_CACHE = json.load(f)
+                    return BLOCKS_CACHE
+            except Exception as e: 
+                logger.error(f"❌ Fichier blocks.json corrompu ou illisible : {e}")
+            
+    BLOCKS_CACHE = {"global_commands": {}, "blocked_users": {}}
+    return BLOCKS_CACHE
 
-async def save_maintenance_async(etat):
-    path = CONFIG_DIR / 'maintenance.json'
+async def save_blocks_async(data):
+    global BLOCKS_CACHE
+    BLOCKS_CACHE = data 
+    path = CONFIG_DIR / 'blocks.json'
     async with get_file_lock(path):
         with open(path, 'w', encoding='utf-8') as f:
-            json.dump({"maintenance_mode": etat}, f)
-
-# ==========================================
-# 💾 GESTION DES FICHIERS JSON (Accès Sécurisés)
-# ==========================================
+            json.dump(data, f, indent=4, ensure_ascii=False)
 
 async def load_configuration_async():
-    """Charge le fichier principal de configuration (serveurs, minutes, events...)."""
     path = CONFIG_DIR / 'configuration.json'
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.error(f"❌ Erreur de lecture de configuration.json : {e}")
+                with open(path, 'r', encoding='utf-8') as f: return json.load(f)
+            except Exception as e: 
+                logger.error(f"❌ Erreur configuration.json : {e}")
         return {"servers": {}, "scan_minutes": {}}
 
 async def save_configuration_async(data):
-    """Sauvegarde le fichier principal de configuration."""
     path = CONFIG_DIR / 'configuration.json'
     async with get_file_lock(path):
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-
-async def load_blocks_async():
-    path = CONFIG_DIR / 'blocks.json'
-    async with get_file_lock(path):
-        if os.path.exists(path):
-            with open(path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-    return {"global_commands": {}, "blocked_users": {}}
-
-async def save_blocks_async(data):
-    path = CONFIG_DIR / 'blocks.json'
-    async with get_file_lock(path):
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-
-async def load_diplo_async():
-    path = ALLIANCES_DIR / 'diplomatie.json'
-    async with get_file_lock(path):
-        if os.path.exists(path):
-            with open(path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-    return {}
-
-async def save_diplo_async(data):
-    path = ALLIANCES_DIR / 'diplomatie.json'
-    async with get_file_lock(path):
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
+        with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
 
 async def load_objectifs_async():
     path = CONFIG_DIR / 'event_objectifs.json'
@@ -260,7 +242,8 @@ async def load_objectifs_async():
         if os.path.exists(path):
             try:
                 with open(path, 'r', encoding='utf-8') as f: return json.load(f)
-            except: pass
+            except Exception as e: 
+                logger.error(f"❌ Erreur event_objectifs.json : {e}")
     return {}
 
 async def save_objectifs_async(data):
@@ -274,7 +257,8 @@ async def load_pseudos_async():
         if os.path.exists(path):
             try:
                 with open(path, 'r', encoding='utf-8') as f: return json.load(f)
-            except: pass
+            except Exception as e:
+                logger.error(f"❌ Erreur discord_pseudos.json : {e}")
     return {}
 
 async def save_pseudos_async(data):
@@ -288,7 +272,8 @@ async def load_rivals_async():
         if os.path.exists(path):
             try:
                 with open(path, 'r', encoding='utf-8') as f: return json.load(f)
-            except: pass
+            except Exception as e:
+                logger.error(f"❌ Erreur rival_radar.json : {e}")
     return {}
 
 async def save_rivals_async(data):
@@ -302,7 +287,8 @@ async def load_dungeons_async():
         if os.path.exists(path):
             try:
                 with open(path, 'r', encoding='utf-8') as f: return json.load(f)
-            except: pass
+            except Exception as e:
+                logger.error(f"❌ Erreur dungeons_sessions.json : {e}")
     return {"sessions": {}}
 
 async def save_dungeons_async(data):
@@ -310,14 +296,49 @@ async def save_dungeons_async(data):
     async with get_file_lock(path):
         with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
 
+async def load_maintenance_async():
+    path = CONFIG_DIR / 'maintenance.json'
+    async with get_file_lock(path):
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f).get("maintenance_mode", False)
+            except Exception as e:
+                logger.error(f"❌ Erreur maintenance.json : {e}")
+    return False
+
+async def save_maintenance_async(etat):
+    path = CONFIG_DIR / 'maintenance.json'
+    async with get_file_lock(path):
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump({"maintenance_mode": etat}, f)
+
+async def load_diplo_async():
+    path = ALLIANCES_DIR / 'diplomatie.json'
+    async with get_file_lock(path):
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f: return json.load(f)
+            except Exception as e:
+                logger.error(f"❌ Erreur diplomatie.json : {e}")
+    return {}
+
+async def save_diplo_async(data):
+    path = ALLIANCES_DIR / 'diplomatie.json'
+    async with get_file_lock(path):
+        with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
+
 async def load_surveillance_async():
     path = CONFIG_DIR / 'surveillance.json'
     async with get_file_lock(path):
         if os.path.exists(path):
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                if "alliances" not in data: data["alliances"] = {}
-                return data
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if "alliances" not in data: data["alliances"] = {}
+                    return data
+            except Exception as e:
+                logger.error(f"❌ Erreur surveillance.json : {e}")
     return {"players": {}, "alliances": {}}
 
 async def save_surveillance_async(data):
@@ -386,7 +407,9 @@ async def get_cached_data(serveur="E4K_FR1"):
             latest = max(player_files, key=lambda p: p.stat().st_mtime)
             with open(latest, 'r', encoding='utf-8') as f: 
                 return json.load(f).get('players', {})
-        except: return {}
+        except Exception as e: 
+            logger.error(f"❌ [Cache] Erreur lors de la lecture lourde de {serveur} : {e}")
+            return {}
 
     if time.time() - CACHE[serveur]['last_refresh'] > 300:
         players_data = await asyncio.to_thread(_lecture_lourde)
@@ -428,7 +451,6 @@ async def event_alliance_autocomplete(interaction: discord.Interaction, current:
     return [app_commands.Choice(name=e, value=e) for e in events_en if current.lower() in e.lower()][:25]
 
 async def generer_rapport_alliance_embed(bot, event_name, event_keys, alliance_name, clr_alliance=0x3498DB, interaction: discord.Interaction = None, custom_server: str = None):
-    """Génère l'embed de classement d'une alliance pour un événement donné."""
     headers = await get_api_headers(interaction=interaction, custom_server=custom_server)
     safe_alliance = urllib.parse.quote(alliance_name)
     

@@ -3,6 +3,7 @@ import os
 import io
 import json
 import logging
+import socket
 import asyncio
 import aiohttp
 from datetime import datetime, timedelta
@@ -46,7 +47,6 @@ class WelcomeView(discord.ui.View):
         super().__init__(timeout=None)
 
     def get_welcome_embed(self, lang="fr"):
-        # On va chercher les traductions dans les JSON via la fonction t()
         title = t(lang, "welcome_title", defaut="🏰 Welcome to GGE Assistant!")
         desc = t(lang, "welcome_desc", defaut="Here is how to get started:")
         
@@ -105,7 +105,6 @@ class GGEAssistantBot(commands.Bot):
         try:
             payload = []
             for cmd in self.tree.get_commands():
-
                 cmd_data = {
                     "name": cmd.name,
                     "description": cmd.description,
@@ -140,7 +139,9 @@ class GGEAssistantBot(commands.Bot):
         return serialized
 
     async def setup_hook(self):
-        self.session = aiohttp.ClientSession()
+        connecteur_ipv4 = aiohttp.TCPConnector(family=socket.AF_INET)
+        self.session = aiohttp.ClientSession(connector=connecteur_ipv4)
+        
         logger.info("🔌 Chargement des modules ...")
         extensions = [
             "cogs.admin", 
@@ -153,6 +154,7 @@ class GGEAssistantBot(commands.Bot):
             "cogs.guerre", 
             "cogs.profils", 
             "cogs.radar",
+            "cogs.storms",
         ]
         for ext in extensions:
             try:
@@ -160,7 +162,6 @@ class GGEAssistantBot(commands.Bot):
                 logger.info(f"✅ Module {ext} chargé.")
             except Exception as e:
                 logger.error(f"❌ Erreur {ext} : {e}")
-            
 
         await self.tree.sync()
         self.export_commands_json()
@@ -186,24 +187,21 @@ class GGEAssistantBot(commands.Bot):
         if self.maintenance_mode:
             statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
             activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
-            target_status = discord.Status.dnd  # 🔴 Pastille rouge (Ne pas déranger)
+            target_status = discord.Status.dnd 
         else:
             activity = discord.Activity(type=discord.ActivityType.watching, name="/setup ➔ /help")
-            target_status = discord.Status.online # 🟢 Pastille verte (En ligne)
+            target_status = discord.Status.online 
 
         await self.change_presence(activity=activity, status=target_status)
-        
         logger.info(f"📡 Statut mis à jour : {activity.name} | Pastille : {target_status}")
 
     # ==========================================
     # 📥 SUIVI DES AJOUTS / RETRAITS DU BOT
     # ==========================================
     async def on_guild_join(self, guild: discord.Guild):
-        """Déclenché quand le bot est ajouté sur un nouveau serveur."""
         logger.info(f"🎉 [NOUVEAU SERVEUR] Le bot a rejoint '{guild.name}' (ID: {guild.id}) | Membres : {guild.member_count}")
         
         channel_to_send = guild.system_channel
-        
         if not channel_to_send or not channel_to_send.permissions_for(guild.me).send_messages:
             for channel in guild.text_channels:
                 if channel.permissions_for(guild.me).send_messages:
@@ -213,14 +211,12 @@ class GGEAssistantBot(commands.Bot):
         if channel_to_send:
             view = WelcomeView()
             embed_initial = view.get_welcome_embed("en")
-            
             try:
                 await channel_to_send.send(embed=embed_initial, view=view)
             except Exception as e:
                 logger.error(f"❌ Impossible d'envoyer le message de bienvenue sur {guild.name} : {e}")
 
     async def on_guild_remove(self, guild: discord.Guild):
-        """Déclenché quand le bot est expulsé ou quitte un serveur."""
         logger.warning(f"👋 [DÉPART SERVEUR] Le bot a été retiré de '{guild.name}' (ID: {guild.id})")
 
     # ==========================================
@@ -250,49 +246,38 @@ class GGEAssistantBot(commands.Bot):
     # ==========================================
     @tasks.loop(seconds=30)
     async def status_task(self):
-        # Si le bot est en maintenance, on fige le statut sur la maintenance !
         if self.maintenance_mode:
             statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
             activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
             await self.change_presence(activity=activity, status=discord.Status.dnd)
             return
 
-        # 1. Calculs en direct
         nb_serveurs = len(self.guilds)
         nb_membres = sum(guild.member_count for guild in self.guilds if guild.member_count)
-        dossier_serveurs = Path('/app/data/server_scans')
-        if dossier_serveurs.exists():
-            nb_gge_serveurs = sum(1 for d in dossier_serveurs.iterdir() if d.is_dir())
-        else:
-            nb_gge_serveurs = 0
+        
+        # --- OPTIMISATION : On compte les dossiers en arrière-plan ---
+        def compter_serveurs_gge():
+            dossier_serveurs = Path('/app/data/server_scans')
+            if dossier_serveurs.exists():
+                return sum(1 for d in dossier_serveurs.iterdir() if d.is_dir())
+            return 0
+            
+        nb_gge_serveurs = await asyncio.to_thread(compter_serveurs_gge)
 
-        # 2. Liste de tes statuts tournants
         statuts = [
-            # Affichera : "Écoute ⚙️ /setup | Start here"
             discord.Activity(type=discord.ActivityType.listening, name="⚙️ /setup | Start here"),
-            
-            # Affichera : "Regarde 📖 /help | All commands"
             discord.Activity(type=discord.ActivityType.watching, name="📖 /help | All commands"),
-            
-            # Affichera : "Regarde 🌍 15 servers | 👥 3500 users"
             discord.Activity(type=discord.ActivityType.watching, name=f"🌍 {nb_serveurs} servers | 👥 {nb_membres} users"),
-            
-            # Affichera : "Participe à ⚔️ 12 GGE servers"
             discord.Activity(type=discord.ActivityType.competing, name=f"⚔️ {nb_gge_serveurs} GGE servers"),
-            
-            # Affichera : "Joue à 🚀 Version 1.1.1"
             discord.Activity(type=discord.ActivityType.playing, name=f"🚀 {BOT_VERSION}")
         ]
 
         if self.custom_status:
-            # On le met en mode "Joue à" suivi de ton message (ex: Joue à ⚠️ Commande /radar HS)
             statuts.append(discord.Activity(type=discord.ActivityType.playing, name=self.custom_status))
 
-        # 3. Choix du statut et incrémentation
         activity = statuts[self.status_index % len(statuts)]
         self.status_index += 1
 
-        # 4. Envoi à Discord
         await self.change_presence(activity=activity, status=discord.Status.online)
 
     @status_task.before_loop
@@ -302,22 +287,18 @@ class GGEAssistantBot(commands.Bot):
     # ==========================================
     # 📈 SYNCHRONISATION TOP.GG
     # ==========================================
-    @tasks.loop(minutes=3600)
+    @tasks.loop(minutes=60)
     async def topgg_update_task(self):
-        """Envoie le nombre de serveurs Discord à Top.gg toutes les 30 minutes."""
-        if not TOPGG_TOKEN:
+        if not TOPGG_TOKEN or TOPGG_TOKEN == "FAUX_TOKEN":
             return
 
-        # Top.gg demande le nombre de serveurs Discord (guilds), pas les serveurs GGE
         serveurs_count = len(self.guilds)
-        
         url = f"https://top.gg/api/bots/{self.user.id}/stats"
         headers = {"Authorization": TOPGG_TOKEN}
         payload = {"server_count": serveurs_count}
 
         try:
-            # On utilise self.session qui est déjà initialisé dans ton setup_hook
-            async with self.session.post(url, headers=headers, json=payload) as response:
+            async with self.session.post(url, headers=headers, json=payload, timeout=10) as response:
                 if response.status == 200:
                     logger.info(f"📈 [Top.gg] Mise à jour réussie : {serveurs_count} serveurs.")
                 else:
@@ -355,44 +336,31 @@ class GGEAssistantBot(commands.Bot):
         except Exception as e:
             logger.error(f"⚠️ Erreur lors de l'écriture du log : {e}")
 
-        # --- 2. VÉRIFICATION DE LA CONFIGURATION (PERSONNELLE UNIQUEMENT) ---
+        # --- 2. VÉRIFICATION DE LA CONFIGURATION (AVEC CACHE RAM) ---
         commandes_libres = ["setup", "help", "contact", "changelog"]
         
         if cmd_name not in commandes_libres:
             config_ok = False
             
-            # On vérifie uniquement le profil du joueur
-            fichier_users = CONFIG_DIR / 'users.json'
-            if fichier_users.exists():
-                with open(fichier_users, 'r', encoding='utf-8') as f:
-                    if str(interaction.user.id) in json.load(f):
-                        config_ok = True
+            # On l'importe ICI, à la volée, pour avoir la valeur la plus récente !
+            from utils import USERS_CONFIG_CACHE
             
-            # Si le joueur n'est pas dans users.json
+            # Vérification ultra-rapide en RAM
+            if USERS_CONFIG_CACHE and str(interaction.user.id) in USERS_CONFIG_CACHE:
+                config_ok = True
+            
             if not config_ok:
                 if interaction.type == discord.InteractionType.application_command:
-                    # Le </setup:0> créera un lien cliquable natif sur Discord !
                     msg = t(langue, "bot_err_config_dm", defaut="⚠️ **Halte là !**\nTu n'as pas encore configuré ton profil personnel. Utilise la commande </setup:0> pour définir ton serveur et ta langue avant d'utiliser le bot.")
                     await interaction.response.send_message(msg, ephemeral=True)
                 return False
 
         # --- 2.5. VÉRIFICATION DES COMMANDES STRICTEMENT PRIVÉES (DM ONLY) ---
         commandes_privees = [
-            "fortress",
-            "fortress scan", 
-            "fortress stop",
-            "rival",
-            "rival start",
-            "rival add",
-            "rival list",
-            "rival stop",
-            "radar",
-            "radar add", 
-            "radar remove", 
-            "radar list",
-            "radar alliance",
-            "radar alliance add", 
-            "radar alliance remove"
+            "fortress", "fortress scan", "fortress stop",
+            "rival", "rival start", "rival add", "rival list", "rival stop",
+            "radar", "radar add", "radar remove", "radar list",
+            "radar alliance", "radar alliance add", "radar alliance remove"
         ]
 
         if interaction.guild and cmd_name in commandes_privees:
@@ -402,18 +370,10 @@ class GGEAssistantBot(commands.Bot):
             return False
 
         # --- 2.6. VÉRIFICATION DES COMMANDES STRICTEMENT SERVEUR (GUILD ONLY) ---
-
         commandes_serveur = [
-            "calendar", 
-            "calendar setup", 
-            "calendar track", 
-            "calendar untrack",
-            "event_goal_set",
-            "event_summary",
-            "diplomacy",
-            "diplomacy add", 
-            "diplomacy remove", 
-            "diplomacy list"
+            "calendar", "calendar setup", "calendar track", "calendar untrack",
+            "event_goal_set", "event_summary",
+            "diplomacy", "diplomacy add", "diplomacy remove", "diplomacy list"
         ]
 
         if not interaction.guild and cmd_name in commandes_serveur:
@@ -451,7 +411,6 @@ class GGEAssistantBot(commands.Bot):
         if user_id_str in blocked_users:
             user_blocks = blocked_users[user_id_str]
             
-            # Blocage TOTAL
             if "ALL" in user_blocks:
                 if interaction.type == discord.InteractionType.application_command:
                     reason = user_blocks['ALL']
@@ -459,7 +418,6 @@ class GGEAssistantBot(commands.Bot):
                     await interaction.response.send_message(msg, ephemeral=True)
                 return False
             
-            # Blocage COMMANDE PRÉCISE
             if cmd_name in user_blocks:
                 if interaction.type == discord.InteractionType.application_command:
                     reason = user_blocks[cmd_name]

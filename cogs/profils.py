@@ -7,7 +7,6 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
-
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -135,6 +134,7 @@ class ProfilsCog(commands.Cog):
         self.clr_alliance    = discord.Color.from_rgb(0, 115, 153)  
         self.clr_historique  = discord.Color.from_rgb(0, 77, 102)   
         self.clr_alliance_pp = discord.Color.from_rgb(0, 140, 186)  
+        self.clr_alliance_property = discord.Color.from_rgb(0, 181, 206)  
         self.clr_colombe     = discord.Color.from_rgb(0, 180, 216)  
 
     # ========================================================
@@ -1004,6 +1004,151 @@ class ProfilsCog(commands.Cog):
         else:
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
+
+    # ========================================================
+    # COMMANDE : ALLIANCE PROPERTY
+    # ========================================================
+    @app_commands.command(name="alliance_property", description="Displays all properties (Cities, Towers, Monuments, Labs) of an alliance")
+    @app_commands.describe(alliance_name="Alliance name")
+    @app_commands.autocomplete(alliance_name=alliance_autocomplete)
+    async def alliance_property(self, interaction: discord.Interaction, alliance_name: str):
+        await interaction.response.defer(thinking=True)
+        langue, serveur = await get_server_config(interaction)
+        headers = await get_api_headers(interaction)
+
+        # --- 1. RECHERCHE DE L'ID DE L'ALLIANCE ---
+        safe_alliance = quote(alliance_name)
+        url_search = f"https://api.gge-tracker.com/api/v1/alliances/name/{safe_alliance}"
+        
+        async with self.bot.session.get(url_search, headers=headers, timeout=10) as r:
+            if r.status != 200:
+                return await interaction.followup.send(t(langue, "cmd_prop_not_found", defaut=f"❌ Alliance **{alliance_name}** introuvable sur l'API."))
+            data = await r.json()
+            if not data:
+                return await interaction.followup.send(t(langue, "cmd_prop_not_found", defaut=f"❌ Alliance **{alliance_name}** introuvable sur l'API."))
+            
+            target = data[0] if isinstance(data, list) else data
+            alliance_id = target.get("alliance_id") or target.get("id")
+            nom_officiel = target.get("alliance_name", alliance_name)
+
+        if not alliance_id:
+            return await interaction.followup.send(t(langue, "cmd_prop_not_found", defaut=f"❌ ID de l'alliance **{alliance_name}** introuvable."))
+
+        # --- 2. RÉCUPÉRATION DE LA CARTOGRAPHIE ---
+        url_carto = f"https://api.gge-tracker.com/api/v1/cartography/id/{alliance_id}"
+        async with self.bot.session.get(url_carto, headers=headers, timeout=15) as r:
+            if r.status != 200:
+                return await interaction.followup.send(t(langue, "cmd_prop_api_err", defaut="❌ Erreur lors de la récupération des données cartographiques."))
+            carto_data = await r.json()
+
+        if not carto_data:
+            return await interaction.followup.send(t(langue, "cmd_prop_empty", defaut=f"📭 L'alliance **{nom_officiel}** ne possède aucune propriété spéciale."))
+
+        # --- 3. CONFIGURATION DES DONNÉES ---
+        PROP_TYPES = {
+            3: {"name": t(langue, "prop_capital", defaut="Capitale"), "emoji": "<:castle3:1512573819313979544>"},
+            22: {"name": t(langue, "prop_city", defaut="Cité Marchande"), "emoji": "<:castle22:1512573821520183347>"},
+            23: {"name": t(langue, "prop_tower", defaut="Tour Royale"), "emoji": "<:castle23:1512573823118086174>"},
+            26: {"name": t(langue, "prop_monument", defaut="Monument"), "emoji": "<:castle26:1512573824086835280>"},
+            28: {"name": t(langue, "prop_lab", defaut="Laboratoire"), "emoji": "<:castle28:1512573825299251351>"}
+        }
+        
+        REALM_NAMES = {
+            0: f"<:dungeon0:1512573840704671775> {t(langue, 'realm_empire', defaut='__Grand Empire__')}",
+            1: f"<:dungeon1:1512573842277794062> {t(langue, 'realm_sands', defaut='__Sables Brûlants__')}",
+            2: f"<:dungeon2:1512573843267518546> {t(langue, 'realm_glacier', defaut='__Glacier Éternel__')}",
+            3: f"<:dungeon3:1512573844538396692> {t(langue, 'realm_peaks', defaut='__Pics du Feu__')}",
+            4: f"<:dungeon4:1512573845737963722> {t(langue, 'realm_storms', defaut='__Îles Orageuses__')}"
+        }
+
+        # Initialisation du dictionnaire avec un ordre fixe
+        proprietes_par_monde = {name: [] for name in REALM_NAMES.values()}
+
+        # --- 4. PARCOURS ET TRI DES JOUEURS ---
+        for player in carto_data:
+            p_name = player.get("name", "Inconnu")
+            
+            # Traitement des châteaux dans le Grand Empire (index 0)
+            for c in player.get("castles", []):
+                if len(c) >= 3 and c[2] in PROP_TYPES:
+                    proprietes_par_monde[REALM_NAMES[0]].append({
+                        "type": c[2], "x": c[0], "y": c[1], "player": p_name
+                    })
+                    
+            # Traitement des châteaux dans les autres mondes
+            for cr in player.get("castles_realm", []):
+                if len(cr) >= 4 and cr[3] in PROP_TYPES:
+                    r_id = cr[0]
+                    r_name = REALM_NAMES.get(r_id, f"Monde {r_id}")
+                    if r_name not in proprietes_par_monde:
+                        proprietes_par_monde[r_name] = []
+                    
+                    proprietes_par_monde[r_name].append({
+                        "type": cr[3], "x": cr[1], "y": cr[2], "player": p_name
+                    })
+
+        # --- 5. CONSTRUCTION DE L'EMBED (PAGINATION AUTO SI TROP LONG) ---
+        embeds = []
+        titre_base = t(langue, "cmd_prop_embed_title", alliance=nom_officiel, defaut=f"🏰 Propriétés de {nom_officiel}")
+        current_embed = discord.Embed(title=titre_base, color=self.clr_alliance_property)
+        char_count = len(current_embed.title)
+        total_props = 0
+
+        for monde, props in proprietes_par_monde.items():
+            if not props:
+                continue
+                
+            # Tri par type de propriété puis par nom de joueur
+            props.sort(key=lambda p: (p["type"], p["player"].lower()))
+            
+            chunk = ""
+            field_count = 0
+            
+            for p in props:
+                info = PROP_TYPES[p["type"]]
+                ligne = f"{info['emoji']} **{info['name']}** | {p['player']} `({p['x']}:{p['y']})`\n"
+                total_props += 1
+                
+                # Si le champ dépasse la limite Discord de 1024 caractères
+                if len(chunk) + len(ligne) > 1024:
+                    current_embed.add_field(name=monde if field_count == 0 else f"{monde} (suite)", value=chunk, inline=False)
+                    char_count += len(monde) + len(chunk)
+                    chunk = ligne
+                    field_count += 1
+                    
+                    # Si l'embed atteint sa limite max, on crée une nouvelle page
+                    if len(current_embed.fields) >= 25 or char_count > 5000:
+                        embeds.append(current_embed)
+                        current_embed = discord.Embed(title=f"{titre_base} (Suite)", color=discord.Color.from_rgb(255, 215, 0))
+                        char_count = len(current_embed.title)
+                else:
+                    chunk += ligne
+                    
+            # Ajout du dernier morceau de texte restant
+            if chunk:
+                current_embed.add_field(name=monde if field_count == 0 else f"{monde} (suite)", value=chunk, inline=False)
+                char_count += len(monde) + len(chunk)
+                if len(current_embed.fields) >= 25 or char_count > 5000:
+                    embeds.append(current_embed)
+                    current_embed = discord.Embed(title=f"{titre_base} (Suite)", color=discord.Color.from_rgb(255, 215, 0))
+                    char_count = len(current_embed.title)
+
+        if len(current_embed.fields) > 0 and current_embed not in embeds:
+            embeds.append(current_embed)
+
+        if total_props == 0:
+            msg_empty = t(langue, "cmd_prop_none", defaut=f"📭 L'alliance **{nom_officiel}** ne possède aucune propriété spéciale (Capitale, Tour du Roi, Monument, Labo).")
+            return await interaction.followup.send(msg_empty)
+
+        # Ajout du footer et envoi (avec la pagination si +1 page)
+        for emb in embeds:
+            await setup_embed_footer(emb, interaction, langue)
+
+        if len(embeds) > 1:
+            view = PaginationView(embeds)
+            await interaction.followup.send(embed=embeds[0], view=view)
+        else:
+            await interaction.followup.send(embed=embeds[0])
 
     # ========================================================
     # 🕊️ COMMANDE : DOVE

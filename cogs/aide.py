@@ -37,84 +37,51 @@ class MenuAideView(discord.ui.View):
         self.embeds = embeds
         
         self.btn_home.label = t(langue, "aide_btn_sommaire", defaut="Sommaire")
-        self.btn_1.label = t(langue, "aide_btn_aide", defaut="Aide")
-        self.btn_2.label = t(langue, "aide_btn_events", defaut="Events")
-        self.btn_3.label = t(langue, "aide_btn_fort", defaut="Fort.")
-        self.btn_4.label = t(langue, "aide_btn_guerre", defaut="Guerre")
-        self.btn_5.label = t(langue, "aide_btn_profils", defaut="Profils")
-        self.btn_6.label = t(langue, "aide_btn_radar", defaut="Radar")
+        self.btn_aide.label = t(langue, "aide_btn_aide", defaut="Aide")
+        self.btn_events.label = t(langue, "aide_btn_events", defaut="Events")
+        self.btn_rank.label = t(langue, "aide_btn_rank", defaut="Ranks")
+        self.btn_profils.label = t(langue, "aide_btn_profils", defaut="Profils")
+        self.btn_guerre.label = t(langue, "aide_btn_guerre", defaut="PvP")
+        self.btn_radar.label = t(langue, "aide_btn_radar", defaut="Radar")
+        self.btn_fort.label = t(langue, "aide_btn_fort", defaut="Forteresses")
 
     async def update_menu(self, interaction: discord.Interaction, page: int):
         await interaction.response.edit_message(embed=self.embeds[page], view=self)
 
-    @discord.ui.button(emoji="<:listitem:1512573892596858960>", style=discord.ButtonStyle.success, row=0)
+    # --- LIGNE 1 (row=0) ---
+    @discord.ui.button(emoji="<:castles:1512574693859786822>", style=discord.ButtonStyle.success, row=0)
     async def btn_home(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 0)
+        await self.update_menu(interaction, 0) # Page 0: Sommaire
 
     @discord.ui.button(emoji="<:parameters:1512573735390154986>", style=discord.ButtonStyle.primary, row=0)
-    async def btn_1(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 1)
+    async def btn_aide(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.update_menu(interaction, 1) # Page 1: Aide
 
     @discord.ui.button(emoji="<:events:1512574699555782666>", style=discord.ButtonStyle.primary, row=0)
-    async def btn_2(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 2)
+    async def btn_events(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.update_menu(interaction, 2) # Page 2: Events
 
-    @discord.ui.button(emoji="<:fortresses:1512574700839239892>", style=discord.ButtonStyle.primary, row=0)
-    async def btn_3(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 3)
+    @discord.ui.button(emoji="<:ranking:1512438311132729525>", style=discord.ButtonStyle.primary, row=0)
+    async def btn_rank(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.update_menu(interaction, 7) # Page 7: Rank
+
+    # --- LIGNE 2 (row=1) ---
+    @discord.ui.button(emoji="<:renames:1512574708913143858>", style=discord.ButtonStyle.primary, row=1)
+    async def btn_profils(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.update_menu(interaction, 5) # Page 5: Profils
 
     @discord.ui.button(emoji="<:2_:1512574740915818527>", style=discord.ButtonStyle.primary, row=1)
-    async def btn_4(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 4)
-
-    @discord.ui.button(emoji="<:renames:1512574708913143858>", style=discord.ButtonStyle.primary, row=1)
-    async def btn_5(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 5)
+    async def btn_guerre(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.update_menu(interaction, 4) # Page 4: Guerre
 
     @discord.ui.button(emoji="<:icon_analyze:1512573874150314005>", style=discord.ButtonStyle.primary, row=1)
-    async def btn_6(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 6)
+    async def btn_radar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.update_menu(interaction, 6) # Page 6: Radar
 
-# ========================================================
-# 🎛️ COMPOSANT UI : CHANGELOG SELECT MENU
-# ========================================================
-class ChangelogSelect(discord.ui.Select):
-    def __init__(self, patches, cog):
-        self.patches = patches
-        self.cog = cog
-        
-        options = []
-        for i, patch in enumerate(patches[:25]): 
-            version = patch.get("version", "Unknown Version")
-            date = patch.get("date", "Unknown Date")
-            
-            emoji = "✨" if i == 0 else "📜"
-            
-            options.append(discord.SelectOption(
-                label=version[:100], 
-                description=f"Deployed on {date}"[:100],
-                value=str(i),
-                emoji=emoji
-            ))
-        
-        super().__init__(
-            placeholder="Select a version to read the patch notes...", 
-            min_values=1, 
-            max_values=1, 
-            options=options
-        )
+    @discord.ui.button(emoji="<:fortresses:1512574700839239892>", style=discord.ButtonStyle.primary, row=1)
+    async def btn_fort(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.update_menu(interaction, 3) # Page 3: Forteresses
 
-    async def callback(self, interaction: discord.Interaction):
-        selected_index = int(self.values[0])
-        selected_patch = self.patches[selected_index]
-        
-        embed = self.cog.build_changelog_embed(selected_patch)
-        await interaction.response.edit_message(embed=embed, view=self.view)
-
-class ChangelogView(discord.ui.View):
-    def __init__(self, patches, cog):
-        super().__init__(timeout=300)
-        self.add_item(ChangelogSelect(patches, cog))
 
 # ==========================================
 # 🤖 MODULE PRINCIPAL (COMMANDES DU BOT)
@@ -123,17 +90,19 @@ class AideCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         
-        self.clr_sommaire    = discord.Color.from_rgb(255, 215, 0)  
-        self.clr_aide        = discord.Color.from_rgb(244, 196, 48) 
-        self.clr_events      = discord.Color.from_rgb(138, 43, 226) 
-        self.clr_forteresses = discord.Color.from_rgb(46, 204, 113) 
-        self.clr_guerre      = discord.Color.from_rgb(178, 34, 34)  
-        self.clr_profils     = discord.Color.from_rgb(0, 139, 139)  
-        self.clr_radar       = discord.Color.from_rgb(26, 43, 76)   
-
-        self.clr_statut    = self.clr_aide
-        self.clr_changelog = self.clr_aide
-        self.clr_contact   = self.clr_aide
+        self.clr_sommaire    = discord.Color.from_rgb(255,220,115) #Gold
+        self.clr_aide        = discord.Color.from_rgb(254,255,184) #Yellow
+        self.clr_events      = discord.Color.from_rgb(141,144,226) #Purple
+        self.clr_forteresses = discord.Color.from_rgb(255,237,193) #Orange
+        self.clr_guerre      = discord.Color.from_rgb(255,202,202) #Red
+        self.clr_profils     = discord.Color.from_rgb(200,229,255) #Blue
+        self.clr_radar       = discord.Color.from_rgb(243,198,242) #Pink
+        self.clr_rank        = discord.Color.from_rgb(196,255,203) #Green
+        self.clr_statut      = discord.Color.from_rgb(255,207,64) #Gold1
+        self.clr_news   = discord.Color.from_rgb(255,191,0) #Gold2
+        self.clr_vote   = discord.Color.from_rgb(232,198,112) #Gold3
+        self.clr_support   = discord.Color.from_rgb(241,213,143) #Gold4
+        self.clr_contact     = discord.Color.from_rgb(247,226,173) #Gold5
 
     # ==========================================
     # 📖 COMMANDE : HELP
@@ -150,12 +119,20 @@ class AideCog(commands.Cog):
         # PAGE 0 : LE SOMMAIRE
         desc0 = t(langue, "aide_p0_desc", version=BOT_VERSION, defaut=f"Bienvenue dans l'interface de navigation tactique.\n*Version du bot : {BOT_VERSION}*\n\n**Parcourez la documentation des modules via les boutons ci-dessous :**")
         embed0 = discord.Embed(title=t(langue, "aide_p0_title", defaut="📖 Manuel d'Utilisation - GGE Assistant"), description=desc0, color=self.clr_sommaire)
+        # 1. Aide (Clé f1)
         embed0.add_field(name=t(langue, "aide_p0_f1_n", defaut="<:parameters:1512573735390154986> 1. Module Aide"), value=t(langue, "aide_p0_f1_v", defaut="Outils système, diagnostics, nouveautés et support."), inline=False)
-        embed0.add_field(name=t(langue, "aide_p0_f2_n", defaut="<:events:1512574699555782666> 2. Module Événements"), value=t(langue, "aide_p0_f2_v", defaut="Liaison de comptes, scores en direct, objectifs, historique sur plusieurs sessions, classement unifié du serveur."), inline=False)
-        embed0.add_field(name=t(langue, "aide_p0_f3_n", defaut="<:fortresses:1512574700839239892> 3. Module Forteresses"), value=t(langue, "aide_p0_f3_v", defaut="Scanners automatisés des forteresses prêtes sur la carte du monde."), inline=False)
-        embed0.add_field(name=t(langue, "aide_p0_f4_n", defaut="<:2_:1512574740915818527> 4. Module Guerre"), value=t(langue, "aide_p0_f4_v", defaut="Analyse tactique joueur et alliance, comparatif entre joueur, ciblage légal et arbitrage RoE."), inline=False)
-        embed0.add_field(name=t(langue, "aide_p0_f5_n", defaut="<:renames:1512574708913143858> 5. Module Profils"), value=t(langue, "aide_p0_f5_v", defaut="Profilages détaillés alliance et joueur, historique et colombe."), inline=False)
+        # 2. Events (Clé f2)
+        embed0.add_field(name=t(langue, "aide_p0_f2_n", defaut="<:events:1512574699555782666> 2. Module Événements"), value=t(langue, "aide_p0_f2_v", defaut="Liaison de comptes, scores en direct, objectifs, calendrier."), inline=False)
+        # 3. Ranks (Clé f7)
+        embed0.add_field(name=t(langue, "aide_p0_f7_n", defaut="<:ranking:1512438311132729525> 3. Module Classements"), value=t(langue, "aide_p0_f7_v", defaut="Tableaux de scores en direct pour tous les événements du jeu."), inline=False)
+        # 4. Profils (Clé f5)
+        embed0.add_field(name=t(langue, "aide_p0_f5_n", defaut="<:renames:1512574708913143858> 4. Module Profils"), value=t(langue, "aide_p0_f5_v", defaut="Profilages détaillés alliance et joueur, historique et colombe."), inline=False)
+        # 5. PvP (Clé f4)
+        embed0.add_field(name=t(langue, "aide_p0_f4_n", defaut="<:2_:1512574740915818527> 5. Module PvP"), value=t(langue, "aide_p0_f4_v", defaut="Analyse tactique joueur et alliance, comparatifs, arbitrage RoE."), inline=False)
+        # 6. Radar (Clé f6)
         embed0.add_field(name=t(langue, "aide_p0_f6_n", defaut="<:icon_analyze:1512573874150314005> 6. Module Radar Personnel"), value=t(langue, "aide_p0_f6_v", defaut="Système de surveillance furtif par alertes automatisées en MP."), inline=False)
+        # 7. Forteresses (Clé f3)
+        embed0.add_field(name=t(langue, "aide_p0_f3_n", defaut="<:fortresses:1512574700839239892> 7. Module Forteresses"), value=t(langue, "aide_p0_f3_v", defaut="Scanners automatisés des forteresses prêtes sur la carte du monde."), inline=False)
         embeds.append(embed0)
 
         # 📑 PAGE 1 : COG AIDE
@@ -163,7 +140,7 @@ class AideCog(commands.Cog):
         embed1.description = t(langue, "aide_p1_f0", defaut="⚠️ **Avant de lancer une commande, vous devez utiliser : \n`/setup scope:👤 For me only (Personal) language: server: `\nSans cela, le bot ne fonctionnera pas** ⚠️")
         embed1.add_field(name="• `/help`", value=t(langue, "aide_p1_f1", defaut="> Affiche le manuel d'utilisation complet du bot."), inline=False)
         embed1.add_field(name="• `/status`", value=t(langue, "aide_p1_f2", defaut="> Vérifie l'état de santé du système (latence, espace disque, statut de l'API)."), inline=False)
-        embed1.add_field(name="• `/changelog`", value=t(langue, "aide_p1_f3", defaut="> Découvre les notes de mise à jour et nouveautés."), inline=False)
+        embed1.add_field(name="• `/support` | `/vote` | `/news`", value=t(langue, "aide_p1_f3", defaut="> Liens utiles pour rejoindre la communauté, voter pour le bot ou lire les mises à jour."), inline=False)
         embed1.add_field(name="• `/contact [message]`", value=t(langue, "aide_p1_f4", defaut="> Permet aux joueurs d'envoyer un rapport ou une suggestion directement au développeur."), inline=False)
         embeds.append(embed1)
 
@@ -190,13 +167,6 @@ class AideCog(commands.Cog):
             "• `/calendar track [alliance_name]`\n> Permet de suivre une alliance sur les événements.\n\n"
             "• `/calendar untrack [alliance_name]`\n> Retire une alliance du suivi événement.\n\n"
             "• `/calendar current`\n> Renvoie les événements ayant lieu ce mois."), inline=False)
-        embed2.add_field(name=t(langue, "aide_p2_g7", defaut="<:ranking:1512438311132729525> Groupe de commandes /rank"), value=t(langue, "aide_p2_v7", defaut=
-            "• `/rank player` / `/rank alliance`\n> Classement global et statistiques (Joueur ou Alliance).\n\n"
-            "• `/rank event [event_name]`\n> Classements des événements (Nomades, Corbeaux, Étrangers, Samouraïs).\n\n"
-            "• `/rank gacha [event_name]`\n> Classements des évents spéciaux (Banquet, Lune Creuse, Flora...)\n\n"
-            "• `/rank league [league_name]`\n> Classements des Ligues (Saison, Ligue du Royaume).\n\n"
-            "• `/rank realms [realm_name]`\n> Classements des mondes (Royaumes Extérieurs, Horizon).\n\n"
-            "• `/rank statistique [stat_name]`\n> Classements globaux (Honneur, Puissance, Pillage, Légendaire)."), inline=False)
         embeds.append(embed2)
 
         # 📑 PAGE 3 : COG FORTERESSES
@@ -206,7 +176,7 @@ class AideCog(commands.Cog):
         embeds.append(embed3)
 
         # 📑 PAGE 4 : COG GUERRE
-        embed4 = discord.Embed(title=t(langue, "aide_p4_title", defaut="<:2_:1512574740915818527> 4. Module Guerre"), color=self.clr_guerre)
+        embed4 = discord.Embed(title=t(langue, "aide_p4_title", defaut="<:2_:1512574740915818527> 4. Module PVP"), color=self.clr_guerre)
         embed4.add_field(name=t(langue, "aide_p4_g1", defaut="<:icon_analyze:1512573874150314005> Scanners & Opérations"), value=t(langue, "aide_p4_v1", defaut=
             "• `/alliance_scanner [alliance_name]`\n> Roster complet en temps réel (Cibles / Ordre des colombes).\n\n"
             "• `/proximity [my_player] [enemy_alliance]`\n> Trouve les ennemis les plus proches de ton château.\n\n"
@@ -242,6 +212,24 @@ class AideCog(commands.Cog):
             "• `/radar alliance add [alliance_name] (reason)`\n> Alerte MP si Entrée, Sortie, Promotion ou Rétrogradation.\n\n"
             "• `/radar alliance remove [alliance_name]`\n> Coupe la surveillance globale sur l'alliance."), inline=False)
         embeds.append(embed6)
+
+        # 📑 PAGE 7 : COG RANK
+        embed7 = discord.Embed(title=t(langue, "aide_p7_title", defaut="<:ranking:1512438311132729525> 7. Module Classements"), color=self.clr_rank)
+        embed7.description = t(langue, "aide_p7_desc", defaut="Affichez les classements mondiaux en direct pour tous les événements du jeu.")
+        embed7.add_field(name=t(langue, "aide_p7_g1", defaut="<:icon_points:1512502439339888820> Événements & Ligues"), value=t(langue, "aide_p7_v1", defaut=
+            "• `/rank event [event_name]`\n> Invasions (Nomades, Samouraïs, Corbeaux, Étrangers) & Bérimond.\n\n"
+            "• `/rank league [league_name]`\n> Saison des festivals, Ligue du Royaume.\n\n"
+            "• `/rank contests [contest_name]`\n> Métamorphes, Noblesse, Guerre des Alliances, Patronage."
+        ), inline=False)
+        embed7.add_field(name=t(langue, "aide_p7_g2", defaut="<:woaicon:1512165794740572292> Statistiques & Gacha"), value=t(langue, "aide_p7_v2", defaut=
+            "• `/rank statistics [stat_name]`\n> Honneur, Puissance, Pillage, Construction, Niv Légendaire.\n\n"
+            "• `/rank gacha [event_name]`\n> Flora, Boule à Neige, Lune Creuse, Sables, Banquet, Minuit."
+        ), inline=False)
+        embed7.add_field(name=t(langue, "aide_p7_g3", defaut="<:outerrealmsicon:1512573734404231329> Alliances & Inter-Serveurs"), value=t(langue, "aide_p7_v3", defaut=
+            "• `/rank realms [realm_name]`\n> Royaumes Extérieurs et Au-delà de l'Horizon.\n\n"
+            "• `/rank alliance [catégorie]`\n> Top des Alliances par événement et statut de groupe."
+        ), inline=False)
+        embeds.append(embed7)
 
         view = MenuAideView(embeds, langue=langue)
         await interaction.followup.send(embed=embeds[0], view=view)
@@ -292,23 +280,11 @@ class AideCog(commands.Cog):
                     latest_scan = max(server_files, key=lambda p: p.stat().st_mtime)
                     mtime_ts = int(latest_scan.stat().st_mtime)
                     last_scan_txt = f"<t:{mtime_ts}:F> (<t:{mtime_ts}:R>)"
-
-            # --- 🧱 Scan Murs ---
-            murs_dir = Path(f"/app/data/murs_scans/{serveur}")
-            last_mur_txt = t(langue, "statut_storage_no_file", defaut="<:error:1512505075220611172> Aucun fichier trouvé")
             
-            if murs_dir.exists():
-                mur_files = list(murs_dir.rglob('*.json'))
-                if mur_files:
-                    latest_mur = max(mur_files, key=lambda p: p.stat().st_mtime)
-                    mtime_mur = int(latest_mur.stat().st_mtime)
-                    last_mur_txt = f"<t:{mtime_mur}:F> (<t:{mtime_mur}:R>)"
-            
-            storage_txt = t(langue, "statut_storage_desc", total=f"{total_gb:.2f}", used=f"{used_gb:.2f}", pct=f"{pourcentage_plein:.1f}", free=f"{free_gb:.2f}", last=last_scan_txt, lastm=last_mur_txt, defaut=(
+            storage_txt = t(langue, "statut_storage_desc", total=f"{total_gb:.2f}", used=f"{used_gb:.2f}", pct=f"{pourcentage_plein:.1f}", free=f"{free_gb:.2f}", last=last_scan_txt, defaut=(
                 f"**Disque Local** : 🟢 Connecté (Lecture/Écriture OK)\n"
                 f"**Espace Utilisé** : `{used_gb:.2f} Go` ({pourcentage_plein:.1f}%)\n"
                 f"**Dernier Scan Serveur** : {last_scan_txt}\n"
-                f"**Dernier Scan Murs** : {last_mur_txt}"
             ))
         except Exception as e:
             storage_txt = t(langue, "statut_storage_err", error=str(e), defaut=f"<:error:1512505075220611172> Erreur de lecture de l'espace de stockage : {e}")
@@ -372,90 +348,70 @@ class AideCog(commands.Cog):
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed)
 
-    # ==========================================
-    # 🛠️ HELPER : GENERATE CHANGELOG EMBED
-    # ==========================================
-    def build_changelog_embed(self, patch: dict) -> discord.Embed:
-        version = patch.get('version', 'Unknown Version')
-        date = patch.get('date', 'Unknown Date')
-        content = patch.get('content', [])
+    # ========================================================
+    # 🆘 COMMANDE : SUPPORT
+    # ========================================================
+    @app_commands.command(name="support", description="Get the invite link to the official support server")
+    async def support(self, interaction: discord.Interaction):
+        langue, _ = await get_server_config(interaction)
 
         embed = discord.Embed(
-            title=f"🚀 Update Notes : {version}",
-            color=discord.Color.blurple(),
-            timestamp=discord.utils.utcnow()
+            title=t(langue, "cmd_support_title", defaut="<:info:1512502828193808537> Support & Communauté"),
+            description=t(langue, "cmd_support_desc", defaut="Vous avez une question, une suggestion ou vous avez trouvé un bug ? Rejoignez le serveur Discord officiel de **GGE Assistant** !"),
+            color=self.clr_support
         )
-        
-        lignes_propres = []
-        raw_lines = content if isinstance(content, list) else content.split('\n')
-        
-        for line in raw_lines:
-            line = line.strip()
-            if not line: continue
-            
-            if not any(line.startswith(c) for c in ['🔹', '•', '-', '*', '🚀', '🛠️', '⚙️', '🟢', '❌', '⚠️', '📈', '✨', '🪙']):
-                lignes_propres.append(f"🔹 {line}")
-            else:
-                lignes_propres.append(line)
 
-        description = "\n\n".join(lignes_propres) if lignes_propres else "*No details provided for this update.*"
-        
-        embed.description = description
-        embed.set_footer(text=f"Patch deployed on {date}")
-        
-        return embed
+        view = discord.ui.View()
+        # 🔗 Remplace par ton vrai lien d'invitation Discord :
+        invite_url = "https://discord.gg/zrrhxp6wDj"
+        btn = discord.ui.Button(label=t(langue, "cmd_support_btn", defaut="Rejoindre le serveur"), url=invite_url, emoji="💬")
+        view.add_item(btn)
 
-    # ==========================================
-    # 🚀 COMMANDE : CHANGELOG
-    # ==========================================
-    @app_commands.command(name="changelog", description="Discover the latest news, fixes and improvements applied to the bot")
-    async def changelog_commande(self, interaction: discord.Interaction):
-        try: await interaction.response.defer(thinking=True)
-        except: return
+        await interaction.response.send_message(embed=embed, view=view)
 
-        logger.info(f"🚀 [Changelog] Consultation par {interaction.user.name}")
+    # ========================================================
+    # ⭐ COMMANDE : VOTE
+    # ========================================================
+    @app_commands.command(name="vote", description="Support the bot by voting on Top.gg")
+    async def vote(self, interaction: discord.Interaction):
+        langue, _ = await get_server_config(interaction)
 
-        # 1. Vérification du fichier
-        if not os.path.exists(CHANGELOG_FILE):
-            embed = discord.Embed(
-                title="🚀 Update Notes (Changelog)", 
-                description="📭 No update notes are available at the moment.",
-                color=discord.Color.red(),
-                timestamp=discord.utils.utcnow()
-            )
-            return await interaction.followup.send(embed=embed)
+        embed = discord.Embed(
+            title=t(langue, "cmd_vote_title", defaut="⭐ Soutenir GGE Assistant"),
+            description=t(langue, "cmd_vote_desc", defaut="Le bot est 100% gratuit ! Le meilleur moyen de soutenir le projet et de l'aider à grandir est de voter sur Top.gg (possible toutes les 12 heures). Merci ! ❤️"),
+            color=self.clr_vote
+        )
 
-        # 2. Lecture sécurisée des données
-        try:
-            with open(CHANGELOG_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                
-            patches = data.get("patches", [])
-            
-            if not patches:
-                embed = discord.Embed(
-                    title="🚀 Update Notes (Changelog)", 
-                    description="📭 The patch history is empty.",
-                    color=discord.Color.orange(),
-                    timestamp=discord.utils.utcnow()
-                )
-                return await interaction.followup.send(embed=embed)
+        view = discord.ui.View()
+        # 🔗 Remplace par l'ID de ton bot pour le lien de vote :
+        bot_id = "1472309793065533493"
+        vote_url = f"https://top.gg/bot/{bot_id}/vote"
+        btn = discord.ui.Button(label=t(langue, "cmd_vote_btn", defaut="Voter sur Top.gg"), url=vote_url, emoji="⭐")
+        view.add_item(btn)
 
-            # 3. Création de la vue et de l'embed par défaut (le plus récent)
-            view = ChangelogView(patches, self)
-            embed_initial = self.build_changelog_embed(patches[0])
+        await interaction.response.send_message(embed=embed, view=view)
 
-            await interaction.followup.send(embed=embed_initial, view=view)
+    # ========================================================
+    # 📰 COMMANDE : NEWS
+    # ========================================================
+    @app_commands.command(name="news", description="Read the latest bot updates and patch notes")
+    async def news(self, interaction: discord.Interaction):
+        langue, _ = await get_server_config(interaction)
 
-        except Exception as e:
-            logger.error(f"❌ Erreur lecture changelog.json : {e}")
-            embed_err = discord.Embed(
-                title="🚀 Update Notes (Changelog)",
-                description="<:error:1512505075220611172> An internal error occurred while reading the patch notes file.",
-                color=discord.Color.red(),
-                timestamp=discord.utils.utcnow()
-            )
-            await interaction.followup.send(embed=embed_err)
+        embed = discord.Embed(
+            title=t(langue, "cmd_news_title", defaut="📰 Dernières Nouveautés"),
+            description=t(langue, "cmd_news_desc", defaut="Découvrez les dernières annonces, les serveurs ajoutés et les nouvelles fonctionnalités du bot directement sur notre page Top.gg !"),
+            color=self.clr_news
+        )
+
+        view = discord.ui.View()
+        # 🔗 Remplace par l'ID de ton bot pour le lien de la page :
+        bot_id = "1472309793065533493"
+        news_url = f"https://top.gg/bot/{bot_id}/announcements" # Le #articles descend la page directement au bon endroit
+        btn = discord.ui.Button(label=t(langue, "cmd_news_btn", defaut="Voir les annonces"), url=news_url, emoji="🗞️")
+        view.add_item(btn)
+
+        await interaction.response.send_message(embed=embed, view=view)
 
     # ==========================================
     # 📩 COMMANDE : CONTACT

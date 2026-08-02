@@ -7,7 +7,7 @@ from discord.ext import commands
 import asyncio
 from pathlib import Path
 
-from utils import CONFIG_DIR, t, get_server_config, MON_ID_DISCORD, load_configuration_async
+from utils import CONFIG_DIR, t, get_server_config, MON_ID_DISCORD, load_configuration_async, clear_config_cache
 
 # ==========================================
 # 💾 SAUVEGARDE CONFIG UTILISATEURS (DMs)
@@ -124,7 +124,7 @@ class ConfigCog(commands.Cog):
             "gge_server": serveur_upper
         }
         await save_users_config(data)
-        
+        clear_config_cache()
         titre = t(language.value, "config_dm_setup_title", defaut="✅ Profil Configuré")
         desc = t(language.value, "config_dm_setup_desc", defaut="Ton profil personnel a bien été configuré !\nLe bot utilisera ces paramètres pour toi, peu importe le serveur Discord où tu te trouves.")
         

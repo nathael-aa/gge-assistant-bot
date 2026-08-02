@@ -7,6 +7,7 @@ data/configs/rival_radar.json
 data/configs/serveurs.json
 data/configs/surveillance.json
 data/configs/users.json
+data/configs/storm_alerts.json
 data/joueurs/
 data/murs_scans/
 data/server_scans/
