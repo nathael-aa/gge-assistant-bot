@@ -81,7 +81,8 @@ class AdminCog(commands.Cog):
         embed.add_field(
             name="🛠️ Code & Emojis",
             value="`!emojis_list` ➔ Liste tous les émojis utilisés dans le code.\n"
-                  "`!emojis_replace [old] [new]` ➔ Remplace un émoji dans tout le code.",
+                  "`!emojis_replace [old] [new]` ➔ Remplace un émoji dans tout le code.\n"
+                  "`!check_emojis` ➔ Détécteur d'émojis fantôme dans le code.",
             inline=False
         )
 
@@ -650,6 +651,95 @@ class AdminCog(commands.Cog):
         
         await msg_wait.delete()
         await ctx.send(embed=embed)
+
+    # ==========================================
+    # 🔍 DÉTECTEUR D'ÉMOJIS FANTÔMES (AVEC EXPORT .TXT)
+    # ==========================================
+    @commands.command(name="check_emojis", hidden=True)
+    async def check_emojis(self, ctx):
+        """[CACHÉE] Vérifie si le bot a accès à tous les émojis du code."""
+        if ctx.author.id != MON_ID_DISCORD: return
+
+        msg_wait = await ctx.send("⏳ **Scanner d'émojis en cours d'analyse...**")
+        
+        # 1. Récupérer tous les IDs des émojis que le bot "voit" actuellement
+        bot_emoji_ids = {str(e.id) for e in self.bot.emojis}
+        
+        # 2. Regex pour capturer les émojis normaux et animés dans le code
+        emoji_regex = re.compile(r"<(a?):([a-zA-Z0-9_]+):(\d+)>")
+        
+        missing_emojis = {}
+        exclude_dirs = [".git", "__pycache__", "venv", "logs", "data"]
+        
+        for root, dirs, files in os.walk(BASE_DIR):
+            dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
+            
+            for file in files:
+                if file.endswith((".py", ".json")):
+                    filepath = os.path.join(root, file)
+                    try:
+                        with open(filepath, "r", encoding="utf-8") as f:
+                            content = f.read()
+                            
+                        matches = emoji_regex.findall(content)
+                        for animated, name, emoji_id in matches:
+                            if emoji_id not in bot_emoji_ids:
+                                full_tag = f"<{animated}:{name}:{emoji_id}>"
+                                if full_tag not in missing_emojis:
+                                    missing_emojis[full_tag] = set()
+                                missing_emojis[full_tag].add(file)
+                    except Exception:
+                        pass
+
+        # 3. Résultat si tout va bien
+        if not missing_emojis:
+            return await msg_wait.edit(content="✅ **Parfait !** Le bot a les droits sur **TOUS** les émojis présents dans le code.")
+
+        # 4. Résultat s'il y a des émojis manquants
+        embed = discord.Embed(
+            title="⚠️ Émojis inaccessibles détectés",
+            description=f"Le bot ne possède pas les droits pour **{len(missing_emojis)}** émojis trouvés dans le code.",
+            color=discord.Color.orange()
+        )
+        
+        # Ajout des 20 premiers dans l'embed pour un aperçu rapide
+        count = 0
+        for emoji_tag, files_set in missing_emojis.items():
+            if count < 20:
+                files_list = ", ".join([f"`{f}`" for f in files_set])
+                embed.add_field(name=f"`{emoji_tag}`", value=f"📁 {files_list}", inline=False)
+                count += 1
+
+        # 5. Gestion de l'export TXT si la limite est dépassée
+        fichier_joint = None
+        if len(missing_emojis) > 20:
+            embed.set_footer(text=f"⚠️ Affichage limité à 20. Consultez le fichier joint pour voir la liste complète.")
+            
+            # Préparation du contenu du fichier texte
+            lignes_rapport = [
+                "==========================================",
+                f"🚨 RAPPORT DES ÉMOJIS FANTÔMES ({len(missing_emojis)} trouvés)",
+                "==========================================\n"
+            ]
+            
+            for tag, files_set in missing_emojis.items():
+                lignes_rapport.append(f"▶ Émoji : {tag}")
+                lignes_rapport.append(f"  Présent dans : {', '.join(files_set)}\n")
+                
+            contenu_complet = "\n".join(lignes_rapport)
+            
+            # Création du fichier directement en mémoire (sans l'écrire sur le disque)
+            buffer = io.BytesIO(contenu_complet.encode('utf-8'))
+            fichier_joint = discord.File(fp=buffer, filename="emojis_fantomes_rapport.txt")
+        else:
+            embed.set_footer(text="Fin du rapport.")
+
+        # 6. Envoi final
+        await msg_wait.delete()
+        if fichier_joint:
+            await ctx.send(embed=embed, file=fichier_joint)
+        else:
+            await ctx.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(AdminCog(bot))
