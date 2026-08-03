@@ -662,8 +662,17 @@ class AdminCog(commands.Cog):
 
         msg_wait = await ctx.send("⏳ **Scanner d'émojis en cours d'analyse...**")
         
-        # 1. Récupérer tous les IDs des émojis que le bot "voit" actuellement
+        # 1. Récupérer tous les IDs des émojis (Serveurs + Application)
         bot_emoji_ids = {str(e.id) for e in self.bot.emojis}
+        
+        try:
+            # Récupération des émojis uploadés sur le portail développeur
+            app_emojis = await self.bot.fetch_application_emojis()
+            for e in app_emojis:
+                bot_emoji_ids.add(str(e.id))
+        except Exception as e:
+            # En cas d'erreur de connexion à l'API, on l'affiche dans la console
+            print(f"Impossible de récupérer les émojis d'application : {e}")
         
         # 2. Regex pour capturer les émojis normaux et animés dans le code
         emoji_regex = re.compile(r"<(a?):([a-zA-Z0-9_]+):(\d+)>")
