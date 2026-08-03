@@ -102,24 +102,26 @@ class HistoriqueView(discord.ui.View):
         self._update_navigation()
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][0], view=self)
 
-    @discord.ui.button(emoji="<:renames:1512574708913143858>", row=0)
+    # Remplacement des émojis personnalisés par des émojis Unicode
+    @discord.ui.button(emoji="🏷️", row=0)
     async def btn_pseudo(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "pseudo")
 
-    @discord.ui.button(emoji="<:alliance_icon:1512574688415580242>", row=0)
+    @discord.ui.button(emoji="🛡️", row=0)
     async def btn_alliance(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "alliance")
 
-    @discord.ui.button(emoji="<:compass:1512504625364729987>", row=0)
+    @discord.ui.button(emoji="🧭", row=0)
     async def btn_position(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "position")
 
-    @discord.ui.button(label="<:lastpage:1533554126984581283>", style=discord.ButtonStyle.blurple, row=1)
+    # Correction : utilisation de "emoji=" au lieu de "label=" pour les flèches
+    @discord.ui.button(emoji="◀️", style=discord.ButtonStyle.blurple, row=1)
     async def btn_prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = max(0, self.current_page - 1)
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][self.current_page], view=self)
 
-    @discord.ui.button(label="<:nextpage:1533554128230420590>", style=discord.ButtonStyle.blurple, row=1)
+    @discord.ui.button(emoji="▶️", style=discord.ButtonStyle.blurple, row=1)
     async def btn_next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = min(len(self.embeds_dict[self.current_cat]) - 1, self.current_page + 1)
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][self.current_page], view=self)
@@ -817,7 +819,7 @@ class ProfilsCog(commands.Cog):
                 elif cat["key"] == "position":
                     x_old, y_old = item.get('position_x_old'), item.get('position_y_old')
                     x_new, y_new = item.get('position_x_new'), item.get('position_y_new')
-                    lines.append(f"<:UyuPdm57K4WjWIFbWCTzgOUhP0hiydbK:1512574624112578580> {d} : `{x_old}:{y_old}` ➔ `{x_new}:{y_new}`")
+                    lines.append(f"<:moove:1512574624112578580> {d} : `{x_old}:{y_old}` ➔ `{x_new}:{y_new}`")
 
             if lines:
                 has_any_data = True
