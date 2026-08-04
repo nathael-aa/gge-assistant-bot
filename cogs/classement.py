@@ -668,7 +668,7 @@ class ClassementCog(commands.Cog):
             "realms_finished": {"name": t(langue, "cal_ev_realms_finished", defaut="Royaumes Extérieurs (Terminé)"), "emoji": "<:outerrealmsicon:1512573734404231329>"},
             "horizon": {"name": t(langue, "cal_ev_horizon", defaut="Au-delà de l'Horizon"), "emoji": "<:bth:1512574690441302026>"}
         }
-        ev_info = EVENT_MAP.get(evenement, {"name": evenement.capitalize(), "emoji": "<:events:1512574699555782666>"})
+        ev_info = EVENT_MAP.get(evenement, {"name": evenement.capitalize(), "emoji": "<:events4:1532431480398286878>"})
         
         cache = await get_cached_data(serveur_local)
         local_data = cache.get('players_data', {})

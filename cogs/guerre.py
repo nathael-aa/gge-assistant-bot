@@ -277,7 +277,7 @@ class GuerreCog(commands.Cog):
             for i in range(0, len(lignes_cibles), chunk_size):
                 chunk = lignes_cibles[i:i+chunk_size]
                 num_page = (i // chunk_size) + 1
-                embed = await creer_base_embed(t(langue, "guerre_scan_page_cib", cur=num_page, tot=nb_pages_cib, defaut=f"<:squarecastle:1512573757426892911> Cibles Libres (Page {num_page}/{nb_pages_cib})"))
+                embed = await creer_base_embed(t(langue, "guerre_scan_page_cib", cur=num_page, tot=nb_pages_cib, defaut=f"<:castle1:1512573817892110647> Cibles Libres (Page {num_page}/{nb_pages_cib})"))
                 embed.add_field(name=t(langue, "guerre_scan_field_cib", defaut="Cibles triées par Puissance"), value="\n".join(chunk), inline=False)
                 embeds.append(embed)
 
@@ -1289,7 +1289,7 @@ class GuerreCog(commands.Cog):
         lbl_f2 = t(langue, "guerre_comp_f2", defaut="<:2_:1512574740915818527> Axe Militaire & Robustesse")
         embed.add_field(name=lbl_f2, value=f"```\n{build_row(lbl_puiss_s, format_num(p1['pp']), pp_1, format_num(p2['pp']), pp_2)}\n{build_row(lbl_inc_s, p1['feux_txt'], '', p2['feux_txt'], '')}\n```", inline=False)
 
-        lbl_f3 = t(langue, "guerre_comp_f3", defaut="<:events:1512574699555782666> Suivi des Événements (Moy. 3 éd.)")
+        lbl_f3 = t(langue, "guerre_comp_f3", defaut="<:events4:1532431480398286878> Suivi des Événements (Moy. 3 éd.)")
         embed.add_field(name=lbl_f3, value=f"```\n{build_row(lbl_nomad_s, format_num(p1['event_averages']['nomades']), nom_1, format_num(p2['event_averages']['nomades']), nom_2)}\n{build_row(lbl_samou_s, format_num(p1['event_averages']['samourais']), sam_1, format_num(p2['event_averages']['samourais']), sam_2)}\n{build_row(lbl_corb_s, format_num(p1['event_averages']['corbeaux']), cor_1, format_num(p2['event_averages']['corbeaux']), cor_2)}\n{build_row(lbl_etr_s, format_num(p1['event_averages']['etrangers']), et_1, format_num(p2['event_averages']['etrangers']), et_2)}\n```", inline=False)
 
         lbl_f4 = t(langue, "guerre_comp_f4", defaut="<:icon_points:1512502439339888820> Activité & Vigilance")

@@ -202,7 +202,7 @@ class ProfilsCog(commands.Cog):
             alliance_display = f"**{alliance_name}**{role_txt}" if alliance_name != txt_sans_alliance else f"**{txt_sans_alliance}**"
 
             outposts = data.get('outposts', [])
-            type_emojis = {1: "<:squarecastle:1512573757426892911>", 3: "<:squarecapital:1512573756243972237>", 4: "<:squareoutpost:1512573761583579228>", 10: "<:date:1512573832375042340>", 12: "<:castle12:1521949211850182686>", 22: "<:castle22:1512573821520183347>", 23: "<:castle23:1512573823118086174>", 24: "<:aquamarine_16:1512573724786950346>", 26: "<:castle26:1512573824086835280>"}
+            type_emojis = {1: "<:castle1:1512573817892110647>", 3: "<:castle3:1512573819313979544>", 4: "<:castle4:1512573820752498839>", 10: "<:date:1512573832375042340>", 12: "<:castle12:1521949211850182686>", 22: "<:castle22:1512573821520183347>", 23: "<:castle23:1512573823118086174>", 24: "<:aquamarine_16:1512573724786950346>", 26: "<:castle26:1512573824086835280>"}
             sort_priority = {1: 0, 4: 1, 12: 2, 3: 3, 22: 4, 23: 5, 24: 7, 26: 6}
             
             if outposts:
@@ -232,7 +232,7 @@ class ProfilsCog(commands.Cog):
 
             info_val = (
                 f"<:lvl:1512571152524906596> **Niveau :** {data.get('level', 0)} (Lég. {data.get('legendary_level', 0)})\n"
-                f"<:renames:1512574708913143858> **ID Joueur :** `{data.get('player_id', unk_id)}`\n"
+                f"<:listitem:1512573892596858960> **ID Joueur :** `{data.get('player_id', unk_id)}`\n"
                 f"{status_txt}"
             )
             embed.add_field(name=info_title, value=info_val, inline=True)
@@ -785,7 +785,7 @@ class ProfilsCog(commands.Cog):
         lines_per_page = 12
 
         categories = [
-            {"key": "pseudo", "title": t(langue, "prof_hist_cat_pseudo", defaut="Historique des Pseudos"), "emoji": "<:renames:1512574708913143858>", "json_key": "updates"},
+            {"key": "pseudo", "title": t(langue, "prof_hist_cat_pseudo", defaut="Historique des Pseudos"), "emoji": "<:listitem:1512573892596858960>", "json_key": "updates"},
             {"key": "alliance", "title": t(langue, "prof_hist_cat_alliance", defaut="Historique des Alliances"), "emoji": "<:alliance_icon:1512574688415580242>", "json_key": "updates"},
             {"key": "position", "title": t(langue, "prof_hist_cat_position", defaut="Historique des Positions"), "emoji": "<:compass:1512504625364729987>", "json_key": "movements"}
         ]

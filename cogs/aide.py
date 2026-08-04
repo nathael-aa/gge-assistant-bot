@@ -122,11 +122,11 @@ class AideCog(commands.Cog):
         # 1. Aide (Clé f1)
         embed0.add_field(name=t(langue, "aide_p0_f1_n", defaut="<:parameters:1512573735390154986> 1. Module Aide"), value=t(langue, "aide_p0_f1_v", defaut="Outils système, diagnostics, nouveautés et support."), inline=False)
         # 2. Events (Clé f2)
-        embed0.add_field(name=t(langue, "aide_p0_f2_n", defaut="<:events:1512574699555782666> 2. Module Événements"), value=t(langue, "aide_p0_f2_v", defaut="Liaison de comptes, scores en direct, objectifs, calendrier."), inline=False)
+        embed0.add_field(name=t(langue, "aide_p0_f2_n", defaut="<:events4:1532431480398286878> 2. Module Événements"), value=t(langue, "aide_p0_f2_v", defaut="Liaison de comptes, scores en direct, objectifs, calendrier."), inline=False)
         # 3. Ranks (Clé f7)
         embed0.add_field(name=t(langue, "aide_p0_f7_n", defaut="<:ranking:1512438311132729525> 3. Module Classements"), value=t(langue, "aide_p0_f7_v", defaut="Tableaux de scores en direct pour tous les événements du jeu."), inline=False)
         # 4. Profils (Clé f5)
-        embed0.add_field(name=t(langue, "aide_p0_f5_n", defaut="<:renames:1512574708913143858> 4. Module Profils"), value=t(langue, "aide_p0_f5_v", defaut="Profilages détaillés alliance et joueur, historique et colombe."), inline=False)
+        embed0.add_field(name=t(langue, "aide_p0_f5_n", defaut="<:listitem:1512573892596858960> 4. Module Profils"), value=t(langue, "aide_p0_f5_v", defaut="Profilages détaillés alliance et joueur, historique et colombe."), inline=False)
         # 5. PvP (Clé f4)
         embed0.add_field(name=t(langue, "aide_p0_f4_n", defaut="<:2_:1512574740915818527> 5. Module PvP"), value=t(langue, "aide_p0_f4_v", defaut="Analyse tactique joueur et alliance, comparatifs, arbitrage RoE."), inline=False)
         # 6. Radar (Clé f6)
@@ -145,7 +145,7 @@ class AideCog(commands.Cog):
         embeds.append(embed1)
 
         # 📑 PAGE 2 : COG EVENTS
-        embed2 = discord.Embed(title=t(langue, "aide_p2_title", defaut="<:events:1512574699555782666> 2. Module Événements"), color=self.clr_events)
+        embed2 = discord.Embed(title=t(langue, "aide_p2_title", defaut="<:events4:1532431480398286878> 2. Module Événements"), color=self.clr_events)
         embed2.description = t(langue, "aide_p2_desc", defaut="Historique des résultats aux évents, informations serveur et classements.")
         embed2.add_field(name=t(langue, "aide_p2_g1", defaut="<:cartography:1512574691766964386> Configuration & Général"), value=t(langue, "aide_p2_v1", defaut=
             "• `/link_account [player]`\n> Lie un compte Discord à un pseudo de jeu GGE.\n\n"
@@ -162,7 +162,7 @@ class AideCog(commands.Cog):
         embed2.add_field(name=t(langue, "aide_p2_g5", defaut="\<:attaque:1512570903886692474> Groupe de commandes /rival"), value=t(langue, "aide_p2_v5", defaut=
             "• `/rival start [event_name] [threshold]` / `/rival stop`\n> Active ou désactive le radar secret en MP.\n\n"
             "• `/rival add [players]` / `/rival list`\n> Gère tes cibles de rival en direct."), inline=False)
-        embed2.add_field(name=t(langue, "aide_p2_g6", defaut="<:events:1512574699555782666> Groupe de commandes Calendar"), value=t(langue, "aide_p2_v6", defaut=
+        embed2.add_field(name=t(langue, "aide_p2_g6", defaut="<:events4:1532431480398286878> Groupe de commandes Calendar"), value=t(langue, "aide_p2_v6", defaut=
             "• `/calendar setup [channel]`\n> Permets de choisir le channel ou seront envoyés les informations d'événements.\n\n"
             "• `/calendar track [alliance_name]`\n> Permet de suivre une alliance sur les événements.\n\n"
             "• `/calendar untrack [alliance_name]`\n> Retire une alliance du suivi événement.\n\n"
@@ -192,7 +192,7 @@ class AideCog(commands.Cog):
         embeds.append(embed4)
 
         # 📑 PAGE 5 : COG PROFILS
-        embed5 = discord.Embed(title=t(langue, "aide_p5_title", defaut="<:renames:1512574708913143858> 5. Module Profils"), color=self.clr_profils)
+        embed5 = discord.Embed(title=t(langue, "aide_p5_title", defaut="<:listitem:1512573892596858960> 5. Module Profils"), color=self.clr_profils)
         embed5.add_field(name=t(langue, "aide_p5_g1", defaut="<:Le_Hraut_Lumbricus_2:1512573890298380388> Renseignement Tactique"), value=t(langue, "aide_p5_v1", defaut=
             "• `/player [name]`\n> Fiche complète d'un joueur (Niveau, PP, Positions, Châteaux).\n\n"
             "• `/alliance [name]`\n> Profil détaillé de l'alliance et roster complet paginé.\n\n"

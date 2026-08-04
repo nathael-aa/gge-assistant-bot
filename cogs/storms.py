@@ -172,7 +172,7 @@ class StormsCog(commands.Cog):
             embeds = []
             items_par_page = 15
             total_pages = (len(forts_filtres) - 1) // items_par_page + 1
-            titre_base = t(langue, "cmd_storm_forts_title", defaut="<:aquamarineforts:1533175610636243024> Available Storm Forts")
+            titre_base = t(langue, "cmd_storm_forts_title", defaut="<:aquamarineforts:1512162154890133506> Available Storm Forts")
             
             # Petit ajout : Affichage de la date d'actualisation
             last_update = f"\n*<:time:1512573766096654458> Last refreshed: <t:{int(datetime.now().timestamp())}:T>*"
@@ -459,7 +459,7 @@ class StormsCog(commands.Cog):
         desc = (
             f"**Last Scan:** {scan_str}\n"
             f"**Covered Radius:** {data.get('scan_radius', 0)} tiles\n\n"
-            f"<:aquamarineforts:1533175610636243024> **Tracked Forts:** {data.get('forts_count', 0):,}\n"
+            f"<:aquamarineforts:1512162154890133506> **Tracked Forts:** {data.get('forts_count', 0):,}\n"
             f"<:aquamarineiles:1512162072249765908> **Tracked Isles:** {data.get('isles_count', 0):,}"
         )
         
@@ -507,7 +507,7 @@ class StormsCog(commands.Cog):
         # -------------------------------
 
         embed = discord.Embed(
-            title=t(langue, "cmd_storm_setup_title", defaut="<:setup:14457223> Storm Islands Alerts Configured!"),
+            title=t(langue, "cmd_storm_setup_title", defaut="<:greencirclebullet:1533440867598340186> Storm Islands Alerts Configured!"),
             color=self.clr_setup,
             description=f"Notifications will be sent in {channel.mention}."
         )
