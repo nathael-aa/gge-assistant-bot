@@ -13,7 +13,7 @@ lancer_scan() {
     local script_path=$1
     echo "🚀 Lancement de $script_path..."
 
-    docker exec gge-assistant python3 "$script_path"
+    /usr/bin/docker exec gge-assistant python3 "$script_path"
 }
 
 lancer_scan "scanners/server_scanner.py"

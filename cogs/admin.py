@@ -81,8 +81,9 @@ class AdminCog(commands.Cog):
         embed.add_field(
             name="🛠️ Code & Emojis",
             value="`!emojis_list` ➔ Liste tous les émojis utilisés dans le code.\n"
-                  "`!emojis_replace [old] [new]` ➔ Remplace un émoji dans tout le code.\n"
-                  "`!check_emojis` ➔ Détécteur d'émojis fantôme dans le code.",
+                  "`!eplace_raw [old] [new]` ➔ Remplace un émoji dans tout le code.\n"
+                  "`!check_emojis` ➔ Détécteur d'émojis fantôme dans le code.\n"
+                  "`!check_bad_emojis` ➔ Détécteur d'émojis éronnés dans le code.",
             inline=False
         )
 
@@ -749,6 +750,74 @@ class AdminCog(commands.Cog):
             await ctx.send(embed=embed, file=fichier_joint)
         else:
             await ctx.send(embed=embed)
+
+    # ==========================================
+    # 🔍 DÉTECTEUR D'ERREURS DE SYNTAXE (ÉMOJIS)
+    # ==========================================
+    @commands.command(name="check_bad_emojis", hidden=True)
+    async def check_bad_emojis(self, ctx):
+        """[CACHÉE] Traque les erreurs de syntaxe comme <<: ou >ID>."""
+        if ctx.author.id != MON_ID_DISCORD: return
+
+        msg_wait = await ctx.send("🔍 **Recherche des émojis malformés en cours...**")
+        
+        # Nos cibles :
+        # 1. Un double chevron entrant (ex: <<:events4:12345>)
+        # 2. Une fin d'émoji suivie de chiffres puis d'un chevron (ex: >123456789>)
+        # 3. Un double chevron sortant (ex: <:events4:12345>>)
+        bad_patterns = [
+            r"<<a?:[a-zA-Z0-9_]+:\d+>", 
+            r">\d+>",
+            r"<a?:[a-zA-Z0-9_]+:\d+>>"
+        ]
+        regexes = [re.compile(p) for p in bad_patterns]
+        
+        erreurs_trouvees = {}
+        exclude_dirs = [".git", "__pycache__", "venv", "logs", "data"]
+        
+        for root, dirs, files in os.walk(BASE_DIR):
+            dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
+            
+            for file in files:
+                if file.endswith((".py", ".json")):
+                    filepath = os.path.join(root, file)
+                    try:
+                        with open(filepath, "r", encoding="utf-8") as f:
+                            lines = f.readlines()
+                            
+                        # On lit ligne par ligne pour te dire exactement où chercher
+                        for i, line in enumerate(lines):
+                            for regex in regexes:
+                                matches = regex.findall(line)
+                                if matches:
+                                    if file not in erreurs_trouvees:
+                                        erreurs_trouvees[file] = []
+                                    # On note le numéro de la ligne et l'erreur exacte
+                                    erreurs_trouvees[file].append(f"Ligne {i+1} : `{matches[0]}`")
+                    except Exception:
+                        pass
+
+        # Si le code est propre
+        if not erreurs_trouvees:
+            return await msg_wait.edit(content="✅ **Code 100% propre !** Aucune balise malformée (`<<:` ou `>>` ou `>ID>`) n'a été détectée.")
+
+        # S'il y a des erreurs
+        embed = discord.Embed(
+            title="⚠️ Syntaxe d'émoji cassée",
+            description="J'ai trouvé des restes de mauvais copier-coller dans ces fichiers :",
+            color=discord.Color.red()
+        )
+        
+        for file, erreurs in erreurs_trouvees.items():
+            # On affiche les 10 premières erreurs par fichier pour ne pas surcharger l'embed
+            valeur = "\n".join(erreurs[:10])
+            if len(erreurs) > 10:
+                valeur += f"\n*... et {len(erreurs) - 10} autres erreurs.*"
+                
+            embed.add_field(name=f"📁 `{file}`", value=valeur, inline=False)
+            
+        await msg_wait.delete()
+        await ctx.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(AdminCog(bot))
