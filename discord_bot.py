@@ -154,6 +154,7 @@ class GGEAssistantBot(commands.Bot):
             "cogs.guerre", 
             "cogs.profils", 
             "cogs.radar",
+            "cogs.scan_server",
             "cogs.storms",
         ]
         for ext in extensions:

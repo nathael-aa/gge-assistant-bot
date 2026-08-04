@@ -302,22 +302,24 @@ class AdminCog(commands.Cog):
     # ==========================================
     @commands.command(name="scan_manuel", hidden=True)
     async def scan_manuel(self, ctx):
-        """[CACHÉE] !scan_manuel : Lance manuellement les scanners Python."""
+        """[CACHÉE] !scan_manuel : Lance manuellement les scanners."""
         if ctx.author.id != MON_ID_DISCORD: return
 
-        msg = await ctx.send("⏳ **Lancement manuel des scanners...** (Scan Serveur puis Murs)")
+        msg = await ctx.send("⏳ **Lancement manuel des scanners...** (Scan Serveur asynchrone)")
 
         try:
-            # 1. Scanner de serveurs
             logger.info(f"🚀 Lancement manuel du ServerScanner par {ctx.author.name}")
-            process_serveur = await asyncio.create_subprocess_exec(
-                "python3", "/app/scanners/server_scanner.py"
-            )
-            await process_serveur.wait()
+            
+            # 1. On va chercher le cog ScanCog qui est chargé dans le bot
+            scan_server = self.bot.get_cog("ScanCog")
+            
+            if scan_server is None:
+                return await ctx.send("❌ **Erreur :** Le module `ScanCog` n'est pas chargé dans le bot.")
 
-            if process_serveur.returncode != 0:
-                await ctx.send("❌ **Erreur dans le Scanner Serveur.** Scan des murs annulé.")
-                return
+            # 2. On lance la fonction, mais cette fois en utilisant scan_server au lieu de self !
+            await scan_server.daily_scan.coro(scan_server)
+            
+            await ctx.send("✅ **Tous les scans manuels sont terminés avec succès !**")
                 
         except Exception as e:
             logger.error(f"❌ Erreur critique scan manuel : {e}")

@@ -1,0 +1,218 @@
+import discord
+from discord.ext import commands, tasks
+import aiohttp
+import asyncio
+import json
+from datetime import datetime, time, timezone
+from pathlib import Path
+import os
+import logging
+import traceback
+
+logger = logging.getLogger("ServerScanner")
+
+class ScanCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.api_url = "https://api.gge-tracker.com/api/v1"
+        data_path = os.getenv('DATA_PATH', '/app/data')
+        self.base_output_dir = Path(data_path) / 'server_scans'
+        self.configuration_path = Path(data_path) / 'configs' / 'configuration.json'
+        
+        self.headers = {
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) GGE-Assistant/3.0 (Async)"
+        }
+        self.webhook_url = "https://discord.com/api/webhooks/1525853187280474222/Y4fycCy0IW019tZCMhGOdJzS1vqg7wSYn1ZEhtVO2o9Atuwr8ek-zieIsN9kG86Ndlcq"
+        
+        # Démarrage de la tâche planifiée (ex: tous les jours à 03:00 UTC)
+        self.daily_scan.start()
+
+    def cog_unload(self):
+        self.daily_scan.cancel()
+
+    async def send_discord_alert(self, title, description, color=16711680):
+        """Envoie une notification sur Discord de manière asynchrone"""
+        if not self.webhook_url: return
+        
+        payload = {
+            "embeds": [{
+                "title": title,
+                "description": description,
+                "color": color,
+                "timestamp": datetime.utcnow().isoformat()
+            }]
+        }
+        try:
+            async with aiohttp.ClientSession() as session:
+                await session.post(self.webhook_url, json=payload)
+        except Exception as e:
+            logger.error(f"❌ Impossible d'envoyer l'alerte Discord : {e}")
+
+    def get_active_servers(self):
+        """Récupère la liste des serveurs depuis le fichier de config"""
+        active_servers = set()
+        if self.configuration_path.exists():
+            try:
+                with open(self.configuration_path, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                servers_status = config_data.get("active_servers", {})
+                for srv_name, is_active in servers_status.items():
+                    if is_active is True:
+                        active_servers.add(srv_name.upper())
+            except Exception as e:
+                logger.error(f"❌ Erreur lecture configuration.json : {e}")
+
+        if not active_servers:
+            logger.warning("⚠️ Aucun serveur actif trouvé. Fallback sur E4K_FR1.")
+            active_servers.add("E4K_FR1")
+        return list(active_servers)
+
+    async def fetch_page(self, session, server, page, semaphore, max_retries=3):
+        """Télécharge UNE page avec gestion des erreurs 429 et limite de requêtes simultanées"""
+        async with semaphore:  # Bloque si on dépasse le nombre de requêtes simultanées
+            url = f"{self.api_url}/players"
+            params = {
+                "limit": 100, "page": page, "banFilter": 0, "allianceFilter": -1,
+                "protectionFilter": -1, "inactiveFilter": 1, "kingdomFilter": 999,
+                "orderBy": "might_current", "orderType": "DESC"
+            }
+            headers = self.headers.copy()
+            headers["gge-server"] = server
+
+            for attempt in range(max_retries):
+                try:
+                    async with session.get(url, headers=headers, params=params, timeout=15) as response:
+                        if response.status == 200:
+                            return await response.json()
+                        elif response.status == 429: # Too Many Requests
+                            wait_time = 5 * (attempt + 1)
+                            logger.warning(f"⚠️ 429 sur {server} (Page {page}). Pause de {wait_time}s...")
+                            await asyncio.sleep(wait_time)
+                        else:
+                            logger.error(f"❌ Erreur {response.status} sur {server} (Page {page}).")
+                            await asyncio.sleep(2)
+                except Exception as e:
+                    logger.error(f"❌ Exception réseau sur {server} (Page {page}): {e}")
+                    await asyncio.sleep(2)
+            
+            return None # Échec après X tentatives
+
+    async def scan_server(self, session, server):
+        """Scanne un serveur complet de manière optimisée"""
+        logger.info(f"🔍 DÉMARRAGE : {server}")
+        start_time = asyncio.get_event_loop().time()
+        
+        # 1. Requête initiale pour avoir le total des pages
+        # Le sémaphore 1 assure qu'on ne fait que cette requête pour l'instant
+        first_page_data = await self.fetch_page(session, server, 1, asyncio.Semaphore(1))
+        
+        if not first_page_data or not first_page_data.get('players'):
+            logger.error(f"❌ Aucun joueur trouvé ou erreur fatale pour {server}.")
+            return None
+
+        total_pages = first_page_data.get('pagination', {}).get('total_pages', 1)
+        total_items = first_page_data.get('pagination', {}).get('total_items_count', '?')
+        logger.info(f"📊 {server} : {total_items} joueurs sur {total_pages} pages.")
+
+        all_players = {}
+        
+        # Fonction utilitaire pour parser les joueurs
+        def parse_players(data_json):
+            for p in data_json.get('players', []):
+                name = p.get('player_name')
+                if not name: continue
+                alliance_raw = p.get('alliance_name') or 'Sans alliance'
+                if alliance_raw.startswith('[') and alliance_raw.endswith(']'):
+                    alliance_raw = alliance_raw.strip('[]')
+                all_players[name] = {
+                    'player_id': p.get('player_id'), 'rank': 0, 'score': 0, 'category': 1,
+                    'alliance': alliance_raw, 'alliance_id': p.get('alliance_id'),
+                    'level': p.get('level', 0), 'legendary_level': p.get('legendary_level', 0),
+                    'honor': p.get('honor', 0), 'victory_points': 0,
+                    'main_points': p.get('might_current', 0), 'structures': []
+                }
+
+        # Ajouter la page 1
+        parse_players(first_page_data)
+
+        # 2. Lancement des requêtes concourantes pour toutes les autres pages
+        if total_pages > 1:
+            # SEMAPHORE : Limite à 8 requêtes SIMULTANÉES pour ne pas fâcher l'API
+            semaphore = asyncio.Semaphore(8) 
+            tasks = []
+            
+            for page in range(2, total_pages + 1):
+                tasks.append(self.fetch_page(session, server, page, semaphore))
+            
+            # On exécute toutes les requêtes d'un coup (le sémaphore gère le flux)
+            results = await asyncio.gather(*tasks)
+            
+            for res in results:
+                if res: parse_players(res)
+
+        duration = round(asyncio.get_event_loop().time() - start_time, 2)
+        logger.info(f"✅ FINI : {server} - {len(all_players)} joueurs récupérés en {duration}s")
+        return all_players, duration
+
+    def save_results(self, players_data, duration, serveur):
+        """Sauvegarde les résultats en JSON (Fonction bloquante isolée)"""
+        today = datetime.now().strftime("%Y-%m-%d")
+        daily_dir = self.base_output_dir / serveur / today
+        daily_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%H%M%S")
+        filepath = daily_dir / f"server_{timestamp}.json"
+        
+        alliances = set(p['alliance'] for p in players_data.values() if p['alliance'] != 'Sans alliance')
+        
+        output_data = {
+            'scan_date': datetime.now().isoformat(), 'scan_duration': duration,
+            'server': serveur, 'total_players': len(players_data),
+            'stats': {'total_alliances': len(alliances), 'total_capitals': 0, 'total_outposts': 0, 'total_castles': 0},
+            'players': players_data
+        }
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(output_data, f, indent=2, ensure_ascii=False)
+            
+        return filepath
+
+    # Lancement tous les jours à 01h00 UTC
+    @tasks.loop(time=time(hour=1, minute=0, tzinfo=timezone.utc))
+    async def daily_scan(self):
+        logger.info("======================================================")
+        logger.info("🌍 DÉMARRAGE DE LA ROUTINE MULTI-SERVEURS (ASYNC)")
+        logger.info("======================================================")
+        
+        try:
+            servers_to_scan = self.get_active_servers()
+            
+            # Ouverture d'une session unique pour TOUT le scan (meilleures performances TCP)
+            async with aiohttp.ClientSession() as session:
+                for srv in servers_to_scan:
+                    result = await self.scan_server(session, srv)
+                    if result:
+                        players, duration = result
+                        # Comme l'écriture de gros JSON peut prendre quelques millisecondes, 
+                        # on la lance dans un thread séparé pour ne pas figer le bot
+                        await asyncio.to_thread(self.save_results, players, duration, srv)
+                    
+                    # Petite pause de 2 secondes entre chaque serveur au lieu de 15 !
+                    await asyncio.sleep(2)
+                    
+            await self.send_discord_alert("✅ Multi-Scan Terminé", f"Tous les serveurs actifs ({len(servers_to_scan)}) ont été scannés à la vitesse de l'éclair !", 65280)
+
+        except Exception as e:
+            logger.error(f"🚨 CRASH FATAL DU SCANNER : {e}")
+            logger.error(traceback.format_exc())
+            await self.send_discord_alert("🚨 CRASH DU SCANNER", f"La boucle asynchrone a planté :\n```py\n{e}\n```", 16711680)
+
+    @daily_scan.before_loop
+    async def before_daily_scan(self):
+        """Attend que le bot soit connecté avant de lancer les crons"""
+        await self.bot.wait_until_ready()
+
+# Fonction d'intégration pour ton bot principal
+async def setup(bot):
+    await bot.add_cog(ScanCog(bot))
