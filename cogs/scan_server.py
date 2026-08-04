@@ -68,9 +68,14 @@ class ScanCog(commands.Cog):
             active_servers.add("E4K_FR1")
         return list(active_servers)
 
-    async def fetch_page(self, session, server, page, semaphore, max_retries=3):
+    async def fetch_page(self, session, server, page, semaphore, max_retries=4):
         """Télécharge UNE page avec gestion des erreurs 429 et limite de requêtes simultanées"""
         async with semaphore:  # Bloque si on dépasse le nombre de requêtes simultanées
+            
+            # 🚦 LE SECRET EST ICI : Un micro-délai systématique avant de tirer.
+            # Ça permet aux commandes des joueurs de s'intercaler sans être bloquées.
+            await asyncio.sleep(0.5)
+            
             url = f"{self.api_url}/players"
             params = {
                 "limit": 100, "page": page, "banFilter": 0, "allianceFilter": -1,
@@ -86,7 +91,8 @@ class ScanCog(commands.Cog):
                         if response.status == 200:
                             return await response.json()
                         elif response.status == 429: # Too Many Requests
-                            wait_time = 5 * (attempt + 1)
+                            # Si on se fait bloquer, on attend plus longtemps (10s, 20s...)
+                            wait_time = 10 * (attempt + 1)
                             logger.warning(f"⚠️ 429 sur {server} (Page {page}). Pause de {wait_time}s...")
                             await asyncio.sleep(wait_time)
                         else:
@@ -103,8 +109,6 @@ class ScanCog(commands.Cog):
         logger.info(f"🔍 DÉMARRAGE : {server}")
         start_time = asyncio.get_event_loop().time()
         
-        # 1. Requête initiale pour avoir le total des pages
-        # Le sémaphore 1 assure qu'on ne fait que cette requête pour l'instant
         first_page_data = await self.fetch_page(session, server, 1, asyncio.Semaphore(1))
         
         if not first_page_data or not first_page_data.get('players'):
@@ -117,7 +121,6 @@ class ScanCog(commands.Cog):
 
         all_players = {}
         
-        # Fonction utilitaire pour parser les joueurs
         def parse_players(data_json):
             for p in data_json.get('players', []):
                 name = p.get('player_name')
@@ -133,19 +136,16 @@ class ScanCog(commands.Cog):
                     'main_points': p.get('might_current', 0), 'structures': []
                 }
 
-        # Ajouter la page 1
         parse_players(first_page_data)
 
-        # 2. Lancement des requêtes concourantes pour toutes les autres pages
         if total_pages > 1:
-            # SEMAPHORE : Limite à 8 requêtes SIMULTANÉES pour ne pas fâcher l'API
-            semaphore = asyncio.Semaphore(8) 
+            # 🚦 BAISSE DE LA LIMITE : On passe de 8 à 3 maximum en même temps.
+            semaphore = asyncio.Semaphore(3) 
             tasks = []
             
             for page in range(2, total_pages + 1):
                 tasks.append(self.fetch_page(session, server, page, semaphore))
             
-            # On exécute toutes les requêtes d'un coup (le sémaphore gère le flux)
             results = await asyncio.gather(*tasks)
             
             for res in results:
