@@ -155,8 +155,8 @@
   "cmd_news_title": "📰 Latest News",
   "cmd_prop_api_err": "❌ Error retrieving cartography data.",
   "cmd_prop_embed_title": "🏰 Properties of {alliance}",
-  "cmd_prop_empty": "📭 The alliance **{nom_officiel}** does not own any special properties.",
-  "cmd_prop_none": "📭 The alliance **{nom_officiel}** does not own any special properties (Capital, Metropolis, Royal Tower, Monument, Laboratory).",
+  "cmd_prop_empty": "📭 The alliance **{alliance}** does not own any special properties.",
+  "cmd_prop_none": "📭 The alliance **{alliance}** has no special properties (Capital, Merchant City, Royal Tower, Monument, Laboratory).",
   "cmd_prop_not_found": "❌ Alliance **{alliance_name}** not found on the API.",
   "cmd_support_btn": "Join the server",
   "cmd_support_desc": "Have a question, a suggestion, or found a bug? Join the official **GGE Assistant** Discord server!",
@@ -678,5 +678,6 @@
   "welcome_step2_title": "2️⃣ Discover the Tools",
   "welcome_step3_desc": "To receive event start and end alerts, an administrator must use the </calendar setup:0> command in a dedicated channel. You can then use </calendar track:0> to automatically get your alliances' results at the end of each event.",
   "welcome_step3_title": "3️⃣ Server Administrator Specifics",
-  "welcome_title": "🏰 Thanks for adding GGE Assistant!"
+  "welcome_title": "🏰 Thanks for adding GGE Assistant!",
+  "cmd_prop_header": "<:Information:1533430015264555099> __**Realm | Type | Player ➔ Coordinates**__\n\n"
 }

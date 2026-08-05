@@ -132,7 +132,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                         events_actifs.append({"key": ev["key"], "start": start_dt, "end": end_dt})
                         seen_uids.add(uid)
             except Exception as e:
-                logger.error(f"Erreur lecture date: {e}")
+                logger.error(f"❌ Erreur lecture date: {e}")
                 
         self.cached_events = events_actifs
         logger.info(f"📂 [Calendrier] {len(self.cached_events)} événements chargés (doublons purgés).")
@@ -382,7 +382,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             self.last_scrape_time = maintenant
             
             await self.save_cache_to_file()
-            logger.info(f"🔄 [Calendrier] Cache mis à jour et sauvegardé : {len(self.cached_events)} événements actifs/récents.")
+            logger.info(f"📝 [Calendrier] Cache mis à jour et sauvegardé : {len(self.cached_events)} événements actifs/récents.")
 
         events = getattr(self, "cached_events", [])
         if not events:

@@ -279,7 +279,7 @@ class EventsCog(commands.Cog):
                         return await interaction.followup.send(t(langue, "ev_err_aqua_hist", player=player, defaut=f"<:error:1512505075220611172> Aucun historique Aquamarine trouvé pour **{player}**."))
                     snapshots = (await resp.json()).get("snapshots", [])
             except Exception as e:
-                logger.error(f"🚨 ERREUR API Aquamarine : {str(e)}")
+                logger.error(f"❌ ERREUR API Aquamarine : {str(e)}")
                 return await interaction.followup.send(t(langue, "ev_err_aqua_tech", type=type(e).__name__, defaut=f"<:error:1512505075220611172> Erreur technique Aquamarine : {type(e).__name__}"))
                 
             if not snapshots:
@@ -792,7 +792,7 @@ class EventsCog(commands.Cog):
                 await save_rivals_async(data)
 
         except Exception as e:
-            logger.error(f"🚨 [RIVAL TASK CRASH] : {e}")
+            logger.error(f"❌ [RIVAL TASK CRASH] : {e}")
 
     # ========================================================
     # GROUPE DE COMMANDES : ROUE DE LA FORTUNE (WOA)

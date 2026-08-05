@@ -204,7 +204,7 @@ class ScanCog(commands.Cog):
             await self.send_discord_alert("✅ Multi-Scan Terminé", f"Tous les serveurs actifs ({len(servers_to_scan)}) ont été scannés à la vitesse de l'éclair !", 65280)
 
         except Exception as e:
-            logger.error(f"🚨 CRASH FATAL DU SCANNER : {e}")
+            logger.error(f"❌ CRASH FATAL DU SCANNER : {e}")
             logger.error(traceback.format_exc())
             await self.send_discord_alert("🚨 CRASH DU SCANNER", f"La boucle asynchrone a planté :\n```py\n{e}\n```", 16711680)
 

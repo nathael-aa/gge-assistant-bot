@@ -155,8 +155,8 @@
   "cmd_news_title": "📰 Aktuelle News",
   "cmd_prop_api_err": "❌ Fehler beim Abrufen der Kartografiedaten.",
   "cmd_prop_embed_title": "🏰 Besitztümer von {alliance}",
-  "cmd_prop_empty": "📭 Die Allianz **{nom_officiel}** besitzt keine besonderen Besitztümer.",
-  "cmd_prop_none": "📭 Die Allianz **{nom_officiel}** besitzt keine besonderen Besitztümer (Hauptstadt, Metropole, Königsturm, Monument, Labor).",
+  "cmd_prop_empty": "📭 Die Allianz **{alliance}** besitzt keine besonderen Besitztümer.",
+  "cmd_prop_none": "📭 Die Allianz **{alliance}** besitzt keine besonderen Eigenschaften (Hauptstadt, Handelsstadt, Königlicher Turm, Denkmal, Labor).",
   "cmd_prop_not_found": "❌ Allianz **{alliance_name}** in der API nicht gefunden.",
   "cmd_support_btn": "Dem Server beitreten",
   "cmd_support_desc": "Hast du eine Frage, einen Vorschlag oder einen Fehler gefunden? Tritt dem offiziellen **GGE Assistant** Discord-Server bei!",
@@ -678,5 +678,6 @@
   "welcome_step2_title": "2️⃣ Entdecke die Werkzeuge",
   "welcome_step3_desc": "Um Benachrichtigungen über den Beginn und das Ende von Events zu erhalten, muss ein Administrator den Befehl </calendar setup:0> in einem dafür vorgesehenen Kanal verwenden. Danach könnt ihr </calendar track:0> nutzen, um automatisch die Ergebnisse eurer Allianzen bei jedem Event zu erhalten.",
   "welcome_step3_title": "3️⃣ Spezifische Funktionen für Server-Administratoren",
-  "welcome_title": "🏰 Danke, dass du den GGE Assistant hinzugefügt hast!"
+  "welcome_title": "🏰 Danke, dass du den GGE Assistant hinzugefügt hast!",
+  "cmd_prop_header": "<:Information:1533430015264555099> __**Welt | Typ | Spieler ➔ Koordinaten**__\n\n"
 }

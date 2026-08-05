@@ -675,7 +675,7 @@ class StormsCog(commands.Cog):
             await save_storm_config(data)
             
         if total_annoncailles > 0:
-            logger.info(f"✅ [Storm Alerts] {total_annoncailles} îles annoncées au total ce cycle !")
+            logger.info(f"📝 [Storm Alerts] {total_annoncailles} îles annoncées au total ce cycle !")
 
     @storm_alert_loop.before_loop
     async def before_storm_alert_loop(self):

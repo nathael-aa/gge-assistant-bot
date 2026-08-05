@@ -155,8 +155,8 @@
   "cmd_news_title": "📰 Dernières Nouveautés",
   "cmd_prop_api_err": "❌ Erreur lors de la récupération des données cartographiques.",
   "cmd_prop_embed_title": "🏰 Propriétés de {alliance}",
-  "cmd_prop_empty": "📭 L'alliance **{nom_officiel}** ne possède aucune propriété spéciale.",
-  "cmd_prop_none": "📭 L'alliance **{nom_officiel}** ne possède aucune propriété spéciale (Capitale, Cité Marchande, Tour Royale, Monument, Laboratoire).",
+  "cmd_prop_empty": "📭 L'alliance **{alliance}** ne possède aucune propriété spéciale.",
+  "cmd_prop_none": "📭 L'alliance **{alliance}** ne possède aucune propriété spéciale (Capitale, Cité Marchande, Tour Royale, Monument, Laboratoire).",
   "cmd_prop_not_found": "❌ Alliance **{alliance_name}** introuvable sur l'API.",
   "cmd_support_btn": "Rejoindre le serveur",
   "cmd_support_desc": "Vous avez une question, une suggestion ou vous avez trouvé un bug ? Rejoignez le serveur Discord officiel de **GGE Assistant** !",
@@ -678,5 +678,6 @@
   "welcome_step2_title": "2️⃣ Découvrir les Outils",
   "welcome_step3_desc": "Pour recevoir les alertes de début et de fin d'événements, un administrateur doit utiliser la commande </calendar setup:0> dans un salon dédié. Vous pourrez ensuite utiliser </calendar track:0> pour avoir les résultats de vos alliances à chaque événements, automatiquement.",
   "welcome_step3_title": "3️⃣ Spécificités aux administrateur du serveur",
-  "welcome_title": "🏰 Merci d'avoir ajouté GGE Assistant !"
+  "welcome_title": "🏰 Merci d'avoir ajouté GGE Assistant !",
+  "cmd_prop_header": "<:Information:1533430015264555099> __**Monde | Type | Joueur ➔ Coordonnées**__\n\n"
 }

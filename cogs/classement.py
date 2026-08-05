@@ -35,14 +35,14 @@ class ClassementCog(commands.Cog):
     def load_rankings_config(self):
         """Charge la configuration depuis le fichier externe."""
         try:
-            self.logger.info(f"🔍 [Classement] Tentative de chargement du JSON à : {self.config_path}")
+            self.logger.info(f"📝 [Classement] Tentative de chargement du JSON à : {self.config_path}")
             if os.path.exists(self.config_path):
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     config_data = json.load(f)
                     self.servers_map = config_data.get("servers", {})
                     self.event_ids = config_data.get("event_ids", {})
                     self.brackets_map = config_data.get("brackets", {})
-                self.logger.info(f"⚙️ [Classement] Fichier chargé ! Serveurs: {len(self.servers_map)}, Events: {len(self.event_ids)}")
+                self.logger.info(f"📝 [Classement] Fichier chargé ! Serveurs: {len(self.servers_map)}, Events: {len(self.event_ids)}")
             else:
                 self.logger.warning(f"⚠️ [Classement] Fichier introuvable à {self.config_path} ! Vérifie ton arborescence.")
         except Exception as e:

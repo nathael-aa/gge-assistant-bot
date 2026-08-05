@@ -600,7 +600,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                 await save_dungeons_async(data)
 
         except Exception as e:
-            logger.error(f"🚨 [FORTERESSES CRASH] : {traceback.format_exc()}")
+            logger.error(f"❌ [FORTERESSES CRASH] : {traceback.format_exc()}")
 
     # ==========================================
     # 📜 Forteresses : HISTORY

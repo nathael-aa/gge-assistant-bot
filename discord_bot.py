@@ -151,7 +151,7 @@ class GGEAssistantBot(commands.Bot):
             "cogs.config", 
             "cogs.events", 
             "cogs.forteresses", 
-            "cogs.guerre", 
+            "cogs.pvp", 
             "cogs.profils", 
             "cogs.radar",
             "cogs.scan_server",
@@ -333,7 +333,7 @@ class GGEAssistantBot(commands.Bot):
                         elif "value" in opt: params.append(f"{opt.get('name')}: {opt.get('value')}")
                 extract_options(interaction.data.get("options", []))
                 options_txt = f" | ⚙️ [{', '.join(params)}]" if params else ""
-                logger.info(f"<:nextpage:1533554128230420590> [COMMANDE] {interaction.user.name} a lancé `/{cmd_name}` sur [{lieu}]{options_txt}")
+                logger.info(f"📝 [COMMANDE] {interaction.user.name} a lancé `/{cmd_name}` sur [{lieu}]{options_txt}")
         except Exception as e:
             logger.error(f"⚠️ Erreur lors de l'écriture du log : {e}")
 

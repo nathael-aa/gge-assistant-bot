@@ -448,8 +448,8 @@ class AideCog(commands.Cog):
                     json.dump(tickets_existants, f, indent=4, ensure_ascii=False)
                     
             except Exception as e:
-                logger.error(f"<:error:1512505075220611172> [Contact] Erreur écriture JSON : {e}")
-                err_msg = t(langue, "contact_err_write", defaut="<:error:1512505075220611172> Une erreur technique interne a empêché l'enregistrement de ton message.")
+                logger.error(f"❌ [Contact] Erreur écriture JSON : {e}")
+                err_msg = t(langue, "contact_err_write", defaut="❌ Une erreur technique interne a empêché l'enregistrement de ton message.")
                 return await interaction.followup.send(err_msg)
 
         try:
@@ -466,9 +466,9 @@ class AideCog(commands.Cog):
             await developpeur.send(embed=embed_mp)
             
         except discord.Forbidden:
-            logger.warning(f"<:error:1512505075220611172> [Contact] Impossible d'envoyer le MP à {MON_ID_DISCORD} (DMs fermés).")
+            logger.warning(f"⚠️ [Contact] Impossible d'envoyer le MP à {MON_ID_DISCORD} (DMs fermés).")
         except Exception as e:
-            logger.error(f"<:error:1512505075220611172> [Contact] Erreur lors de l'alerte MP : {e}")
+            logger.error(f"❌ [Contact] Erreur lors de l'alerte MP : {e}")
 
         succ_msg = t(langue, "contact_success", defaut="<:players:1512504277392953426> **Merci !** Ton message a bien été enregistré et transmis au développeur.")
         await interaction.followup.send(succ_msg)

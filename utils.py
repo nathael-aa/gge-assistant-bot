@@ -102,6 +102,45 @@ async def get_api_headers(interaction: discord.Interaction = None, custom_server
     }
 
 # ==========================================
+# 🌍 GET API TIMESTAMP
+# ==========================================
+def _get_api_timestamp(*sources):
+    """
+    Explore de manière récursive et profonde les structures de données renvoyées par l'API.
+    Traque TOUTES les dates trouvées pour s'assurer d'extraire la plus récente.
+    """
+    dates_trouvees = []
+
+    def search_ts(obj):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if k in ["updated_at", "updatedAt", "last_update", "date", "collected_at", "last_collected_at", "attacked_at"] and isinstance(v, str):
+                    if len(v) >= 10 and v[4] == '-':
+                        dates_trouvees.append(v)
+            
+            for v in obj.values():
+                if isinstance(v, (dict, list)):
+                    search_ts(v)
+                    
+        elif isinstance(obj, list):
+            for item in obj:
+                if isinstance(item, (dict, list)):
+                    search_ts(item)
+
+    for src in sources:
+        if src:
+            search_ts(src)
+
+    if dates_trouvees:
+        try:
+            latest_str = max(dates_trouvees)
+            return datetime.fromisoformat(latest_str.replace('Z', '+00:00'))
+        except:
+            pass
+            
+    return discord.utils.utcnow()
+
+# ==========================================
 # 🌍 MOTEUR DE TRADUCTION (i18n)
 # ==========================================
 _translations = {}
@@ -109,7 +148,7 @@ _translations = {}
 def charger_langues():
     _translations.clear()
     if not LOCALES_DIR.exists():
-        logger.warning(f"Le dossier des langues n'existe pas : {LOCALES_DIR}")
+        logger.warning(f"⚠️ Le dossier des langues n'existe pas : {LOCALES_DIR}")
         return
 
     for fichier in LOCALES_DIR.glob("*.json"):
@@ -129,7 +168,7 @@ def t(langue: str, cle: str, defaut: str = None, **kwargs) -> str:
         try:
             return texte.format(**kwargs)
         except KeyError as e:
-            logger.warning(f"Variable {e} manquante pour la traduction de la clé '{cle}'")
+            logger.warning(f"⚠️ Variable {e} manquante pour la traduction de la clé '{cle}'")
             return texte
     return texte
 
@@ -455,9 +494,13 @@ async def generer_rapport_alliance_embed(bot, event_name, event_keys, alliance_n
     safe_alliance = urllib.parse.quote(alliance_name)
     
     langue = "fr"
-    if interaction:
-        langue, _ = await get_server_config(interaction)
+    serveur_cible = custom_server or "E4K_FR1"
     
+    if interaction:
+        langue, srv = await get_server_config(interaction)
+        if not custom_server:
+            serveur_cible = srv
+            
     search_url = f"https://api.gge-tracker.com/api/v1/alliances/name/{safe_alliance}"
     
     try:
@@ -500,7 +543,7 @@ async def generer_rapport_alliance_embed(bot, event_name, event_keys, alliance_n
     player_dict = {}
     alliance_members = set()
     
-    cache = await get_cached_data(custom_server)
+    cache = await get_cached_data(serveur_cible)
     local_data = cache.get('players_data', {})
 
     api_pids = set(str(entry.get("player_id")) for entry in best_history)

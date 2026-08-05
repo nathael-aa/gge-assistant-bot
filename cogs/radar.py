@@ -199,9 +199,9 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     user = self.bot.get_user(int(user_id)) or await self.bot.fetch_user(int(user_id))
                     await user.send(embed=embed)
                 except discord.Forbidden:
-                    logger.warning(f"Impossible d'envoyer un MP à {user_id} (DMs bloqués).")
+                    logger.warning(f"⚠️ Impossible d'envoyer un MP à {user_id} (DMs bloqués).")
                 except Exception as e:
-                    logger.error(f"Erreur MP à {user_id} : {e}")
+                    logger.error(f"❌ Erreur MP à {user_id} : {e}")
 
     # ==========================================
     # 🕵️‍♂️ COMMANDES : RADAR PLAYER
@@ -213,7 +213,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         try: await interaction.response.defer(ephemeral=True, thinking=True)
         except: return
 
-        logger.info(f"🎯 [Radar Add] {interaction.user.name} a ajouté le joueur {player}")
         langue, serveur = await get_server_config(interaction)
 
         p_id, p_might = None, 0
@@ -313,8 +312,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         try: await interaction.response.defer(ephemeral=True, thinking=True)
         except: return
 
-        logger.info(f"🛡️ [Radar Alli Add] {interaction.user.name} a ajouté l'alliance {alliance_name}")
-
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
         
@@ -345,7 +342,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                     "rank": int(m.get('alliance_rank', 8))
                                 }
         except Exception as e:
-            logger.error(f"[Radar Alli Add] Erreur API : {e}")
+            logger.error(f"❌ [Radar Alli Add] Erreur API : {e}")
             msg = t(langue, "rad_err_api_join", defaut="❌ Impossible de joindre GGE-Tracker pour trouver cette alliance.")
             return await interaction.followup.send(msg)
 
@@ -644,7 +641,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                     changes_detected = True
 
                     except Exception as e:
-                        logger.error(f"[Radar Spy] Erreur analyse alliance {a_id} : {e}")
+                        logger.error(f"❌ [Radar Spy] Erreur analyse alliance {a_id} : {e}")
 
             # ==========================================
             # --- ÉTAPE 2 : ANALYSE DES JOUEURS ---
@@ -814,7 +811,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 await save_surveillance_async(data)
 
         except Exception as e:
-            logger.error(f"🚨 [RADAR CRASH] : {traceback.format_exc()}")
+            logger.error(f"❌ [RADAR CRASH] : {traceback.format_exc()}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(RadarCog(bot))
