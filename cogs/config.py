@@ -40,6 +40,10 @@ class ConfigCog(commands.Cog):
         lbl_ok = t(langue, "config_supported", defaut="🟢 Pris en charge")
         lbl_ko = t(langue, "config_unsupported", defaut="🔴 Non pris en charge")
         lbl_unk = t(langue, "config_unknown", defaut="❓ Inconnu")
+        
+        # 💡 Ajout des labels de plateforme pour l'affichage
+        lbl_mobile = t(langue, "platform_mobile", defaut="Mobile")
+        lbl_pc = t(langue, "platform_pc", defaut="Computer")
 
         choix_vert = []
         choix_rouge = []
@@ -50,10 +54,15 @@ class ConfigCog(commands.Cog):
         
         for srv, is_supported in active_servers.items():
             if current.lower() in srv.lower():
+                
+                # 💡 Logique d'affichage dynamique (E4K = Mobile)
+                platform_tag = lbl_mobile if srv.startswith("E4K_") else lbl_pc
+                display_name = f"{srv} - {platform_tag}"
+                
                 if is_supported:
-                    choix_vert.append(app_commands.Choice(name=f"{srv} ({lbl_ok})", value=srv))
+                    choix_vert.append(app_commands.Choice(name=f"{display_name} ({lbl_ok})", value=srv))
                 else:
-                    choix_rouge.append(app_commands.Choice(name=f"{srv} ({lbl_ko})", value=srv))
+                    choix_rouge.append(app_commands.Choice(name=f"{display_name} ({lbl_ko})", value=srv))
         
         choix = (choix_vert + choix_rouge)[:25]
         

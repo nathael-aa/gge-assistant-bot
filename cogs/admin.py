@@ -20,6 +20,9 @@ from utils import (
     load_blocks_async, 
     save_blocks_async, 
     PaginationView,
+    LOCALES_DIR,
+    charger_langues,
+    get_server_config,
     load_maintenance_async,
     setup_embed_footer,
     save_maintenance_async
@@ -77,21 +80,22 @@ class AdminCog(commands.Cog):
             inline=False
         )
 
-        # Catégorie Code & Emojis
-        embed.add_field(
-            name="🛠️ Code & Emojis",
-            value="`!emojis_list` ➔ Liste tous les émojis utilisés dans le code.\n"
-                  "`!eplace_raw [old] [new]` ➔ Remplace un émoji dans tout le code.\n"
-                  "`!check_emojis` ➔ Détécteur d'émojis fantôme dans le code.\n"
-                  "`!check_bad_emojis` ➔ Détécteur d'émojis éronnés dans le code.",
-            inline=False
-        )
-
         # Catégorie Traductions
         embed.add_field(
             name="🌐 Traductions (i18n)",
             value="`!i18n_sync` ➔ Scanne le code et met à jour les `.json`.\n"
+                  "`!sort_locales` ➔ Trie tous les fichiers de langue JSON par ordre alphabétique.\n"
                   "`!i18n_export [lang]` ➔ Génère un `.csv` pour les traducteurs.",
+            inline=False
+        )
+
+        # Catégorie Code & Emojis
+        embed.add_field(
+            name="🛠️ Code & Emojis",
+            value="`!emojis_list` ➔ Liste tous les émojis utilisés dans le code.\n"
+                  "`!replace_raw [old] [new]` ➔ Remplace un émoji dans tout le code.\n"
+                  "`!check_emojis` ➔ Détécteur d'émojis fantôme dans le code.\n"
+                  "`!check_bad_emojis` ➔ Détécteur d'émojis éronnés dans le code.",
             inline=False
         )
 
@@ -479,6 +483,53 @@ class AdminCog(commands.Cog):
         embed = discord.Embed(title="🧹 Synchronisation i18n Terminée", description="\n".join(log_msg), color=discord.Color.green())
         embed.set_footer(text="Ouvre tes fichiers JSON et cherche '[TODO]' pour voir ce qu'il reste à traduire !")
         await ctx.send(embed=embed)
+
+    # ==========================================
+    # 🛠️ COMMANDE ADMIN : TRI DES LANGUES (Préfixe)
+    # ==========================================
+    @commands.command(name="sort_locales", aliases=["sortlang"])
+    @commands.is_owner() # Réservé EXCLUSIVEMENT au créateur du bot
+    async def sort_locales(self, ctx: commands.Context):
+        fichiers_traites = 0
+        cles_totales = 0
+
+        try:
+            # Affiche "Le bot écrit..." le temps du traitement
+            async with ctx.typing():
+                # On parcourt tous les fichiers .json dans le dossier locales
+                for fichier in LOCALES_DIR.glob("*.json"):
+                    with open(fichier, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    
+                    # Tri du dictionnaire par ordre alphabétique des clés
+                    sorted_data = dict(sorted(data.items()))
+                    
+                    # Réécriture du fichier avec le dictionnaire trié et une belle indentation
+                    with open(fichier, 'w', encoding='utf-8') as f:
+                        json.dump(sorted_data, f, indent=4, ensure_ascii=False)
+                    
+                    fichiers_traites += 1
+                    cles_totales += len(sorted_data)
+
+                # On recharge la mémoire du bot avec les fichiers fraîchement triés
+                charger_langues()
+
+            # Message de confirmation
+            embed = discord.Embed(
+                title="🛠️ Nettoyage des Langues Terminé",
+                description=f"Le tri alphabétique a été appliqué avec succès !\n\n**Fichiers traités :** `{fichiers_traites}`\n**Clés triées :** `{cles_totales}`\n**Statut :** 🟢 *Rechargées en mémoire*",
+                color=discord.Color.green()
+            )
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            # Gestion d'erreur au cas où un JSON est mal formaté
+            embed_err = discord.Embed(
+                title="❌ Erreur lors du tri",
+                description=f"Une erreur est survenue lors du traitement des fichiers :\n```python\n{e}\n```",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed_err)
 
     # ==========================================
     # 📤 EXPORTATION POUR LES TRADUCTEURS (CSV)

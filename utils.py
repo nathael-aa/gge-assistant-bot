@@ -210,7 +210,7 @@ def get_file_lock(filepath):
 # ==========================================
 # 🔧 Footer global
 # ==========================================
-BOT_VERSION = "GGE Assistant • Version 1.1.4"
+BOT_VERSION = "GGE Assistant • Version 1.1.5"
 
 async def setup_embed_footer(embed: discord.Embed, interaction: discord.Interaction = None, langue: str = "fr", custom_server: str = None):
     txt = BOT_VERSION

@@ -128,9 +128,9 @@ class GuerreCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-        self.clr_proximite = discord.Color.from_rgb(166, 0, 0)   
-        self.clr_cible     = discord.Color.from_rgb(255, 92, 92)  
-        self.clr_hr        = discord.Color.from_rgb(140, 35, 35)  
+        self.clr_proximite = discord.Color.from_rgb(204,0,0)
+        self.clr_cible     = discord.Color.from_rgb(183,0,0)
+        self.clr_hr        = discord.Color.from_rgb(146,0,0)
 
     # ==========================================
     # 📍 COMMANDE : PROXIMITY

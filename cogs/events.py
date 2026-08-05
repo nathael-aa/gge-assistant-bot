@@ -216,17 +216,14 @@ class EventsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         
-        self.clr_obj_set        = discord.Color.from_rgb(75, 0, 130)     
-        self.clr_bilan          = discord.Color.from_rgb(102, 51, 153)   
-        self.clr_joueur_dernier = discord.Color.from_rgb(138, 43, 226)  
-        self.clr_joueur_cumul   = discord.Color.from_rgb(153, 50, 204)  
-        self.clr_alliance       = discord.Color.from_rgb(186, 85, 211)  
-        self.clr_serveur        = discord.Color.from_rgb(218, 112, 214) 
-        self.clr_rival_list     = discord.Color.from_rgb(238, 130, 238) 
-        self.clr_woa_historique = discord.Color.from_rgb(81, 45, 168)  
-        self.clr_woa_classement = discord.Color.from_rgb(170, 0, 255)  
-        self.clr_woa_bilan      = discord.Color.from_rgb(126, 87, 194) 
-        self.clr_aqua           = discord.Color.from_rgb(0, 180, 216)   
+        self.clr_joueur_dernier = discord.Color.from_rgb(192,214,228)
+        self.clr_joueur_cumul   = discord.Color.from_rgb(172,192,205)
+        self.clr_alliance       = discord.Color.from_rgb(214,228,192)
+        self.clr_rival_list     = discord.Color.from_rgb(228,206,192)
+        self.clr_woa_historique = discord.Color.from_rgb(229,148,0)
+        self.clr_woa_classement = discord.Color.from_rgb(234,169,50)
+        self.clr_woa_bilan      = discord.Color.from_rgb(240,194,111)
+        self.clr_aqua           = discord.Color.from_rgb(226,235,252)
 
     async def cog_load(self):
         if not self.rival_check_task.is_running():

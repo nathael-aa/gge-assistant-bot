@@ -98,15 +98,17 @@ class ProfilsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.bdd_chemin = BASE_DATA_PATH / "bdd_items_gge.json"
-        
-        self.clr_joueur      = discord.Color.from_rgb(0, 163, 204)
-        self.clr_historique  = discord.Color.from_rgb(0, 77, 102)
-        self.clr_colombe     = discord.Color.from_rgb(0, 180, 216)  
-        self.clr_compare_j = discord.Color.from_rgb(217, 0, 0)   
-        self.clr_alliance    = discord.Color.from_rgb(0, 115, 153)
-        self.clr_alliance_pp = discord.Color.from_rgb(0, 140, 186)
-        self.clr_alliance_property = discord.Color.from_rgb(0, 181, 206)
-        self.clr_scanner     = discord.Color.from_rgb(115, 0, 0)
+        #Purple for player group
+        self.clr_joueur      = discord.Color.from_rgb(223,204,241)
+        self.clr_historique  = discord.Color.from_rgb(200,183,216)
+        self.clr_colombe     = discord.Color.from_rgb(160,146,172)
+        self.clr_compare_j = discord.Color.from_rgb(112,102,120)
+        #Green for lliance group
+        self.clr_alliance    = discord.Color.from_rgb(129,186,39)
+        self.clr_alliance_pp = discord.Color.from_rgb(116,167,35)
+        self.clr_alliance_property = discord.Color.from_rgb(92,133,28)
+        self.clr_scanner     = discord.Color.from_rgb(64,93,19)
+        self.clr_descalli    = discord.Color.from_rgb(77,111,23)
 
     # ========================================================
     # 👑 COMMANDE : PLAYER PROFILE
@@ -1524,7 +1526,7 @@ class ProfilsCog(commands.Cog):
         embed = discord.Embed(
             title=t(langue, "prof_desc_embed_title", a=nom_alliance.upper(), defaut=f"Archives Alliance : {nom_alliance.upper()}"),
             description=str_date_header + desc_i18n,
-            color=getattr(self, "clr_alliance", discord.Color.blue())
+            color=self.clr_descalli
         )
 
         # A) Champ de la description Actuelle

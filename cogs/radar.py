@@ -174,10 +174,10 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         self.last_scan_hour = None  
         super().__init__()
         
-        self.clr_add_joueur     = discord.Color.from_rgb(25, 42, 86)     
-        self.clr_add_alliance   = discord.Color.from_rgb(39, 60, 117)    
-        self.clr_list_alliances = discord.Color.from_rgb(12, 36, 97)     
-        self.clr_list_joueurs   = discord.Color.from_rgb(74, 105, 124)   
+        self.clr_add_joueur     = discord.Color.from_rgb(255,246,143)
+        self.clr_add_alliance   = discord.Color.from_rgb(229,221,128)
+        self.clr_list_alliances = discord.Color.from_rgb(183,176,102)
+        self.clr_list_joueurs   = discord.Color.from_rgb(128,123,71)
 
     async def cog_load(self):
         if not self.radar_spy_task.is_running():

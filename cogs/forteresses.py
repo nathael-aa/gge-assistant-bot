@@ -113,8 +113,8 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         super().__init__()
         
         # 🎨 PALETTE VERT RADAR / EMERAUDE
-        self.clr_activation = discord.Color.from_rgb(0, 204, 153) 
-        self.clr_attente = discord.Color.from_rgb(61, 140, 107)
+        self.clr_activation = discord.Color.from_rgb(180,238,180)
+        self.clr_attente = discord.Color.from_rgb(255,195,160)
 
     async def cog_load(self):
         if not self.dungeon_spy_task.is_running():

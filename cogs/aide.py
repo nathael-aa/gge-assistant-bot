@@ -26,62 +26,171 @@ from utils import (
 logger = logging.getLogger("GGE_Bot")
 
 CONTACTS_FILE = JOUEURS_DIR / 'contacts.json'
-CHANGELOG_FILE = CONFIG_DIR / 'changelog.json'
 
 # ==========================================
-# 🎛️ CLASSE DU MENU INTERACTIF (BOUTONS)
+# ⚙️ CONFIGURATION CENTRALISÉE DE L'AIDE
 # ==========================================
-class MenuAideView(discord.ui.View):
-    def __init__(self, embeds, langue="fr"):
-        super().__init__(timeout=7200)
-        self.embeds = embeds
+HELP_CONFIG = {
+    "home": {
+        "emoji": "🏠", 
+        "color": discord.Color.from_rgb(198,226,255),
+        "title_key": "help_home_title",
+        "desc_key": "aide_p0_desc"
+    },
+    "config": {
+        "emoji": "⚙️", 
+        "color": discord.Color.from_rgb(102,102,102),
+        "title_key": "help_cat_config",
+        "commands": [
+            {"name": "/setup", "desc_key": "help_cmd_setup"},
+            {"name": "/link_account", "desc_key": "help_cmd_link_account"},
+            {"name": "/status", "desc_key": "help_cmd_status"},
+            {"name": "/help", "desc_key": "help_cmd_help"}
+        ]
+    },
+    "communaute": {
+        "emoji": "💬", 
+        "color": discord.Color.from_rgb(230,230,250),
+        "title_key": "help_cat_communaute",
+        "commands": [
+            {"name": "/news", "desc_key": "help_cmd_news"},
+            {"name": "/support", "desc_key": "help_cmd_support"},
+            {"name": "/contact", "desc_key": "help_cmd_contact"},
+            {"name": "/vote", "desc_key": "help_cmd_vote"}
+        ]
+    },
+    "profils": {
+        "emoji": "👥", 
+        "color": discord.Color.from_rgb(50,214,50),
+        "title_key": "help_cat_profils",
+        "commands": [
+            {"name": "/player profile", "desc_key": "help_cmd_player_profile"},
+            {"name": "/player history", "desc_key": "help_cmd_player_history"},
+            {"name": "/player dove", "desc_key": "help_cmd_player_dove"},
+            {"name": "/player compare", "desc_key": "help_cmd_player_compare"},
+            {"name": "/alliance profile", "desc_key": "help_cmd_alliance_profile"},
+            {"name": "/alliance might", "desc_key": "help_cmd_alliance_might"},
+            {"name": "/alliance property", "desc_key": "help_cmd_alliance_property"},
+            {"name": "/alliance description", "desc_key": "help_cmd_alliance_desc"}
+        ]
+    },
+    "guerre": {
+        "emoji": "⚔️", 
+        "color": discord.Color.from_rgb(139,0,0),
+        "title_key": "help_cat_guerre",
+        "commands": [
+            {"name": "/alliance scanner", "desc_key": "help_cmd_alliance_scanner"},
+            {"name": "/target", "desc_key": "help_cmd_target"},
+            {"name": "/proximity", "desc_key": "help_cmd_proximity"},
+            {"name": "/hr", "desc_key": "help_cmd_hr"},
+            {"name": "/diplomacy add", "desc_key": "help_cmd_diplomacy_add"},
+            {"name": "/diplomacy remove", "desc_key": "help_cmd_diplomacy_remove"},
+            {"name": "/diplomacy list", "desc_key": "help_cmd_diplomacy_list"}
+        ]
+    },
+    "events": {
+        "emoji": "🏆", 
+        "color": discord.Color.from_rgb(175,238,238),
+        "title_key": "help_cat_events",
+        "commands": [
+            {"name": "/event player", "desc_key": "help_cmd_event_player"},
+            {"name": "/event alliance", "desc_key": "help_cmd_event_alliance"},
+            {"name": "/calendar (setup / track / untrack / current)", "desc_key": "help_cmd_calendar_group"},
+            {"name": "/rank (event / league / contests / statistics / gacha / realms / alliance)", "desc_key": "help_cmd_rank_group"},
+            {"name": "/leaderboard (woa / storm_islands)", "desc_key": "help_cmd_leaderboard_group"},
+            {"name": "/woa (history / summary)", "desc_key": "help_cmd_woa_group"}
+        ]
+    },
+    "radars": {
+        "emoji": "📡", 
+        "color": discord.Color.from_rgb(255,174,25),
+        "title_key": "help_cat_radars",
+        "commands": [
+            {"name": "/radar (add / remove / list)", "desc_key": "help_cmd_radar_group"},
+            {"name": "/radar alliance (add / remove)", "desc_key": "help_cmd_radar_alliance_group"},
+            {"name": "/rival (start / stop / add / list)", "desc_key": "help_cmd_rival_group"},
+            {"name": "/fortress (scan / stop)", "desc_key": "help_cmd_fortress_group"}
+        ]
+    }
+}
+
+# ==========================================
+# 🎛️ MENU DÉROULANT (SELECT MENU)
+# ==========================================
+class HelpSelect(discord.ui.Select):
+    def __init__(self, langue: str):
+        self.langue = langue
         
-        self.btn_home.label = t(langue, "aide_btn_sommaire", defaut="Sommaire")
-        self.btn_aide.label = t(langue, "aide_btn_aide", defaut="Aide")
-        self.btn_events.label = t(langue, "aide_btn_events", defaut="Events")
-        self.btn_rank.label = t(langue, "aide_btn_rank", defaut="Ranks")
-        self.btn_profils.label = t(langue, "aide_btn_profils", defaut="Profils")
-        self.btn_guerre.label = t(langue, "aide_btn_guerre", defaut="PvP")
-        self.btn_radar.label = t(langue, "aide_btn_radar", defaut="Radar")
-        self.btn_fort.label = t(langue, "aide_btn_fort", defaut="Forteresses")
+        options = [
+            discord.SelectOption(
+                label=t(langue, "help_menu_home", defaut="Sommaire Principal"),
+                emoji="🏠",
+                value="home",
+                description=t(langue, "help_menu_home_desc", defaut="Revenir à l'accueil du manuel")
+            ),
+            discord.SelectOption(
+                label=t(langue, "help_menu_config", defaut="Configuration & Système"),
+                emoji="⚙️",
+                value="config"
+            ),
+            discord.SelectOption(
+                label=t(langue, "help_menu_communaute", defaut="Communauté & Support"),
+                emoji="💬",
+                value="communaute"
+            ),
+            discord.SelectOption(
+                label=t(langue, "help_menu_profils", defaut="Profils & Informations"),
+                emoji="👥",
+                value="profils"
+            ),
+            discord.SelectOption(
+                label=t(langue, "help_menu_guerre", defaut="Guerre & Diplomatie"),
+                emoji="⚔️",
+                value="guerre"
+            ),
+            discord.SelectOption(
+                label=t(langue, "help_menu_events", defaut="Événements & Classements"),
+                emoji="🏆",
+                value="events"
+            ),
+            discord.SelectOption(
+                label=t(langue, "help_menu_radars", defaut="Radars & Traqueurs"),
+                emoji="📡",
+                value="radars"
+            )
+        ]
+        
+        super().__init__(
+            placeholder=t(langue, "help_placeholder", defaut="📂 Choisissez une catégorie..."),
+            min_values=1,
+            max_values=1,
+            options=options
+        )
 
-    async def update_menu(self, interaction: discord.Interaction, page: int):
-        await interaction.response.edit_message(embed=self.embeds[page], view=self)
+    async def callback(self, interaction: discord.Interaction):
+        cat_id = self.values[0]
+        cat_data = HELP_CONFIG[cat_id]
+        
+        embed = discord.Embed(
+            title=f"{cat_data['emoji']} {t(self.langue, cat_data['title_key'], defaut=cat_id.capitalize())}",
+            color=cat_data['color']
+        )
+        
+        if cat_id == "home":
+            desc = t(self.langue, cat_data["desc_key"], version=BOT_VERSION, defaut=f"Bienvenue dans l'interface de navigation tactique.\n*Version du bot : {BOT_VERSION}*\n\n**Utilisez le menu déroulant ci-dessous pour explorer les commandes.**")
+            embed.description = desc
+        else:
+            for cmd in cat_data["commands"]:
+                cmd_desc = t(self.langue, cmd["desc_key"], defaut="> *Description manquante*")
+                embed.add_field(name=f"**`{cmd['name']}`**", value=f"{cmd_desc}", inline=False)
 
-    # --- LIGNE 1 (row=0) ---
-    @discord.ui.button(emoji="🏰", style=discord.ButtonStyle.success, row=0)
-    async def btn_home(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 0) # Page 0: Sommaire
+        await setup_embed_footer(embed, interaction, self.langue)
+        await interaction.response.edit_message(embed=embed, view=self.view)
 
-    @discord.ui.button(emoji="⚙️", style=discord.ButtonStyle.primary, row=0)
-    async def btn_aide(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 1) # Page 1: Aide
-
-    @discord.ui.button(emoji="📅", style=discord.ButtonStyle.primary, row=0)
-    async def btn_events(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 2) # Page 2: Events
-
-    @discord.ui.button(emoji="🏆", style=discord.ButtonStyle.primary, row=0)
-    async def btn_rank(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 7) # Page 7: Rank
-
-    # --- LIGNE 2 (row=1) ---
-    @discord.ui.button(emoji="👥", style=discord.ButtonStyle.primary, row=1)
-    async def btn_profils(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 5) # Page 5: Profils
-
-    @discord.ui.button(emoji="⚔️", style=discord.ButtonStyle.primary, row=1)
-    async def btn_guerre(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 4) # Page 4: Guerre
-
-    @discord.ui.button(emoji="📡", style=discord.ButtonStyle.primary, row=1)
-    async def btn_radar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 6) # Page 6: Radar
-
-    @discord.ui.button(emoji="🏯", style=discord.ButtonStyle.primary, row=1)
-    async def btn_fort(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.update_menu(interaction, 3) # Page 3: Forteresses
-
+class HelpView(discord.ui.View):
+    def __init__(self, langue: str):
+        super().__init__(timeout=1200)
+        self.add_item(HelpSelect(langue))
 
 # ==========================================
 # 🤖 MODULE PRINCIPAL (COMMANDES DU BOT)
@@ -90,19 +199,11 @@ class AideCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         
-        self.clr_sommaire    = discord.Color.from_rgb(255,220,115) #Gold
-        self.clr_aide        = discord.Color.from_rgb(254,255,184) #Yellow
-        self.clr_events      = discord.Color.from_rgb(141,144,226) #Purple
-        self.clr_forteresses = discord.Color.from_rgb(255,237,193) #Orange
-        self.clr_guerre      = discord.Color.from_rgb(255,202,202) #Red
-        self.clr_profils     = discord.Color.from_rgb(200,229,255) #Blue
-        self.clr_radar       = discord.Color.from_rgb(243,198,242) #Pink
-        self.clr_rank        = discord.Color.from_rgb(196,255,203) #Green
-        self.clr_statut      = discord.Color.from_rgb(255,207,64) #Gold1
-        self.clr_news   = discord.Color.from_rgb(255,191,0) #Gold2
-        self.clr_vote   = discord.Color.from_rgb(232,198,112) #Gold3
-        self.clr_support   = discord.Color.from_rgb(241,213,143) #Gold4
-        self.clr_contact     = discord.Color.from_rgb(247,226,173) #Gold5
+        self.clr_statut  = discord.Color.from_rgb(255,207,64) #Gold1
+        self.clr_news    = discord.Color.from_rgb(255,191,0) #Gold2
+        self.clr_vote    = discord.Color.from_rgb(232,198,112) #Gold3
+        self.clr_support = discord.Color.from_rgb(241,213,143) #Gold4
+        self.clr_contact = discord.Color.from_rgb(247,226,173) #Gold5
 
     # ==========================================
     # 📖 COMMANDE : HELP
@@ -114,125 +215,17 @@ class AideCog(commands.Cog):
         
         langue, _ = await get_server_config(interaction)
 
-        embeds = []
-
-        # PAGE 0 : LE SOMMAIRE
-        desc0 = t(langue, "aide_p0_desc", version=BOT_VERSION, defaut=f"Bienvenue dans l'interface de navigation tactique.\n*Version du bot : {BOT_VERSION}*\n\n**Parcourez la documentation des modules via les boutons ci-dessous :**")
-        embed0 = discord.Embed(title=t(langue, "aide_p0_title", defaut="📖 Manuel d'Utilisation - GGE Assistant"), description=desc0, color=self.clr_sommaire)
-        # 1. Aide (Clé f1)
-        embed0.add_field(name=t(langue, "aide_p0_f1_n", defaut="<:parameters:1512573735390154986> 1. Module Aide"), value=t(langue, "aide_p0_f1_v", defaut="Outils système, diagnostics, nouveautés et support."), inline=False)
-        # 2. Events (Clé f2)
-        embed0.add_field(name=t(langue, "aide_p0_f2_n", defaut="<:events4:1532431480398286878> 2. Module Événements"), value=t(langue, "aide_p0_f2_v", defaut="Liaison de comptes, scores en direct, objectifs, calendrier."), inline=False)
-        # 3. Ranks (Clé f7)
-        embed0.add_field(name=t(langue, "aide_p0_f7_n", defaut="<:ranking:1512438311132729525> 3. Module Classements"), value=t(langue, "aide_p0_f7_v", defaut="Tableaux de scores en direct pour tous les événements du jeu."), inline=False)
-        # 4. Profils (Clé f5)
-        embed0.add_field(name=t(langue, "aide_p0_f5_n", defaut="<:listitem:1512573892596858960> 4. Module Profils"), value=t(langue, "aide_p0_f5_v", defaut="Profilages détaillés alliance et joueur, historique et colombe."), inline=False)
-        # 5. PvP (Clé f4)
-        embed0.add_field(name=t(langue, "aide_p0_f4_n", defaut="<:2_:1512574740915818527> 5. Module PvP"), value=t(langue, "aide_p0_f4_v", defaut="Analyse tactique joueur et alliance, comparatifs, arbitrage RoE."), inline=False)
-        # 6. Radar (Clé f6)
-        embed0.add_field(name=t(langue, "aide_p0_f6_n", defaut="<:icon_analyze:1512573874150314005> 6. Module Radar Personnel"), value=t(langue, "aide_p0_f6_v", defaut="Système de surveillance furtif par alertes automatisées en MP."), inline=False)
-        # 7. Forteresses (Clé f3)
-        embed0.add_field(name=t(langue, "aide_p0_f3_n", defaut="<:fortresses:1512574700839239892> 7. Module Forteresses"), value=t(langue, "aide_p0_f3_v", defaut="Scanners automatisés des forteresses prêtes sur la carte du monde."), inline=False)
-        embeds.append(embed0)
-
-        # 📑 PAGE 1 : COG AIDE
-        embed1 = discord.Embed(title=t(langue, "aide_p1_title", defaut="<:parameters:1512573735390154986> 1. Module Aide"), color=self.clr_aide)
-        embed1.description = t(langue, "aide_p1_f0", defaut="⚠️ **Avant de lancer une commande, vous devez utiliser : \n`/setup scope:👤 For me only (Personal) language: server: `\nSans cela, le bot ne fonctionnera pas** ⚠️")
-        embed1.add_field(name="• `/help`", value=t(langue, "aide_p1_f1", defaut="> Affiche le manuel d'utilisation complet du bot."), inline=False)
-        embed1.add_field(name="• `/status`", value=t(langue, "aide_p1_f2", defaut="> Vérifie l'état de santé du système (latence, espace disque, statut de l'API)."), inline=False)
-        embed1.add_field(name="• `/support` | `/vote` | `/news`", value=t(langue, "aide_p1_f3", defaut="> Liens utiles pour rejoindre la communauté, voter pour le bot ou lire les mises à jour."), inline=False)
-        embed1.add_field(name="• `/contact [message]`", value=t(langue, "aide_p1_f4", defaut="> Permet aux joueurs d'envoyer un rapport ou une suggestion directement au développeur."), inline=False)
-        embeds.append(embed1)
-
-        # 📑 PAGE 2 : COG EVENTS
-        embed2 = discord.Embed(title=t(langue, "aide_p2_title", defaut="<:events4:1532431480398286878> 2. Module Événements"), color=self.clr_events)
-        embed2.description = t(langue, "aide_p2_desc", defaut="Historique des résultats aux évents, informations serveur et classements.")
-        embed2.add_field(name=t(langue, "aide_p2_g1", defaut="<:cartography:1512574691766964386> Configuration & Général"), value=t(langue, "aide_p2_v1", defaut=
-            "• `/link_account [player]`\n> Lie un compte Discord à un pseudo de jeu GGE.\n\n"
-            "• `/server`\n> Affiche les statistiques du serveur GGE et le Top 15 Alliances."), inline=False)
-        embed2.add_field(name=t(langue, "aide_p2_g2", defaut="<:grandtournament:1514704234128343040> Suivi des Scores"), value=t(langue, "aide_p2_v2", defaut=
-            "• `/event player [event_name] [player] [mode: latest/total]`\n> Affiche le score live ou le cumul d'un joueur.\n\n"
-            "• `/event alliance [event_name] [alliance_name] [display_mode]`\n> Génère le classement interne complet des membres.\n\n"), inline=False)
-        embed2.add_field(name=t(langue, "aide_p2_g3", defaut="<:ranking:1512438311132729525> Groupe de commandes /leaderboard"), value=t(langue, "aide_p2_v3", defaut=
-            "• `/leaderboard woa`\n> Affiche le top de la dernière Roue de la Fortune.\n\n"
-            "• `/leaderboard storm_islands`\n> Affiche le top des meilleurs pilleurs d'Aquamarine."), inline=False)
-        embed2.add_field(name=t(langue, "aide_p2_g4", defaut="<:woaicon:1512165794740572292> Groupe de commandes /woa"), value=t(langue, "aide_p2_v4", defaut=
-            "• `/woa history [player]`\n> Consulte l'historique des tickets dépensés.\n\n"
-            "• `/woa summary`\n> Affiche l'activité économique globale du serveur."), inline=False)
-        embed2.add_field(name=t(langue, "aide_p2_g5", defaut="\<:attaque:1512570903886692474> Groupe de commandes /rival"), value=t(langue, "aide_p2_v5", defaut=
-            "• `/rival start [event_name] [threshold]` / `/rival stop`\n> Active ou désactive le radar secret en MP.\n\n"
-            "• `/rival add [players]` / `/rival list`\n> Gère tes cibles de rival en direct."), inline=False)
-        embed2.add_field(name=t(langue, "aide_p2_g6", defaut="<:events4:1532431480398286878> Groupe de commandes Calendar"), value=t(langue, "aide_p2_v6", defaut=
-            "• `/calendar setup [channel]`\n> Permets de choisir le channel ou seront envoyés les informations d'événements.\n\n"
-            "• `/calendar track [alliance_name]`\n> Permet de suivre une alliance sur les événements.\n\n"
-            "• `/calendar untrack [alliance_name]`\n> Retire une alliance du suivi événement.\n\n"
-            "• `/calendar current`\n> Renvoie les événements ayant lieu ce mois."), inline=False)
-        embeds.append(embed2)
-
-        # 📑 PAGE 3 : COG FORTERESSES
-        embed3 = discord.Embed(title=t(langue, "aide_p3_title", defaut="<:fortresses:1512574700839239892> 3. Module Forteresses"), color=self.clr_forteresses)
-        embed3.add_field(name="• `/fortress scan [player] [ice] [sands] [peaks]`", value=t(langue, "aide_p3_f1", defaut="> Recherche automatique en cascade des forteresses prêtes."), inline=False)
-        embed3.add_field(name="• `/fortress stop`", value=t(langue, "aide_p3_f2", defaut="> Interrompt la session de recherche active."), inline=False)
-        embeds.append(embed3)
-
-        # 📑 PAGE 4 : COG GUERRE
-        embed4 = discord.Embed(title=t(langue, "aide_p4_title", defaut="<:2_:1512574740915818527> 4. Module PVP"), color=self.clr_guerre)
-        embed4.add_field(name=t(langue, "aide_p4_g1", defaut="<:icon_analyze:1512573874150314005> Scanners & Opérations"), value=t(langue, "aide_p4_v1", defaut=
-            "• `/alliance_scanner [alliance_name]`\n> Roster complet en temps réel (Cibles / Ordre des colombes).\n\n"
-            "• `/proximity [my_player] [enemy_alliance]`\n> Trouve les ennemis les plus proches de ton château.\n\n"
-            "• `/target [attacker] [sort_by] (target_alliance)`\n> Génère une liste de cibles légales selon la charte.\n\n"
-            "• `/hr [attacker] [defender]`\n> Vérifie la légalité d'une attaque selon les RoE."), inline=False)
-        embed4.add_field(name=t(langue, "aide_p4_g2", defaut="<:icon_friends2:1512573878801797271> Comparaison"), value=t(langue, "aide_p4_v2", defaut=
-            "• `/compare player [player1] [player2]`\n> Duel statistique complet en 7 rounds.\n\n"
-            "• `/compare alliance [alliance_1] [alliance_2]`\n> Duel complet entre deux alliances."), inline=False)
-        embed4.add_field(name=t(langue, "aide_p4_g3", defaut="<:4_:1512574743369224303> Diplomatie"), value=t(langue, "aide_p4_v3", defaut=
-            "• `/diplomacy add [my_alliance] [target] [status]`\n> Enregistre un lien Allié, PNA ou Guerre.\n\n"
-            "• `/diplomacy remove [my_alliance] [target]`\n> Supprime un accord diplomatique.\n\n"
-            "• `/diplomacy list [alliance_name]`\n> Affiche secrètement le registre diplomatique."), inline=False)
-        embeds.append(embed4)
-
-        # 📑 PAGE 5 : COG PROFILS
-        embed5 = discord.Embed(title=t(langue, "aide_p5_title", defaut="<:listitem:1512573892596858960> 5. Module Profils"), color=self.clr_profils)
-        embed5.add_field(name=t(langue, "aide_p5_g1", defaut="<:Le_Hraut_Lumbricus_2:1512573890298380388> Renseignement Tactique"), value=t(langue, "aide_p5_v1", defaut=
-            "• `/player [name]`\n> Fiche complète d'un joueur (Niveau, PP, Positions, Châteaux).\n\n"
-            "• `/alliance [name]`\n> Profil détaillé de l'alliance et roster complet paginé.\n\n"
-            "• `/dove [player]`\n> Compte à rebours précis avant la fin de protection."), inline=False)
-        embed5.add_field(name=t(langue, "aide_p5_g2", defaut="<:memberlistactivity:1512573911257190481> Renseignement Historique"), value=t(langue, "aide_p5_v2", defaut=
-            "• `/history [type] [player]`\n> Traque les changements de pseudos, d'alliances ou châteaux.\n\n"
-            "• `/alliance_might [alliance_name] [days]`\n> Évolution de la puissance globale d'une alliance."), inline=False)
-        embeds.append(embed5)
-
-        # 📑 PAGE 6 : COG RADAR
-        embed6 = discord.Embed(title=t(langue, "aide_p6_title", defaut="<:icon_analyze:1512573874150314005> 6. Module Radar Personnel"), color=self.clr_radar)
-        embed6.add_field(name=t(langue, "aide_p6_g1", defaut="<:Information:1533430015264555099> Surveillance Individuelle"), value=t(langue, "aide_p6_v1", defaut=
-            "• `/radar add [player] (reason)`\n> Place une cible sous surveillance étroite (Alertes MP).\n\n"
-            "• `/radar remove [player]`\n> Retire un joueur de ta surveillance personnelle.\n\n"
-            "• `/radar list`\n> Tableau de bord centralisé de tous tes suivis actifs."), inline=False)
-        embed6.add_field(name=t(langue, "aide_p6_g2", defaut="<:Information:1533430015264555099> Sous-groupe /radar alliance"), value=t(langue, "aide_p6_v2", defaut=
-            "• `/radar alliance add [alliance_name] (reason)`\n> Alerte MP si Entrée, Sortie, Promotion ou Rétrogradation.\n\n"
-            "• `/radar alliance remove [alliance_name]`\n> Coupe la surveillance globale sur l'alliance."), inline=False)
-        embeds.append(embed6)
-
-        # 📑 PAGE 7 : COG RANK
-        embed7 = discord.Embed(title=t(langue, "aide_p7_title", defaut="<:ranking:1512438311132729525> 7. Module Classements"), color=self.clr_rank)
-        embed7.description = t(langue, "aide_p7_desc", defaut="Affichez les classements mondiaux en direct pour tous les événements du jeu.")
-        embed7.add_field(name=t(langue, "aide_p7_g1", defaut="<:icon_points:1512502439339888820> Événements & Ligues"), value=t(langue, "aide_p7_v1", defaut=
-            "• `/rank event [event_name]`\n> Invasions (Nomades, Samouraïs, Corbeaux, Étrangers) & Bérimond.\n\n"
-            "• `/rank league [league_name]`\n> Saison des festivals, Ligue du Royaume.\n\n"
-            "• `/rank contests [contest_name]`\n> Métamorphes, Noblesse, Guerre des Alliances, Patronage."
-        ), inline=False)
-        embed7.add_field(name=t(langue, "aide_p7_g2", defaut="<:woaicon:1512165794740572292> Statistiques & Gacha"), value=t(langue, "aide_p7_v2", defaut=
-            "• `/rank statistics [stat_name]`\n> Honneur, Puissance, Pillage, Construction, Niv Légendaire.\n\n"
-            "• `/rank gacha [event_name]`\n> Flora, Boule à Neige, Lune Creuse, Sables, Banquet, Minuit."
-        ), inline=False)
-        embed7.add_field(name=t(langue, "aide_p7_g3", defaut="<:outerrealmsicon:1512573734404231329> Alliances & Inter-Serveurs"), value=t(langue, "aide_p7_v3", defaut=
-            "• `/rank realms [realm_name]`\n> Royaumes Extérieurs et Au-delà de l'Horizon.\n\n"
-            "• `/rank alliance [catégorie]`\n> Top des Alliances par événement et statut de groupe."
-        ), inline=False)
-        embeds.append(embed7)
-
-        view = MenuAideView(embeds, langue=langue)
-        await interaction.followup.send(embed=embeds[0], view=view)
+        home_data = HELP_CONFIG["home"]
+        embed = discord.Embed(
+            title=t(langue, home_data['title_key'], defaut="📖 Manuel d'Utilisation - GGE Assistant"),
+            color=home_data['color']
+        )
+        embed.description = t(langue, home_data["desc_key"], version=BOT_VERSION, defaut=f"Bienvenue dans l'interface de navigation tactique.\n*Version du bot : {BOT_VERSION}*\n\n**Utilisez le menu déroulant ci-dessous pour explorer les commandes.**")
+        
+        await setup_embed_footer(embed, interaction, langue)
+        
+        view = HelpView(langue)
+        await interaction.followup.send(embed=embed, view=view)
 
     # ==========================================
     # 📡 COMMANDE : STATUS
