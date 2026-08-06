@@ -265,6 +265,7 @@
     "fort_verify_unknown": "<:warning:1534907226689634404> **Unbekannt** *(Zu weit entfernt oder API-Fehler)*",
     "fort_wait_desc": "😴 **Keine Festung ist angreifbar oder steht kurz vor der Öffnung (nichts innerhalb der Stunde).**\nAlle umliegenden Strukturen sind in der Wiederaufbauphase gesperrt.\n\n*Nutze die Zeit, um neue Truppen auszubilden, deine Allianz zu verwalten oder eine Kaffeepause zu machen. Die Wache bleibt unauffällig wachsam und meldet sich per DM, sobald eine Mauer wieder verwundbar wird!* ☕",
     "fort_wait_title": "📭 Totenstille an den Grenzen...",
+    "fort_warn_overwrite": "⚠️ **Warnung:** Du hattest bereits ein aktives Radar! Es wurde gerade zurückgesetzt. Denke daran, das nächste Mal `/fortress stop` zu verwenden, um doppelte Warnungen zu vermeiden.",
     "guerre_btn_next": "Nächste Seite ⏭️",
     "guerre_btn_prev": "⏮️ Vorherige Seite",
     "guerre_btn_rerun": "🔄 Neue Welle starten",

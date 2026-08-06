@@ -321,17 +321,17 @@ async def save_rivals_async(data):
         with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
 
 async def load_dungeons_async():
-    path = JOUEURS_DIR / 'dungeons_sessions.json'
+    path = CONFIG_DIR / 'forteresses_sessions.json'
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
                 with open(path, 'r', encoding='utf-8') as f: return json.load(f)
             except Exception as e:
-                logger.error(f"❌ Erreur dungeons_sessions.json : {e}")
+                logger.error(f"❌ Erreur forteresses_sessions.json : {e}")
     return {"sessions": {}}
 
 async def save_dungeons_async(data):
-    path = JOUEURS_DIR / 'dungeons_sessions.json'
+    path = CONFIG_DIR / 'forteresses_sessions.json'
     async with get_file_lock(path):
         with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
 

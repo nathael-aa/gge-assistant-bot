@@ -265,6 +265,7 @@
     "fort_verify_unknown": "<:warning:1534907226689634404> **Unknown** *(Too far or API glitch)*",
     "fort_wait_desc": "😴 **No fortress is attackable or about to open (nothing within the hour).**\nAll nearby structures are locked in a rebuilding phase.\n\n*Take this time to train new troops, manage your alliance, or grab a coffee break. The watch stays silently alert and will DM you as soon as a wall becomes vulnerable again!* ☕",
     "fort_wait_title": "📭 Dead calm on the borders...",
+    "fort_warn_overwrite": "⚠️ **Warning:** You already had an active radar! It has just been reset. Remember to use `/fortress stop` next time to avoid receiving duplicate alerts.",
     "guerre_btn_next": "Next Page ⏩",
     "guerre_btn_prev": "⏮️ Previous Page",
     "guerre_btn_rerun": "🔄 Relaunch a wave",

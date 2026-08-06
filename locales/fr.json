@@ -265,6 +265,7 @@
     "fort_verify_unknown": "<:warning:1534907226689634404> **Inconnu** *(Trop loin ou bug API)*",
     "fort_wait_desc": "😴 **Aucune forteresse n'est attaquable ou proche de s'ouvrir (rien à moins d'une heure).**\nToutes les structures aux alentours sont verrouillées en phase de reconstruction.\n\n*Profites-en pour former de nouvelles troupes, gérer ton alliance ou t'accorder une pause café. Le guet reste en alerte invisible et te contactera par MP dès qu'un mur redevient vulnérable !* ☕",
     "fort_wait_title": "📭 Calme plat sur les frontières...",
+    "fort_warn_overwrite": "⚠️ **Attention :** Tu avais déjà un radar en cours ! Il vient d'être réinitialisé. Pense à utiliser `/fortress stop` la prochaine fois pour éviter de recevoir des alertes en double.",
     "guerre_btn_next": "Page Suivante ⏩",
     "guerre_btn_prev": "⏮️ Page Précédente",
     "guerre_btn_rerun": "🔄️ Relancer une vague",
