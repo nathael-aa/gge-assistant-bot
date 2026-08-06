@@ -25,7 +25,6 @@ logger = logging.getLogger("GGE_Bot")
 STORM_CONFIG_PATH = "data/configs/storm_alerts.json"
 SERVEURS_DE_TEST = [1342424613660921908]
 
-
 async def load_storm_config():
     if not os.path.exists(STORM_CONFIG_PATH):
         return {"guilds": {}, "notified": []}
@@ -55,13 +54,20 @@ FORT_LEVELS_MAPPING = {
 }
 
 ISLE_RESOURCE_MAPPING = {
-    1: "Wood (40,000<:wood:1533427512611311728>)",
-    4: "Wood (20,000<:wood:1533427512611311728>)",
-    2: "Stone (40,000<:stone:1533427511315402822>)",
-    5: "Stone (20,000<:stone:1533427511315402822>)",
-    3: "Aquamarine (52,000<:aquamarine_brut:1533424307512807486>)",
-    6: "Aquamarine (11,500<:aquamarine_brut:1533424307512807486>)"
+    1: {"key": "storm_res_wood", "def": "Wood", "qty": "40,000<:wood:1533427512611311728>"},
+    4: {"key": "storm_res_wood", "def": "Wood", "qty": "20,000<:wood:1533427512611311728>"},
+    2: {"key": "storm_res_stone", "def": "Stone", "qty": "40,000<:stone:1533427511315402822>"},
+    5: {"key": "storm_res_stone", "def": "Stone", "qty": "20,000<:stone:1533427511315402822>"},
+    3: {"key": "storm_res_aqua", "def": "Aquamarine", "qty": "52,000<:aquamarine_brut:1533424307512807486>"},
+    6: {"key": "storm_res_aqua", "def": "Aquamarine", "qty": "11,500<:aquamarine_brut:1533424307512807486>"}
 }
+
+def get_isle_name(isle_id, langue):
+    res_data = ISLE_RESOURCE_MAPPING.get(isle_id)
+    if not res_data: 
+        return t(langue, "storm_res_unknown", defaut="Unknown Island")
+    name = t(langue, res_data["key"], defaut=res_data["def"])
+    return f"{name} ({res_data['qty']})"
 # ==========================================
 
 class StormsCog(commands.Cog):
@@ -105,14 +111,11 @@ class StormsCog(commands.Cog):
         min_attacks="Minimum attacks left (0-10)"
     )
     async def storm_forts(self, interaction: discord.Interaction, availability: int = 1, lvl40: bool = False, lvl50: bool = False, lvl60: bool = False, lvl70: bool = False, lvl80: bool = False, min_attacks: app_commands.Range[int, 0, 10] = 0):
-        # On signale à Discord que le bot réfléchit
         await interaction.response.defer(thinking=True)
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
 
-        # 🔄 Sous-fonction qui gère tout (utilisable par la commande ET par le bouton)
         async def fetch_and_build_view(current_inter: discord.Interaction, is_refresh: bool):
-            # 1. Construction dynamique de la liste des IDs
             isle_ids = []
             if lvl40: isle_ids.append(10)
             if lvl50: isle_ids.append(11)
@@ -123,7 +126,6 @@ class StormsCog(commands.Cog):
             if not isle_ids:
                 isle_ids = [7, 8, 9, 10, 11, 12, 13, 14]
 
-            # 2. Paramètres API
             params = {
                 "page": 1,
                 "size": 500,
@@ -147,7 +149,6 @@ class StormsCog(commands.Cog):
                 msg = t(langue, "cmd_storm_no_forts", defaut="<:Information:1533430015264555099> No forts match your criteria.")
                 return await current_inter.followup.send(msg, ephemeral=True) if is_refresh else await current_inter.followup.send(msg)
 
-            # 3. Filtrage et Tri
             forts_filtres = []
             for fort in forts:
                 fort_info = FORT_LEVELS_MAPPING.get(fort.get("isle_id"))
@@ -168,14 +169,14 @@ class StormsCog(commands.Cog):
             else:
                 forts_filtres.sort(key=lambda x: (x[0], x[1].get("attacks_left", 0)), reverse=True)
 
-            # 4. Construction des Embeds (15 par page)
             embeds = []
             items_par_page = 15
             total_pages = (len(forts_filtres) - 1) // items_par_page + 1
             titre_base = t(langue, "cmd_storm_forts_title", defaut="<:aquamarineforts:1512162154890133506> Available Storm Forts")
             
-            # Petit ajout : Affichage de la date d'actualisation
-            last_update = f"\n*<:time:1512573766096654458> Last refreshed: <t:{int(datetime.now().timestamp())}:T>*"
+            lbl_refreshed = t(langue, "storm_last_refreshed", defaut="Last refreshed:")
+            last_update = f"\n*<:time:1512573766096654458> {lbl_refreshed} <t:{int(datetime.now().timestamp())}:T>*"
+            lbl_att_left = t(langue, "storm_att_left", defaut="att. left")
 
             for i in range(0, len(forts_filtres), items_par_page):
                 page_items = forts_filtres[i : i + items_par_page]
@@ -200,13 +201,12 @@ class StormsCog(commands.Cog):
                         except:
                             pass
 
-                    lignes_description.append(f"**Lvl. {desc}** | <:compass:1512504625364729987> `({x}:{y})` | <:attaque:1512570903886692474> {attaques} att. left{time_str}")
+                    lignes_description.append(f"**Lvl. {desc}** | <:compass:1512504625364729987> `({x}:{y})` | <:attaque:1512570903886692474> {attaques} {lbl_att_left}{time_str}")
                 
                 embed.description = "\n".join(lignes_description) + "\n" + last_update
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
 
-            # 5. Création de la Vue et Ajout du Bouton Refresh
             if len(embeds) > 1:
                 view = PaginationView(embeds)
             else:
@@ -218,23 +218,18 @@ class StormsCog(commands.Cog):
                 label=t(langue, "btn_refresh", defaut="Refresh")
             )
             
-            # Callback exclusif au bouton
             async def refresh_callback(btn_inter: discord.Interaction):
-                await btn_inter.response.defer() # On dit à Discord qu'on charge
+                await btn_inter.response.defer()
                 await fetch_and_build_view(btn_inter, is_refresh=True)
                 
             refresh_btn.callback = refresh_callback
-            view.add_item(refresh_btn) # On ajoute le bouton à la vue (paginée ou non)
+            view.add_item(refresh_btn)
 
-            # 6. Envoi ou Édition
             if is_refresh:
-                # Si c'est un refresh, on modifie le message actuel
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
             else:
-                # Premier appel de la commande
                 await current_inter.followup.send(embed=embeds[0], view=view)
 
-        # Appel initial lors du lancement de la commande
         await fetch_and_build_view(interaction, is_refresh=False)
 
     # ========================================================
@@ -260,12 +255,10 @@ class StormsCog(commands.Cog):
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
 
-        # 🔄 Sous-fonction qui gère tout (utilisable par la commande ET par le bouton)
         async def fetch_and_build_view(current_inter: discord.Interaction, is_refresh: bool):
-            # 1. Paramètres API
             params = {
                 "page": 1,
-                "size": 500, # On limite pour éviter de saturer
+                "size": 500,
             }
             if status.value != 0:
                 params["filterByState"] = status.value
@@ -279,13 +272,12 @@ class StormsCog(commands.Cog):
 
             isles = data.get("isles", [])
             
-            # 2. Filtrage local par ressource (l'API n'a pas filterByIsleIds pour les îles)
             if resource.value == 1:
-                allowed_isles = [3, 6] # Aquamarine
+                allowed_isles = [3, 6]
             elif resource.value == 2:
-                allowed_isles = [1, 4] # Wood
+                allowed_isles = [1, 4]
             elif resource.value == 3:
-                allowed_isles = [2, 5] # Stone
+                allowed_isles = [2, 5]
             else:
                 allowed_isles = []
 
@@ -296,7 +288,6 @@ class StormsCog(commands.Cog):
                 msg = t(langue, "cmd_storm_no_isles", defaut="<:Information:1533430015264555099> No islands match your criteria.")
                 return await current_inter.followup.send(msg, ephemeral=True) if is_refresh else await current_inter.followup.send(msg)
 
-            # 3. Tri (Chronologique si Respawning, sinon tri par type de ressource)
             if status.value == 3:
                 def sort_by_spawn(isle):
                     raw_time = isle.get("available_at", "")
@@ -309,13 +300,16 @@ class StormsCog(commands.Cog):
             else:
                 isles.sort(key=lambda x: x.get("isle_id", 0))
 
-            # 4. Construction des Embeds (15 par page)
             embeds = []
             items_par_page = 15
             total_pages = (len(isles) - 1) // items_par_page + 1
             titre_base = t(langue, "cmd_storm_isles_title", defaut="<:aquamarineiles:1512162072249765908> Storm Islands")
             
-            last_update = f"\n*<:refresh:1533433306610274425> Last refreshed: <t:{int(datetime.now().timestamp())}:T>*"
+            lbl_refreshed = t(langue, "storm_last_refreshed", defaut="Last refreshed:")
+            last_update = f"\n*<:refresh:1533433306610274425> {lbl_refreshed} <t:{int(datetime.now().timestamp())}:T>*"
+            lbl_free = t(langue, "storm_isle_free", defaut="Free!")
+            lbl_respawns = t(langue, "storm_isle_respawns", defaut="Respawns:")
+            lbl_unknown = t(langue, "storm_isle_unknown", defaut="State unknown")
 
             for i in range(0, len(isles), items_par_page):
                 page_items = isles[i : i + items_par_page]
@@ -329,14 +323,12 @@ class StormsCog(commands.Cog):
                 lignes_description = []
                 for isle in page_items:
                     x, y = isle.get("position_x"), isle.get("position_y")
-                    res_nom = ISLE_RESOURCE_MAPPING.get(isle.get("isle_id"), "Unknown")
+                    res_nom = get_isle_name(isle.get("isle_id"), langue)
                     etat = isle.get("state")
                     
-                    # ⚠️ CORRECTION : L'API renvoie 0 (Libre), 1 (Occupé), 2 (En réapparition)
                     if etat == 0:
-                        ligne = f"🟢 **{res_nom}** | <:compass:1512504625364729987> `({x}:{y})` | *Free!*"
+                        ligne = f"🟢 **{res_nom}** | <:compass:1512504625364729987> `({x}:{y})` | *{lbl_free}*"
                     elif etat == 1:
-                        # Utilisation de 'or' au cas où l'API renvoie un vrai JSON 'null'
                         occupant = isle.get("occupier_name") or "Unknown"
                         alliance = isle.get("occupier_alliance_name") or "None"
                         ligne = f"🔴 **{res_nom}** | <:compass:1512504625364729987> `({x}:{y})` | 🛡️ {occupant} (*{alliance}*)"
@@ -347,10 +339,10 @@ class StormsCog(commands.Cog):
                             ts = int(dt.timestamp())
                             time_str = f"<t:{ts}:R>"
                         except:
-                            time_str = "Soon"
-                        ligne = f"<:time:1512573766096654458> **{res_nom}** | <:compass:1512504625364729987> `({x}:{y})` | Respawns: {time_str}"
+                            time_str = t(langue, "storm_isle_soon", defaut="Soon")
+                        ligne = f"<:time:1512573766096654458> **{res_nom}** | <:compass:1512504625364729987> `({x}:{y})` | {lbl_respawns} {time_str}"
                     else:
-                        ligne = f"<:Information:1533430015264555099> **{res_nom}** | <:compass:1512504625364729987> `({x}:{y})` | State unknown"
+                        ligne = f"<:Information:1533430015264555099> **{res_nom}** | <:compass:1512504625364729987> `({x}:{y})` | {lbl_unknown}"
 
                     lignes_description.append(ligne)
                 
@@ -358,7 +350,6 @@ class StormsCog(commands.Cog):
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
 
-            # 5. Création de la Vue et Ajout du Bouton Refresh
             if len(embeds) > 1:
                 view = PaginationView(embeds)
             else:
@@ -377,13 +368,11 @@ class StormsCog(commands.Cog):
             refresh_btn.callback = refresh_callback
             view.add_item(refresh_btn)
 
-            # 6. Envoi ou Édition
             if is_refresh:
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
             else:
                 await current_inter.followup.send(embed=embeds[0], view=view)
 
-        # Appel initial
         await fetch_and_build_view(interaction, is_refresh=False)
 
     # ========================================================
@@ -410,22 +399,24 @@ class StormsCog(commands.Cog):
             return await interaction.followup.send(t(langue, "cmd_storm_no_occupier", defaut=f"<:Information:1533430015264555099> The player **{player}** does not currently hold any resource islands."))
 
         titre = t(langue, "cmd_storm_occupier_title", defaut=f"<:players:1512504277392953426> Islands held by {player}")
-        embed = discord.Embed(title=titre, description=f"Total islands under control: **{len(isles)}**", color=self.clr_occupier)
+        desc_total = t(langue, "storm_occ_total", count=len(isles), defaut=f"Total islands under control: **{len(isles)}**")
+        embed = discord.Embed(title=titre, description=desc_total, color=self.clr_occupier)
         
+        lbl_positions = t(langue, "storm_occ_positions", defaut="Positions")
         chunk = ""
         for isle in isles:
             x, y = isle.get("position_x"), isle.get("position_y")
-            res_nom = ISLE_RESOURCE_MAPPING.get(isle.get("isle_id"), "Unknown")
+            res_nom = get_isle_name(isle.get("isle_id"), langue)
             ligne = f"<:compass:1512504625364729987> `({x}:{y})` | {res_nom}\n"
             
             if len(chunk) + len(ligne) > 1024:
-                embed.add_field(name="Positions", value=chunk, inline=False)
+                embed.add_field(name=lbl_positions, value=chunk, inline=False)
                 chunk = ligne
             else:
                 chunk += ligne
                 
         if chunk:
-            embed.add_field(name="Positions", value=chunk, inline=False)
+            embed.add_field(name=lbl_positions, value=chunk, inline=False)
 
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed)
@@ -445,22 +436,26 @@ class StormsCog(commands.Cog):
                 return await interaction.followup.send(t(langue, "cmd_storm_api_err", defaut="<:error:1512505075220611172> Error connecting to the Storms API."))
             data = await r.json()
 
-        # Formatage des timestamps
         last_scan = data.get("last_scan_at", "")
-        
         try:
             ts_scan = int(datetime.fromisoformat(last_scan.replace('Z', '+00:00')).timestamp())
             scan_str = f"<t:{ts_scan}:R>"
         except:
-            scan_str = "Unknown"
+            scan_str = t(langue, "storm_status_unknown", defaut="Unknown")
 
         embed = discord.Embed(title=t(langue, "cmd_storm_status_title", defaut="<:status:1533435056087896164> Storm Islands Status"), color=self.clr_status)
         
-        desc = (
-            f"**Last Scan:** {scan_str}\n"
-            f"**Covered Radius:** {data.get('scan_radius', 0)} tiles\n\n"
-            f"<:aquamarineforts:1512162154890133506> **Tracked Forts:** {data.get('forts_count', 0):,}\n"
-            f"<:aquamarineiles:1512162072249765908> **Tracked Isles:** {data.get('isles_count', 0):,}"
+        desc = t(langue, "storm_status_desc", 
+            scan=scan_str, 
+            radius=data.get('scan_radius', 0), 
+            forts=data.get('forts_count', 0), 
+            isles=data.get('isles_count', 0), 
+            defaut=(
+                f"**Last Scan:** {scan_str}\n"
+                f"**Covered Radius:** {data.get('scan_radius', 0)} tiles\n\n"
+                f"<:aquamarineforts:1512162154890133506> **Tracked Forts:** {data.get('forts_count', 0):,}\n"
+                f"<:aquamarineiles:1512162072249765908> **Tracked Isles:** {data.get('isles_count', 0):,}"
+            )
         )
         
         embed.description = desc
@@ -490,7 +485,6 @@ class StormsCog(commands.Cog):
 
         ping_format = role.mention if role else "@here"
         
-        # --- SAUVEGARDE DANS LE JSON ---
         data = await load_storm_config()
         if "guilds" not in data:
             data["guilds"] = {}
@@ -504,21 +498,25 @@ class StormsCog(commands.Cog):
             "langue": langue
         }
         await save_storm_config(data)
-        # -------------------------------
 
+        desc = t(langue, "storm_setup_desc", channel=channel.mention, defaut=f"Notifications will be sent in {channel.mention}.")
         embed = discord.Embed(
             title=t(langue, "cmd_storm_setup_title", defaut="<:greencirclebullet:1533440867598340186> Storm Islands Alerts Configured!"),
             color=self.clr_setup,
-            description=f"Notifications will be sent in {channel.mention}."
+            description=desc
         )
         
-        etat_big = "<:greencirclebullet:1533440867598340186> Yes" if ping_big else "<:tomatobulletpoint:1533440866063224933> No"
-        etat_small = "<:greencirclebullet:1533440867598340186> Yes" if ping_small else "<:tomatobulletpoint:1533440866063224933> No"
-        mention_txt = ping_format if (ping_big or ping_small) else "No mention"
+        val_yes = t(langue, "storm_setup_yes", defaut="Yes")
+        val_no = t(langue, "storm_setup_no", defaut="No")
+        val_no_mention = t(langue, "storm_setup_no_mention", defaut="No mention")
 
-        embed.add_field(name="Ping Big Isles", value=etat_big, inline=True)
-        embed.add_field(name="Ping Small Isles", value=etat_small, inline=True)
-        embed.add_field(name="Mention", value=mention_txt, inline=True)
+        etat_big = f"<:greencirclebullet:1533440867598340186> {val_yes}" if ping_big else f"<:tomatobulletpoint:1533440866063224933> {val_no}"
+        etat_small = f"<:greencirclebullet:1533440867598340186> {val_yes}" if ping_small else f"<:tomatobulletpoint:1533440866063224933> {val_no}"
+        mention_txt = ping_format if (ping_big or ping_small) else val_no_mention
+
+        embed.add_field(name=t(langue, "storm_setup_field_big", defaut="Ping Big Isles"), value=etat_big, inline=True)
+        embed.add_field(name=t(langue, "storm_setup_field_small", defaut="Ping Small Isles"), value=etat_small, inline=True)
+        embed.add_field(name=t(langue, "storm_setup_field_mention", defaut="Mention"), value=mention_txt, inline=True)
 
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed)
@@ -533,27 +531,23 @@ class StormsCog(commands.Cog):
     async def storm_alert_loop(self):
         now = datetime.now().timestamp()
 
-        # ==========================================================
-        # 🔄 MISE À JOUR DES EMBEDS (Passage en rouge quand ça spawn)
-        # ==========================================================
         alerts_to_keep = []
         for alert in self.active_alerts:
             if now >= alert["ts"]:
-                # Le temps est écoulé, l'île a spawn !
                 emb = alert["embed"]
+                langue_alert = alert.get("langue", "fr")
+                
                 emb.color = discord.Color.red()
-                # On met à jour le titre pour indiquer que c'est apparu
-                emb.title = "<:aquamarineiles:1512162072249765908> Island Spawned!"
+                emb.title = t(langue_alert, "alert_storm_spawned_title", defaut="<:aquamarineiles:1512162072249765908> Island Spawned!")
+                
                 try:
                     await alert["message"].edit(embed=emb)
                 except Exception:
-                    pass # Le message a pu être supprimé entre temps
+                    pass 
             else:
-                # Pas encore l'heure, on garde en mémoire
                 alerts_to_keep.append(alert)
                 
         self.active_alerts = alerts_to_keep
-        # ==========================================================
 
         data = await load_storm_config()
         guilds_config = data.get("guilds", {})
@@ -562,7 +556,6 @@ class StormsCog(commands.Cog):
         if not guilds_config:
             return 
             
-        # 1. Regrouper les configurations Discord par serveur de jeu GGE
         servers_to_check = {}
         for guild_id_str, config in guilds_config.items():
             gge_server = config.get("gge_server", "E4K_FR1")
@@ -573,7 +566,6 @@ class StormsCog(commands.Cog):
         modifie = False
         total_annoncailles = 0
 
-        # 2. Faire une requête API pour CHAQUE serveur de jeu concerné
         for gge_server, guilds_list in servers_to_check.items():
             headers = await get_api_headers(custom_server=gge_server)
             params = {"size": 4000, "filterByState": 3}
@@ -589,11 +581,9 @@ class StormsCog(commands.Cog):
             isles = api_data.get("isles", [])
             isles_to_announce = []
             
-            # 3. Filtrer les îles
             for isle in isles:
                 isle_id = isle.get("isle_id")
                 
-                # 🛑 FILTRE OPTIMISÉ : On ignore immédiatement le Bois et la Pierre
                 if isle_id not in [3, 6]:
                     continue
 
@@ -604,10 +594,6 @@ class StormsCog(commands.Cog):
                     time_left = ts - now
                     
                     x, y = isle.get("position_x"), isle.get("position_y")
-                    
-                    # 🛠️ CORRECTION DU BUG DE DOUBLON
-                    # Au lieu du timestamp exact, on arrondit à l'heure près (// 3600).
-                    # Une île ne spawn jamais deux fois aux mêmes coordonnées dans la même heure.
                     uid = f"{gge_server}_{x}_{y}_{int(ts) // 3600}" 
                     
                     if 0 < time_left <= 300 and uid not in notified:
@@ -617,7 +603,6 @@ class StormsCog(commands.Cog):
                 except:
                     continue
 
-            # 4. Envoyer les annonces
             if not isles_to_announce:
                 continue
 
@@ -641,13 +626,12 @@ class StormsCog(commands.Cog):
                     is_small = (isle_id == 6)
                     
                     should_ping = (is_big and ping_big) or (is_small and ping_small)
-                    res_nom = ISLE_RESOURCE_MAPPING.get(isle_id, "Unknown Island")
+                    res_nom = get_isle_name(isle_id, langue)
                     x, y = isle.get("position_x"), isle.get("position_y")
                     
                     msg_content = f"{ping_role}" if should_ping else None
                     titre = t(langue, "alert_storm_title", defaut="<:aquamarineiles:1512162072249765908> Island Respawning Soon!")
                     
-                    # ⏱️ FORMAT PRÉCIS : Ajout de :T pour l'heure exacte (avec secondes) et :R pour le compte à rebours
                     desc = t(langue, "alert_storm_desc", name=res_nom, ts=int(ts), x=x, y=y, defaut=f"**{res_nom}** will spawn at **<t:{int(ts)}:T>** (<t:{int(ts)}:R>)\n<:compass:1512504625364729987> Coords: `{x}:{y}`")
 
                     embed = discord.Embed(
@@ -657,17 +641,16 @@ class StormsCog(commands.Cog):
                     )
                     
                     try:
-                        # On envoie le message et on l'ajoute à la mémoire pour l'éditer plus tard
                         sent_msg = await channel.send(content=msg_content, embed=embed)
                         self.active_alerts.append({
                             "message": sent_msg,
                             "embed": embed,
-                            "ts": ts
+                            "ts": ts,
+                            "langue": langue
                         })
                     except discord.Forbidden:
                         pass 
 
-        # 5. Sauvegarde générale
         if modifie:
             if len(notified) > 200: 
                 notified = notified[-200:]
@@ -686,7 +669,7 @@ class StormsCog(commands.Cog):
     # ========================================================
     @storm_group.command(name="stop", description="Stop automatic alerts for respawning islands")
     @app_commands.guild_only()
-    @app_commands.default_permissions(manage_guild=True) # Réservé aux admins, comme le setup
+    @app_commands.default_permissions(manage_guild=True)
     async def storm_stop(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
         langue, serveur = await get_server_config(interaction)
@@ -694,9 +677,7 @@ class StormsCog(commands.Cog):
         data = await load_storm_config()
         guild_id_str = str(interaction.guild.id)
 
-        # On vérifie si le serveur a bien une configuration active
         if "guilds" in data and guild_id_str in data["guilds"]:
-            # On supprime le serveur du dictionnaire
             del data["guilds"][guild_id_str]
             await save_storm_config(data)
             
@@ -708,7 +689,6 @@ class StormsCog(commands.Cog):
             await setup_embed_footer(embed, interaction, langue)
             await interaction.followup.send(embed=embed)
         else:
-            # Si le serveur n'était pas configuré
             msg = t(langue, "cmd_storm_stop_none", defaut="<:Information:1533430015264555099> No active alerts configuration found for this server.")
             await interaction.followup.send(msg)
 
