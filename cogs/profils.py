@@ -1641,7 +1641,7 @@ class ProfilsCog(commands.Cog):
         chunk_size = 10 
         
         lignes_colombes = [f"<:peace:1512503935892586566> **{c['name']}** ({format_num(c['pp'])} PP) ➔ Fin: <t:{c['fin']}:R>" for c in colombes]
-        lignes_cibles = [f"\<:attaque:1512570903886692474> **{c['name']}** ➔ **{format_num(c['pp'])} PP**" for c in cibles_libres]
+        lignes_cibles = [f"<:attaque:1512570903886692474> **{c['name']}** ➔ **{format_num(c['pp'])} PP**" for c in cibles_libres]
 
         async def creer_base_embed(titre_page):
             embed = discord.Embed(

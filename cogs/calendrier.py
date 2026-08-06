@@ -162,34 +162,29 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
 
     @app_commands.command(name="setup", description="Defines the room where calendar alerts will be sent")
     @app_commands.describe(
-        channel="The text-based event lounge",
-        server="The Goodgame Empire server for this Discord",
-        langue="Language for the automated messages"
+        channel="The text-based event lounge"
     )
-    @app_commands.choices(langue=[
-        app_commands.Choice(name="🇫🇷 Français", value="fr"),
-        app_commands.Choice(name="🇬🇧 English", value="en"),
-        app_commands.Choice(name="🇩🇪 Deutsch", value="de")
-    ])
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
-    async def c_setup(self, interaction: discord.Interaction, channel: discord.TextChannel, server: str, langue: app_commands.Choice[str]):
+    async def c_setup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         await interaction.response.defer(ephemeral=True)
+        
+        # 💡 Magie : On récupère la langue et le serveur depuis la config globale du bot !
+        langue, serveur = await get_server_config(interaction)
         
         data = await load_calendrier_async()
         guild_id = str(interaction.guild_id)
-        serveur_upper = server.upper()
         
         if guild_id not in data["guilds"]:
             data["guilds"][guild_id] = {"channel_id": None, "tracked_alliances": []}
             
         data["guilds"][guild_id]["channel_id"] = channel.id
-        data["guilds"][guild_id]["gge_server"] = serveur_upper
-        data["guilds"][guild_id]["langue"] = langue.value
+        data["guilds"][guild_id]["gge_server"] = serveur
+        data["guilds"][guild_id]["langue"] = langue
         
         await save_calendrier_async(data)
         
-        msg = t(langue.value, "cal_setup_success", salon=channel.mention, defaut=f"✅ Le salon des alertes a été défini sur {channel.mention} pour le serveur **{serveur_upper}**.")
+        msg = t(langue, "cal_setup_success", salon=channel.mention, defaut=f"✅ Le salon des alertes a été défini sur {channel.mention} pour le serveur **{serveur}**.")
         await interaction.followup.send(msg)
 
     @app_commands.command(name="track", description="Adds an alliance to the automatic end-of-event report")

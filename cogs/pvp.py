@@ -83,8 +83,8 @@ class CiblePaginationView(discord.ui.View):
         self.ruleset = ruleset
         self.langue = langue
         
-        self.btn_prev.label = t(langue, "guerre_btn_prev", defaut="<:lastpage:1533554126984581283> Page Précédente")
-        self.btn_next.label = t(langue, "guerre_btn_next", defaut="Page Suivante <:nextpage:1533554128230420590>")
+        self.btn_prev.label = t(langue, "guerre_btn_prev", defaut="⏮️ Page Précédente")
+        self.btn_next.label = t(langue, "guerre_btn_next", defaut="Page Suivante ⏭️")
         self.btn_rerun.label = t(langue, "guerre_btn_rerun", defaut="🔄 Relancer une vague")
         self.update_buttons()
 
