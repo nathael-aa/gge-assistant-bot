@@ -420,15 +420,16 @@ class EventsCog(commands.Cog):
         alliance_name = stats_data.get("alliance_name") or "Sans alliance"
 
         sessions, current_session = [], []
-        CUTOFF_DATE = datetime.fromisoformat('2026-06-30T22:40:00+00:00')
+        
         for entry in merged_history:
             d_str = entry.get("date")
             pt = int(entry.get("point", 0))
             if not d_str: continue
             try:
                 dt = datetime.fromisoformat(d_str.replace('Z', '+00:00'))
-                if dt > CUTOFF_DATE:
-                    continue
+                
+                # La vérification CUTOFF_DATE a été supprimée ici
+                
                 if not current_session: current_session.append((dt, pt))
                 else:
                     last_dt = current_session[-1][0]
