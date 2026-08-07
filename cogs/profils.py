@@ -68,25 +68,25 @@ class HistoriqueView(discord.ui.View):
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][0], view=self)
 
     # Remplacement des émojis personnalisés par des émojis Unicode
-    @discord.ui.button(emoji="🏷️", row=0)
+    @discord.ui.button(emoji="<:listitem:1512573892596858960>", row=0)
     async def btn_pseudo(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "pseudo")
 
-    @discord.ui.button(emoji="🛡️", row=0)
+    @discord.ui.button(emoji="<:icon_alliance:1512573872774451210>", row=0)
     async def btn_alliance(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "alliance")
 
-    @discord.ui.button(emoji="🧭", row=0)
+    @discord.ui.button(emoji="<:moove:1512574624112578580>", row=0)
     async def btn_position(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "position")
 
     # Correction : utilisation de "emoji=" au lieu de "label=" pour les flèches
-    @discord.ui.button(emoji="◀️", style=discord.ButtonStyle.blurple, row=1)
+    @discord.ui.button(emoji="<:lastpage:1533554126984581283>", style=discord.ButtonStyle.blurple, row=1)
     async def btn_prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = max(0, self.current_page - 1)
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][self.current_page], view=self)
 
-    @discord.ui.button(emoji="▶️", style=discord.ButtonStyle.blurple, row=1)
+    @discord.ui.button(emoji="<:nextpage:1533554128230420590>", style=discord.ButtonStyle.blurple, row=1)
     async def btn_next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = min(len(self.embeds_dict[self.current_cat]) - 1, self.current_page + 1)
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][self.current_page], view=self)

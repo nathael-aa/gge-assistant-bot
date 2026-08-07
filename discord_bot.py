@@ -71,15 +71,15 @@ class WelcomeView(discord.ui.View):
         embed.set_footer(text=t(lang, "welcome_footer", defaut="Select your language below."))
         return embed
 
-    @discord.ui.button(label="Français", emoji="🇫🇷", style=discord.ButtonStyle.secondary, custom_id="welc_fr")
+    @discord.ui.button(label="Français", emoji="<:flagfrench:1535281050249601105>", style=discord.ButtonStyle.secondary, custom_id="welc_fr")
     async def btn_fr(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=self.get_welcome_embed("fr"))
 
-    @discord.ui.button(label="English", emoji="🇬🇧", style=discord.ButtonStyle.secondary, custom_id="welc_en")
+    @discord.ui.button(label="English", emoji="<:flagunitedkingdom:1535281046394769429>", style=discord.ButtonStyle.secondary, custom_id="welc_en")
     async def btn_en(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=self.get_welcome_embed("en"))
 
-    @discord.ui.button(label="Deutsch", emoji="🇩🇪", style=discord.ButtonStyle.secondary, custom_id="welc_de")
+    @discord.ui.button(label="Deutsch", emoji="<:flaggermany:1535281037716889750>", style=discord.ButtonStyle.secondary, custom_id="welc_de")
     async def btn_de(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=self.get_welcome_embed("de"))
 

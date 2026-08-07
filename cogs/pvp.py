@@ -83,28 +83,31 @@ class CiblePaginationView(discord.ui.View):
         self.ruleset = ruleset
         self.langue = langue
         
-        self.btn_prev.label = t(langue, "guerre_btn_prev", defaut="⏮️ Page Précédente")
-        self.btn_next.label = t(langue, "guerre_btn_next", defaut="Page Suivante ⏭️")
-        self.btn_rerun.label = t(langue, "guerre_btn_rerun", defaut="🔄 Relancer une vague")
+        # 💡 CORRECTION ICI : On retire les emojis des textes (et n'oublie pas de faire pareil dans tes .json !)
+        self.btn_prev.label = t(langue, "guerre_btn_prev", defaut="Page Précédente")
+        self.btn_next.label = t(langue, "guerre_btn_next", defaut="Page Suivante")
+        self.btn_rerun.label = t(langue, "guerre_btn_rerun", defaut="Relancer une vague")
         self.update_buttons()
 
     def update_buttons(self):
         self.btn_prev.disabled = self.current_page == 0
         self.btn_next.disabled = self.current_page == len(self.embeds) - 1
 
-    @discord.ui.button(style=discord.ButtonStyle.secondary, custom_id="cible_prev")
+    # Boutons avec juste un émoji universel (l'émoji gère l'image, le __init__ gère le texte !)
+    @discord.ui.button(emoji="<:lastpage:1533554126984581283>", style=discord.ButtonStyle.secondary, custom_id="cible_prev")
     async def btn_prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page -= 1
         self.update_buttons()
         await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
 
-    @discord.ui.button(style=discord.ButtonStyle.secondary, custom_id="cible_next")
+    @discord.ui.button(emoji="<:nextpage:1533554128230420590>", style=discord.ButtonStyle.secondary, custom_id="cible_next")
     async def btn_next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page += 1
         self.update_buttons()
         await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
 
-    @discord.ui.button(style=discord.ButtonStyle.primary, custom_id="cible_rerun")
+    # On définit l'émoji en dur, mais le texte (label) est géré par le __init__
+    @discord.ui.button(emoji="<:refresh:1533433306610274425>", style=discord.ButtonStyle.primary, custom_id="cible_rerun")
     async def btn_rerun(self, interaction: discord.Interaction, button: discord.ui.Button):
         for item in self.children:
             item.disabled = True

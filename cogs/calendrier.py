@@ -37,13 +37,25 @@ class CalendarNavView(discord.ui.View):
         self.current_page = current_page
         self.langue = langue
 
-        self.btn_past = discord.ui.Button(label=t(langue, "cal_btn_past", defaut="⏮️ Historique"), custom_id="cal_past")
+        self.btn_past = discord.ui.Button(
+            label=t(langue, "cal_btn_past", defaut="Historique"), 
+            emoji="<:lastpage:1533554126984581283>", 
+            custom_id="cal_past"
+        )
         self.btn_past.callback = self.callback_past
 
-        self.btn_main = discord.ui.Button(label=t(langue, "cal_btn_main", defaut="⏺️ Actuels & À venir"), custom_id="cal_main")
+        self.btn_main = discord.ui.Button(
+            label=t(langue, "cal_btn_main", defaut="Actuels & À venir"), 
+            emoji="<:main:1535282885769171006>", 
+            custom_id="cal_main"
+        )
         self.btn_main.callback = self.callback_main
 
-        self.btn_future = discord.ui.Button(label=t(langue, "cal_btn_future", defaut="⏭️ À venir (Uniquement)"), custom_id="cal_future")
+        self.btn_future = discord.ui.Button(
+            label=t(langue, "cal_btn_future", defaut="À venir (Uniquement)"), 
+            emoji="<:nextpage:1533554128230420590>", 
+            custom_id="cal_future"
+        )
         self.btn_future.callback = self.callback_future
 
         self.add_item(self.btn_past)
@@ -105,7 +117,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             "berimond": {"name_key": "cal_ev_berimond", "name_default": "Bérimond", "emoji": "<:berimond:1512430901756428390>", "color": 0x4b86b4, "tracker_name": "Bataille de Bérimond", "start": "11:00", "end": "08:30"},
             "bladecoast": {"name_key": "cal_ev_bladecoast", "name_default": "Côte Tranchante", "emoji": "<:bladecoast:1514704235894407399>", "color": 0xbfb5b2, "tracker_name": None, "start": "11:00", "end": "09:00"},
             "rift raid": {"name_key": "cal_ev_rift", "name_default": "Raid de la Faille", "emoji": "<:riftraid:1514704237206966272>", "color": 0xfb2e01, "tracker_name": None, "start": "11:00", "end": "09:00"},
-            "grand tournament": {"name_key": "cal_ev_tournament", "name_default": "Grand Tournoi", "emoji": "<:grandtournament:1514704234128343040>", "color": 0x03396c, "tracker_name": None, "start": "11:00", "end": "12:10"},
+            "grand tournament": {"name_key": "cal_ev_tournament", "name_default": "Grand Tournoi", "emoji": "<:grandtournament:1514704234128343040>", "color": 0x03396c, "tracker_name": None, "start": "11:00", "end": "12:00"},
             "beyond the horizon": {"name_key": "cal_ev_horizon", "name_default": "Au-delà de l'horizon", "emoji": "<:bth:1512574690441302026>", "color": 0x006666, "tracker_name": None, "start": "11:00", "end": "00:40"},
             "outer realms": {"name_key": "cal_ev_outer", "name_default": "Royaumes extérieurs", "emoji": "<:outerrealmsicon:1512573734404231329>", "color": 0xffe28a, "tracker_name": None, "start": "11:00", "end": "00:40"},
             "imperial patronage": {"name_key": "cal_ev_patronage", "name_default": "Patronage impérial", "emoji": "<:patronage:1514704230106140874>", "color": 0xe8702a, "tracker_name": None, "start": "11:00", "end": "09:30"},

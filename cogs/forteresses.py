@@ -79,15 +79,17 @@ class FortressActionView(discord.ui.View):
 
         self.btn_verify = discord.ui.Button(
             style=discord.ButtonStyle.secondary, 
-            label=t(langue, "fort_btn_verify", defaut="🔍 Vérifier ces cibles"),
+            label=t(langue, "fort_btn_verify", defaut="Vérifier ces cibles"),
+            emoji="<:search:1512504654183792690>",
             custom_id="btn_fort_verify"
         )
         self.btn_verify.callback = self.callback_verify
 
         self.btn_relaunch = discord.ui.Button(
             style=discord.ButtonStyle.primary, 
-            label=t(langue, "fort_btn_relaunch", defaut="🔄 Relancer (10 suivantes)"),
-            custom_id="btn_fort_relaunch"
+            label=t(langue, "fort_btn_relaunch", defaut="Relancer (10 suivantes)"),
+            emoji="<:refresh:1533433306610274425>",
+            custom_id="fort_btn_relaunch"
         )
         self.btn_relaunch.callback = self.callback_relaunch
 

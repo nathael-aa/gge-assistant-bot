@@ -71,7 +71,7 @@ class RadarSettingsView(discord.ui.View):
         self.btn_alliance.label = t(langue, "rad_btn_alli", defaut="Alliance")
         self.btn_puissance.label = t(langue, "rad_btn_pp", defaut="Puissance")
         self.btn_colombe.label = t(langue, "rad_btn_dove", defaut="Colombe")
-        self.btn_fermer.label = t(langue, "rad_btn_close", defaut="✅ Terminer et Fermer")
+        self.btn_fermer.label = t(langue, "rad_btn_close", defaut="Terminer et Fermer")
         self.update_buttons_state()
 
     async def toggle_pref(self, pref_key: str):
@@ -110,7 +110,7 @@ class RadarSettingsView(discord.ui.View):
     async def btn_colombe(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.toggle_pref("colombe"); self.update_buttons_state(); await interaction.response.edit_message(view=self)
 
-    @discord.ui.button(style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(emoji="<:greencirclebullet:1533440867598340186>", style=discord.ButtonStyle.secondary, row=2)
     async def btn_fermer(self, interaction: discord.Interaction, button: discord.ui.Button):
         msg = t(self.langue, "rad_saved_player", defaut="✅ **Préférences enregistrées avec succès !** Le radar joueur est actif.")
         await interaction.response.edit_message(content=msg, view=None)
@@ -130,7 +130,7 @@ class RadarAllianceSettingsView(discord.ui.View):
         self.btn_mouvements.label = t(langue, "rad_alli_btn_mouv", defaut="Entrées/Sorties")
         self.btn_rangs.label = t(langue, "rad_alli_btn_rangs", defaut="Promotions/Rétrogradations")
         self.btn_infos.label = t(langue, "rad_alli_btn_infos", defaut="Changement Nom/Chef")
-        self.btn_fermer.label = t(langue, "rad_btn_close", defaut="✅ Terminer et Fermer")
+        self.btn_fermer.label = t(langue, "rad_btn_close", defaut="Terminer et Fermer")
         self.update_buttons_state()
 
     async def toggle_pref(self, pref_key: str):
@@ -159,7 +159,7 @@ class RadarAllianceSettingsView(discord.ui.View):
     async def btn_infos(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.toggle_pref("infos"); self.update_buttons_state(); await interaction.response.edit_message(view=self)
 
-    @discord.ui.button(style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(emoji="<:greencirclebullet:1533440867598340186>", style=discord.ButtonStyle.secondary, row=2)
     async def btn_fermer(self, interaction: discord.Interaction, button: discord.ui.Button):
         msg = t(self.langue, "rad_alli_saved", defaut="✅ **Préférences d'alliance enregistrées !** Le radar global est actif.")
         await interaction.response.edit_message(content=msg, view=None)

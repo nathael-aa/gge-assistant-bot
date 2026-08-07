@@ -393,14 +393,24 @@ class PaginationView(discord.ui.View):
         super().__init__(timeout=7200)
         self.embeds = embeds
         self.current_page = 0
-    @discord.ui.button(label="⏮️", style=discord.ButtonStyle.secondary)
-    async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.update_buttons()
+
+    def update_buttons(self):
+        self.btn_prev.disabled = (self.current_page == 0)
+        self.btn_next.disabled = (self.current_page == len(self.embeds) - 1)
+
+    # On utilise "emoji=" au lieu de "label=" !
+    @discord.ui.button(emoji="<:lastpage:1533554126984581283>", style=discord.ButtonStyle.secondary, custom_id="page_prev")
+    async def btn_prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = max(0, self.current_page - 1)
-        await interaction.response.edit_message(embed=self.embeds[self.current_page])
-    @discord.ui.button(label="⏭️", style=discord.ButtonStyle.secondary)
-    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
+
+    @discord.ui.button(emoji="<:nextpage:1533554128230420590>", style=discord.ButtonStyle.secondary, custom_id="page_next")
+    async def btn_next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = min(len(self.embeds) - 1, self.current_page + 1)
-        await interaction.response.edit_message(embed=self.embeds[self.current_page])
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
 
 def format_num(n):
     try:
