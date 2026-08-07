@@ -115,6 +115,14 @@ HELP_CONFIG = {
 }
 
 # ==========================================
+# 🛡️ PROTECTEUR DE CLÉS POUR LE SCRIPT DE SYNCHRO
+# ==========================================
+def _protect_help_keys():
+    for cat_data in HELP_CONFIG.values():
+        for cmd in cat_data.get("commands", []):
+            t("fr", cmd["desc_key"])
+
+# ==========================================
 # 🎛️ MENU DÉROULANT (SELECT MENU)
 # ==========================================
 class HelpSelect(discord.ui.Select):

@@ -692,5 +692,16 @@ class StormsCog(commands.Cog):
             msg = t(langue, "cmd_storm_stop_none", defaut="<:Information:1533430015264555099> No active alerts configuration found for this server.")
             await interaction.followup.send(msg)
 
+    # ==========================================
+    # 🛡️ LEURRES POUR LE SCRIPT DE TRADUCTION
+    # Ces appels ne sont jamais exécutés, ils servent
+    # juste à empêcher !i18l_sync de supprimer ces clés dynamiques.
+    # ==========================================
+    def _dummy_i18n():
+        # --- Ressources Storms ---
+        t(langue, "storm_res_aqua")
+        t(langue, "storm_res_stone")
+        t(langue, "storm_res_wood")
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(StormsCog(bot))
