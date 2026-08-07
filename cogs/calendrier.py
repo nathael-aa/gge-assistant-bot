@@ -169,7 +169,6 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
     async def c_setup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         await interaction.response.defer(ephemeral=True)
         
-        # 💡 Magie : On récupère la langue et le serveur depuis la config globale du bot !
         langue, serveur = await get_server_config(interaction)
         
         data = await load_calendrier_async()
@@ -236,6 +235,28 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
         
         msg_success = t(langue, "cal_untrack_success", alliance=alliance_name, defaut=f"❌ L'alliance **{alliance_name}** a été retirée de la liste de suivi.")
         await interaction.followup.send(msg_success)
+
+    @app_commands.command(name="stop", description="Disable calendar alerts and event reports for this server")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def c_stop(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        langue, _ = await get_server_config(interaction)
+        
+        data = await load_calendrier_async()
+        guild_id = str(interaction.guild_id)
+        
+        # On vérifie s'il y a bien un salon configuré
+        if guild_id in data.get("guilds", {}) and data["guilds"][guild_id].get("channel_id") is not None:
+            # On supprime juste l'ID du salon (les alliances suivies sont conservées)
+            data["guilds"][guild_id]["channel_id"] = None
+            await save_calendrier_async(data)
+            
+            msg = t(langue, "cal_stop_success", defaut="🛑 **Calendrier désactivé.** Ce serveur ne recevra plus les alertes d'événements et les rapports d'alliance.")
+            await interaction.followup.send(msg)
+        else:
+            msg_fail = t(langue, "cal_stop_fail", defaut="⚠️ Le calendrier n'était pas activé sur ce serveur.")
+            await interaction.followup.send(msg_fail)
 
     # ==========================================
     # 📆 COMMANDE CURRENT (NAVIGATION INTÉGRÉE)
@@ -393,10 +414,11 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             uid_start = f"{ev['key']}_{ev['start'].strftime('%Y-%m-%d')}_start"
             uid_end = f"{ev['key']}_{ev['end'].strftime('%Y-%m-%d')}_end"
 
+            # 🟢 DÉBUT D'ÉVÉNEMENT
             if maintenant >= ev["start"] and uid_start not in notified:
-                logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT DÉBUT de {meta['name_default']}")
-                
+                # On limite l'envoi Discord ET les logs aux événements d'aujourd'hui !
                 if ev["start"].date() == maintenant.date():
+                    logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT DÉBUT de {meta['name_default']}")
                     ts_fin = int(ev["end"].timestamp())
                     
                     for guild_id, g_info in data.get("guilds", {}).items():
@@ -426,14 +448,16 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                 try: await channel.send(embed=embed_start)
                                 except: pass
 
+                # L'ajout à la mémoire se fait dans tous les cas pour ignorer les vieux événements
                 notified.append(uid_start)
                 modifie = True
 
-            # 🔴 FIN D'ÉVÉNEMENT (09h00)
+            # 🔴 FIN D'ÉVÉNEMENT
             if maintenant >= ev["end"] and uid_end not in notified:
-                logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT FIN de {meta['name_default']}")
-                
+                # On limite l'envoi Discord ET les logs aux événements d'aujourd'hui !
                 if ev["end"].date() == maintenant.date():
+                    logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT FIN de {meta['name_default']}")
+                    
                     for guild_id, g_info in data.get("guilds", {}).items():
                         channel_id = g_info.get("channel_id")
                         if channel_id:
@@ -477,11 +501,13 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                                 try: await channel.send(err_msg)
                                                 except: pass
 
+                # L'ajout à la mémoire se fait dans tous les cas pour ignorer les vieux événements
                 notified.append(uid_end)
                 modifie = True
 
         if modifie:
-            if len(notified) > 60: notified = notified[-60:]
+            # 💡 LE FIX EST ICI : On passe la mémoire de 60 à 500 événements !
+            if len(notified) > 500: notified = notified[-500:]
             data["notified"] = notified
             await save_calendrier_async(data)
 

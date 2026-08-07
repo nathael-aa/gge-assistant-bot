@@ -685,5 +685,7 @@
     "welcome_step2_title": "<:two:1533556308723109999> Discover the Tools",
     "welcome_step3_desc": "To receive event start and end alerts, an administrator must use the </calendar setup:0> command in a dedicated channel. You can then use </calendar track:0> to automatically get your alliances' results at the end of each event.",
     "welcome_step3_title": "<:three:1533556307511087144> Server Administrator Specifics",
-    "welcome_title": "<:castle1:1512573817892110647> Thanks for adding GGE Assistant!"
+    "welcome_title": "<:castle1:1512573817892110647> Thanks for adding GGE Assistant!",
+    "cal_stop_success": "🛑 **Calendar disabled.** This server will no longer receive event alerts and alliance reports.",
+    "cal_stop_fail": "⚠️ The calendar was not active on this server."
 }
