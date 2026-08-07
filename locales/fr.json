@@ -74,6 +74,8 @@
     "cal_stat_master": "Puissance de Construction",
     "cal_stat_might": "Points de Puissance",
     "cal_stat_plunder": "Points de Pillage",
+    "cal_stop_fail": "⚠️ Le calendrier n'était pas activé sur ce serveur.",
+    "cal_stop_success": "🛑 **Calendrier désactivé.** Ce serveur ne recevra plus les alertes d'événements et les rapports d'alliance.",
     "cal_title_future": "🚀 Événements Futurs Uniquement",
     "cal_title_main": "📅 Événements Actuels & À venir",
     "cal_title_past": "⏳ Événements Passés (30 derniers jours)",
@@ -685,7 +687,5 @@
     "welcome_step2_title": "<:two:1533556308723109999> Découvrir les Outils",
     "welcome_step3_desc": "Pour recevoir les alertes de début et de fin d'événements, un administrateur doit utiliser la commande </calendar setup:0> dans un salon dédié. Vous pourrez ensuite utiliser </calendar track:0> pour avoir les résultats de vos alliances à chaque événements, automatiquement.",
     "welcome_step3_title": "<:three:1533556307511087144> Spécificités aux administrateur du serveur",
-    "welcome_title": "<:castle1:1512573817892110647> Merci d'avoir ajouté GGE Assistant !",
-    "cal_stop_success": "🛑 **Calendrier désactivé.** Ce serveur ne recevra plus les alertes d'événements et les rapports d'alliance.",
-    "cal_stop_fail": "⚠️ Le calendrier n'était pas activé sur ce serveur."
+    "welcome_title": "<:castle1:1512573817892110647> Merci d'avoir ajouté GGE Assistant !"
 }

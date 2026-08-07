@@ -74,6 +74,8 @@
     "cal_stat_master": "Building Might",
     "cal_stat_might": "Might Points",
     "cal_stat_plunder": "Plunder Points",
+    "cal_stop_fail": "⚠️ The calendar was not active on this server.",
+    "cal_stop_success": "🛑 **Calendar disabled.** This server will no longer receive event alerts and alliance reports.",
     "cal_title_future": "🚀 Upcoming Events Only",
     "cal_title_main": "📅 Current & Upcoming Events",
     "cal_title_past": "⏳ Past Events (Last 30 days)",
@@ -685,7 +687,5 @@
     "welcome_step2_title": "<:two:1533556308723109999> Discover the Tools",
     "welcome_step3_desc": "To receive event start and end alerts, an administrator must use the </calendar setup:0> command in a dedicated channel. You can then use </calendar track:0> to automatically get your alliances' results at the end of each event.",
     "welcome_step3_title": "<:three:1533556307511087144> Server Administrator Specifics",
-    "welcome_title": "<:castle1:1512573817892110647> Thanks for adding GGE Assistant!",
-    "cal_stop_success": "🛑 **Calendar disabled.** This server will no longer receive event alerts and alliance reports.",
-    "cal_stop_fail": "⚠️ The calendar was not active on this server."
+    "welcome_title": "<:castle1:1512573817892110647> Thanks for adding GGE Assistant!"
 }

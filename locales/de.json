@@ -74,6 +74,8 @@
     "cal_stat_master": "Bau-Macht",
     "cal_stat_might": "Machtpunkte",
     "cal_stat_plunder": "Plünderpunkte",
+    "cal_stop_fail": "⚠️ Der Kalender war auf diesem Server nicht aktiv.",
+    "cal_stop_success": "🛑 **Kalender deaktiviert.** Dieser Server erhält keine Ereigniswarnungen und Allianzberichte mehr.",
     "cal_title_future": "🚀 Nur bevorstehende Events",
     "cal_title_main": "📅 Aktuelle & bevorstehende Events",
     "cal_title_past": "⏳ Vergangene Events (letzte 30 Tage)",
@@ -685,7 +687,5 @@
     "welcome_step2_title": "<:two:1533556308723109999> Entdecke die Werkzeuge",
     "welcome_step3_desc": "Um Benachrichtigungen über den Beginn und das Ende von Events zu erhalten, muss ein Administrator den Befehl </calendar setup:0> in einem dafür vorgesehenen Kanal verwenden. Danach könnt ihr </calendar track:0> nutzen, um automatisch die Ergebnisse eurer Allianzen bei jedem Event zu erhalten.",
     "welcome_step3_title": "<:three:1533556307511087144> Spezifische Funktionen für Server-Administratoren",
-    "welcome_title": "<:castle1:1512573817892110647> Danke, dass du den GGE Assistant hinzugefügt hast!",
-    "cal_stop_success": "🛑 **Kalender deaktiviert.** Dieser Server erhält keine Ereigniswarnungen und Allianzberichte mehr.",
-    "cal_stop_fail": "⚠️ Der Kalender war auf diesem Server nicht aktiv."
+    "welcome_title": "<:castle1:1512573817892110647> Danke, dass du den GGE Assistant hinzugefügt hast!"
 }
