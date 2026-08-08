@@ -649,7 +649,11 @@ class StormsCog(commands.Cog):
                             "langue": langue
                         })
                     except discord.Forbidden:
-                        pass 
+                        # Le bot n'a pas les permissions de parler dans ce salon
+                        pass
+                    except discord.HTTPException as e:
+                        # Intercepte les erreurs 503, 500, etc. venant de Discord
+                        logger.error(f"❌ [Storm Alerts] Erreur réseau Discord lors de l'envoi : {e}")
 
         if modifie:
             if len(notified) > 200: 
