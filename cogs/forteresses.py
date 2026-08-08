@@ -494,9 +494,9 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         if 2 in kids: noms_royaumes.append(t(langue, "fort_realm_ice", defaut="Glaces <:dungeon2:1512573843267518546>"))
         if 3 in kids: noms_royaumes.append(t(langue, "fort_realm_peaks", defaut="Pics <:dungeon3:1512573844538396692>"))
         
-        st_fluide = t(langue, "fort_status_fluid", defaut="<:greencirclebullet:1533440867598340186> Fluide")
-        st_mod = t(langue, "fort_status_mod", defaut="<:deeporangebullet:1534908821925920818> Modérée")
-        st_elev = t(langue, "fort_status_high", defaut="<:tomatobulletpoint:1533440866063224933> Élevée")
+        st_fluide = t(langue, "fort_status_fluid", defaut="<:greencirclebullet:1533440867598340186> `Fluide`")
+        st_mod = t(langue, "fort_status_mod", defaut="<:deeporangebullet:1534908821925920818> `Modérée`")
+        st_elev = t(langue, "fort_status_high", defaut="<:tomatobulletpoint:1533440866063224933> `Élevée`")
         status_charge = st_fluide if nb_sessions_actives < 4 else st_mod if nb_sessions_actives < 8 else st_elev
 
         embed_conf = discord.Embed(title=t(langue, "fort_setup_title", defaut="<:fortresses:1512574700839239892> Dispositif de Guet Activé"), color=self.clr_activation)
@@ -504,7 +504,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         embed_conf.add_field(name=t(langue, "fort_field_realms", defaut="<:icon_world:1512517516012814537> Mondes"), value=" • ".join(noms_royaumes), inline=False)
         embed_conf.add_field(name=t(langue, "fort_field_freq", defaut="⏱️ Fréquence"), value=f"`{freq_val} min`", inline=True)
         embed_conf.add_field(name=t(langue, "fort_field_end", defaut="⏳ Fin du guet"), value=f"<t:{ts_fin}:R>", inline=True)
-        embed_conf.add_field(name=t(langue, "fort_field_load", defaut="📊 Charge Bot"), value=f"`{status_charge}`", inline=True)
+        embed_conf.add_field(name=t(langue, "fort_field_load", defaut="📊 Charge Bot"), value=f"{status_charge}", inline=True)
         await setup_embed_footer(embed_conf, interaction, langue)
         await interaction.followup.send(embed=embed_conf, ephemeral=False)
         
