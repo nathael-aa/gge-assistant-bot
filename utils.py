@@ -143,6 +143,16 @@ def _get_api_timestamp(*sources):
 # ==========================================
 # 🌍 MOTEUR DE TRADUCTION (i18n)
 # ==========================================
+import json
+import logging
+
+# On importe ton futur dictionnaire d'émojis
+# (On utilise un try/except pour que ton bot ne plante pas si le fichier n'existe pas encore)
+try:
+    from emojis import DICT_EMOJIS
+except ImportError:
+    DICT_EMOJIS = {}
+
 _translations = {}
 
 def charger_langues():
@@ -164,12 +174,19 @@ def t(langue: str, cle: str, defaut: str = None, **kwargs) -> str:
     dico = _translations.get(langue, _translations.get('fr', {}))
     texte = dico.get(cle, defaut if defaut else f"[{cle}_MANQUANT]")
     
-    if kwargs:
+    # 🔥 LA MAGIE OPÈRE ICI :
+    # On fusionne le dictionnaire global des émojis avec tes variables locales (kwargs)
+    variables_fusionnees = {**DICT_EMOJIS, **kwargs}
+    
+    # On vérifie s'il y a des variables (soit des émojis, soit des kwargs) à remplacer
+    if variables_fusionnees:
         try:
-            return texte.format(**kwargs)
+            return texte.format(**variables_fusionnees)
         except KeyError as e:
-            logger.warning(f"⚠️ Variable {e} manquante pour la traduction de la clé '{cle}'")
+            logger.warning(f"⚠️ Variable {e} manquante pour la traduction de '{cle}'")
+            # En cas d'erreur (ex: un paramètre oublié), on renvoie quand même le texte brut
             return texte
+            
     return texte
 
 # ==========================================
