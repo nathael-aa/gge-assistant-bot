@@ -148,7 +148,7 @@ import logging
 
 # 1. On corrige le chemin d'import (locales.emojis au lieu de emojis)
 try:
-    from locales.emojis import DICT_EMOJIS
+    from emojis import DICT_EMOJIS
 except ImportError as e:
     logger.error(f"❌ Impossible de charger les émojis : {e}")
     DICT_EMOJIS = {}
