@@ -146,14 +146,19 @@ def _get_api_timestamp(*sources):
 import json
 import logging
 
-# On importe ton futur dictionnaire d'émojis
-# (On utilise un try/except pour que ton bot ne plante pas si le fichier n'existe pas encore)
+# 1. On corrige le chemin d'import (locales.emojis au lieu de emojis)
 try:
-    from emojis import DICT_EMOJIS
-except ImportError:
+    from locales.emojis import DICT_EMOJIS
+except ImportError as e:
+    logger.error(f"❌ Impossible de charger les émojis : {e}")
     DICT_EMOJIS = {}
 
 _translations = {}
+
+# 2. Le Gilet Pare-Balles : Si une variable manque, elle ne fait pas planter le bot !
+class SafeDict(dict):
+    def __missing__(self, key):
+        return f"{{{key}}}"  # Renvoie {nom_de_la_cle_manquante} au lieu de crasher
 
 def charger_langues():
     _translations.clear()
@@ -174,18 +179,12 @@ def t(langue: str, cle: str, defaut: str = None, **kwargs) -> str:
     dico = _translations.get(langue, _translations.get('fr', {}))
     texte = dico.get(cle, defaut if defaut else f"[{cle}_MANQUANT]")
     
-    # 🔥 LA MAGIE OPÈRE ICI :
-    # On fusionne le dictionnaire global des émojis avec tes variables locales (kwargs)
+    # On fusionne le dictionnaire global des émojis avec tes variables locales
     variables_fusionnees = {**DICT_EMOJIS, **kwargs}
     
-    # On vérifie s'il y a des variables (soit des émojis, soit des kwargs) à remplacer
     if variables_fusionnees:
-        try:
-            return texte.format(**variables_fusionnees)
-        except KeyError as e:
-            logger.warning(f"⚠️ Variable {e} manquante pour la traduction de '{cle}'")
-            # En cas d'erreur (ex: un paramètre oublié), on renvoie quand même le texte brut
-            return texte
+        # 💡 On utilise format_map avec notre SafeDict pour une sécurité absolue
+        return texte.format_map(SafeDict(**variables_fusionnees))
             
     return texte
 
