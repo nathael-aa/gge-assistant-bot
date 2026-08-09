@@ -261,7 +261,7 @@
     "fort_title_rescue": " {e_std_ambulance} (Notfallmodus)",
     "fort_unknown_player": "Unbekannt",
     "fort_unknown_realm": "Reich {kid}",
-    "fort_verify_burning": "{e_fire2} **In Flammen** *(Verfügbar in {mins} Min)*",
+    "fort_verify_burning": "{e_fire2} **In Flammen** *(Verfügbar in <t:{ts}:R> Min)*",
     "fort_verify_free": "{e_greencirclebullet} **Immer noch frei!**",
     "fort_verify_title": "{e_search} Ergebnis der Überprüfung",
     "fort_verify_unknown": "{e_warning} **Unbekannt** *(Zu weit entfernt oder API-Fehler)*",

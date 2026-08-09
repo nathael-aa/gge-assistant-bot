@@ -261,7 +261,7 @@
     "fort_title_rescue": " {e_std_ambulance} (Backup Mode)",
     "fort_unknown_player": "Unknown",
     "fort_unknown_realm": "Realm {kid}",
-    "fort_verify_burning": "{e_fire2} **On fire** *(Available in {mins} min)*",
+    "fort_verify_burning": "{e_fire2} **On fire** *(Available in <t:{ts}:R> min)*",
     "fort_verify_free": "{e_greencirclebullet} **Still free!**",
     "fort_verify_title": "{e_search} Verification Result",
     "fort_verify_unknown": "{e_warning} **Unknown** *(Too far or API glitch)*",

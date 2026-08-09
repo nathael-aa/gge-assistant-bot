@@ -148,10 +148,16 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             elif etat["status"] == "libre":
                 status_txt = t(langue, "fort_verify_free", defaut="🟢 **Attaquable maintenant**")
             else:
+                else:
                 try:
                     dt_cd = datetime.fromisoformat(etat["cd_until"].replace('Z', '+00:00'))
                     ts_cd = int(dt_cd.timestamp())
-                    status_txt = t(langue, "fort_verify_burning", defaut=f"🔥 **En feu** *(Dispo <t:{ts_cd}:R>)*")
+                    
+                    # On calcule les minutes restantes
+                    maintenant_ts = int(discord.utils.utcnow().timestamp())
+                    minutes_restantes = max(1, int((ts_cd - maintenant_ts) / 60))
+                    
+                    status_txt = t(langue, "fort_verify_burning", mins=minutes_restantes, ts=ts_cd, defaut=f"🔥 **En feu** *(Dispo dans {minutes_restantes} min)*")
                 except:
                     status_txt = t(langue, "fort_verify_burning_unk", defaut="🔥 **En feu** *(Temps inconnu)*")
             

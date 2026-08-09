@@ -261,7 +261,7 @@
     "fort_title_rescue": " {e_std_ambulance} (Mode Secours)",
     "fort_unknown_player": "Inconnu",
     "fort_unknown_realm": "Monde {kid}",
-    "fort_verify_burning": "{e_fire2} **En feu** *(Dispo dans {mins} min)*",
+    "fort_verify_burning": "{e_fire2} **En feu** *(Dispo <t:{ts}:R>)*",
     "fort_verify_free": "{e_greencirclebullet} **Toujours libre !**",
     "fort_verify_title": "{e_search} Résultat de la vérification",
     "fort_verify_unknown": "{e_warning} **Inconnu** *(Trop loin ou bug API)*",
