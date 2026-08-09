@@ -479,7 +479,8 @@ class EventsCog(commands.Cog):
             ))
             
             embeds = []
-            chunk_size = 15
+            # 🟢 RÉDUCTION de 15 à 10 pour éviter le crash des limites Discord
+            chunk_size = 10 
             nb_pages = max(1, (len(lignes_details) - 1) // chunk_size + 1)
 
             for i in range(0, len(lignes_details), chunk_size):
@@ -493,8 +494,14 @@ class EventsCog(commands.Cog):
                 f_title1 = t(langue, "ev_cumul_field_stats", n=len(recent_sessions), start=start_date_global, end=end_date_global, defaut=f"<:stats:1512517930490003726> Bilan sur les {len(recent_sessions)} derniers events\n*(Période du {start_date_global} au {end_date_global})*")
                 embed.add_field(name=f_title1, value=stats_txt, inline=False)
                 
+                field_value = ""
+                for ligne in chunk:
+                    if len(field_value) + len(ligne) + 1 > 1000:
+                        break
+                    field_value += ligne + "\n"
+                
                 f_title2 = t(langue, "ev_session_details_page", curr=page_actuelle, tot=nb_pages, defaut=f"Détails des sessions (Page {page_actuelle}/{nb_pages})")
-                embed.add_field(name=f_title2, value="\n".join(chunk), inline=False)
+                embed.add_field(name=f_title2, value=field_value.strip(), inline=False)
                 
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)

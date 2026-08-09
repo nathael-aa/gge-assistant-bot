@@ -148,7 +148,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             elif etat["status"] == "libre":
                 status_txt = t(langue, "fort_verify_free", defaut="🟢 **Attaquable maintenant**")
             else:
-                else:
                 try:
                     dt_cd = datetime.fromisoformat(etat["cd_until"].replace('Z', '+00:00'))
                     ts_cd = int(dt_cd.timestamp())
