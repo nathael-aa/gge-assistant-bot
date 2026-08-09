@@ -25,7 +25,7 @@ class ScanCog(commands.Cog):
         }
         self.webhook_url = "https://discord.com/api/webhooks/1525853187280474222/Y4fycCy0IW019tZCMhGOdJzS1vqg7wSYn1ZEhtVO2o9Atuwr8ek-zieIsN9kG86Ndlcq"
         
-        # Démarrage de la tâche planifiée (ex: tous les jours à 03:00 UTC)
+        # Démarrage de la tâche planifiée (ex: tous les jours à 01:00 UTC)
         self.daily_scan.start()
 
     def cog_unload(self):
@@ -68,48 +68,42 @@ class ScanCog(commands.Cog):
             active_servers.add("E4K_FR1")
         return list(active_servers)
 
-    async def fetch_page(self, session, server, page, semaphore, max_retries=4):
-        """Télécharge UNE page avec gestion des erreurs 429 et limite de requêtes simultanées"""
-        async with semaphore:  # Bloque si on dépasse le nombre de requêtes simultanées
-            
-            # 🚦 LE SECRET EST ICI : Un micro-délai systématique avant de tirer.
-            # Ça permet aux commandes des joueurs de s'intercaler sans être bloquées.
-            await asyncio.sleep(0.5)
-            
-            url = f"{self.api_url}/players"
-            params = {
-                "limit": 100, "page": page, "banFilter": 0, "allianceFilter": -1,
-                "protectionFilter": -1, "inactiveFilter": 1, "kingdomFilter": 999,
-                "orderBy": "might_current", "orderType": "DESC"
-            }
-            headers = self.headers.copy()
-            headers["gge-server"] = server
+    async def fetch_page(self, session, server, page, max_retries=4):
+        """Télécharge UNE page avec gestion des erreurs 429 adaptées au rate limit de l'API"""
+        url = f"{self.api_url}/players"
+        params = {
+            "limit": 100, "page": page, "banFilter": 0, "allianceFilter": -1,
+            "protectionFilter": -1, "inactiveFilter": 1, "kingdomFilter": 999,
+            "orderBy": "might_current", "orderType": "DESC"
+        }
+        headers = self.headers.copy()
+        headers["gge-server"] = server
 
-            for attempt in range(max_retries):
-                try:
-                    async with session.get(url, headers=headers, params=params, timeout=15) as response:
-                        if response.status == 200:
-                            return await response.json()
-                        elif response.status == 429: # Too Many Requests
-                            # Si on se fait bloquer, on attend plus longtemps (10s, 20s...)
-                            wait_time = 10 * (attempt + 1)
-                            logger.warning(f"⚠️ 429 sur {server} (Page {page}). Pause de {wait_time}s...")
-                            await asyncio.sleep(wait_time)
-                        else:
-                            logger.error(f"❌ Erreur {response.status} sur {server} (Page {page}).")
-                            await asyncio.sleep(2)
-                except Exception as e:
-                    logger.error(f"❌ Exception réseau sur {server} (Page {page}): {e}")
-                    await asyncio.sleep(2)
-            
-            return None # Échec après X tentatives
+        for attempt in range(max_retries):
+            try:
+                async with session.get(url, headers=headers, params=params, timeout=15) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    elif response.status == 429: # Too Many Requests
+                        wait_time = 15 * (attempt + 1)
+                        logger.warning(f"⚠️ 429 sur {server} (Page {page}). Purge API de {wait_time}s...")
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.error(f"❌ Erreur {response.status} sur {server} (Page {page}).")
+                        await asyncio.sleep(2)
+            except Exception as e:
+                logger.error(f"❌ Exception réseau sur {server} (Page {page}): {e}")
+                await asyncio.sleep(2)
+        
+        return None # Échec après X tentatives
 
-    async def scan_server(self, session, server):
-        """Scanne un serveur complet de manière optimisée"""
-        logger.info(f"🔍 DÉMARRAGE : {server}")
+    # 🟢 AJOUT : index_actuel et total_serveurs en paramètres
+    async def scan_server(self, session, server, index_actuel, total_serveurs):
+        """Scanne un serveur complet de manière optimisée et non-bloquante"""
+        logger.info(f"🔍 DÉMARRAGE [{index_actuel}/{total_serveurs}] : {server}")
         start_time = asyncio.get_event_loop().time()
         
-        first_page_data = await self.fetch_page(session, server, 1, asyncio.Semaphore(1))
+        first_page_data = await self.fetch_page(session, server, 1)
         
         if not first_page_data or not first_page_data.get('players'):
             logger.error(f"❌ Aucun joueur trouvé ou erreur fatale pour {server}.")
@@ -139,20 +133,16 @@ class ScanCog(commands.Cog):
         parse_players(first_page_data)
 
         if total_pages > 1:
-            # 🚦 BAISSE DE LA LIMITE : On passe de 8 à 3 maximum en même temps.
-            semaphore = asyncio.Semaphore(3) 
-            tasks = []
-            
             for page in range(2, total_pages + 1):
-                tasks.append(self.fetch_page(session, server, page, semaphore))
-            
-            results = await asyncio.gather(*tasks)
-            
-            for res in results:
-                if res: parse_players(res)
+                res = await self.fetch_page(session, server, page)
+                if res: 
+                    parse_players(res)
+                
+                await asyncio.sleep(1.2) # Bouclier anti-429
 
         duration = round(asyncio.get_event_loop().time() - start_time, 2)
-        logger.info(f"✅ FINI : {server} - {len(all_players)} joueurs récupérés en {duration}s")
+        # 🟢 AJOUT : Le compteur de fin
+        logger.info(f"✅ FINI [{index_actuel}/{total_serveurs}] : {server} - {len(all_players)} joueurs récupérés en {duration}s")
         return all_players, duration
 
     def save_results(self, players_data, duration, serveur):
@@ -187,21 +177,21 @@ class ScanCog(commands.Cog):
         
         try:
             servers_to_scan = self.get_active_servers()
+            total_serveurs = len(servers_to_scan) # 🟢 AJOUT : Calcul du total
             
-            # Ouverture d'une session unique pour TOUT le scan (meilleures performances TCP)
             async with aiohttp.ClientSession() as session:
-                for srv in servers_to_scan:
-                    result = await self.scan_server(session, srv)
+                # 🟢 AJOUT : enumerate(..., start=1) pour générer le numéro (1, 2, 3...)
+                for index_actuel, srv in enumerate(servers_to_scan, start=1):
+                    # On passe nos deux nouveaux paramètres au scan !
+                    result = await self.scan_server(session, srv, index_actuel, total_serveurs)
+                    
                     if result:
                         players, duration = result
-                        # Comme l'écriture de gros JSON peut prendre quelques millisecondes, 
-                        # on la lance dans un thread séparé pour ne pas figer le bot
                         await asyncio.to_thread(self.save_results, players, duration, srv)
                     
-                    # Petite pause de 2 secondes entre chaque serveur au lieu de 15 !
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(5)
                     
-            await self.send_discord_alert("✅ Multi-Scan Terminé", f"Tous les serveurs actifs ({len(servers_to_scan)}) ont été scannés à la vitesse de l'éclair !", 65280)
+            await self.send_discord_alert("✅ Multi-Scan Terminé", f"Tous les serveurs actifs ({total_serveurs}) ont été scannés fluidement !", 65280)
 
         except Exception as e:
             logger.error(f"❌ CRASH FATAL DU SCANNER : {e}")

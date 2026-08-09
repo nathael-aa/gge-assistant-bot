@@ -115,14 +115,6 @@ HELP_CONFIG = {
 }
 
 # ==========================================
-# 🛡️ PROTECTEUR DE CLÉS POUR LE SCRIPT DE SYNCHRO
-# ==========================================
-def _protect_help_keys():
-    for cat_data in HELP_CONFIG.values():
-        for cmd in cat_data.get("commands", []):
-            t("fr", cmd["desc_key"])
-
-# ==========================================
 # 🎛️ MENU DÉROULANT (SELECT MENU)
 # ==========================================
 class HelpSelect(discord.ui.Select):
@@ -473,6 +465,80 @@ class AideCog(commands.Cog):
 
         succ_msg = t(langue, "contact_success", defaut="<:players:1512504277392953426> **Merci !** Ton message a bien été enregistré et transmis au développeur.")
         await interaction.followup.send(succ_msg)
+
+    # ==========================================
+    # 🛡️ PROTECTEUR DE CLÉS POUR LE SCRIPT DE SYNCHRO
+    # Ces appels ne sont jamais exécutés, ils servent
+    # juste à empêcher !i18l_sync de supprimer ces clés dynamiques.
+    # ==========================================
+    def _dummy_i18n():
+        langue = "fr"
+        
+        # --- Titres & Catégories ---
+        t(langue, "help_home_title")
+        t(langue, "aide_p0_desc")
+        t(langue, "help_cat_config")
+        t(langue, "help_cat_communaute")
+        t(langue, "help_cat_profils")
+        t(langue, "help_cat_guerre")
+        t(langue, "help_cat_events")
+        t(langue, "help_cat_radars")
+        
+        # --- Commandes : Config ---
+        t(langue, "help_cmd_setup")
+        t(langue, "help_cmd_link_account")
+        t(langue, "help_cmd_status")
+        t(langue, "help_cmd_help")
+        
+        # --- Commandes : Communauté ---
+        t(langue, "help_cmd_news")
+        t(langue, "help_cmd_support")
+        t(langue, "help_cmd_contact")
+        t(langue, "help_cmd_vote")
+        
+        # --- Commandes : Profils ---
+        t(langue, "help_cmd_player_profile")
+        t(langue, "help_cmd_player_history")
+        t(langue, "help_cmd_player_dove")
+        t(langue, "help_cmd_player_compare")
+        t(langue, "help_cmd_alliance_profile")
+        t(langue, "help_cmd_alliance_might")
+        t(langue, "help_cmd_alliance_property")
+        t(langue, "help_cmd_alliance_desc")
+        
+        # --- Commandes : Guerre ---
+        t(langue, "help_cmd_alliance_scanner")
+        t(langue, "help_cmd_target")
+        t(langue, "help_cmd_proximity")
+        t(langue, "help_cmd_hr")
+        t(langue, "help_cmd_diplomacy_add")
+        t(langue, "help_cmd_diplomacy_remove")
+        t(langue, "help_cmd_diplomacy_list")
+        
+        # --- Commandes : Events ---
+        t(langue, "help_cmd_event_player")
+        t(langue, "help_cmd_event_alliance")
+        t(langue, "help_cmd_calendar_group")
+        t(langue, "help_cmd_rank_group")
+        t(langue, "help_cmd_leaderboard_group")
+        t(langue, "help_cmd_woa_group")
+        
+        # --- Commandes : Radars ---
+        t(langue, "help_cmd_radar_group")
+        t(langue, "help_cmd_radar_alliance_group")
+        t(langue, "help_cmd_rival_group")
+        t(langue, "help_cmd_fortress_group")
+
+        # --- Éléments du Select Menu ---
+        t(langue, "help_placeholder")
+        t(langue, "help_menu_home")
+        t(langue, "help_menu_home_desc")
+        t(langue, "help_menu_config")
+        t(langue, "help_menu_communaute")
+        t(langue, "help_menu_profils")
+        t(langue, "help_menu_guerre")
+        t(langue, "help_menu_events")
+        t(langue, "help_menu_radars")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AideCog(bot))
