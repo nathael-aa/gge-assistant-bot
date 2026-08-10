@@ -16,7 +16,8 @@ from utils import (
     alliance_autocomplete,
     get_cached_data,
     get_api_headers,
-    PaginationView
+    PaginationView,
+    prompt_vote_if_lucky
 )
 
 class ClassementCog(commands.Cog):
@@ -254,6 +255,7 @@ class ClassementCog(commands.Cog):
         if hasattr(view, 'update_buttons'): view.update_buttons()
             
         await interaction.followup.send(embed=embeds[page_cible], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
 
     @classement.command(name="event", description="Displays an event's live ranking.")
@@ -484,6 +486,7 @@ class ClassementCog(commands.Cog):
         if hasattr(view, 'update_buttons'): view.update_buttons()
             
         await interaction.followup.send(embed=embeds[page_cible], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
 
     @classement.command(name="gacha", description="Displays a player's live ranking for Gacha events")
@@ -641,6 +644,7 @@ class ClassementCog(commands.Cog):
         if hasattr(view, 'update_buttons'): view.update_buttons()
             
         await interaction.followup.send(embed=embeds[page_cible], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
 
     @classement.command(name="realms", description="Displays a player's ranking for cross-server events")
@@ -800,6 +804,7 @@ class ClassementCog(commands.Cog):
         if hasattr(view, 'update_buttons'): view.update_buttons()
             
         await interaction.followup.send(embed=embeds[page_cible], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
 
     @classement.command(name="league", description="Displays a player's ranking for Season and League events")
@@ -1002,6 +1007,7 @@ class ClassementCog(commands.Cog):
         if hasattr(view, 'update_buttons'): view.update_buttons()
             
         await interaction.followup.send(embed=embeds[page_cible], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
 
     @classement.command(name="contests", description="Displays a player's ranking for specific contests")
@@ -1195,6 +1201,7 @@ class ClassementCog(commands.Cog):
         if hasattr(view, 'update_buttons'): view.update_buttons()
             
         await interaction.followup.send(embed=embeds[page_cible], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
     @classement.command(name="alliance", description="Displays live rankings and statistics for alliances")
     @app_commands.choices(categorie=[
@@ -1348,6 +1355,7 @@ class ClassementCog(commands.Cog):
         if hasattr(view, 'update_buttons'): view.update_buttons()
             
         await interaction.followup.send(embed=embeds[page_cible], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
 async def setup(bot):
     await bot.add_cog(ClassementCog(bot))

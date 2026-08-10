@@ -23,7 +23,8 @@ from utils import (
     get_cached_data,
     PaginationView,
     get_server_config,
-    get_api_headers
+    get_api_headers,
+    prompt_vote_if_lucky
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -486,6 +487,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             )
             await setup_embed_footer(embed_attente, interaction, langue)
             await interaction.followup.send(embed=embed_attente, ephemeral=False)
+        await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
 
     # ==========================================
     # 🔴 COMMANDE : STOP
@@ -506,6 +508,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             await interaction.followup.send(t(langue, "fort_stop_success", defaut="<:tomatobulletpoint:1533440866063224933> **Session arrêtée.** Fin des alertes."), ephemeral=False)
         else:
             await interaction.followup.send(t(langue, "fort_stop_fail", defaut="<:error:1512505075220611172> Tu n'as aucune session active."), ephemeral=False)
+        await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
 
     # ==========================================
     # 🛰️ LA TÂCHE DE FOND
@@ -732,6 +735,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         else:
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ForteressesCog(bot))

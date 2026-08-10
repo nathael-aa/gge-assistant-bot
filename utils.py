@@ -4,6 +4,8 @@ import json
 import time
 import asyncio
 import logging
+import random
+import topgg
 from pathlib import Path
 from datetime import datetime, timedelta
 from discord import app_commands
@@ -100,6 +102,73 @@ async def get_api_headers(interaction: discord.Interaction = None, custom_server
         'gge-server': server,
         'User-Agent': 'Mozilla/5.0 GGE-Assistant/2.0'
     }
+
+# ==========================================
+# 🎲 MESSAGE SOUTIENS ALEATOIRE
+# ==========================================
+import random
+import discord
+import json
+from datetime import datetime
+from pathlib import Path
+
+VOTES_FILE = Path('/app/data/votes.json')
+
+async def prompt_vote_if_lucky(interaction: discord.Interaction, probability_percent: int, langue: str = "fr"):
+    """
+    Vérifie si le joueur est protégé par les 7 jours. Sinon, lance le dé.
+    """
+    user_id_str = str(interaction.user.id)
+    
+    # 1. Vérification du bouclier de 7 jours (Ultra-rapide, zéro API)
+    if VOTES_FILE.exists():
+        try:
+            with open(VOTES_FILE, 'r', encoding='utf-8') as f:
+                votes_data = json.load(f)
+            
+            if user_id_str in votes_data:
+                deadline = datetime.fromisoformat(votes_data[user_id_str])
+                if datetime.now() < deadline:
+                    return # Le joueur a son bouclier actif, on le laisse tranquille !
+        except Exception:
+            pass
+
+    # 2. Le tirage (Dé virtuel) - On ne le lance que s'il n'est pas protégé
+    if random.randint(1, 100) > probability_percent:
+        return # Perdu : On s'arrête là silencieusement
+
+    # 3. Action : Création des liens
+    vote_url = "https://top.gg/bot/1472309793065533493/vote" 
+    review_url = "https://top.gg/bot/1472309793065533493#reviews" # 🟢 Le lien direct vers les avis
+    
+    # Textes traduits
+    btn_vote_lbl = t(langue, "vote_prompt_btn", defaut="Voter (1 clic)")
+    btn_review_lbl = t(langue, "review_prompt_btn", defaut="Laisser un avis")
+    titre_txt = t(langue, "vote_prompt_title", defaut="⭐ Coucou ! Un petit service ?")
+    
+    # On met à jour la description pour inclure la mention des avis
+    desc_txt = t(langue, "vote_prompt_desc", defaut="Tu utilises souvent cette commande ! Si GGE Assistant t'aide au quotidien, prends quelques secondes pour voter ou nous laisser un petit avis sur Top.gg. C'est gratuit et ça nous aide énormément ! ❤️\n\n*(Ce message disparaîtra pendant 7 jours après ton vote !)*")
+    
+    view = discord.ui.View()
+    
+    # 🟢 Bouton 1 : Le Vote
+    btn_vote = discord.ui.Button(label=btn_vote_lbl, url=vote_url, emoji="<:sparkles:1535653527488303236>")
+    view.add_item(btn_vote)
+
+    # 🟢 Bouton 2 : L'Avis (Optionnel)
+    btn_review = discord.ui.Button(label=btn_review_lbl, url=review_url, emoji="<:main:1535282885769171006>")
+    view.add_item(btn_review)
+
+    embed = discord.Embed(
+        title=titre_txt,
+        description=desc_txt,
+        color=discord.Color.random()
+    )
+    
+    try:
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+    except Exception:
+        pass
 
 # ==========================================
 # 🌍 GET API TIMESTAMP
@@ -226,7 +295,7 @@ def get_file_lock(filepath):
 # ==========================================
 # 🔧 Footer global
 # ==========================================
-BOT_VERSION = "GGE Assistant • Version 1.1.7"
+BOT_VERSION = "GGE Assistant • Version 1.1.8"
 
 async def setup_embed_footer(embed: discord.Embed, interaction: discord.Interaction = None, langue: str = "fr", custom_server: str = None):
     txt = BOT_VERSION
@@ -415,7 +484,6 @@ class PaginationView(discord.ui.View):
         self.btn_prev.disabled = (self.current_page == 0)
         self.btn_next.disabled = (self.current_page == len(self.embeds) - 1)
 
-    # On utilise "emoji=" au lieu de "label=" !
     @discord.ui.button(emoji="<:lastpage:1533554126984581283>", style=discord.ButtonStyle.secondary, custom_id="page_prev")
     async def btn_prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = max(0, self.current_page - 1)
@@ -500,12 +568,12 @@ async def get_cached_data(serveur="E4K_FR1"):
 async def joueur_autocomplete(interaction: discord.Interaction, current: str):
     _, serveur = await get_server_config(interaction)
     data = await get_cached_data(serveur)
-    return [app_commands.Choice(name=n, value=n) for n in data.get('players', []) if current.lower() in n.lower()][:25]
+    return [app_commands.Choice(name=str(n)[:100], value=str(n)[:100]) for n in data.get('players', []) if current.lower() in str(n).lower() and str(n).strip()][:25]
 
 async def alliance_autocomplete(interaction: discord.Interaction, current: str):
     _, serveur = await get_server_config(interaction)
     data = await get_cached_data(serveur)
-    return [app_commands.Choice(name=n, value=n) for n in data.get('alliances', []) if current.lower() in n.lower()][:25]
+    return [app_commands.Choice(name=str(n)[:100], value=str(n)[:100]) for n in data.get('alliances', []) if current.lower() in str(n).lower() and str(n).strip()][:25]
 
 async def event_autocomplete(interaction: discord.Interaction, current: str):
     events_en = ["Nomad Invasion", "Samurai Invasion", "Bloodcrow Invasion", "War of the Realms", "Storm Islands", "Battle of Berimond"]

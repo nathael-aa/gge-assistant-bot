@@ -9,9 +9,9 @@ import aiohttp
 from datetime import datetime, timedelta
 from pathlib import Path
 from logging.handlers import TimedRotatingFileHandler
-
 import discord
 from discord.ext import commands, tasks
+import topgg
 
 from utils import TOKEN, TOPGG_TOKEN, BOT_VERSION, MON_ID_DISCORD, load_maintenance, load_blocks_async, get_cached_data, CACHE, charger_langues, CONFIG_DIR, get_server_config, t
 
@@ -100,6 +100,15 @@ class GGEAssistantBot(commands.Bot):
         self.status_index = 0
         self.custom_status = None
 
+        if TOPGG_TOKEN and TOPGG_TOKEN != "FAUX_TOKEN":
+            self.topgg_client = topgg.DBLClient(self, TOPGG_TOKEN)
+            self.autoposter = topgg.AutoPoster(self, self.topgg_client)
+            self.autoposter.start()
+            logger.info("🟢 Client Top.gg (DBLClient) initialisé avec succès.")
+        else:
+            self.topgg_client = None
+            logger.warning("⚠️ Aucun token Top.gg détecté. Les requêtes de vote seront ignorées.")
+
     def export_commands_json(self):
         """Exporte uniquement le 'Slash Command Payload' minimal requis."""
         try:
@@ -174,10 +183,10 @@ class GGEAssistantBot(commands.Bot):
         if not self.status_task.is_running():
             self.status_task.start()
             logger.info("🛰️ [Tasks] status_task initialisée dans le setup_hook.")
-            
-        if not self.topgg_update_task.is_running():
-            self.topgg_update_task.start()
-            logger.info("🛰️ [Tasks] topgg_update_task initialisée dans le setup_hook.")
+
+        if not self.sync_topgg_votes_task.is_running():
+            self.sync_topgg_votes_task.start()
+            logger.info("🛰️ [Tasks] sync_topgg_votes_task initialisée dans le setup_hook.")
 
         self.add_view(WelcomeView())
 
@@ -286,29 +295,67 @@ class GGEAssistantBot(commands.Bot):
         await self.wait_until_ready()
 
     # ==========================================
-    # 📈 SYNCHRONISATION TOP.GG
+    # 🔄 TÂCHE : SYNCHRONISATION DES VOTES (12H)
     # ==========================================
-    @tasks.loop(minutes=60)
-    async def topgg_update_task(self):
-        if not TOPGG_TOKEN or TOPGG_TOKEN == "FAUX_TOKEN":
+    @tasks.loop(hours=12)
+    async def sync_topgg_votes_task(self):
+        VOTES_FILE = Path('/app/data/configs/votes.json')
+        if not self.topgg_client:
             return
 
-        serveurs_count = len(self.guilds)
-        url = f"https://top.gg/api/bots/{self.user.id}/stats"
-        headers = {"Authorization": TOPGG_TOKEN}
-        payload = {"server_count": serveurs_count}
-
         try:
-            async with self.session.post(url, headers=headers, json=payload, timeout=10) as response:
-                if response.status == 200:
-                    logger.info(f"📈 [Top.gg] Mise à jour réussie : {serveurs_count} serveurs.")
-                else:
-                    logger.warning(f"⚠️ [Top.gg] Erreur HTTP {response.status} lors de la mise à jour.")
+            # Récupère la liste des derniers votants
+            recent_voters = await self.topgg_client.get_bot_votes()
         except Exception as e:
-            logger.error(f"❌ [Top.gg] Erreur de connexion : {e}")
+            logger.error(f"❌ [Top.gg] Erreur récupération votes : {e}")
+            return
 
-    @topgg_update_task.before_loop
-    async def before_topgg_task(self):
+        # 1. Lecture du fichier actuel
+        votes_data = {}
+        if VOTES_FILE.exists():
+            try:
+                with open(VOTES_FILE, 'r', encoding='utf-8') as f:
+                    votes_data = json.load(f)
+            except Exception:
+                pass
+
+        now = datetime.now()
+        updated = False
+
+        # 2. Nettoyage des expirés
+        keys_to_delete = []
+        for uid, deadline_iso in votes_data.items():
+            if datetime.fromisoformat(deadline_iso) < now:
+                keys_to_delete.append(uid)
+        
+        # 3. Traitement des votants récupérés
+        for voter in recent_voters:
+            uid = str(voter.id)
+            
+            # L'ASTUCE : On ne lui remet 7 jours que s'il n'est pas déjà dans le fichier,
+            # OU s'il venait d'expirer (et était donc dans la liste à supprimer)
+            if uid not in votes_data or uid in keys_to_delete:
+                votes_data[uid] = (now + timedelta(days=7)).isoformat()
+                if uid in keys_to_delete:
+                    keys_to_delete.remove(uid) # On le sauve de la suppression
+                updated = True
+
+        # 4. Suppression définitive de ceux qui ont expiré et n'ont pas revoté
+        for uid in keys_to_delete:
+            del votes_data[uid]
+            updated = True
+
+        # 5. Sauvegarde
+        if updated:
+            try:
+                with open(VOTES_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(votes_data, f, indent=4)
+                logger.info("✅ [Top.gg] Base des votes mise à jour (Boucliers 7j attribués/nettoyés).")
+            except Exception as e:
+                logger.error(f"❌ Impossible de sauvegarder votes.json : {e}")
+
+    @sync_topgg_votes_task.before_loop
+    async def before_sync_votes(self):
         await self.wait_until_ready()
 
     # ==========================================
@@ -431,6 +478,7 @@ class GGEAssistantBot(commands.Bot):
     async def close(self):
         self.flag_watcher_task.cancel()
         self.status_task.cancel()
+        self.sync_topgg_votes_task.cancel()
         if self.session: 
             await self.session.close()
         await super().close()

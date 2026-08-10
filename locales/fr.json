@@ -687,5 +687,9 @@
     "welcome_step2_title": "{e_two} Découvrir les Outils",
     "welcome_step3_desc": "Pour recevoir les alertes de début et de fin d'événements, un administrateur doit utiliser la commande </calendar setup:0> dans un salon dédié. Vous pourrez ensuite utiliser </calendar track:0> pour avoir les résultats de vos alliances à chaque événements, automatiquement.",
     "welcome_step3_title": "{e_three} Spécificités aux administrateur du serveur",
-    "welcome_title": "{e_castle1} Merci d'avoir ajouté GGE Assistant !"
+    "welcome_title": "{e_castle1} Merci d'avoir ajouté GGE Assistant !",
+    "vote_prompt_btn": "Voter (1 clic)",
+    "review_prompt_btn": "Laisser un avis",
+    "vote_prompt_title": "{e_bot} Coucou ! Un petit service ?",
+    "vote_prompt_desc": "Tu utilises souvent cette commande ! Si GGE Assistant t'aide au quotidien, prends quelques secondes pour voter ou nous laisser un petit avis sur Top.gg. C'est gratuit et ça nous aide énormément ! {e_std_winking_face}\n\n*(Ce message disparaîtra pendant 7 jours après ton vote !)*"
 }

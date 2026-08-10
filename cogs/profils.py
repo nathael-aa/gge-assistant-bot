@@ -26,7 +26,8 @@ from utils import (
     PaginationView,
     get_server_config, 
     get_api_headers,
-    get_cached_data
+    get_cached_data,
+    prompt_vote_if_lucky
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -250,6 +251,7 @@ class ProfilsCog(commands.Cog):
 
             await setup_embed_footer(embed, interaction, langue)
             await interaction.followup.send(embed=embed)
+            await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
         except Exception as e:
             import traceback
@@ -569,6 +571,7 @@ class ProfilsCog(commands.Cog):
 
         view = HistoriqueView(embeds_dict, interaction, langue=langue)
         await interaction.followup.send(embed=embeds_dict[view.current_cat][0], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     # ========================================================
     # 🕊️ COMMANDE : PLAYER DOVE
@@ -613,8 +616,10 @@ class ProfilsCog(commands.Cog):
 
                         await setup_embed_footer(embed, interaction, langue)
                         await interaction.followup.send(embed=embed)
+                        await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
                     else:
                         await interaction.followup.send(t(langue, "prof_col_expired", j=player, ts=ts, defaut="La colombe a expiré."))
+                        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
                 else:
                     await interaction.followup.send(t(langue, "prof_col_err_api", j=player, s=r.status, defaut="Erreur API."))
         except Exception:
@@ -1024,6 +1029,7 @@ class ProfilsCog(commands.Cog):
             else:
                 view = PaginationView(embeds)
                 await interaction.followup.send(embed=embeds[0], view=view)
+            await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
         except Exception as e:
             logger.error(f"❌ [Profils - Alliance] Erreur fatale : {traceback.format_exc()}")
@@ -1277,6 +1283,7 @@ class ProfilsCog(commands.Cog):
         else:
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
     # ========================================================
     # COMMANDE : ALLIANCE PROPERTY
@@ -1398,6 +1405,7 @@ class ProfilsCog(commands.Cog):
             await interaction.followup.send(embed=embeds[0], view=view)
         else:
             await interaction.followup.send(embed=embeds[0])
+        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
     # ========================================================
     # 📜 COMMANDE : DESCRIPTION ALLIANCE (API GGE Tracker)
@@ -1679,6 +1687,7 @@ class ProfilsCog(commands.Cog):
         else:
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ProfilsCog(bot))

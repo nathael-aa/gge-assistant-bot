@@ -25,7 +25,8 @@ from utils import (
     load_configuration_async,
     get_discord_timestamp,
     get_server_config,   
-    get_api_headers
+    get_api_headers,
+    prompt_vote_if_lucky
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -275,6 +276,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         view = RadarSettingsView(p_id, user_id, player, data["players"][p_id]["abonnes"][user_id], langue)
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed, view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=20, langue=langue)
 
     @app_commands.command(name="remove", description="Remove a player from your personal radar")
     @app_commands.autocomplete(player=joueur_autocomplete)
@@ -389,6 +391,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         view = RadarAllianceSettingsView(a_id, user_id, a_name_real, data["alliances"][a_id]["abonnes"][user_id], langue)
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed, view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=20, langue=langue)
 
     @alliance_group.command(name="remove", description="Remove an alliance from your personal radar")
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
@@ -491,6 +494,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         else:
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     # ==========================================
     # 🛰️ LE SATELLITE ESPION (Tâche de fond ultra-optimisée)

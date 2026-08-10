@@ -20,7 +20,8 @@ from utils import (
     generer_rapport_alliance_embed, 
     TRACKER_EVENTS,
     get_server_config, 
-    t 
+    t,
+    prompt_vote_if_lucky
 )
 
 logger = logging.getLogger("GGE_Bot")

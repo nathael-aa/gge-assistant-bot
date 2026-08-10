@@ -37,7 +37,8 @@ from utils import (
     load_rivals_async,
     save_rivals_async,
     get_api_headers,
-    get_server_config
+    get_server_config,
+    prompt_vote_if_lucky
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -349,7 +350,9 @@ class EventsCog(commands.Cog):
                     embed.add_field(name=t(langue, "ev_aqua_last_hit_title", defaut="⏱️ Dernière Frappe"), value=t(langue, "ev_aqua_last_hit_desc", r=ts_r, t=ts_t, defaut=f"Relevée par l'API {ts_r} (*{ts_t}*)"), inline=False)
 
                 await setup_embed_footer(embed, interaction, langue)
-                return await interaction.followup.send(embed=embed)
+                await interaction.followup.send(embed=embed)
+                await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
+                return
 
             elif mode.value == "history":
                 from collections import defaultdict
@@ -396,6 +399,7 @@ class EventsCog(commands.Cog):
                 
                 embed = await view.generate_embed(sorted_months[0])
                 await interaction.followup.send(embed=embed, view=view)
+                await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
                 return
 
         event_keys = TRACKER_EVENTS.get(event_name)
@@ -510,6 +514,7 @@ class EventsCog(commands.Cog):
             else:
                 view = PaginationView(embeds)
                 await interaction.followup.send(embed=embeds[0], view=view)
+            await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
         else:
             latest_point, latest_date = 0, ""
@@ -536,6 +541,7 @@ class EventsCog(commands.Cog):
                 
             await setup_embed_footer(embed, interaction, langue)
             await interaction.followup.send(embed=embed)
+            await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     # =========================================
     # COMMANDE : EVENT ALLIANCE
@@ -593,6 +599,7 @@ class EventsCog(commands.Cog):
                 
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     # ==========================================
     # 🔗 LIAISON DU COMPTE DISCORD
@@ -637,6 +644,7 @@ class EventsCog(commands.Cog):
         
         event_trad = get_ev_name(event_name, langue)
         await interaction.response.send_message(t(langue, "ev_rival_started", event=event_trad, defaut=f"<:icon_analyze:1512573874150314005> Radar activé pour **{event_trad}** !"))
+        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
     @rival_group.command(name="add", description="Add rivals (Max 10)")
     async def rival_add(self, interaction: discord.Interaction, player1: str, player2: str = None, player3: str = None, player4: str = None, player5: str = None):
@@ -665,6 +673,7 @@ class EventsCog(commands.Cog):
         embed = discord.Embed(title=title, description=desc, color=self.clr_rival_list)
         await setup_embed_footer(embed, interaction, langue)
         await interaction.response.send_message(embed=embed)
+        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
     @rival_group.command(name="stop", description="Turn off the radar")
     async def rival_stop(self, interaction: discord.Interaction):
@@ -889,6 +898,7 @@ class EventsCog(commands.Cog):
 
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
+            await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
         except Exception as e: 
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur technique : {e}"))
 
@@ -955,6 +965,7 @@ class EventsCog(commands.Cog):
                 embeds.append(embed)
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
+            await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
         except Exception as e: 
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur : {e}"))
 
@@ -1022,6 +1033,7 @@ class EventsCog(commands.Cog):
 
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
+            await prompt_vote_if_lucky(interaction, probability_percent=10, langue=langue)
         except Exception as e: 
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur : {e}"))
 
@@ -1099,6 +1111,7 @@ class EventsCog(commands.Cog):
 
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
+            await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
         except Exception as e: 
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur technique : {e}"))
 

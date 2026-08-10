@@ -687,5 +687,9 @@
     "welcome_step2_title": "{e_two} Discover the Tools",
     "welcome_step3_desc": "To receive event start and end alerts, an administrator must use the </calendar setup:0> command in a dedicated channel. You can then use </calendar track:0> to automatically get your alliances' results at the end of each event.",
     "welcome_step3_title": "{e_three} Server Administrator Specifics",
-    "welcome_title": "{e_castle1} Thanks for adding GGE Assistant!"
+    "welcome_title": "{e_castle1} Thanks for adding GGE Assistant!",
+    "vote_prompt_btn": "Vote (1 click)",
+    "review_prompt_btn": "Leave a review",
+    "vote_prompt_title": "{e_bot} Hey! Need a quick favor?",
+    "vote_prompt_desc": "You use this command often! If GGE Assistant helps you daily, please take a few seconds to vote or leave a short review on Top.gg. It's free and helps us a lot! {e_std_winking_face}\n\n*(This message won't show up again for 7 days after you vote!)*"
 }

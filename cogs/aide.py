@@ -20,7 +20,8 @@ from utils import (
     setup_embed_footer,
     get_api_headers,
     get_server_config,
-    t
+    t,
+    prompt_vote_if_lucky
 )
 
 logger = logging.getLogger("GGE_Bot")

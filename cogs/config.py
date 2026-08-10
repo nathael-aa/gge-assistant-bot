@@ -7,7 +7,7 @@ from discord.ext import commands
 import asyncio
 from pathlib import Path
 
-from utils import CONFIG_DIR, t, get_server_config, MON_ID_DISCORD, load_configuration_async, clear_config_cache
+from utils import CONFIG_DIR, t, get_server_config, MON_ID_DISCORD, load_configuration_async, clear_config_cache, prompt_vote_if_lucky
 
 # ==========================================
 # 💾 SAUVEGARDE CONFIG UTILISATEURS (DMs)

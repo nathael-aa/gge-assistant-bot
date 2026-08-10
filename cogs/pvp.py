@@ -31,7 +31,8 @@ from utils import (
     save_diplo_async,
     PaginationView,
     get_api_headers,     
-    get_server_config    
+    get_server_config,
+    prompt_vote_if_lucky
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -280,6 +281,7 @@ class GuerreCog(commands.Cog):
         else:
             view = PaginationView(embeds)
             await interaction.followup.send(embed=embeds[0], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
 
     # ==========================================
     # 🎯 COMMANDE : TARGET
@@ -662,6 +664,7 @@ class GuerreCog(commands.Cog):
             await message_to_edit.edit(content=None, embed=embeds[0], view=view)
         else:
             await interaction.followup.send(embed=embeds[0], view=view)
+        await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
 
     # ==========================================
     # ⚖️ COMMANDE : HR
@@ -891,6 +894,7 @@ class GuerreCog(commands.Cog):
             embed.color = discord.Color.green()
             embed.add_field(name=t(langue, "guerre_hr_res_gre_t", defaut="✅ ATTAQUE EN RÈGLES"), value=t(langue, "guerre_hr_res_gre_d", defaut="Aucune infraction ni avertissement détecté selon ce traité."), inline=False)
             await interaction.followup.send(embed=embed)
+        await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     # ==========================================
     # 🤝 GROUPE DE COMMANDES : DIPLOMACY

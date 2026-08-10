@@ -16,13 +16,14 @@ from utils import (
     get_server_config,
     setup_embed_footer,
     joueur_autocomplete,
-    t
+    t,
+    prompt_vote_if_lucky
 )
 
 logger = logging.getLogger("GGE_Bot")
 
 STORM_CONFIG_PATH = "data/configs/storm_alerts.json"
-SERVEURS_DE_TEST = [1342424613660921908]
+SERVEURS_DE_TEST = [1342424613660921908,1512165717380825310]
 
 async def load_storm_config():
     if not os.path.exists(STORM_CONFIG_PATH):
@@ -227,6 +228,7 @@ class StormsCog(commands.Cog):
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
             else:
                 await current_inter.followup.send(embed=embeds[0], view=view)
+            await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
         await fetch_and_build_view(interaction, is_refresh=False)
 
@@ -370,6 +372,7 @@ class StormsCog(commands.Cog):
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
             else:
                 await current_inter.followup.send(embed=embeds[0], view=view)
+            await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
         await fetch_and_build_view(interaction, is_refresh=False)
 
@@ -418,6 +421,7 @@ class StormsCog(commands.Cog):
 
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed)
+        await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
     # ========================================================
     # 📡 COMMANDE : /storm status
