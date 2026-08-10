@@ -100,15 +100,6 @@ class GGEAssistantBot(commands.Bot):
         self.status_index = 0
         self.custom_status = None
 
-        if TOPGG_TOKEN and TOPGG_TOKEN != "FAUX_TOKEN":
-            self.topgg_client = topgg.DBLClient(self, TOPGG_TOKEN)
-            self.autoposter = topgg.AutoPoster(self, self.topgg_client)
-            self.autoposter.start()
-            logger.info("🟢 Client Top.gg (DBLClient) initialisé avec succès.")
-        else:
-            self.topgg_client = None
-            logger.warning("⚠️ Aucun token Top.gg détecté. Les requêtes de vote seront ignorées.")
-
     def export_commands_json(self):
         """Exporte uniquement le 'Slash Command Payload' minimal requis."""
         try:
@@ -148,6 +139,15 @@ class GGEAssistantBot(commands.Bot):
         return serialized
 
     async def setup_hook(self):
+        if TOPGG_TOKEN and TOPGG_TOKEN != "FAUX_TOKEN":
+            self.topgg_client = topgg.DBLClient(self, TOPGG_TOKEN)
+            self.autoposter = topgg.AutoPoster(self, self.topgg_client)
+            self.autoposter.start()
+            logger.info("🟢 Client Top.gg (DBLClient) initialisé avec succès.")
+        else:
+            self.topgg_client = None
+            logger.warning("⚠️ Aucun token Top.gg détecté. Les requêtes de vote seront ignorées.")
+
         connecteur_ipv4 = aiohttp.TCPConnector(family=socket.AF_INET)
         self.session = aiohttp.ClientSession(connector=connecteur_ipv4)
         
