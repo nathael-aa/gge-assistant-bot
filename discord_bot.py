@@ -139,12 +139,9 @@ class GGEAssistantBot(commands.Bot):
         return serialized
 
     async def setup_hook(self):
-        # Dans ton setup_hook
         if TOPGG_TOKEN and TOPGG_TOKEN != "FAUX_TOKEN":
             self.topgg_client = topgg.DBLClient(self, TOPGG_TOKEN)
-            self.autoposter = topgg.AutoPoster(self.topgg_client, self) 
-            self.autoposter.start()
-            logger.info("🟢 Client Top.gg (DBLClient) initialisé avec succès.")
+            logger.info("🟢 Client Top.gg initialisé avec succès.")
         else:
             self.topgg_client = None
             logger.warning("⚠️ Aucun token Top.gg détecté. Les requêtes de vote seront ignorées.")
