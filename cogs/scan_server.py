@@ -9,7 +9,7 @@ import os
 import logging
 import traceback
 
-logger = logging.getLogger("ServerScanner")
+logger = logging.getLogger("GGE_Bot")
 
 class ScanCog(commands.Cog):
     def __init__(self, bot):
@@ -25,7 +25,7 @@ class ScanCog(commands.Cog):
         }
         self.webhook_url = "https://discord.com/api/webhooks/1525853187280474222/Y4fycCy0IW019tZCMhGOdJzS1vqg7wSYn1ZEhtVO2o9Atuwr8ek-zieIsN9kG86Ndlcq"
         
-        # Démarrage de la tâche planifiée (ex: tous les jours à 01:00 UTC)
+        # Démarrage de la tâche planifiée (ex: tous les jours à 00:30 UTC)
         self.daily_scan.start()
 
     def cog_unload(self):
@@ -95,9 +95,8 @@ class ScanCog(commands.Cog):
                 logger.error(f"❌ Exception réseau sur {server} (Page {page}): {e}")
                 await asyncio.sleep(2)
         
-        return None # Échec après X tentatives
+        return None
 
-    # 🟢 AJOUT : index_actuel et total_serveurs en paramètres
     async def scan_server(self, session, server, index_actuel, total_serveurs):
         """Scanne un serveur complet de manière optimisée et non-bloquante"""
         logger.info(f"🔍 DÉMARRAGE [{index_actuel}/{total_serveurs}] : {server}")
@@ -138,10 +137,9 @@ class ScanCog(commands.Cog):
                 if res: 
                     parse_players(res)
                 
-                await asyncio.sleep(1.2) # Bouclier anti-429
+                await asyncio.sleep(1.2)
 
         duration = round(asyncio.get_event_loop().time() - start_time, 2)
-        # 🟢 AJOUT : Le compteur de fin
         logger.info(f"✅ FINI [{index_actuel}/{total_serveurs}] : {server} - {len(all_players)} joueurs récupérés en {duration}s")
         return all_players, duration
 
@@ -168,8 +166,8 @@ class ScanCog(commands.Cog):
             
         return filepath
 
-    # Lancement tous les jours à 01h00 UTC
-    @tasks.loop(time=time(hour=1, minute=0, tzinfo=timezone.utc))
+    # Lancement tous les jours à 00h30 UTC
+    @tasks.loop(time=time(hour=0, minute=30, tzinfo=timezone.utc))
     async def daily_scan(self):
         logger.info("======================================================")
         logger.info("🌍 DÉMARRAGE DE LA ROUTINE MULTI-SERVEURS (ASYNC)")
@@ -177,12 +175,10 @@ class ScanCog(commands.Cog):
         
         try:
             servers_to_scan = self.get_active_servers()
-            total_serveurs = len(servers_to_scan) # 🟢 AJOUT : Calcul du total
+            total_serveurs = len(servers_to_scan)
             
             async with aiohttp.ClientSession() as session:
-                # 🟢 AJOUT : enumerate(..., start=1) pour générer le numéro (1, 2, 3...)
                 for index_actuel, srv in enumerate(servers_to_scan, start=1):
-                    # On passe nos deux nouveaux paramètres au scan !
                     result = await self.scan_server(session, srv, index_actuel, total_serveurs)
                     
                     if result:
@@ -203,6 +199,5 @@ class ScanCog(commands.Cog):
         """Attend que le bot soit connecté avant de lancer les crons"""
         await self.bot.wait_until_ready()
 
-# Fonction d'intégration pour ton bot principal
 async def setup(bot):
     await bot.add_cog(ScanCog(bot))

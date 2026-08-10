@@ -21,7 +21,6 @@ from utils import (
 
 logger = logging.getLogger("GGE_Bot")
 
-# Fichier de sauvegarde
 STORM_CONFIG_PATH = "data/configs/storm_alerts.json"
 SERVEURS_DE_TEST = [1342424613660921908]
 
@@ -68,7 +67,6 @@ def get_isle_name(isle_id, langue):
         return t(langue, "storm_res_unknown", defaut="Unknown Island")
     name = t(langue, res_data["key"], defaut=res_data["def"])
     return f"{name} ({res_data['qty']})"
-# ==========================================
 
 class StormsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -210,7 +208,7 @@ class StormsCog(commands.Cog):
             if len(embeds) > 1:
                 view = PaginationView(embeds)
             else:
-                view = discord.ui.View(timeout=600)
+                view = discord.ui.View(timeout=72000)
                 
             refresh_btn = discord.ui.Button(
                 style=discord.ButtonStyle.primary, 
@@ -353,7 +351,7 @@ class StormsCog(commands.Cog):
             if len(embeds) > 1:
                 view = PaginationView(embeds)
             else:
-                view = discord.ui.View(timeout=600)
+                view = discord.ui.View(timeout=1800)
                 
             refresh_btn = discord.ui.Button(
                 style=discord.ButtonStyle.primary, 
@@ -649,10 +647,8 @@ class StormsCog(commands.Cog):
                             "langue": langue
                         })
                     except discord.Forbidden:
-                        # Le bot n'a pas les permissions de parler dans ce salon
                         pass
                     except discord.HTTPException as e:
-                        # Intercepte les erreurs 503, 500, etc. venant de Discord
                         logger.error(f"❌ [Storm Alerts] Erreur réseau Discord lors de l'envoi : {e}")
 
         if modifie:

@@ -179,7 +179,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         self.clr_list_alliances = discord.Color.from_rgb(183,176,102)
         self.clr_list_joueurs   = discord.Color.from_rgb(128,123,71)
         
-        # Cache des langues utilisateurs pour soulager le disque
         self.users_lang_cache = {}
         self.users_cache_mtime = 0
 
@@ -510,7 +509,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             
             if not players and not alliances_trackees: return
 
-            # 🟢 OPTIMISATION 3: On met en cache users.json pour soulager les I/O du NAS
             path_users = CONFIG_DIR / 'users.json'
             if os.path.exists(path_users):
                 mtime = os.path.getmtime(path_users)
@@ -526,7 +524,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             changes_detected = False
             session = self.bot.session  
 
-            # 🟢 OPTIMISATION 4: Groupement par Serveur (On ne lit l'heure qu'une seule fois !)
             targets_by_server = {}
             for a_id, a_info in alliances_trackees.items():
                 srv = a_info.get("serveur", "E4K_FR1").upper()
@@ -539,7 +536,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 targets_by_server[srv]["players"].append((p_id, p_info))
 
             for serveur, targets in targets_by_server.items():
-                # ⏱️ Vérification du timing
                 minute_cible = server_scan_minutes.get(serveur, 46)
                 minutes_valides = [
                     minute_cible,
@@ -658,7 +654,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 # ==========================================
                 # --- ÉTAPE 2 : ANALYSE DES JOUEURS (En vrac / Bulk) ---
                 # ==========================================
-                # 🟢 OPTIMISATION 1: Rassembler tous les joueurs surveillés du serveur en UNE seule requête !
                 tracked_players = targets["players"]
                 if tracked_players:
                     player_ids = [p_id for p_id, p_info in tracked_players]
@@ -679,7 +674,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
 
                                     player = info["name"]
                                     
-                                    # 🔹 VÉRIFICATION PSEUDO
                                     new_name = p_data.get("player_name", player)
                                     if new_name != player:
                                         embeds_locales = {}
@@ -695,7 +689,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                         player = new_name # Update for following checks
                                         changes_detected = True
 
-                                    # 🔹 VÉRIFICATION ALLIANCE
                                     old_alli = info.get("last_alliance_name")
                                     new_alli = p_data.get("alliance_name") or "Sans alliance"
                                     
@@ -715,7 +708,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                         info["last_alliance_name"], info["last_alliance"] = new_alli, maintenant.isoformat().replace('+00:00', 'Z')
                                         changes_detected = True
 
-                                    # 🔹 VÉRIFICATION PUISSANCE
                                     current_might = int(p_data.get("might_current", 0))
                                     diff = current_might - info.get("last_might", current_might)
                                     if abs(diff) >= 500_000:
@@ -731,7 +723,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                         info["last_might"] = current_might 
                                         changes_detected = True
 
-                                    # 🔹 VÉRIFICATION COLOMBE
                                     new_peace = p_data.get("peace_disabled_at")
                                     if new_peace == "null": new_peace = None
                                     old_peace, was_protected = info.get("peace_disabled_at"), info.get("is_protected", False)
@@ -784,14 +775,12 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     # ==========================================
                     # --- ÉTAPE 3 : MOUVEMENTS GLOBAUX ---
                     # ==========================================
-                    # 🟢 OPTIMISATION 2 : Une seule requête globale pour vérifier TOUS les déménagements
                     try:
                         url_movements = f"https://api.gge-tracker.com/api/v1/server/movements?page=1&castleType=1&movementType=3"
                         async with session.get(url_movements, headers=headers, timeout=5) as r:
                             if r.status == 200:
                                 movements = (await r.json()).get("movements", [])
                                 
-                                # On vérifie localement si un mouvement concerne l'un de nos joueurs
                                 for m in movements:
                                     m_name = m.get("player_name")
                                     
@@ -814,7 +803,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     except Exception as e:
                         logger.error(f"❌ [Radar Spy] Erreur Global Movements : {e}")
 
-                await asyncio.sleep(1) # Sécurité Rate Limiting
+                await asyncio.sleep(1)
 
             if changes_detected:
                 await save_surveillance_async(data)

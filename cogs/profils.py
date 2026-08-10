@@ -67,7 +67,6 @@ class HistoriqueView(discord.ui.View):
         self._update_navigation()
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][0], view=self)
 
-    # Remplacement des émojis personnalisés par des émojis Unicode
     @discord.ui.button(emoji="<:listitem:1512573892596858960>", row=0)
     async def btn_pseudo(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "pseudo")
@@ -80,7 +79,6 @@ class HistoriqueView(discord.ui.View):
     async def btn_position(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "position")
 
-    # Correction : utilisation de "emoji=" au lieu de "label=" pour les flèches
     @discord.ui.button(emoji="<:lastpage:1533554126984581283>", style=discord.ButtonStyle.blurple, row=1)
     async def btn_prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = max(0, self.current_page - 1)

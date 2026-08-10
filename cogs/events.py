@@ -1102,6 +1102,5 @@ class EventsCog(commands.Cog):
         except Exception as e: 
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur technique : {e}"))
 
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(EventsCog(bot))
