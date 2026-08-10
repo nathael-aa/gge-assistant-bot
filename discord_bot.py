@@ -139,9 +139,10 @@ class GGEAssistantBot(commands.Bot):
         return serialized
 
     async def setup_hook(self):
+        # Dans ton setup_hook
         if TOPGG_TOKEN and TOPGG_TOKEN != "FAUX_TOKEN":
             self.topgg_client = topgg.DBLClient(self, TOPGG_TOKEN)
-            self.autoposter = topgg.AutoPoster(self, self.topgg_client)
+            self.autoposter = topgg.AutoPoster(self.topgg_client, self) 
             self.autoposter.start()
             logger.info("🟢 Client Top.gg (DBLClient) initialisé avec succès.")
         else:
@@ -476,11 +477,13 @@ class GGEAssistantBot(commands.Bot):
         return True
 
     async def close(self):
-        self.flag_watcher_task.cancel()
-        self.status_task.cancel()
-        self.sync_topgg_votes_task.cancel()
-        if self.session: 
-            await self.session.close()
+        if hasattr(self, 'flag_watcher_task'): self.flag_watcher_task.cancel()
+        if hasattr(self, 'status_task'): self.status_task.cancel()
+        if hasattr(self, 'sync_topgg_votes_task'): self.sync_topgg_votes_task.cancel()
+        session = getattr(self, 'session', None)
+        if session: 
+            await session.close()
+            
         await super().close()
 
 bot = GGEAssistantBot()
