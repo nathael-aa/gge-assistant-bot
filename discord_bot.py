@@ -327,7 +327,7 @@ class GGEAssistantBot(commands.Bot):
     # 🌐 WEBHOOK TOP.GG (HYBRIDE v0 & v1 SÉCURISÉ)
     # ==========================================
     async def vote_handler(self, request):
-        secret = "whs_a42fc9b8601eea72e30a50098c98946511c3e93d6a43fa79cfd81c23dc8d4c9b"
+        secret = "whs_932ffa2e1ec06ab843880ad41fd0f38c9f83d540694ab74c245bddc4958a6d69"
         
         signature_header = request.headers.get("x-topgg-signature")
         auth_header = request.headers.get("Authorization")
