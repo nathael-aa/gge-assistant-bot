@@ -5,7 +5,6 @@ import time
 import asyncio
 import logging
 import random
-import topgg
 from pathlib import Path
 from datetime import datetime, timedelta
 from discord import app_commands

@@ -325,7 +325,7 @@ class GGEAssistantBot(commands.Bot):
         # 1. On vérifie le mot de passe (sécurité)
         auth_header = request.headers.get("Authorization")
         # ⚠️ Tu mettras ce même mot de passe sur le site de Top.gg !
-        if auth_header != "GGE!Assist@nt140226": 
+        if auth_header != "whs_657d7e86c2b85f4b884495a7c6a860e5f99d8dabdca608332a7e9d50b96a235b": 
             return web.Response(status=401, text="Accès refusé.")
 
         # 2. On lit les données envoyées par Top.gg
