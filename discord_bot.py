@@ -327,7 +327,7 @@ class GGEAssistantBot(commands.Bot):
     # 🌐 WEBHOOK TOP.GG (HYBRIDE v0 & v1 SÉCURISÉ)
     # ==========================================
     async def vote_handler(self, request):
-        secret = "whs_932ffa2e1ec06ab843880ad41fd0f38c9f83d540694ab74c245bddc4958a6d69"
+        secret = "whs_c7babaae2778a44fca787c43be391732e3924c5790907857e61b15b397e3fc32"
         
         signature_header = request.headers.get("x-topgg-signature")
         auth_header = request.headers.get("Authorization")
@@ -336,7 +336,7 @@ class GGEAssistantBot(commands.Bot):
         
         # --- 1. VÉRIFICATION DE SÉCURITÉ ---
         if signature_header:
-            # Méthode v1 (Nouvelle)
+            # Méthode v1 (Nouvelle avec HMAC)
             try:
                 parts = dict(part.split('=') for part in signature_header.split(','))
                 message = f"{parts.get('t')}.{raw_body}".encode('utf-8')
@@ -348,27 +348,42 @@ class GGEAssistantBot(commands.Bot):
                 return web.Response(status=400, text="Erreur de calcul v1")
                 
         elif auth_header:
-            # Méthode v0 (Ancienne)
+            # Méthode v0 (Ancienne avec Header)
             if auth_header != secret:
                 logger.warning("❌ [Webhook] Mot de passe v0 invalide.")
                 return web.Response(status=401, text="Mauvais mot de passe v0")
                 
         else:
-            # Aucune sécurité trouvée
             logger.warning(f"❌ [Webhook] Requête refusée (ni v0, ni v1). Headers : {request.headers}")
             return web.Response(status=401, text="Missing auth")
 
-        # --- 2. LECTURE DU VOTE ---
+        # --- 2. LECTURE INTELLIGENTE DU JSON (v0 & v1) ---
         try:
-            data = json.loads(raw_body)
+            payload = json.loads(raw_body)
         except Exception:
             return web.Response(status=400, text="Invalid JSON")
 
-        user_id = data.get("user")
+        # Détection du format
+        if "data" in payload:
+            # C'est un format v1
+            user_id = payload.get("data", {}).get("user", {}).get("platform_id")
+            event_type = payload.get("type")
+        else:
+            # C'est un format v0
+            user_id = payload.get("user")
+            event_type = payload.get("type")
+
         if not user_id:
+            logger.error(f"❌ [Webhook] Impossible de lire l'ID dans le payload : {payload}")
             return web.Response(status=400, text="Missing user ID")
 
-        # --- 3. SAUVEGARDE (Bouclier 7j) ---
+        # --- 3. GESTION DU TYPE (TEST ou VOTE) ---
+        if event_type in ["test", "webhook.test"]:
+            logger.info(f"✅ [Webhook] TEST RÉUSSI ! La liaison avec Top.gg est parfaite (Test par {user_id}).")
+        else:
+            logger.info(f"✅ [Webhook] Vrai vote reçu ! Application du bouclier pour {user_id}.")
+
+        # --- 4. SAUVEGARDE (Bouclier 7j) ---
         VOTES_FILE = Path('/app/data/configs/votes.json')
         votes_data = {}
         if VOTES_FILE.exists():
@@ -384,11 +399,10 @@ class GGEAssistantBot(commands.Bot):
         try:
             with open(VOTES_FILE, 'w', encoding='utf-8') as f:
                 json.dump(votes_data, f, indent=4)
-            logger.info(f"✅ [Webhook] Vote reçu et validé ! Bouclier 7j activé pour l'utilisateur {user_id}.")
         except Exception as e:
             logger.error(f"❌ [Webhook] Erreur lors de la sauvegarde : {e}")
 
-        # --- 4. MESSAGE PRIVÉ ---
+        # --- 5. MESSAGE PRIVÉ ---
         try:
             user = self.get_user(int(user_id)) or await self.fetch_user(int(user_id))
             if user:
