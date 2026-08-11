@@ -223,7 +223,7 @@ except ImportError as e:
 
 _translations = {}
 
-# 2. Le Gilet Pare-Balles : Si une variable manque, elle ne fait pas planter le bot !
+# 2. Le Gilet Pare-Balles : Si une variable manque, elle ne fait pas planter le bot
 class SafeDict(dict):
     def __missing__(self, key):
         return f"{{{key}}}"  # Renvoie {nom_de_la_cle_manquante} au lieu de crasher
