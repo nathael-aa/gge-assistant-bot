@@ -327,8 +327,7 @@ class GGEAssistantBot(commands.Bot):
     async def vote_handler(self, request):
         # 1. On vérifie le mot de passe (sécurité)
         auth_header = request.headers.get("Authorization")
-        # ⚠️ Tu mettras ce même mot de passe sur le site de Top.gg !
-        if auth_header != "whs_6c0f2f6a10acdf052457d65890b5124cdda7c8a46dfcedbb5faaf68646ea53e4": 
+        if auth_header != "whs_fbfeedb724ad169cdd099483f77ea23f7193e7fcb88d90e10eb0e4ec8e12402b": 
             return web.Response(status=401, text="Accès refusé.")
 
         # 2. On lit les données envoyées par Top.gg
