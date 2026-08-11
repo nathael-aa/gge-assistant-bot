@@ -6,12 +6,12 @@ import logging
 import socket
 import asyncio
 import aiohttp
+from aiohttp import web
 from datetime import datetime, timedelta
 from pathlib import Path
 from logging.handlers import TimedRotatingFileHandler
 import discord
 from discord.ext import commands, tasks
-import topgg
 
 from utils import TOKEN, TOPGG_TOKEN, BOT_VERSION, MON_ID_DISCORD, load_maintenance, load_blocks_async, get_cached_data, CACHE, charger_langues, CONFIG_DIR, get_server_config, t
 
@@ -140,10 +140,10 @@ class GGEAssistantBot(commands.Bot):
 
     async def setup_hook(self):
         if TOPGG_TOKEN and TOPGG_TOKEN != "FAUX_TOKEN":
-            self.topgg_client = topgg.DBLClient(self, TOPGG_TOKEN)
-            logger.info("🟢 Client Top.gg initialisé avec succès.")
+            self.topgg_token = TOPGG_TOKEN
+            logger.info("🟢 Token Top.gg enregistré (utilisation via aiohttp v1).")
         else:
-            self.topgg_client = None
+            self.topgg_token = None
             logger.warning("⚠️ Aucun token Top.gg détecté. Les requêtes de vote seront ignorées.")
 
         connecteur_ipv4 = aiohttp.TCPConnector(family=socket.AF_INET)
@@ -202,6 +202,17 @@ class GGEAssistantBot(commands.Bot):
             logger.info("🛰️ [Tasks] sync_topgg_votes_task initialisée dans le setup_hook.")
 
         self.add_view(WelcomeView())
+
+        # 🟢 DÉMARRAGE DU SERVEUR WEBHOOK (Port 5011)
+        self.web_app = web.Application()
+        self.web_app.router.add_post('/dblwebhook', self.vote_handler)
+        self.web_runner = web.AppRunner(self.web_app)
+        await self.web_runner.setup()
+        
+        # 0.0.0.0 veut dire qu'on accepte les connexions de l'extérieur du conteneur
+        self.web_site = web.TCPSite(self.web_runner, '0.0.0.0', 5011)
+        await self.web_site.start()
+        logger.info("🌐 [Webhook] Serveur web en écoute sur le port 5011.")
 
     async def on_ready(self):
         charger_langues()
@@ -308,22 +319,99 @@ class GGEAssistantBot(commands.Bot):
         await self.wait_until_ready()
 
     # ==========================================
+    # 🌐 WEBHOOK TOP.GG (RÉCEPTION DES VOTES)
+    # ==========================================
+    async def vote_handler(self, request):
+        # 1. On vérifie le mot de passe (sécurité)
+        auth_header = request.headers.get("Authorization")
+        # ⚠️ Tu mettras ce même mot de passe sur le site de Top.gg !
+        if auth_header != "GGE!Assist@nt140226": 
+            return web.Response(status=401, text="Accès refusé.")
+
+        # 2. On lit les données envoyées par Top.gg
+        try:
+            data = await request.json()
+        except Exception:
+            return web.Response(status=400, text="Bad Request")
+
+        user_id = data.get("user")
+        if not user_id:
+            return web.Response(status=400, text="Missing user ID")
+
+        # 3. On met à jour le fichier votes.json (Bouclier de 7 jours)
+        VOTES_FILE = Path('/app/data/configs/votes.json')
+        votes_data = {}
+        if VOTES_FILE.exists():
+            try:
+                with open(VOTES_FILE, 'r', encoding='utf-8') as f:
+                    votes_data = json.load(f)
+            except Exception:
+                pass
+
+        now = datetime.now()
+        votes_data[str(user_id)] = (now + timedelta(days=7)).isoformat()
+
+        try:
+            with open(VOTES_FILE, 'w', encoding='utf-8') as f:
+                json.dump(votes_data, f, indent=4)
+            logger.info(f"✅ [Webhook] Vote reçu ! Bouclier 7j activé pour l'utilisateur {user_id}.")
+        except Exception as e:
+            logger.error(f"❌ [Webhook] Erreur lors de la sauvegarde : {e}")
+
+        # 4. On envoie le Message Privé de remerciement !
+        try:
+            user = self.get_user(int(user_id)) or await self.fetch_user(int(user_id))
+            if user:
+                embed = discord.Embed(
+                    title="🎉 Merci pour ton soutien !",
+                    description="Ton vote sur Top.gg a bien été pris en compte.\n\n🛡️ **Ton bouclier est maintenant actif !**\nTu ne verras plus aucune demande de vote sur les commandes du radar pendant les **7 prochains jours**.\n\nBon jeu ! ⚔️",
+                    color=discord.Color.brand_green()
+                )
+                await user.send(embed=embed)
+        except Exception as e:
+            logger.info(f"⚠️ [Webhook] Impossible d'envoyer le MP de remerciement à {user_id} (MP fermés).")
+
+        return web.Response(status=200, text="OK")
+
+    # ==========================================
     # 🔄 TÂCHE : SYNCHRONISATION DES VOTES (12H)
     # ==========================================
     @tasks.loop(hours=12)
     async def sync_topgg_votes_task(self):
         VOTES_FILE = Path('/app/data/configs/votes.json')
-        if not self.topgg_client:
+        
+        # Si pas de token, on annule
+        if not getattr(self, 'topgg_token', None):
             return
 
+        # 🟢 1. REQUÊTE DIRECTE À L'API (Format v1)
+        headers = {"Authorization": f"Bearer {self.topgg_token}"}
+        url = f"https://top.gg/api/bots/{self.user.id}/votes"
+
+        recent_voters_ids = []
         try:
-            # Récupère la liste des derniers votants
-            recent_voters = await self.topgg_client.get_bot_votes()
+            async with self.session.get(url, headers=headers, timeout=10) as r:
+                if r.status != 200:
+                    err_txt = await r.text()
+                    logger.error(f"❌ [Top.gg] Erreur API ({r.status}) : {err_txt}")
+                    return
+                
+                raw_voters = await r.json()
+                
+                # Extraction ultra-robuste des IDs
+                for v in raw_voters:
+                    if isinstance(v, dict):
+                        recent_voters_ids.append(str(v.get("id", "")))
+                    else:
+                        recent_voters_ids.append(str(v))
+                        
+                recent_voters_ids = [uid for uid in recent_voters_ids if uid]
+                
         except Exception as e:
-            logger.error(f"❌ [Top.gg] Erreur récupération votes : {e}")
+            logger.error(f"❌ [Top.gg] Erreur de requête aiohttp : {e}")
             return
 
-        # 1. Lecture du fichier actuel
+        # 🟢 2. GESTION DU FICHIER JSON (Ton code intact)
         votes_data = {}
         if VOTES_FILE.exists():
             try:
@@ -335,41 +423,30 @@ class GGEAssistantBot(commands.Bot):
         now = datetime.now()
         updated = False
 
-        # 2. Nettoyage des expirés
         keys_to_delete = []
         for uid, deadline_iso in votes_data.items():
             if datetime.fromisoformat(deadline_iso) < now:
                 keys_to_delete.append(uid)
         
-        # 3. Traitement des votants récupérés
-        for voter in recent_voters:
-            uid = str(voter.id)
-            
-            # L'ASTUCE : On ne lui remet 7 jours que s'il n'est pas déjà dans le fichier,
-            # OU s'il venait d'expirer (et était donc dans la liste à supprimer)
+        # On utilise notre nouvelle liste d'IDs (recent_voters_ids)
+        for uid in recent_voters_ids:
             if uid not in votes_data or uid in keys_to_delete:
                 votes_data[uid] = (now + timedelta(days=7)).isoformat()
                 if uid in keys_to_delete:
-                    keys_to_delete.remove(uid) # On le sauve de la suppression
+                    keys_to_delete.remove(uid) 
                 updated = True
 
-        # 4. Suppression définitive de ceux qui ont expiré et n'ont pas revoté
         for uid in keys_to_delete:
             del votes_data[uid]
             updated = True
 
-        # 5. Sauvegarde
         if updated:
             try:
                 with open(VOTES_FILE, 'w', encoding='utf-8') as f:
                     json.dump(votes_data, f, indent=4)
-                logger.info("✅ [Top.gg] Base des votes mise à jour (Boucliers 7j attribués/nettoyés).")
+                logger.info("✅ [Top.gg] Base des votes mise à jour via API v1 (Boucliers 7j attribués/nettoyés).")
             except Exception as e:
                 logger.error(f"❌ Impossible de sauvegarder votes.json : {e}")
-
-    @sync_topgg_votes_task.before_loop
-    async def before_sync_votes(self):
-        await self.wait_until_ready()
 
     # ==========================================
     # 🛑 LE VIDEUR UNIQUE ET UNIVERSEL
@@ -492,6 +569,9 @@ class GGEAssistantBot(commands.Bot):
         if hasattr(self, 'flag_watcher_task'): self.flag_watcher_task.cancel()
         if hasattr(self, 'status_task'): self.status_task.cancel()
         if hasattr(self, 'sync_topgg_votes_task'): self.sync_topgg_votes_task.cancel()
+        if hasattr(self, 'web_site'):
+            await self.web_site.stop()
+            await self.web_runner.cleanup()
         session = getattr(self, 'session', None)
         if session: 
             await session.close()
