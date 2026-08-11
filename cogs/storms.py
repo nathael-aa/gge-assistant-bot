@@ -228,8 +228,7 @@ class StormsCog(commands.Cog):
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
             else:
                 await current_inter.followup.send(embed=embeds[0], view=view)
-            await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
-
+                await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
         await fetch_and_build_view(interaction, is_refresh=False)
 
     # ========================================================
@@ -372,8 +371,7 @@ class StormsCog(commands.Cog):
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
             else:
                 await current_inter.followup.send(embed=embeds[0], view=view)
-            await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
-
+                await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
         await fetch_and_build_view(interaction, is_refresh=False)
 
     # ========================================================

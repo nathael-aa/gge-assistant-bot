@@ -171,7 +171,22 @@ class GGEAssistantBot(commands.Bot):
             except Exception as e:
                 logger.error(f"❌ Erreur {ext} : {e}")
 
+        # 1. Synchronisation globale (pour le reste du monde)
         await self.tree.sync()
+        
+        # 2. Synchronisation instantanée pour tes serveurs de test
+        SERVEURS_DE_TEST = [1342424613660921908, 1512165717380825310] 
+        
+        for guild_id in SERVEURS_DE_TEST:
+            try:
+                serveur = discord.Object(id=guild_id)
+                self.tree.copy_global_to(guild=serveur)
+                await self.tree.sync(guild=serveur)
+                
+                logger.info(f"⚡ [SYNC] Commandes forcées sur le serveur test ({guild_id})")
+            except Exception as e:
+                logger.error(f"❌ [SYNC] Échec sur le serveur {guild_id} : {e}")
+
         self.export_commands_json()
         
         if not self.flag_watcher_task.is_running():
