@@ -324,41 +324,41 @@ class GGEAssistantBot(commands.Bot):
         await self.wait_until_ready()
 
     # ==========================================
-    # 🌐 WEBHOOK TOP.GG v1 (RÉCEPTION DES VOTES SÉCURISÉE)
+    # 🌐 WEBHOOK TOP.GG (HYBRIDE v0 & v1 SÉCURISÉ)
     # ==========================================
     async def vote_handler(self, request):
-        secret = "whs_9faf7c104c4d882618b74d6a40499a3578443576ce867392851439da53907d4d"
+        secret = "whs_a42fc9b8601eea72e30a50098c98946511c3e93d6a43fa79cfd81c23dc8d4c9b"
+        
         signature_header = request.headers.get("x-topgg-signature")
-
-        # 1. Vérification de la présence de la signature
-        if not signature_header:
-            logger.warning("❌ [Webhook] Requête sans signature Top.gg reçue.")
-            return web.Response(status=401, text="Missing signature")
-
-        # On récupère le corps brut de la requête (requis pour le calcul crypto)
+        auth_header = request.headers.get("Authorization")
+        
         raw_body = await request.text()
+        
+        # --- 1. VÉRIFICATION DE SÉCURITÉ ---
+        if signature_header:
+            # Méthode v1 (Nouvelle)
+            try:
+                parts = dict(part.split('=') for part in signature_header.split(','))
+                message = f"{parts.get('t')}.{raw_body}".encode('utf-8')
+                expected_sig = hmac.new(secret.encode('utf-8'), message, hashlib.sha256).hexdigest()
+                if not hmac.compare_digest(expected_sig, parts.get('v1')):
+                    logger.warning("❌ [Webhook] Signature v1 invalide.")
+                    return web.Response(status=401, text="Signature invalide")
+            except Exception:
+                return web.Response(status=400, text="Erreur de calcul v1")
+                
+        elif auth_header:
+            # Méthode v0 (Ancienne)
+            if auth_header != secret:
+                logger.warning("❌ [Webhook] Mot de passe v0 invalide.")
+                return web.Response(status=401, text="Mauvais mot de passe v0")
+                
+        else:
+            # Aucune sécurité trouvée
+            logger.warning(f"❌ [Webhook] Requête refusée (ni v0, ni v1). Headers : {request.headers}")
+            return web.Response(status=401, text="Missing auth")
 
-        # 2. Découpage de la signature (t=...,v1=...)
-        try:
-            parts = dict(part.split('=') for part in signature_header.split(','))
-            timestamp = parts.get('t')
-            received_sig = parts.get('v1')
-        except Exception:
-            return web.Response(status=400, text="Invalid signature format")
-
-        if not timestamp or not received_sig:
-             return web.Response(status=400, text="Invalid signature values")
-
-        # 3. Calcul cryptographique (HMAC SHA-256)
-        message = f"{timestamp}.{raw_body}".encode('utf-8')
-        expected_sig = hmac.new(secret.encode('utf-8'), message, hashlib.sha256).hexdigest()
-
-        # 4. Comparaison sécurisée
-        if not hmac.compare_digest(expected_sig, received_sig):
-            logger.warning("❌ [Webhook] Signature invalide (Tentative de fraude ?)")
-            return web.Response(status=401, text="Signature mismatch")
-
-        # 5. La signature est valide ! On lit le JSON.
+        # --- 2. LECTURE DU VOTE ---
         try:
             data = json.loads(raw_body)
         except Exception:
@@ -368,7 +368,7 @@ class GGEAssistantBot(commands.Bot):
         if not user_id:
             return web.Response(status=400, text="Missing user ID")
 
-        # 6. Mise à jour du fichier votes.json (Bouclier de 7 jours)
+        # --- 3. SAUVEGARDE (Bouclier 7j) ---
         VOTES_FILE = Path('/app/data/configs/votes.json')
         votes_data = {}
         if VOTES_FILE.exists():
@@ -384,11 +384,11 @@ class GGEAssistantBot(commands.Bot):
         try:
             with open(VOTES_FILE, 'w', encoding='utf-8') as f:
                 json.dump(votes_data, f, indent=4)
-            logger.info(f"✅ [Webhook] Vote reçu (v1) ! Bouclier 7j activé pour l'utilisateur {user_id}.")
+            logger.info(f"✅ [Webhook] Vote reçu et validé ! Bouclier 7j activé pour l'utilisateur {user_id}.")
         except Exception as e:
             logger.error(f"❌ [Webhook] Erreur lors de la sauvegarde : {e}")
 
-        # 7. On envoie le Message Privé de remerciement !
+        # --- 4. MESSAGE PRIVÉ ---
         try:
             user = self.get_user(int(user_id)) or await self.fetch_user(int(user_id))
             if user:
@@ -398,10 +398,9 @@ class GGEAssistantBot(commands.Bot):
                     color=discord.Color.brand_green()
                 )
                 await user.send(embed=embed)
-        except Exception as e:
-            logger.info(f"⚠️ [Webhook] Impossible d'envoyer le MP de remerciement à {user_id} (MP fermés).")
+        except Exception:
+            pass
 
-        # On retourne un succès total pour Top.gg
         return web.Response(status=200, text="OK")
 
     # ==========================================
