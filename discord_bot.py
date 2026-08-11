@@ -6,6 +6,8 @@ import logging
 import socket
 import asyncio
 import aiohttp
+import hmac
+import hashlib
 from aiohttp import web
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -322,25 +324,51 @@ class GGEAssistantBot(commands.Bot):
         await self.wait_until_ready()
 
     # ==========================================
-    # 🌐 WEBHOOK TOP.GG (RÉCEPTION DES VOTES)
+    # 🌐 WEBHOOK TOP.GG v1 (RÉCEPTION DES VOTES SÉCURISÉE)
     # ==========================================
     async def vote_handler(self, request):
-        # 1. On vérifie le mot de passe (sécurité)
-        auth_header = request.headers.get("Authorization")
-        if auth_header != "whs_4e077053e71e5db033457ec1f2d0fe3389c31865f7ba469e2855fa48edc1bc98": 
-            return web.Response(status=401, text="Accès refusé.")
+        secret = "whs_9faf7c104c4d882618b74d6a40499a3578443576ce867392851439da53907d4d"
+        signature_header = request.headers.get("x-topgg-signature")
 
-        # 2. On lit les données envoyées par Top.gg
+        # 1. Vérification de la présence de la signature
+        if not signature_header:
+            logger.warning("❌ [Webhook] Requête sans signature Top.gg reçue.")
+            return web.Response(status=401, text="Missing signature")
+
+        # On récupère le corps brut de la requête (requis pour le calcul crypto)
+        raw_body = await request.text()
+
+        # 2. Découpage de la signature (t=...,v1=...)
         try:
-            data = await request.json()
+            parts = dict(part.split('=') for part in signature_header.split(','))
+            timestamp = parts.get('t')
+            received_sig = parts.get('v1')
         except Exception:
-            return web.Response(status=400, text="Bad Request")
+            return web.Response(status=400, text="Invalid signature format")
+
+        if not timestamp or not received_sig:
+             return web.Response(status=400, text="Invalid signature values")
+
+        # 3. Calcul cryptographique (HMAC SHA-256)
+        message = f"{timestamp}.{raw_body}".encode('utf-8')
+        expected_sig = hmac.new(secret.encode('utf-8'), message, hashlib.sha256).hexdigest()
+
+        # 4. Comparaison sécurisée
+        if not hmac.compare_digest(expected_sig, received_sig):
+            logger.warning("❌ [Webhook] Signature invalide (Tentative de fraude ?)")
+            return web.Response(status=401, text="Signature mismatch")
+
+        # 5. La signature est valide ! On lit le JSON.
+        try:
+            data = json.loads(raw_body)
+        except Exception:
+            return web.Response(status=400, text="Invalid JSON")
 
         user_id = data.get("user")
         if not user_id:
             return web.Response(status=400, text="Missing user ID")
 
-        # 3. On met à jour le fichier votes.json (Bouclier de 7 jours)
+        # 6. Mise à jour du fichier votes.json (Bouclier de 7 jours)
         VOTES_FILE = Path('/app/data/configs/votes.json')
         votes_data = {}
         if VOTES_FILE.exists():
@@ -356,11 +384,11 @@ class GGEAssistantBot(commands.Bot):
         try:
             with open(VOTES_FILE, 'w', encoding='utf-8') as f:
                 json.dump(votes_data, f, indent=4)
-            logger.info(f"✅ [Webhook] Vote reçu ! Bouclier 7j activé pour l'utilisateur {user_id}.")
+            logger.info(f"✅ [Webhook] Vote reçu (v1) ! Bouclier 7j activé pour l'utilisateur {user_id}.")
         except Exception as e:
             logger.error(f"❌ [Webhook] Erreur lors de la sauvegarde : {e}")
 
-        # 4. On envoie le Message Privé de remerciement !
+        # 7. On envoie le Message Privé de remerciement !
         try:
             user = self.get_user(int(user_id)) or await self.fetch_user(int(user_id))
             if user:
@@ -373,6 +401,7 @@ class GGEAssistantBot(commands.Bot):
         except Exception as e:
             logger.info(f"⚠️ [Webhook] Impossible d'envoyer le MP de remerciement à {user_id} (MP fermés).")
 
+        # On retourne un succès total pour Top.gg
         return web.Response(status=200, text="OK")
 
     # ==========================================
