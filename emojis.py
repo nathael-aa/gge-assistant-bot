@@ -124,4 +124,6 @@ DICT_EMOJIS = {
     "e_woaicon": "<:woaicon:1512165794740572292>",
     "e_working": "<:working:1534907475470323794>",
     "e_yellowbullet": "<:yellowbullet:1534908820675887348>",
+    "e_heart": "<a:pinkhearts:1536862210578456656>",
+    "e_marshal": "<:stalwartmarshal:1533429333388165130>",
 }

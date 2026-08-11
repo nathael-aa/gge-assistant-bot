@@ -402,13 +402,35 @@ class GGEAssistantBot(commands.Bot):
         except Exception as e:
             logger.error(f"❌ [Webhook] Erreur lors de la sauvegarde : {e}")
 
-        # --- 5. MESSAGE PRIVÉ ---
+        # --- 5. MESSAGE PRIVÉ (TRADUIT) ---
         try:
             user = self.get_user(int(user_id)) or await self.fetch_user(int(user_id))
             if user:
+                # 1. On cherche la langue du joueur dans le cache RAM
+                from utils import USERS_CONFIG_CACHE
+                langue = "en" # Anglais par défaut
+                
+                user_data = USERS_CONFIG_CACHE.get(str(user_id))
+                if user_data and isinstance(user_data, dict):
+                    langue = user_data.get("lang", user_data.get("langue", "en"))
+
+                # 2. Textes par défaut (Anglais)
+                titre_defaut = "🎉 Thank you for your support!"
+                desc_defaut = (
+                    "Your vote on Top.gg has been successfully recorded.\n\n"
+                    "🛡️ **Your shield is now active!**\n"
+                    "You won't see any vote requests on radar commands for the next **7 days**.\n\n"
+                    "Happy gaming! ⚔️"
+                )
+
+                # 3. Traduction via ta fonction t()
+                titre = t(langue, "vote_thanks_title", defaut=titre_defaut)
+                description = t(langue, "vote_thanks_desc", defaut=desc_defaut)
+
+                # 4. Envoi de l'embed
                 embed = discord.Embed(
-                    title="🎉 Merci pour ton soutien !",
-                    description="Ton vote sur Top.gg a bien été pris en compte.\n\n🛡️ **Ton bouclier est maintenant actif !**\nTu ne verras plus aucune demande de vote sur les commandes du radar pendant les **7 prochains jours**.\n\nBon jeu ! ⚔️",
+                    title=titre,
+                    description=description,
                     color=discord.Color.brand_green()
                 )
                 await user.send(embed=embed)

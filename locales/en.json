@@ -691,5 +691,7 @@
     "vote_prompt_btn": "Vote (1 click)",
     "review_prompt_btn": "Leave a review",
     "vote_prompt_title": "{e_bot} Hey! Need a quick favor?",
-    "vote_prompt_desc": "You use this command often! If GGE Assistant helps you daily, please take a few seconds to vote or leave a short review on Top.gg. It's free and helps us a lot! {e_std_winking_face}\n\n*(This message won't show up again for 7 days after you vote!)*"
+    "vote_prompt_desc": "You use this command often! If GGE Assistant helps you daily, please take a few seconds to vote or leave a short review on Top.gg. It's free and helps us a lot! {e_std_winking_face}\n\n*(This message won't show up again for 7 days after you vote!)*",
+    "vote_thanks_title": "{e_heart} Thank you for your support!",
+    "vote_thanks_desc": "Your vote on Top.gg has been successfully recorded.\n\n{e_std_shield} **Your shield is now active!**\nYou will no longer see any vote requests on radar commands for the next **7 days**.\n\nHappy gaming! {e_marshal}"
 }

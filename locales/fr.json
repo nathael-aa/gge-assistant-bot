@@ -691,5 +691,7 @@
     "vote_prompt_btn": "Voter (1 clic)",
     "review_prompt_btn": "Laisser un avis",
     "vote_prompt_title": "{e_bot} Coucou ! Un petit service ?",
-    "vote_prompt_desc": "Tu utilises souvent cette commande ! Si GGE Assistant t'aide au quotidien, prends quelques secondes pour voter ou nous laisser un petit avis sur Top.gg. C'est gratuit et ça nous aide énormément ! {e_std_winking_face}\n\n*(Ce message disparaîtra pendant 7 jours après ton vote !)*"
+    "vote_prompt_desc": "Tu utilises souvent cette commande ! Si GGE Assistant t'aide au quotidien, prends quelques secondes pour voter ou nous laisser un petit avis sur Top.gg. C'est gratuit et ça nous aide énormément ! {e_std_winking_face}\n\n*(Ce message disparaîtra pendant 7 jours après ton vote !)*",
+    "vote_thanks_title": "{e_heart} Merci pour ton soutien !",
+    "vote_thanks_desc": "Ton vote sur Top.gg a bien été pris en compte.\n\n{e_std_shield} **Ton bouclier est maintenant actif !**\nTu ne verras plus aucune demande de vote sur les commandes du radar pendant les **7 prochains jours**.\n\nBon jeu ! {e_marshal}"
 }
