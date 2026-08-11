@@ -201,6 +201,10 @@ class GGEAssistantBot(commands.Bot):
             self.sync_topgg_votes_task.start()
             logger.info("🛰️ [Tasks] sync_topgg_votes_task initialisée dans le setup_hook.")
 
+        if not self.post_server_count_task.is_running():
+            self.post_server_count_task.start()
+            logger.info("🛰️ [Tasks] post_server_count_task initialisée dans le setup_hook.")
+
         self.add_view(WelcomeView())
 
         # 🟢 DÉMARRAGE DU SERVEUR WEBHOOK (Port 5011)
@@ -289,7 +293,6 @@ class GGEAssistantBot(commands.Bot):
         nb_serveurs = len(self.guilds)
         nb_membres = sum(guild.member_count for guild in self.guilds if guild.member_count)
         
-        # --- OPTIMISATION : On compte les dossiers en arrière-plan ---
         def compter_serveurs_gge():
             dossier_serveurs = Path('/app/data/server_scans')
             if dossier_serveurs.exists():
@@ -325,7 +328,7 @@ class GGEAssistantBot(commands.Bot):
         # 1. On vérifie le mot de passe (sécurité)
         auth_header = request.headers.get("Authorization")
         # ⚠️ Tu mettras ce même mot de passe sur le site de Top.gg !
-        if auth_header != "whs_657d7e86c2b85f4b884495a7c6a860e5f99d8dabdca608332a7e9d50b96a235b": 
+        if auth_header != "whs_6c0f2f6a10acdf052457d65890b5124cdda7c8a46dfcedbb5faaf68646ea53e4": 
             return web.Response(status=401, text="Accès refusé.")
 
         # 2. On lit les données envoyées par Top.gg
@@ -448,6 +451,35 @@ class GGEAssistantBot(commands.Bot):
             except Exception as e:
                 logger.error(f"❌ Impossible de sauvegarder votes.json : {e}")
 
+    @sync_topgg_votes_task.before_loop
+    async def before_sync_votes(self):
+        await self.wait_until_ready()
+
+    # ==========================================
+    # 📈 TÂCHE : MISE À JOUR DU NOMBRE DE SERVEURS TOP.GG
+    # ==========================================
+    @tasks.loop(minutes=30)
+    async def post_server_count_task(self):
+        if not getattr(self, 'topgg_token', None):
+            return
+
+        url = f"https://top.gg/api/bots/{self.user.id}/stats"
+        headers = {"Authorization": f"Bearer {self.topgg_token}"}
+        payload = {"server_count": len(self.guilds)}
+
+        try:
+            async with self.session.post(url, headers=headers, json=payload, timeout=10) as r:
+                if r.status == 200:
+                    logger.info(f"📈 [Top.gg] Compteur de serveurs mis à jour : {len(self.guilds)} serveurs.")
+                else:
+                    logger.error(f"❌ [Top.gg] Échec de la mise à jour des stats ({r.status}).")
+        except Exception as e:
+            logger.error(f"❌ [Top.gg] Erreur réseau lors de la mise à jour des stats : {e}")
+
+    @post_server_count_task.before_loop
+    async def before_post_stats(self):
+        await self.wait_until_ready()
+
     # ==========================================
     # 🛑 LE VIDEUR UNIQUE ET UNIVERSEL
     # ==========================================
@@ -569,6 +601,7 @@ class GGEAssistantBot(commands.Bot):
         if hasattr(self, 'flag_watcher_task'): self.flag_watcher_task.cancel()
         if hasattr(self, 'status_task'): self.status_task.cancel()
         if hasattr(self, 'sync_topgg_votes_task'): self.sync_topgg_votes_task.cancel()
+        if hasattr(self, 'post_server_count_task'): self.post_server_count_task.cancel()
         if hasattr(self, 'web_site'):
             await self.web_site.stop()
             await self.web_runner.cleanup()

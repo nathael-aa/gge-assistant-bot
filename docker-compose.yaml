@@ -6,7 +6,7 @@ services:
     container_name: gge-assistant
     restart: unless-stopped
     ports:
-      - "5011:5011"
+      - "60001:5011"
     env_file:
       - .env
     environment:
