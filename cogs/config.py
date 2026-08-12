@@ -60,14 +60,21 @@ class ConfigCog(commands.Cog):
                 display_name = f"{srv} - {platform_tag}"
                 
                 if is_supported:
-                    choix_vert.append(app_commands.Choice(name=f"{display_name} ({lbl_ok})", value=srv))
+                    # ✅ AJOUT DE [:100] ICI
+                    full_name = f"{display_name} ({lbl_ok})"[:100]
+                    choix_vert.append(app_commands.Choice(name=full_name, value=srv))
                 else:
-                    choix_rouge.append(app_commands.Choice(name=f"{display_name} ({lbl_ko})", value=srv))
+                    # ✅ AJOUT DE [:100] ICI
+                    full_name = f"{display_name} ({lbl_ko})"[:100]
+                    choix_rouge.append(app_commands.Choice(name=full_name, value=srv))
         
         choix = (choix_vert + choix_rouge)[:25]
         
         if not choix and current:
-            choix.append(app_commands.Choice(name=f"{current.upper()} ({lbl_unk})", value=current.upper()))
+            # ✅ AJOUT DE [:100] SUR LE NAME ET LA VALUE ICI AUSSI
+            full_name = f"{current.upper()} ({lbl_unk})"[:100]
+            safe_value = current.upper()[:100]
+            choix.append(app_commands.Choice(name=full_name, value=safe_value))
             
         return choix
 

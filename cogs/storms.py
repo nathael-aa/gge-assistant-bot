@@ -531,24 +531,6 @@ class StormsCog(commands.Cog):
     async def storm_alert_loop(self):
         now = datetime.now().timestamp()
 
-        alerts_to_keep = []
-        for alert in self.active_alerts:
-            if now >= alert["ts"]:
-                emb = alert["embed"]
-                langue_alert = alert.get("langue", "fr")
-                
-                emb.color = discord.Color.red()
-                emb.title = t(langue_alert, "alert_storm_spawned_title", defaut="<:aquamarineiles:1512162072249765908> Island Spawned!")
-                
-                try:
-                    await alert["message"].edit(embed=emb)
-                except Exception:
-                    pass 
-            else:
-                alerts_to_keep.append(alert)
-                
-        self.active_alerts = alerts_to_keep
-
         data = await load_storm_config()
         guilds_config = data.get("guilds", {})
         notified = data.get("notified", [])
@@ -563,27 +545,49 @@ class StormsCog(commands.Cog):
                 servers_to_check[gge_server] = []
             servers_to_check[gge_server].append((guild_id_str, config))
 
+        # 1️⃣ Mémoire : Identifier les serveurs qui ont des îles "Apparues" en attente de capture
+        servers_with_spawned = {
+            alert["gge_server"] for alert in self.active_alerts 
+            if now >= alert["ts"] and alert.get("status", "pending") in ["pending", "spawned"]
+        }
+
         modifie = False
         total_annoncailles = 0
+        occupied_isles_by_server = {}
 
+        # 2️⃣ Fetch API : On récupère les respawns et les occupations intelligemment
         for gge_server, guilds_list in servers_to_check.items():
             headers = await get_api_headers(custom_server=gge_server)
-            params = {"size": 4000, "filterByState": 3}
             
+            # A) Îles en phase de Respawn (filterByState=3)
+            params_respawning = {"size": 4000, "filterByState": 3}
+            isles_respawning = []
             try:
-                async with self.bot.session.get(f"{self.api_base}storms/isles", headers=headers, params=params, timeout=15) as r:
-                    if r.status != 200: continue
-                    api_data = await r.json()
+                async with self.bot.session.get(f"{self.api_base}storms/isles", headers=headers, params=params_respawning, timeout=15) as r:
+                    if r.status == 200:
+                        api_data = await r.json()
+                        isles_respawning = api_data.get("isles", [])
             except Exception as e:
-                logger.error(f"❌ [Storm Alerts] Erreur API pour {gge_server} : {e}")
-                continue
-
-            isles = api_data.get("isles", [])
-            isles_to_announce = []
-            
-            for isle in isles:
-                isle_id = isle.get("isle_id")
+                logger.error(f"❌ [Storm Alerts] Erreur API Respawning pour {gge_server} : {e}")
                 
+            # B) Îles Occupées (filterByState=2) - UNIQUEMENT si on en a besoin (économie de requêtes)
+            if gge_server in servers_with_spawned:
+                params_occupied = {"size": 4000, "filterByState": 2}
+                try:
+                    async with self.bot.session.get(f"{self.api_base}storms/isles", headers=headers, params=params_occupied, timeout=15) as r:
+                        if r.status == 200:
+                            occ_data = await r.json()
+                            occupied_isles_by_server[gge_server] = {
+                                (isle.get("position_x"), isle.get("position_y")): isle 
+                                for isle in occ_data.get("isles", [])
+                            }
+                except Exception as e:
+                    logger.error(f"❌ [Storm Alerts] Erreur API Occupied pour {gge_server} : {e}")
+
+            # C) Création des nouvelles alertes pour les îles qui vont spawn
+            isles_to_announce = []
+            for isle in isles_respawning:
+                isle_id = isle.get("isle_id")
                 if isle_id not in [3, 6]:
                     continue
 
@@ -642,17 +646,80 @@ class StormsCog(commands.Cog):
                     
                     try:
                         sent_msg = await channel.send(content=msg_content, embed=embed)
+                        # Ajout des informations vitales pour retrouver l'île plus tard
                         self.active_alerts.append({
                             "message": sent_msg,
                             "embed": embed,
                             "ts": ts,
-                            "langue": langue
+                            "langue": langue,
+                            "x": x,
+                            "y": y,
+                            "gge_server": gge_server,
+                            "res_nom": res_nom,
+                            "status": "pending"
                         })
                     except discord.Forbidden:
                         pass
                     except discord.HTTPException as e:
-                        logger.error(f"❌ [Storm Alerts] Erreur réseau Discord lors de l'envoi : {e}")
+                        logger.error(f"❌ [Storm Alerts] Erreur réseau Discord : {e}")
 
+        # 3️⃣ Cycle de vie des alertes (Pending ➔ Spawned ➔ Captured)
+        alerts_to_keep = []
+        for alert in self.active_alerts:
+            status = alert.get("status", "pending")
+            ts = alert["ts"]
+            langue_alert = alert["langue"]
+            emb = alert["embed"]
+            msg = alert["message"]
+            
+            # Phase 1 : Pas encore apparue, on la garde en attente
+            if now < ts:
+                alerts_to_keep.append(alert)
+                continue
+                
+            # Phase 2 : Vient d'apparaître ! (Vert)
+            if status == "pending":
+                alert["status"] = "spawned"
+                emb.color = discord.Color.green()
+                emb.title = t(langue_alert, "alert_storm_spawned_title", defaut="<:aquamarineiles:1512162072249765908> Island Spawned!")
+                emb.description = t(langue_alert, "alert_storm_spawned_desc", name=alert["res_nom"], x=alert["x"], y=alert["y"], defaut=f"**{alert['res_nom']}** is now available!\n<:compass:1512504625364729987> Coords: `{alert['x']}:{alert['y']}`")
+                try:
+                    await msg.edit(embed=emb)
+                except:
+                    pass
+                alerts_to_keep.append(alert)
+                continue
+                
+            # Phase 3 : Était déjà apparue, on vérifie si un joueur l'a capturée (Rouge)
+            if status == "spawned":
+                gge_server = alert["gge_server"]
+                x, y = alert["x"], alert["y"]
+                
+                occ_dict = occupied_isles_by_server.get(gge_server, {})
+                isle_data = occ_dict.get((x, y))
+                
+                if isle_data:
+                    # ✅ Un joueur l'a prise !
+                    occupier = isle_data.get("occupier_name") or "Unknown"
+                    alliance = isle_data.get("occupier_alliance_name") or "None"
+                    
+                    emb.color = discord.Color.red()
+                    emb.title = t(langue_alert, "alert_storm_captured_title", defaut="<:aquamarineiles:1512162072249765908> Island Captured!")
+                    emb.description = t(langue_alert, "alert_storm_captured_desc", name=alert["res_nom"], x=x, y=y, occupier=occupier, alliance=alliance, defaut=f"**{alert['res_nom']}** was captured by **{occupier}** (*{alliance}*)!\n<:compass:1512504625364729987> Coords: `{x}:{y}`")
+                    
+                    try:
+                        await msg.edit(embed=emb)
+                    except:
+                        pass
+                    # On ne l'ajoute plus à alerts_to_keep : le cycle de cette alerte est terminé.
+                else:
+                    # Toujours libre sur la carte. On la surveille pendant 2 heures max (7200 secondes).
+                    if now <= ts + 7200:
+                        alerts_to_keep.append(alert)
+
+        self.active_alerts = alerts_to_keep
+
+        # Sauvegarde finale
         if modifie:
             if len(notified) > 200: 
                 notified = notified[-200:]

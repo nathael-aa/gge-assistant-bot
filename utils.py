@@ -111,7 +111,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-VOTES_FILE = Path('/app/data/votes.json')
+VOTES_FILE = Path('/app/data/configs/votes.json')
 
 async def prompt_vote_if_lucky(interaction: discord.Interaction, probability_percent: int, langue: str = "fr"):
     """
