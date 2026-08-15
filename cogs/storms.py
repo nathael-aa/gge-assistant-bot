@@ -41,7 +41,7 @@ async def save_storm_config(data):
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 # ==========================================
-# ⚙️ CONFIGURATION DES ID DE L'API STORMS
+# ⚙️ CONFIGURATION ID DE L'API STORM
 # ==========================================
 FORT_LEVELS_MAPPING = {
     10: {"lvl": 40, "desc": "40"},
