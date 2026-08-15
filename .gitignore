@@ -1,22 +1,25 @@
 # DATA
-data/alliances/diplomatie.json
-data/configs/blocks.json
-data/configs/calendrier.json
-data/configs/maintenance.json
-data/configs/rival_radar.json
-data/configs/serveurs.json
-data/configs/surveillance.json
+
+#admins
+data/admins/blocks.json
+data/admins/contacts.json
+data/admins/maintenance.json
+#configs
 data/configs/users.json
-data/configs/storm_alerts.json
-data/joueurs/
-data/murs_scans/
+#joueurs
+data/joueurs/rival_radar.json
+data/joueurs/forteresses_sessions.json
+data/joueurs/pseudos.json
+data/joueurs/surveillance.json
+data/joueurs/votes.json
+#serveurs
+data/serveurs/calendrier.json
+data/serveurs/storm_alerts.json
+#server_scans
 data/server_scans/
 
 # LOG
 logs/
-
-#SCANNERS
-scanners/__pycache__
 
 #COGS
 cogs/__pycache__
