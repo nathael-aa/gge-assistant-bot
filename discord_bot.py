@@ -177,7 +177,7 @@ class GGEAssistantBot(commands.Bot):
         await self.tree.sync()
         
         # 2. Synchronisation instantanée pour tes serveurs de test
-        SERVEURS_DE_TEST = [1342424613660921908, 1512165717380825310] 
+        SERVEURS_DE_TEST = [1342424613660921908, 1512165717380825310,1537532071898128566] 
         
         for guild_id in SERVEURS_DE_TEST:
             try:

@@ -1,0 +1,316 @@
+{
+  "guilds": {},
+  "notified": [
+    "outer realms_2026-07-06_start",
+    "nomad invasion_2026-07-07_end",
+    "bloodcrow invasion_2026-07-07_start",
+    "berimond_2026-07-07_start",
+    "outer realms_2026-07-09_end",
+    "outer realms_2026-07-09_start",
+    "samurai invasion_2026-07-10_start",
+    "bloodcrow invasion_2026-07-10_end",
+    "berimond_2026-07-10_end",
+    "samurai invasion_2026-07-25_end",
+    "nomad invasion_2026-07-25_start",
+    "rift raid_2026-07-07_start",
+    "samurai invasion_2026-07-11_end",
+    "nomad invasion_2026-07-11_start",
+    "rift raid_2026-07-10_start",
+    "bladecoast_2026-07-12_start",
+    "outer realms_2026-07-13_end",
+    "outer realms_2026-07-13_start",
+    "nomad invasion_2026-07-14_end",
+    "war of the realms_2026-07-14_start",
+    "rift raid_2026-07-14_end",
+    "samurai invasion_2026-07-17_start",
+    "samurai invasion_2026-07-18_end",
+    "samurai invasion_2026-07-24_start",
+    "nomad invasion_2026-07-18_start",
+    "nomad invasion_2026-07-21_end",
+    "nomad invasion_2026-07-28_end",
+    "bloodcrow invasion_2026-07-21_start",
+    "bloodcrow invasion_2026-07-24_end",
+    "war of the realms_2026-07-17_end",
+    "war of the realms_2026-07-28_start",
+    "berimond_2026-07-28_start",
+    "bladecoast_2026-07-19_end",
+    "rift raid_2026-07-17_end",
+    "grand tournament_2026-07-21_start",
+    "beyond the horizon_2026-07-16_start",
+    "beyond the horizon_2026-07-20_end",
+    "outer realms_2026-07-16_end",
+    "outer realms_2026-07-20_start",
+    "outer realms_2026-07-24_end",
+    "imperial patronage_2026-07-17_start",
+    "imperial patronage_2026-07-24_end",
+    "grand nobility contest_2026-06-16_start",
+    "grand nobility contest_2026-07-17_end",
+    "grand nobility contest_2026-07-17_start",
+    "beyond the horizon_2026-08-03_end",
+    "outer realms_2026-08-03_start",
+    "grand tournament_2026-07-28_end",
+    "beyond the horizon_2026-07-30_start",
+    "samurai invasion_2026-07-31_start",
+    "war of the realms_2026-07-31_end",
+    "berimond_2026-07-31_end",
+    "samurai invasion_2026-08-01_end",
+    "nomad invasion_2026-08-04_end",
+    "bloodcrow invasion_2026-08-04_start",
+    "berimond_2026-08-04_start",
+    "rift raid_2026-08-04_start",
+    "outer realms_2026-08-06_end",
+    "outer realms_2026-08-06_start",
+    "nomad invasion_2026-08-01_start",
+    "samurai invasion_2026-08-07_start",
+    "bloodcrow invasion_2026-08-07_end",
+    "berimond_2026-08-07_end",
+    "samurai invasion_2026-08-08_end",
+    "nomad invasion_2026-08-08_start",
+    "outer realms_2026-08-10_end",
+    "outer realms_2026-08-10_start",
+    "nomad invasion_2026-08-11_end",
+    "war of the realms_2026-08-11_start",
+    "rift raid_2026-08-11_end",
+    "bladecoast_2026-08-12_start",
+    "outer realms_2026-08-13_end",
+    "beyond the horizon_2026-08-13_start",
+    "grand nobility contest_2026-08-15_end",
+    "samurai invasion_2026-08-14_start",
+    "samurai invasion_2026-08-15_end",
+    "nomad invasion_2026-08-15_start",
+    "war of the realms_2026-08-14_end",
+    "grand nobility contest_2026-08-15_start"
+  ],
+  "cached_events": [
+    {
+      "key": "samurai invasion",
+      "start": "2026-07-17T11:00:00",
+      "end": "2026-07-18T09:00:00"
+    },
+    {
+      "key": "samurai invasion",
+      "start": "2026-07-24T11:00:00",
+      "end": "2026-07-25T09:00:00"
+    },
+    {
+      "key": "samurai invasion",
+      "start": "2026-07-31T11:00:00",
+      "end": "2026-08-01T09:00:00"
+    },
+    {
+      "key": "nomad invasion",
+      "start": "2026-07-18T11:00:00",
+      "end": "2026-07-21T09:00:00"
+    },
+    {
+      "key": "nomad invasion",
+      "start": "2026-07-25T11:00:00",
+      "end": "2026-07-28T09:00:00"
+    },
+    {
+      "key": "bloodcrow invasion",
+      "start": "2026-07-21T11:00:00",
+      "end": "2026-07-24T09:00:00"
+    },
+    {
+      "key": "war of the realms",
+      "start": "2026-07-14T11:00:00",
+      "end": "2026-07-17T09:00:00"
+    },
+    {
+      "key": "war of the realms",
+      "start": "2026-07-28T11:00:00",
+      "end": "2026-07-31T09:00:00"
+    },
+    {
+      "key": "berimond",
+      "start": "2026-07-28T11:00:00",
+      "end": "2026-07-31T09:00:00"
+    },
+    {
+      "key": "bladecoast",
+      "start": "2026-07-12T11:00:00",
+      "end": "2026-07-19T09:00:00"
+    },
+    {
+      "key": "rift raid",
+      "start": "2026-07-10T13:30:00",
+      "end": "2026-07-17T09:00:00"
+    },
+    {
+      "key": "grand tournament",
+      "start": "2026-07-21T11:00:00",
+      "end": "2026-07-28T12:30:00"
+    },
+    {
+      "key": "beyond the horizon",
+      "start": "2026-07-16T11:00:00",
+      "end": "2026-07-20T00:40:00"
+    },
+    {
+      "key": "beyond the horizon",
+      "start": "2026-07-30T11:00:00",
+      "end": "2026-08-03T00:40:00"
+    },
+    {
+      "key": "outer realms",
+      "start": "2026-07-20T11:00:00",
+      "end": "2026-07-24T00:40:00"
+    },
+    {
+      "key": "imperial patronage",
+      "start": "2026-07-17T11:00:00",
+      "end": "2026-07-24T09:30:00"
+    },
+    {
+      "key": "grand nobility contest",
+      "start": "2026-06-16T11:00:00",
+      "end": "2026-07-17T09:00:00"
+    },
+    {
+      "key": "grand nobility contest",
+      "start": "2026-07-17T11:00:00",
+      "end": "2026-08-15T09:00:00"
+    },
+    {
+      "key": "samurai invasion",
+      "start": "2026-08-07T11:00:00",
+      "end": "2026-08-08T09:00:00"
+    },
+    {
+      "key": "samurai invasion",
+      "start": "2026-08-14T11:00:00",
+      "end": "2026-08-15T09:00:00"
+    },
+    {
+      "key": "samurai invasion",
+      "start": "2026-08-21T11:00:00",
+      "end": "2026-08-22T09:00:00"
+    },
+    {
+      "key": "samurai invasion",
+      "start": "2026-08-28T11:00:00",
+      "end": "2026-08-29T09:00:00"
+    },
+    {
+      "key": "nomad invasion",
+      "start": "2026-08-01T11:00:00",
+      "end": "2026-08-04T09:00:00"
+    },
+    {
+      "key": "nomad invasion",
+      "start": "2026-08-08T11:00:00",
+      "end": "2026-08-11T09:00:00"
+    },
+    {
+      "key": "nomad invasion",
+      "start": "2026-08-15T11:00:00",
+      "end": "2026-08-18T09:00:00"
+    },
+    {
+      "key": "nomad invasion",
+      "start": "2026-08-22T11:00:00",
+      "end": "2026-08-25T09:00:00"
+    },
+    {
+      "key": "nomad invasion",
+      "start": "2026-08-29T11:00:00",
+      "end": "2026-09-01T09:00:00"
+    },
+    {
+      "key": "bloodcrow invasion",
+      "start": "2026-08-04T11:00:00",
+      "end": "2026-08-07T09:00:00"
+    },
+    {
+      "key": "bloodcrow invasion",
+      "start": "2026-08-18T11:00:00",
+      "end": "2026-08-21T09:00:00"
+    },
+    {
+      "key": "war of the realms",
+      "start": "2026-08-11T11:00:00",
+      "end": "2026-08-14T09:00:00"
+    },
+    {
+      "key": "war of the realms",
+      "start": "2026-08-25T11:00:00",
+      "end": "2026-08-28T09:00:00"
+    },
+    {
+      "key": "berimond",
+      "start": "2026-08-04T11:00:00",
+      "end": "2026-08-07T08:30:00"
+    },
+    {
+      "key": "berimond",
+      "start": "2026-08-25T11:00:00",
+      "end": "2026-08-28T08:30:00"
+    },
+    {
+      "key": "bladecoast",
+      "start": "2026-08-12T11:00:00",
+      "end": "2026-08-19T09:00:00"
+    },
+    {
+      "key": "rift raid",
+      "start": "2026-08-04T11:00:00",
+      "end": "2026-08-11T09:00:00"
+    },
+    {
+      "key": "grand tournament",
+      "start": "2026-08-18T11:00:00",
+      "end": "2026-08-25T12:30:00"
+    },
+    {
+      "key": "beyond the horizon",
+      "start": "2026-08-13T11:00:00",
+      "end": "2026-08-17T00:40:00"
+    },
+    {
+      "key": "beyond the horizon",
+      "start": "2026-08-27T11:00:00",
+      "end": "2026-08-31T00:40:00"
+    },
+    {
+      "key": "outer realms",
+      "start": "2026-08-03T11:00:00",
+      "end": "2026-08-06T00:40:00"
+    },
+    {
+      "key": "outer realms",
+      "start": "2026-08-06T11:00:00",
+      "end": "2026-08-10T00:40:00"
+    },
+    {
+      "key": "outer realms",
+      "start": "2026-08-10T11:00:00",
+      "end": "2026-08-13T00:40:00"
+    },
+    {
+      "key": "outer realms",
+      "start": "2026-08-17T11:00:00",
+      "end": "2026-08-20T00:40:00"
+    },
+    {
+      "key": "outer realms",
+      "start": "2026-08-20T11:00:00",
+      "end": "2026-08-24T00:40:00"
+    },
+    {
+      "key": "outer realms",
+      "start": "2026-08-24T11:00:00",
+      "end": "2026-08-27T00:40:00"
+    },
+    {
+      "key": "imperial patronage",
+      "start": "2026-08-22T11:00:00",
+      "end": "2026-08-29T09:30:00"
+    },
+    {
+      "key": "grand nobility contest",
+      "start": "2026-08-15T11:00:00",
+      "end": "2026-09-12T09:00:00"
+    }
+  ]
+}

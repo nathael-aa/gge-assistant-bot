@@ -14,9 +14,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+import utils
 from utils import (
     BASE_DATA_PATH, 
-    ALLIANCES_DIR,  
+    SERVEURS_DIR,  
+    JOUEURS_DIR,
     CONFIG_DIR,     
     _get_api_timestamp,
     t,              
@@ -27,8 +29,6 @@ from utils import (
     MON_ID_DISCORD,
     setup_embed_footer,
     get_cached_data,
-    load_diplo_async,
-    save_diplo_async,
     PaginationView,
     get_api_headers,     
     get_server_config,
@@ -37,43 +37,141 @@ from utils import (
 
 logger = logging.getLogger("GGE_Bot")
 
-def get_alliance_diplo_key(data, alliance_name):
-    if not alliance_name: return None
-    for key in data.keys():
-        if key.lower() == alliance_name.lower():
-            return key
-    return alliance_name
+# ========================================================
+# 🎛️ COMPOSANTS UI : DASHBOARD ET MODAL PERSO
+# ========================================================
+class TargetSetupModal(discord.ui.Modal):
+    # Les labels sont définis dynamiquement dans __init__
+    min_dist = discord.ui.TextInput(custom_id="min_dist", label="...", required=True)
+    tier_diff = discord.ui.TextInput(custom_id="tier_diff", label="...", required=True)
+    pp_min = discord.ui.TextInput(custom_id="pp_min", label="...", required=True)
+    pp_max = discord.ui.TextInput(custom_id="pp_max", label="...", required=True)
 
-REGLEMENTS_FILE = ALLIANCES_DIR / 'reglements.json'
+    def __init__(self, dashboard_view, langue="en"):
+        # Titre du modal traduit
+        super().__init__(title=t(langue, "target_modal_title", defaut="⚙️ Personal Radar Rules"))
+        self.dashboard_view = dashboard_view
+        self.langue = langue
+        config = self.dashboard_view.config
+        
+        # Traduction et pré-remplissage des champs
+        self.min_dist.label = t(langue, "target_modal_dist_lbl", defaut="Minimum distance (leagues)")
+        self.min_dist.placeholder = "Ex: 10"
+        self.min_dist.default = str(config.get("min_dist", 0))
+        
+        self.tier_diff.label = t(langue, "target_modal_tier_lbl", defaut="Max Tier difference")
+        self.tier_diff.placeholder = t(langue, "target_modal_tier_ph", defaut="0 = Same tier, 1 = +1 tier")
+        self.tier_diff.default = str(config.get("tier_diff", 0))
+        
+        self.pp_min.label = t(langue, "target_modal_ppmin_lbl", defaut="Max PP Difference (Downward)")
+        self.pp_min.placeholder = "Ex: -3000000"
+        self.pp_min.default = str(config.get("pp_min", -3000000))
+        
+        self.pp_max.label = t(langue, "target_modal_ppmax_lbl", defaut="Max PP Difference (Upward)")
+        self.pp_max.placeholder = "Ex: 10000000"
+        self.pp_max.default = str(config.get("pp_max", 10000000))
 
-async def load_reglements_async():
-    """Charge dynamiquement le fichier JSON des règlements avec un repli par défaut."""
-    if not REGLEMENTS_FILE.exists():
-        return {
-            "cdr": {
-                "nom": "Règles CDR Strictes",
-                "check_api_limit": True,
-                "api_limit_threshold": 50000000,
-                "allowed_tiers_relative": [0, 1],
-                "pp_offset_min": -3000000,
-                "pp_offset_max": 10000000,
-                "tier_0_max_lvl_diff": 10
-            }
-        }
-    try:
-        with open(REGLEMENTS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"❌ [CRITIQUE] Impossible de lire reglements.json : {e}")
-        return {
-            "cdr": {"check_api_limit": True, "api_limit_threshold": 50000000, "allowed_tiers_relative": [0, 1], "pp_offset_min": -3000000, "pp_offset_max": 10000000, "tier_0_max_lvl_diff": 10}
-        }
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            self.dashboard_view.config["min_dist"] = int(self.min_dist.value)
+            self.dashboard_view.config["tier_diff"] = int(self.tier_diff.value)
+            self.dashboard_view.config["pp_min"] = int(self.pp_min.value)
+            self.dashboard_view.config["pp_max"] = int(self.pp_max.value)
+        except ValueError:
+            err = t(self.langue, "target_modal_err_val", defaut="❌ **Error:** You must enter numbers only!")
+            return await interaction.response.send_message(err, ephemeral=True)
+
+        self.dashboard_view.save_config()
+        self.dashboard_view.update_buttons()
+        await interaction.response.edit_message(embed=self.dashboard_view.generate_embed(), view=self.dashboard_view)
+
+class TargetDashboardView(discord.ui.View):
+    def __init__(self, user_id, langue="en"):
+        super().__init__(timeout=None)
+        self.user_id = user_id
+        self.langue = langue
+        
+        if utils.USERS_CONFIG_CACHE is None:
+            utils.USERS_CONFIG_CACHE = {}
+            
+        self.config = utils.USERS_CONFIG_CACHE.get(user_id, {}).get("custom_rules", {
+            "min_dist": 0, "tier_diff": 0, "pp_min": -3000000, "pp_max": 10000000,
+            "show_doves": False, "ignore_tiers": False, "only_with_alliance": True
+        })
+        
+        # Traduction des boutons
+        self.btn_doves.label = t(langue, "target_dash_btn_doves", defaut="Doves")
+        self.btn_tiers.label = t(langue, "target_dash_btn_tiers", defaut="Ignore Tiers")
+        self.btn_alli.label = t(langue, "target_dash_btn_alli", defaut="Alliance Filter")
+        self.btn_numbers.label = t(langue, "target_dash_btn_numbers", defaut="Edit Numbers")
+        
+        self.update_buttons()
+
+    def update_buttons(self):
+        self.btn_doves.style = discord.ButtonStyle.success if self.config.get("show_doves") else discord.ButtonStyle.secondary
+        self.btn_tiers.style = discord.ButtonStyle.success if self.config.get("ignore_tiers") else discord.ButtonStyle.secondary
+        self.btn_alli.style = discord.ButtonStyle.success if self.config.get("only_with_alliance") else discord.ButtonStyle.secondary
+
+    def generate_embed(self):
+        title = t(self.langue, "target_dash_title", defaut="⚙️ Personal Radar Configuration")
+        embed = discord.Embed(title=title, color=discord.Color.blue())
+        
+        txt_doves = t(self.langue, "target_dash_on", defaut="✅ Included") if self.config.get("show_doves") else t(self.langue, "target_dash_off", defaut="❌ Hidden")
+        txt_tiers = t(self.langue, "target_dash_tiers_on", defaut="✅ Yes (No-limit)") if self.config.get("ignore_tiers") else t(self.langue, "target_dash_tiers_off", defaut="❌ No (Strict matching)")
+        txt_alli = t(self.langue, "target_dash_alli_on", defaut="✅ Yes") if self.config.get("only_with_alliance") else t(self.langue, "target_dash_alli_off", defaut="❌ No (Includes no-alliance)")
+
+        f1_name = t(self.langue, "target_dash_f1_name", defaut="🔢 Numeric Variables")
+        f1_val = t(self.langue, "target_dash_f1_val", d=self.config.get('min_dist'), t=self.config.get('tier_diff'), p1=self.config.get('pp_min'), p2=self.config.get('pp_max'), defaut=f"**Min distance** : {self.config.get('min_dist')} leagues\n**Tier diff** : +{self.config.get('tier_diff')}\n**PP diff** : {self.config.get('pp_min')} to +{self.config.get('pp_max')}")
+        
+        f2_name = t(self.langue, "target_dash_f2_name", defaut="🎛️ Advanced Filters")
+        f2_val = t(self.langue, "target_dash_f2_val", doves=txt_doves, tiers=txt_tiers, alli=txt_alli, defaut=f"**Doves** : {txt_doves}\n**Ignore Tiers** : {txt_tiers}\n**Alliance Only** : {txt_alli}")
+
+        embed.add_field(name=f1_name, value=f1_val, inline=False)
+        embed.add_field(name=f2_name, value=f2_val, inline=False)
+        return embed
+
+    @discord.ui.button(emoji="🕊️", custom_id="dash_doves")
+    async def btn_doves(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.config["show_doves"] = not self.config.get("show_doves")
+        self.save_config()
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.generate_embed(), view=self)
+
+    @discord.ui.button(emoji="⚖️", custom_id="dash_tiers")
+    async def btn_tiers(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.config["ignore_tiers"] = not self.config.get("ignore_tiers")
+        self.save_config()
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.generate_embed(), view=self)
+
+    @discord.ui.button(emoji="🛡️", custom_id="dash_alli")
+    async def btn_alli(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.config["only_with_alliance"] = not self.config.get("only_with_alliance")
+        self.save_config()
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.generate_embed(), view=self)
+
+    @discord.ui.button(emoji="🔢", style=discord.ButtonStyle.primary, row=1)
+    async def btn_numbers(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(TargetSetupModal(self, self.langue))
+
+    def save_config(self):
+        if self.user_id not in utils.USERS_CONFIG_CACHE:
+            utils.USERS_CONFIG_CACHE[self.user_id] = {}
+        utils.USERS_CONFIG_CACHE[self.user_id]["custom_rules"] = self.config
+        
+        path_users = CONFIG_DIR / 'target.json'
+        try:
+            with open(path_users, 'w', encoding='utf-8') as f:
+                json.dump(utils.USERS_CONFIG_CACHE, f, indent=4)
+        except Exception as e:
+            logger.error(f"Erreur sauvegarde config perso : {e}")
 
 # ========================================================
 # 🎛️ COMPOSANT UI : PAGINATION DES CIBLES + RELANCE EN DIRECT
 # ========================================================
 class CiblePaginationView(discord.ui.View):
-    def __init__(self, cog, attacker, sort_by, target_alliance, embeds, ruleset="cdr", langue="fr"):
+    def __init__(self, cog, attacker, sort_by, target_alliance, embeds, langue="fr"):
         super().__init__(timeout=1800)
         self.cog = cog
         self.attacker = attacker
@@ -81,7 +179,6 @@ class CiblePaginationView(discord.ui.View):
         self.target_alliance = target_alliance
         self.embeds = embeds
         self.current_page = 0
-        self.ruleset = ruleset
         self.langue = langue
         
         self.btn_prev.label = t(langue, "guerre_btn_prev", defaut="Page Précédente")
@@ -118,8 +215,7 @@ class CiblePaginationView(discord.ui.View):
             self.attacker, 
             self.sort_by, 
             self.target_alliance, 
-            message_to_edit=interaction.message, 
-            ruleset=self.ruleset
+            message_to_edit=interaction.message
         )
 
 # ==========================================
@@ -284,25 +380,60 @@ class GuerreCog(commands.Cog):
         await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
 
     # ==========================================
-    # 🎯 COMMANDE : TARGET
+    # 🎯 GROUPE DE COMMANDES : TARGET
     # ==========================================
-    @app_commands.command(name="target", description="Find legal targets according to the chosen regulations")
+    target_group = app_commands.Group(
+        name="target", 
+        description="Radar tools and rules arbitration based on your personal profile"
+    )
+
+    @target_group.command(name="setup", description="Configure your personal radar rules")
+    async def target_setup(self, interaction: discord.Interaction):
+        langue, _ = await get_server_config(interaction)
+        user_id = str(interaction.user.id)
+        view = TargetDashboardView(user_id, langue)
+        await interaction.response.send_message(embed=view.generate_embed(), view=view, ephemeral=True)
+
+    @target_group.command(name="search", description="Find targets based on your personal rules")
     @app_commands.autocomplete(attacker=joueur_autocomplete)
     @app_commands.autocomplete(target_alliance=alliance_autocomplete)
-    @app_commands.choices(ruleset=[
-        app_commands.Choice(name="⚖️ Comité des Rois (CDR)", value="cdr"),
-        app_commands.Choice(name="⚔️ QG ETERNITY", value="eternity"),
-        app_commands.Choice(name="🛡️ SØNS ØF GOD (SOG)", value="sog")
-    ])
-    async def target(self, interaction: discord.Interaction, attacker: str, ruleset: str, target_alliance: str = None):
+    async def target_search(self, interaction: discord.Interaction, attacker: str, target_alliance: str = None):
+        langue, _ = await get_server_config(interaction)
+        import utils
+        user_id = str(interaction.user.id)
+        has_rules = utils.USERS_CONFIG_CACHE and user_id in utils.USERS_CONFIG_CACHE and "custom_rules" in utils.USERS_CONFIG_CACHE[user_id]
+        
+        if not has_rules:
+            view = TargetDashboardView(user_id, langue)
+            err_msg = t(langue, "target_err_no_setup", defaut="⚠️ **Stop!** You must configure your targeting rules first.\nHere is your dashboard to set up your custom radar:")
+            return await interaction.response.send_message(err_msg, embed=view.generate_embed(), view=view, ephemeral=True)
+
         try: await interaction.response.defer(thinking=True)
         except: return
-        await self._execute_cible(interaction, attacker, "aleatoire", target_alliance, ruleset=ruleset)
+        await self._execute_cible(interaction, attacker, "aleatoire", target_alliance)
+
+    @target_group.command(name="hr", description="Check if an attack complies with your personal rules")
+    @app_commands.autocomplete(attacker=joueur_autocomplete)
+    @app_commands.autocomplete(defender=joueur_autocomplete)
+    async def target_hr(self, interaction: discord.Interaction, attacker: str, defender: str):
+        langue, _ = await get_server_config(interaction)
+        import utils
+        user_id = str(interaction.user.id)
+        has_rules = utils.USERS_CONFIG_CACHE and user_id in utils.USERS_CONFIG_CACHE and "custom_rules" in utils.USERS_CONFIG_CACHE[user_id]
+        
+        if not has_rules:
+            view = TargetDashboardView(user_id, langue)
+            err_msg = t(langue, "target_err_no_setup", defaut="⚠️ **Stop!** You must configure your targeting rules first.\nHere is your dashboard to set up your custom radar:")
+            return await interaction.response.send_message(err_msg, embed=view.generate_embed(), view=view, ephemeral=True)
+            
+        try: await interaction.response.defer(thinking=True)
+        except: return
+        await self._execute_hr(interaction, attacker, defender)
 
     # ==========================================
     # ⚙️ MOTEUR D'EXÉCUTION CENTRALISÉ DU SCAN
     # ==========================================
-    async def _execute_cible(self, interaction: discord.Interaction, attacker: str, sort_by: str = "aleatoire", target_alliance: str = None, message_to_edit=None, ruleset: str = "cdr"):
+    async def _execute_cible(self, interaction: discord.Interaction, attacker: str, sort_by: str = "aleatoire", target_alliance: str = None, message_to_edit=None):
         langue, serveur = await get_server_config(interaction)
 
         def get_tier(lvl, leg):
@@ -313,39 +444,35 @@ class GuerreCog(commands.Cog):
             if leg <= 949: return 4
             return 5
 
-        all_rules = await load_reglements_async()
-        rules = all_rules.get(ruleset, all_rules.get("cdr"))
+        # -----------------------------------------------------
+        # CHARGEMENT STRICT DES RÈGLES PERSOS DU JOUEUR
+        # -----------------------------------------------------
+        user_id = str(interaction.user.id)
+        user_rules = utils.USERS_CONFIG_CACHE.get(user_id, {}).get("custom_rules", {})
+        
+        config = {
+            "nom": "Règles Personnelles",
+            "check_api_limit": False,
+            "allowed_tiers_relative": list(range(user_rules.get("tier_diff", 0) + 1)),
+            "pp_offset_min": user_rules.get("pp_min", -3000000),
+            "pp_offset_max": user_rules.get("pp_max", 10000000),
+            "min_distance": user_rules.get("min_dist", 0),
+            "ignore_tiers": user_rules.get("ignore_tiers", False),
+            "affichage": {"max_attaques": "Variables", "cooldown": "Selon envies"}
+        }
+        show_doves = user_rules.get("show_doves", False)
+        only_with_alliance = user_rules.get("only_with_alliance", True)
 
         def is_legal_target(a_pp, a_tier, a_lvl, t_pp, t_tier, t_lvl):
-            if rules.get("check_api_limit"):
-                limit = rules.get("api_limit_threshold", 50000000)
-                if a_pp >= limit:
-                    if t_pp < limit: return False
-                    if rules.get("api_limit_no_rules_above"): return True
-                elif t_pp >= limit:
-                    return False 
-
-            config = rules
-            if rules.get("tranches_pp"):
-                matched = False
-                for tranche in rules["tranches_pp"]:
-                    if tranche.get("a_min", 0) <= a_pp <= tranche.get("a_max", 999999999):
-                        config = tranche
-                        matched = True
-                        break
-                if not matched: return False
-
-            if not config.get("ignore_tiers", rules.get("ignore_tiers", False)):
+            if not config.get("ignore_tiers", False):
                 diff_tier = t_tier - a_tier
-                allowed_tiers = config.get("allowed_tiers_relative", rules.get("allowed_tiers_relative", [0]))
+                allowed_tiers = config.get("allowed_tiers_relative", [0])
                 if diff_tier not in allowed_tiers: return False
 
                 if a_tier == 0 and t_tier == 0:
-                    max_lvl_diff = config.get("tier_0_max_lvl_diff", rules.get("tier_0_max_lvl_diff", 10))
+                    max_lvl_diff = 10
                     if abs(a_lvl - t_lvl) > max_lvl_diff: return False
 
-            if "t_min" in config and t_pp < config["t_min"]: return False
-            if "t_max" in config and t_pp > config["t_max"]: return False
             if "pp_offset_min" in config and t_pp < (a_pp + config["pp_offset_min"]): return False
             if "pp_offset_max" in config and t_pp > (a_pp + config["pp_offset_max"]): return False
 
@@ -401,25 +528,6 @@ class GuerreCog(commands.Cog):
         a_pp = int(a_info.get('might_current', a_info.get('main_points', a_info.get('might', 0))))
         a_tier = get_tier(a_lvl, a_leg)
         
-        raw_a_alliance = a_info.get('alliance_name') or a_info.get('allianceName') or a_info.get('alliance') or ''
-        if isinstance(raw_a_alliance, dict): 
-            a_alliance = raw_a_alliance.get('name') or raw_a_alliance.get('alliance_name') or ''
-        else: 
-            a_alliance = str(raw_a_alliance)
-
-        txt_sans_alliance = t(langue, "guerre_sa", defaut="Sans alliance")
-        a_alli_clean = "".join(c for c in a_alliance.lower() if c.isalnum()) if a_alliance and a_alliance != txt_sans_alliance else ""
-
-        allies_et_pna_clean = []
-        try:
-            if a_alliance and a_alliance != txt_sans_alliance:
-                diplo_data = await load_diplo_async()
-                for key, diplo in diplo_data.items():
-                    if key.lower() == a_alliance.lower() and diplo.get("guild_id") == interaction.guild_id:
-                        allies_et_pna_clean = ["".join(c for c in str(a).lower() if c.isalnum()) for a in diplo.get("allies", []) + diplo.get("pna", [])]
-                        break
-        except: pass
-
         mots_interdits_mur, alliances_mur_alerte = ["repos", "deuil", "hospitalisé"], []
         try:
             fichier_murs = BASE_DATA_PATH / 'murs_scans' / serveur / 'murs_alliances.json'
@@ -431,6 +539,8 @@ class GuerreCog(commands.Cog):
         except: pass
 
         pool_candidats = []
+        txt_sans_alliance = t(langue, "guerre_sa", defaut="Sans alliance")
+
         for t_name, t_info in local_data.items():
             if t_name.lower() == a_name_real.lower(): continue
             
@@ -440,13 +550,19 @@ class GuerreCog(commands.Cog):
             else: 
                 t_alliance = str(raw_t_alliance)
                 
-            if not t_alliance or t_alliance == txt_sans_alliance: continue
+            if only_with_alliance and (not t_alliance or t_alliance == txt_sans_alliance): 
+                continue
+
+            if not show_doves:
+                p_peace = t_info.get('peace_disabled_at')
+                if p_peace and p_peace != "null":
+                    try:
+                        if datetime.fromisoformat(p_peace.replace('Z', '+00:00')) > discord.utils.utcnow():
+                            continue 
+                    except: pass
             
             alli_clean = "".join(c for c in t_alliance.lower() if c.isalnum())
-
-            if a_alli_clean and alli_clean == a_alli_clean: continue
             if target_alliance and t_alliance.lower() != target_alliance.lower(): continue
-            if alli_clean in allies_et_pna_clean: continue
 
             t_lvl = int(t_info.get('level', 0))
             t_leg = int(t_info.get('legendary_level', 0))
@@ -465,9 +581,7 @@ class GuerreCog(commands.Cog):
             })
 
             if not pool_candidats:
-                nom_regle_raw = rules.get("nom", ruleset.upper())
-                nom_regle = t(langue, nom_regle_raw, defaut=nom_regle_raw)
-            
+                nom_regle = "Règles Personnelles"
                 no_targets_msg = t(langue, "guerre_err_no_target_crit", regle=nom_regle, defaut=f"<:error:1512505075220611172> Aucune cible trouvée respectant les critères (**{nom_regle}**) dans la base de données.")
                 if message_to_edit: await message_to_edit.edit(content=no_targets_msg, view=None)
                 else: await interaction.followup.send(no_targets_msg)
@@ -526,7 +640,7 @@ class GuerreCog(commands.Cog):
                 if t_cnd['is_ghost'] or t_cnd['x'] == "???": continue
                 
                 if is_legal_target(a_pp, a_tier, a_lvl, t_cnd['pp'], t_cnd['tier'], t_cnd['lvl']):
-                    min_dist = rules.get("min_distance", 0)
+                    min_dist = config.get("min_distance", 0)
                     if t_cnd['dist'] < min_dist: 
                         continue
                     final_targets.append(t_cnd)
@@ -534,39 +648,13 @@ class GuerreCog(commands.Cog):
             await asyncio.sleep(0.15)
 
         if not final_targets:
-            nom_regle = {
-                "cdr": t(langue, "rules_name_cdr", defaut="Règles CDR"), 
-                "eternity": t(langue, "rules_name_eternity", defaut="Règlement Eternity"), 
-                "sog": t(langue, "rules_name_sog", defaut="Règles SOG")
-            }.get(ruleset, "Inconnue")
-            
+            nom_regle = "Règles Personnelles"
             empty_msg = t(langue, "guerre_err_no_target_valid", regle=nom_regle, defaut=f"<:error:1512505075220611172> Les cibles potentielles ne respectent plus les règles (**{nom_regle}**) avec leurs puissances actuelles ou sont hors-ligne.")
             if message_to_edit: await message_to_edit.edit(content=empty_msg, view=None)
             else: await interaction.followup.send(empty_msg)
             return
 
         actualisation_dt = _get_api_timestamp(a_info, final_targets)
-        active_affichage = rules.get("affichage", {})
-        if rules.get("tranches_pp"):
-            for tranche in rules["tranches_pp"]:
-                if tranche.get("a_min", 0) <= a_pp <= tranche.get("a_max", 999999999):
-                    active_affichage = tranche.get("affichage", active_affichage)
-                    break
-        
-        key_feu = active_affichage.get("feu_min_soldats")
-        txt_feu = t(langue, key_feu, defaut=str(key_feu)) if key_feu else t(langue, "guerre_regle_none", defaut="Non défini")
-        
-        key_ap = active_affichage.get("ap_regle")
-        txt_ap = t(langue, key_ap, defaut=str(key_ap)) if key_ap else t(langue, "guerre_regle_none", defaut="Non défini")
-        
-        key_attente = active_affichage.get("cooldown")
-        txt_attente = t(langue, key_attente, defaut=str(key_attente)) if key_attente else t(langue, "guerre_regle_none", defaut="Non défini")
-        
-        key_max_att = active_affichage.get("max_attaques")
-        txt_max_att = t(langue, key_max_att, defaut=str(key_max_att)) if key_max_att else t(langue, "guerre_regle_none", defaut="Non défini")
-        
-        key_interdit = active_affichage.get("interdictions")
-        txt_interdit = t(langue, key_interdit, defaut=str(key_interdit)) if key_interdit else t(langue, "guerre_regle_none_spec", defaut="Aucune spécifique")
 
         best_targets = final_targets[:10]
         embeds = []
@@ -575,12 +663,7 @@ class GuerreCog(commands.Cog):
         
         lbl_alli_target = t(langue, "guerre_cible_alli_target", a=target_alliance, defaut=f" (Alliance : {target_alliance})")
         titre_alliance = lbl_alli_target if target_alliance else ""
-        
-        nom_regle_titre = {
-            "cdr": t(langue, "rules_name_cdr", defaut="Règles CDR"), 
-            "eternity": t(langue, "rules_name_eternity", defaut="Règlement Eternity"), 
-            "sog": t(langue, "rules_name_sog", defaut="Règles SOG")
-        }.get(ruleset, "")
+        nom_regle_titre = "Règles Personnelles"
         
         lbl_alli = t(langue, "guerre_cible_field_alli", defaut="Alliance :")
         lbl_lvl = t(langue, "guerre_cible_field_lvl", defaut="Niveau :")
@@ -624,7 +707,7 @@ class GuerreCog(commands.Cog):
 
                 warnings = []
                 if t_cnd['wall_warning']: warnings.append(t(langue, "guerre_warn_wall", defaut="\n<:error:1512505075220611172> **VÉRIFIEZ LE MUR :** Description d'alliance sensible !"))
-                if t_cnd['is_upper_tier'] and not rules.get("ignore_tiers"): warnings.append(t(langue, "guerre_warn_tier", defaut="\n<:error:1512505075220611172> **RISQUE DE REPRESAILLES :** Joueur du palier supérieur !"))
+                if t_cnd['is_upper_tier'] and not config.get("ignore_tiers"): warnings.append(t(langue, "guerre_warn_tier", defaut="\n<:error:1512505075220611172> **RISQUE DE REPRESAILLES :** Joueur du palier supérieur !"))
                 if is_under_colombe: warnings.append(t(langue, "guerre_warn_peace", defaut="\n<:peace:1512503935892586566> **JOUEUR SOUS COLOMBE : Protection active (Inattaquable) !**"))
                 
                 warning_txt = "".join(warnings) if warnings else ""
@@ -642,15 +725,6 @@ class GuerreCog(commands.Cog):
                 name_cible = t(langue, "guerre_cible_field_title", idx=index_global, n=t_cnd['name'], icon=target_icon, defaut=f"{target_icon} Cible #{index_global} : {t_cnd['name']}")
                 embed.add_field(name=name_cible, value=description_cible, inline=False)
 
-            reglement_texte = t(langue, "guerre_cible_rules", ma=txt_max_att, att=txt_attente, f=txt_feu, ap=txt_ap, inter=txt_interdit, defaut=(
-                f"⚔️ Limite d'attaque : **{txt_max_att}** | ⏳ Attente : **{txt_attente}**\n"
-                f"<:fire:1512573853774254303> Si feu : **{txt_feu}** | <:avp:1512572561647468555> Règle AVP : **{txt_ap}**\n"
-                f"🚫 Interdictions : *{txt_interdit}*"
-            ))
-            
-            titre_regles = t(langue, "guerre_cible_rules_title", defaut="<:members:1512573912305766652> Règlement en vigueur\n\n")
-            embed.add_field(name=titre_regles, value=reglement_texte, inline=False)
-
             titre_page = t(langue, "guerre_cible_footer_page", cur=page_num, tot=nb_pages, defaut=f"Page {page_num}/{nb_pages}")
             val_spy = t(langue, "guerre_cible_footer_spy", defaut="<:icon_name:1512505444172697611> **SPY OBLIGATOIRE** avant impact.")
             embed.add_field(name=titre_page, value=val_spy, inline=False)
@@ -658,7 +732,7 @@ class GuerreCog(commands.Cog):
             await setup_embed_footer(embed, interaction, langue)
             embeds.append(embed)
 
-        view = CiblePaginationView(self, attacker, sort_by, target_alliance, embeds, ruleset, langue)
+        view = CiblePaginationView(self, attacker, sort_by, target_alliance, embeds, langue)
         
         if message_to_edit:
             await message_to_edit.edit(content=None, embed=embeds[0], view=view)
@@ -667,30 +741,27 @@ class GuerreCog(commands.Cog):
         await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
 
     # ==========================================
-    # ⚖️ COMMANDE : HR
+    # ⚖️ MOTEUR D'EXÉCUTION CENTRALISÉ HR
     # ==========================================
-    @app_commands.command(name="hr", description="Check if an attack between two players complies with the chosen rules.")
-    @app_commands.autocomplete(attacker=joueur_autocomplete)
-    @app_commands.autocomplete(defender=joueur_autocomplete)
-    @app_commands.choices(ruleset=[
-        app_commands.Choice(name="⚖️ Comité des Rois (CDR)", value="cdr"),
-        app_commands.Choice(name="⚔️ QG ETERNITY", value="eternity"),
-        app_commands.Choice(name="🛡️ SØNS ØF GOD", value="sog")
-    ])
-    async def hr(self, interaction: discord.Interaction, attacker: str, defender: str, ruleset: str):
-        try: await interaction.response.defer(thinking=True)
-        except: return
-        
+    async def _execute_hr(self, interaction: discord.Interaction, attacker: str, defender: str):
         langue, serveur = await get_server_config(interaction)
 
         if attacker.lower() == defender.lower(): 
             msg = t(langue, "guerre_hr_err_self", defaut="<:error:1512505075220611172> Tu ne peux pas t'attaquer toi-même, voyons ! 😂")
             return await interaction.followup.send(msg)
 
-        all_rules = await load_reglements_async()
-        rules = all_rules.get(ruleset, all_rules.get("cdr"))
-        nom_regle_raw = rules.get("nom", ruleset.upper())
-        nom_regle_titre = t(langue, nom_regle_raw, defaut=nom_regle_raw)
+        user_id = str(interaction.user.id)
+        user_rules = utils.USERS_CONFIG_CACHE.get(user_id, {}).get("custom_rules", {})
+        
+        config = {
+            "nom": "Règles Personnelles",
+            "allowed_tiers_relative": list(range(user_rules.get("tier_diff", 0) + 1)),
+            "pp_offset_min": user_rules.get("pp_min", -3000000),
+            "pp_offset_max": user_rules.get("pp_max", 10000000),
+            "min_distance": user_rules.get("min_dist", 0),
+            "ignore_tiers": user_rules.get("ignore_tiers", False)
+        }
+        nom_regle_titre = t(langue, "rules_name_perso", defaut="Règles Personnelles")
 
         cache_data = await get_cached_data(serveur)
         local_data = cache_data.get('players_data', {})
@@ -744,27 +815,9 @@ class GuerreCog(commands.Cog):
         distance = math.hypot(d_coords[0] - a_coords[0], d_coords[1] - a_coords[1]) if a_coords and d_coords else None
         
         infractions, avertissements = [], []
-        allies_propres, pna_propres, diplo_privee = [], [], False
         
-        try:
-            if a_alli:
-                diplo_data = await load_diplo_async()
-                for key, diplo in diplo_data.items():
-                    if key.lower() == a_alli.lower():
-                        if diplo.get("guild_id") == interaction.guild_id:
-                            allies_propres = ["".join(c for c in str(a).lower() if c.isalnum()) for a in diplo.get("allies", [])]
-                            pna_propres = ["".join(c for c in str(a).lower() if c.isalnum()) for a in diplo.get("pna", [])]
-                        else: diplo_privee = True
-                        break
-        except: pass
-
         if d_alli:
             d_alli_clean = "".join(c for c in str(d_alli).lower() if c.isalnum())
-            if d_alli_clean in allies_propres: 
-                infractions.append(t(langue, "guerre_hr_diplo_ally", d_alli=d_alli, defaut=f"<:4_:1512574743369224303> **Diplomatie** : Le défenseur est dans une alliance ALLIÉE (*{d_alli}*)."))
-            elif d_alli_clean in pna_propres: 
-                infractions.append(t(langue, "guerre_hr_diplo_pna", d_alli=d_alli, defaut=f"<:4_:1512574743369224303> **Diplomatie** : Le défenseur est dans une alliance PNA (*{d_alli}*)."))
-            
             try:
                 fichier_murs = BASE_DATA_PATH / 'murs_scans' / serveur / 'murs_alliances.json'
                 if fichier_murs.exists():
@@ -778,68 +831,24 @@ class GuerreCog(commands.Cog):
                                 break
             except: pass
 
-        config = rules
-        if rules.get("tranches_pp"):
-            for tranche in rules["tranches_pp"]:
-                if tranche.get("a_min", 0) <= a_pp <= tranche.get("a_max", 999999999):
-                    config = tranche
-                    break
-
-        skip_other_checks = False
-
-        if rules.get("check_api_limit"):
-            limit = rules.get("api_limit_threshold", 50000000)
-            if a_pp >= limit:
-                if d_pp < limit: 
-                    infractions.append(t(langue, "guerre_hr_cross_league", l=format_num(limit), defaut=f"<:pp2:1512571027119538335> **Ligue croisée** : L'attaquant (> {format_num(limit)}) ne peut pas cibler un joueur sous le seuil."))
-                elif rules.get("api_limit_no_rules_above"):
-                    skip_other_checks = True 
-            else:
-                if d_pp >= limit: 
-                    avertissements.append(t(langue, "guerre_hr_suicide", l=format_num(limit), defaut=f"<:pp2:1512571027119538335> **Mission Suicide** : Tu attaques un joueur au-dessus du seuil ({format_num(limit)}). Risque fort de représailles."))
-
-        min_dist = config.get("min_distance", rules.get("min_distance", 0))
+        min_dist = config.get("min_distance", 0)
         if distance is not None and distance < min_dist: 
             infractions.append(t(langue, "guerre_hr_dist_short", d=int(distance), m=min_dist, defaut=f"<:icon_search:1512505406474293438> **Distance** : Cible trop proche ! Distance : **{int(distance)} lieues** (Règlement exige Min: {min_dist})."))
 
-        if not skip_other_checks:
-            if "t_min" in config and d_pp < config["t_min"]:
-                infractions.append(t(langue, "guerre_hr_pp_low", min=format_num(config['t_min']), defaut=f"<:pp1:1512438903821570160> **Écart de Puissance** : La cible a trop peu de PP (Min exigé par ta tranche: {format_num(config['t_min'])})."))
-            if "t_max" in config and d_pp > config["t_max"]:
-                avertissements.append(t(langue, "guerre_hr_pp_high", max=format_num(config['t_max']), defaut=f"<:pp1:1512438903821570160> **Puissance élevée** : La cible dépasse la limite de ta tranche (Max conseillé: {format_num(config['t_max'])})."))
+        if "pp_offset_min" in config and d_pp < (a_pp + config["pp_offset_min"]):
+            infractions.append(t(langue, "guerre_hr_pp_diff_low", d1=format_num(a_pp - d_pp), d2=format_num(abs(config['pp_offset_min'])), defaut=f"<:pp1:1512438903821570160> **Écart de Puissance** : Tu as {format_num(a_pp - d_pp)} PP de plus (L'écart max autorisé vers le bas est de {format_num(abs(config['pp_offset_min']))})."))
+        if "pp_offset_max" in config and d_pp > (a_pp + config["pp_offset_max"]):
+            avertissements.append(t(langue, "guerre_hr_pp_diff_high", d1=format_num(d_pp - a_pp), defaut=f"<:pp1:1512438903821570160> **Défenseur plus fort** : Le défenseur a {format_num(d_pp - a_pp)} PP de plus que toi. Prudence."))
 
-            if "pp_offset_min" in config and d_pp < (a_pp + config["pp_offset_min"]):
-                infractions.append(t(langue, "guerre_hr_pp_diff_low", d1=format_num(a_pp - d_pp), d2=format_num(abs(config['pp_offset_min'])), defaut=f"<:pp1:1512438903821570160> **Écart de Puissance** : Tu as {format_num(a_pp - d_pp)} PP de plus (L'écart max autorisé vers le bas est de {format_num(abs(config['pp_offset_min']))})."))
-            if "pp_offset_max" in config and d_pp > (a_pp + config["pp_offset_max"]):
-                avertissements.append(t(langue, "guerre_hr_pp_diff_high", d1=format_num(d_pp - a_pp), defaut=f"<:pp1:1512438903821570160> **Défenseur plus fort** : Le défenseur a {format_num(d_pp - a_pp)} PP de plus que toi. Prudence."))
+        if not config.get("ignore_tiers", False):
+            diff_tier = d_tier - a_tier
+            allowed_tiers = config.get("allowed_tiers_relative", [0])
+            
+            if diff_tier < min(allowed_tiers):
+                infractions.append(t(langue, "guerre_hr_tier_low", at=a_tier, dt=d_tier, defaut=f"<:lvl:1512571152524906596> **Écart de Palier** : Tu (Palier {a_tier}) n'as pas le droit d'attaquer un joueur de Palier inférieur ({d_tier})."))
+            elif diff_tier > max(allowed_tiers):
+                avertissements.append(t(langue, "guerre_hr_tier_high", dt=d_tier, defaut=f"<:lvl:1512571152524906596> **Niveau élevé** : Tu attaques un Palier supérieur ({d_tier}). Risque de représailles."))
 
-            if not config.get("ignore_tiers", rules.get("ignore_tiers", False)):
-                diff_tier = d_tier - a_tier
-                allowed_tiers = config.get("allowed_tiers_relative", rules.get("allowed_tiers_relative", [0]))
-                
-                if diff_tier < min(allowed_tiers):
-                    infractions.append(t(langue, "guerre_hr_tier_low", at=a_tier, dt=d_tier, defaut=f"<:lvl:1512571152524906596> **Écart de Palier** : Tu (Palier {a_tier}) n'as pas le droit d'attaquer un joueur de Palier inférieur ({d_tier})."))
-                elif diff_tier > max(allowed_tiers):
-                    avertissements.append(t(langue, "guerre_hr_tier_high", dt=d_tier, defaut=f"<:lvl:1512571152524906596> **Niveau élevé** : Tu attaques un Palier supérieur ({d_tier}). Risque de représailles."))
-
-                if a_tier == 0 and d_tier == 0:
-                    max_lvl_diff = config.get("tier_0_max_lvl_diff", rules.get("tier_0_max_lvl_diff", 10))
-                    if a_lvl > d_lvl + max_lvl_diff:
-                        infractions.append(t(langue, "guerre_hr_lvl_low", dl=a_lvl - d_lvl, m=max_lvl_diff, defaut=f"<:lvl:1512571152524906596> **Niveaux <70** : Tu as {a_lvl - d_lvl} niveaux de plus (Max autorisé: +{max_lvl_diff})."))
-                    elif a_lvl < d_lvl - max_lvl_diff:
-                        avertissements.append(t(langue, "guerre_hr_lvl_high", dl=d_lvl - a_lvl, defaut=f"<:lvl:1512571152524906596> **Défenseur plus fort** : La cible a {d_lvl - a_lvl} niveaux de plus que toi."))
-
-        affichage = config.get("affichage", rules.get("affichage", {}))
-        
-        key_ap = affichage.get("ap_regle")
-        txt_ap = t(langue, key_ap, defaut=str(key_ap)) if key_ap else t(langue, "guerre_regle_none", defaut="Non défini")
-        
-        key_troops = affichage.get("feu_min_soldats")
-        min_troops = t(langue, key_troops, defaut=str(key_troops)) if key_troops else t(langue, "guerre_regle_none", defaut="Non défini")
-        
-        key_max_att = affichage.get("max_attaques")
-        txt_max_att = t(langue, key_max_att, defaut=str(key_max_att)) if key_max_att else t(langue, "guerre_regle_none", defaut="Non défini")
-        
         dist_txt = f"{int(distance)} lieues" if distance else t(langue, "guerre_prox_dist_unk", defaut="<:error:1512505075220611172> Inconnue")
 
         diff_pp = d_pp - a_pp
@@ -869,178 +878,24 @@ class GuerreCog(commands.Cog):
             inline=False
         )
         
-        lbl_att = t(langue, "guerre_hr_lbl_att", defaut="Limite d'attaques :")
-        lbl_ap = t(langue, "guerre_hr_lbl_ap", defaut="Cibles AP :")
-        lbl_troops = t(langue, "guerre_hr_lbl_troops", defaut="Min. Soldats (Si feu) :")
-        
-        embed.add_field(name=t(langue, "guerre_hr_field_cond_title", defaut="\<:attaque:1512570903886692474> Conditions de l'attaque"), value=f"<:Porteurs_de_bouclier:1512574622271279114> {lbl_att} **{txt_max_att}**\n<:castle4:1512573820752498839> {lbl_ap} **{txt_ap}**\n<:troop:1512573768893989015> {lbl_troops} **{min_troops}**", inline=False)
-        
-        if diplo_privee: embed.add_field(name=t(langue, "guerre_hr_diplo_priv_title", defaut="<:4_:1512574743369224303> Sécurité Diplomatique"), value=t(langue, "guerre_hr_diplo_priv_val", defaut="La diplomatie de l'attaquant est gérée par un autre serveur. Liens d'alliance ignorés."), inline=False)
         await setup_embed_footer(embed, interaction, langue)
 
         if infractions:
             embed.color = discord.Color.red()
-            embed.add_field(name=t(langue, "guerre_hr_res_red_t", defaut="❌ HORS RÈGLES (HR)"), value=t(langue, "guerre_hr_res_red_d", defaut="__L'attaque is formellement interdite selon le règlement :__\n\n") + "\n".join([f"• {i}" for i in infractions]), inline=False)
+            embed.add_field(name=t(langue, "guerre_hr_res_red_t", defaut="❌ HORS RÈGLES (HR)"), value=t(langue, "guerre_hr_res_red_d", defaut="__L'attaque est formellement interdite selon ton profil :__\n\n") + "\n".join([f"• {i}" for i in infractions]), inline=False)
             if avertissements:
                 embed.add_field(name=t(langue, "guerre_hr_res_warn", defaut="⚠️ Autres observations"), value="\n".join([f"• {a}" for a in avertissements]), inline=False)
             await interaction.followup.send(embed=embed)
-
         elif avertissements:
             embed.color = discord.Color.orange()
-            embed.add_field(name=t(langue, "guerre_hr_res_ora_t", defaut="⚠️ ATTAQUE EN RÈGLES (Mais Risquée)"), value=t(langue, "guerre_hr_res_ora_d", defaut="__L'attaque respecte les règles, mais attention :__\n\n") + "\n".join([f"• {a}" for a in avertissements]), inline=False)
+            embed.add_field(name=t(langue, "guerre_hr_res_ora_t", defaut="⚠️ ATTAQUE EN RÈGLES (Mais Risquée)"), value=t(langue, "guerre_hr_res_ora_d", defaut="__L'attaque respecte tes limites, mais attention :__\n\n") + "\n".join([f"• {a}" for a in avertissements]), inline=False)
             await interaction.followup.send(embed=embed)
-
         else:
             embed.color = discord.Color.green()
-            embed.add_field(name=t(langue, "guerre_hr_res_gre_t", defaut="✅ ATTAQUE EN RÈGLES"), value=t(langue, "guerre_hr_res_gre_d", defaut="Aucune infraction ni avertissement détecté selon ce traité."), inline=False)
+            embed.add_field(name=t(langue, "guerre_hr_res_gre_t", defaut="✅ ATTAQUE EN RÈGLES"), value=t(langue, "guerre_hr_res_gre_d", defaut="Aucune infraction ni avertissement détecté selon tes limites."), inline=False)
             await interaction.followup.send(embed=embed)
         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
-    # ==========================================
-    # 🤝 GROUPE DE COMMANDES : DIPLOMACY
-    # ==========================================
-    diplo_group = app_commands.Group(
-        name="diplomacy", 
-        description="Diplomatic relations management (Admin only)",
-        default_permissions=discord.Permissions(administrator=True),
-        guild_only=True
-    )
-
-    @diplo_group.command(name="add", description="Defines the diplomatic status between two alliances")
-    @app_commands.guild_only()
-    @app_commands.autocomplete(my_alliance=alliance_autocomplete)
-    @app_commands.autocomplete(target=alliance_autocomplete)
-    @app_commands.choices(status=[
-        app_commands.Choice(name="🟢 Ally", value="allies"),
-        app_commands.Choice(name="🟡 PNA (Non-Aggression Pact)", value="pna"),
-        app_commands.Choice(name="🔴 At War", value="guerre")
-    ])
-    async def d_add(self, interaction: discord.Interaction, my_alliance: str, target: str, status: app_commands.Choice[str]):
-        langue, _ = await get_server_config(interaction)
-        
-        data = await load_diplo_async()
-        source_key = get_alliance_diplo_key(data, my_alliance)
-        
-        if source_key not in data:
-            data[source_key] = {"allies": [], "pna": [], "guerre": [], "guild_id": interaction.guild_id}
-        else:
-            owner_id = data[source_key].get("guild_id")
-            if owner_id and owner_id != interaction.guild_id:
-                return await interaction.response.send_message(t(langue, "guerre_diplo_err_owner", defaut="<:error:1512505075220611172> **Accès refusé** : La diplomatie de cette alliance est gérée par un autre serveur Discord."), ephemeral=True)
-            elif not owner_id:
-                data[source_key]["guild_id"] = interaction.guild_id
-                
-        target_lower = target.lower()
-        for key in ["allies", "pna", "guerre"]:
-            data[source_key][key] = [a for a in data[source_key][key] if a.lower() != target_lower]
-            
-        data[source_key][status.value].append(target)
-        await save_diplo_async(data)
-        
-        emojis = {"allies": "🟢", "pna": "🟡", "guerre": "🔴"}
-        msg = t(langue, "guerre_diplo_add_succ", e=emojis[status.value], a=my_alliance, c=target, s=status.name, defaut=f"<:4_:1512574743369224303> {emojis[status.value]} Pour **{my_alliance}**, l'alliance **{target}** a été enregistrée en tant que **{status.name}**.")
-        await interaction.response.send_message(msg, ephemeral=True)
-
-    @diplo_group.command(name="remove", description="Removes an alliance from your diplomacy (becomes neutral)")
-    @app_commands.guild_only()
-    @app_commands.autocomplete(my_alliance=alliance_autocomplete)
-    @app_commands.autocomplete(target=alliance_autocomplete)
-    async def d_remove(self, interaction: discord.Interaction, my_alliance: str, target: str):
-        langue, _ = await get_server_config(interaction)
-        
-        data = await load_diplo_async()
-        source_key = get_alliance_diplo_key(data, my_alliance)
-        
-        if source_key not in data:
-            return await interaction.response.send_message(t(langue, "guerre_diplo_err_empty", a=my_alliance, defaut=f"<:4_:1512574743369224303> **{my_alliance}** n'a aucune diplomatie enregistrée."), ephemeral=True)
-
-        owner_id = data[source_key].get("guild_id")
-        if owner_id and owner_id != interaction.guild_id:
-            return await interaction.response.send_message(t(langue, "guerre_diplo_err_owner", defaut="<:error:1512505075220611172> **Accès refusé** : La diplomatie de cette alliance est gérée par un autre serveur Discord."), ephemeral=True)
-
-        target_lower = target.lower()
-        trouve = False
-        
-        for key in ["allies", "pna", "guerre"]:
-            if any(a.lower() == target_lower for a in data[source_key][key]):
-                data[source_key][key] = [a for a in data[source_key][key] if a.lower() != target_lower]
-                trouve = True
-                
-        if trouve:
-            await save_diplo_async(data)
-            await interaction.response.send_message(t(langue, "guerre_diplo_rem_succ", c=target, defaut=f"<:4_:1512574743369224303> L'alliance **{target}** a été retirée. Elle est redevenue Neutre."), ephemeral=True)
-        else:
-            await interaction.response.send_message(t(langue, "guerre_diplo_rem_fail", c=target, a=my_alliance, defaut=f"<:error:1512505075220611172> **{target}** n'est dans aucune liste diplomatique de **{my_alliance}**."), ephemeral=True)
-
-    @diplo_group.command(name="list", description="Displays the diplomatic board of an alliance (Private)")
-    @app_commands.guild_only()
-    @app_commands.autocomplete(alliance_name=alliance_autocomplete)
-    async def d_list(self, interaction: discord.Interaction, alliance_name: str):
-        langue, _ = await get_server_config(interaction)
-        
-        data = await load_diplo_async()
-        source_key = get_alliance_diplo_key(data, alliance_name)
-        
-        if source_key not in data:
-            return await interaction.response.send_message(t(langue, "guerre_diplo_list_empty", a=alliance_name, defaut=f"<:4_:1512574743369224303> Le registre diplomatique de **{alliance_name}** est vide."), ephemeral=True)
-            
-        diplo_alli = data[source_key]
-        owner_id = diplo_alli.get("guild_id")
-        
-        if owner_id and owner_id != interaction.guild_id:
-            return await interaction.response.send_message(t(langue, "guerre_diplo_list_denied", a=alliance_name, defaut=f"<:error:1512505075220611172> **Accès classifié** : Vous n'avez pas l'autorisation de consulter la diplomatie de **{alliance_name}** depuis ce serveur."), ephemeral=True)
-        
-        embed = discord.Embed(title=t(langue, "guerre_diplo_list_title", a=alliance_name, defaut=f"📜 Registre Diplomatique : {alliance_name}"), color=discord.Color.gold())
-        
-        aucun = t(langue, "guerre_diplo_list_none", defaut="*Aucun*")
-        
-        lbl_diplo_allies = t(langue, "guerre_diplo_allies", defaut="🟢 ALLIÉS")
-        lbl_diplo_pna = t(langue, "guerre_diplo_pna", defaut="🟡 PNA")
-        lbl_diplo_war = t(langue, "guerre_diplo_war", defaut="🔴 GUERRE")
-        
-        embed.add_field(name=lbl_diplo_allies, value="\n".join([f"🛡️ {a}" for a in diplo_alli.get("allies", [])]) or aucun, inline=True)
-        embed.add_field(name=lbl_diplo_pna, value="\n".join([f"🤝 {a}" for a in diplo_alli.get("pna", [])]) or aucun, inline=True)
-        embed.add_field(name=lbl_diplo_war, value="\n".join([f"⚔️ {a}" for a in diplo_alli.get("guerre", [])]) or aucun, inline=False)
-        await setup_embed_footer(embed, interaction, langue)
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    # ==========================================
-    # 👻 ANTI-SUPPRESSION POUR i18n_sync
-    # Ce code n'est jamais exécuté. Il sert juste à forcer 
-    # le scanner à garder les clés dynamiques de reglements.json
-    # ==========================================
-    def _keep_json_translations_alive():
-        # Noms des règlements
-        t("fr", "rules_name_cdr")
-        t("fr", "rules_name_eternity")
-        t("fr", "rules_name_sog")
-
-        # Cooldowns
-        t("fr", "rules_cd_1week")
-        t("fr", "rules_cd_72h")
-        t("fr", "rules_cd_24h_losses")
-        t("fr", "rules_cd_none")
-
-        # Limites d'attaques
-        t("fr", "rules_max_3fulls")
-        t("fr", "rules_max_5fulls")
-
-        # Troupes (Feu)
-        t("fr", "rules_fire_5k")
-        t("fr", "rules_fire_20k")
-        t("fr", "rules_fire_50k")
-
-        # Cibles AP
-        t("fr", "rules_ap_gt_30m")
-        t("fr", "rules_ap_multi_top150")
-        t("fr", "rules_ap_none")
-
-        # Interdictions
-        t("fr", "rules_interdit_cdr_low")
-        t("fr", "rules_interdit_cdr_high")
-        t("fr", "rules_interdit_ete_high")
-        t("fr", "rules_interdit_sog")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(GuerreCog(bot))

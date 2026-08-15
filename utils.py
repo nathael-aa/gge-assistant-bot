@@ -14,7 +14,7 @@ import urllib.parse
 logger = logging.getLogger("GGE_Bot")
 
 # ==========================================
-# ⚙️ GESTION DES CHEMINS & DOSSIERS
+# ⚙️ GESTION DES CHEMINS & DOSSIER
 # ==========================================
 BASE_DIR = Path(__file__).parent
 LOCALES_DIR = BASE_DIR / 'locales'
@@ -22,9 +22,10 @@ BASE_DATA_PATH = BASE_DIR / 'data'
 
 CONFIG_DIR = BASE_DATA_PATH / 'configs'
 JOUEURS_DIR = BASE_DATA_PATH / 'joueurs'
-ALLIANCES_DIR = BASE_DATA_PATH / 'alliances'
+SERVEURS_DIR = BASE_DATA_PATH / 'serveurs'
+ADMINS_DIR = BASE_DATA_PATH / 'admins'
 
-for directory in [CONFIG_DIR, JOUEURS_DIR, ALLIANCES_DIR, LOCALES_DIR]:
+for directory in [CONFIG_DIR, JOUEURS_DIR, SERVEURS_DIR, ADMINS_DIR, LOCALES_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
 # ==========================================
@@ -35,7 +36,7 @@ GUILDS_CONFIG_CACHE = None
 BLOCKS_CACHE = None
 
 def clear_config_cache():
-    """Fonction à appeler dans ton /setup pour forcer la mise à jour de la RAM"""
+
     global USERS_CONFIG_CACHE, GUILDS_CONFIG_CACHE
     USERS_CONFIG_CACHE = None
     GUILDS_CONFIG_CACHE = None
@@ -105,13 +106,8 @@ async def get_api_headers(interaction: discord.Interaction = None, custom_server
 # ==========================================
 # 🎲 MESSAGE SOUTIENS ALEATOIRE
 # ==========================================
-import random
-import discord
-import json
-from datetime import datetime
-from pathlib import Path
 
-VOTES_FILE = Path('/app/data/configs/votes.json')
+VOTES_FILE = JOUEURS_DIR / 'votes.json'
 
 async def prompt_vote_if_lucky(interaction: discord.Interaction, probability_percent: int, langue: str = "fr"):
     """
@@ -138,7 +134,7 @@ async def prompt_vote_if_lucky(interaction: discord.Interaction, probability_per
 
     # 3. Action : Création des liens
     vote_url = "https://top.gg/bot/1472309793065533493/vote" 
-    review_url = "https://top.gg/bot/1472309793065533493#reviews" # 🟢 Le lien direct vers les avis
+    review_url = "https://top.gg/bot/1472309793065533493#reviews"
     
     # Textes traduits
     btn_vote_lbl = t(langue, "vote_prompt_btn", defaut="Voter (1 clic)")
@@ -211,8 +207,6 @@ def _get_api_timestamp(*sources):
 # ==========================================
 # 🌍 MOTEUR DE TRADUCTION (i18n)
 # ==========================================
-import json
-import logging
 
 # 1. On corrige le chemin d'import (locales.emojis au lieu de emojis)
 try:
@@ -294,7 +288,7 @@ def get_file_lock(filepath):
 # ==========================================
 # 🔧 Footer global
 # ==========================================
-BOT_VERSION = "GGE Assistant • Version 1.1.8"
+BOT_VERSION = "GGE Assistant • Version 1.1.9"
 
 async def setup_embed_footer(embed: discord.Embed, interaction: discord.Interaction = None, langue: str = "fr", custom_server: str = None):
     txt = BOT_VERSION
@@ -309,7 +303,7 @@ async def setup_embed_footer(embed: discord.Embed, interaction: discord.Interact
 # 🔧 MAINTENANCE & CACHES JSON
 # ==========================================
 def load_maintenance():
-    path = CONFIG_DIR / 'maintenance.json'
+    path = ADMINS_DIR / 'maintenance.json'
     if os.path.exists(path):
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -323,7 +317,7 @@ async def load_blocks_async():
     if BLOCKS_CACHE is not None:
         return BLOCKS_CACHE
         
-    path = CONFIG_DIR / 'blocks.json'
+    path = ADMINS_DIR / 'blocks.json'
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
@@ -339,7 +333,7 @@ async def load_blocks_async():
 async def save_blocks_async(data):
     global BLOCKS_CACHE
     BLOCKS_CACHE = data 
-    path = CONFIG_DIR / 'blocks.json'
+    path = ADMINS_DIR / 'blocks.json'
     async with get_file_lock(path):
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
@@ -359,21 +353,6 @@ async def save_configuration_async(data):
     async with get_file_lock(path):
         with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
 
-async def load_objectifs_async():
-    path = CONFIG_DIR / 'event_objectifs.json'
-    async with get_file_lock(path):
-        if os.path.exists(path):
-            try:
-                with open(path, 'r', encoding='utf-8') as f: return json.load(f)
-            except Exception as e: 
-                logger.error(f"❌ Erreur event_objectifs.json : {e}")
-    return {}
-
-async def save_objectifs_async(data):
-    path = CONFIG_DIR / 'event_objectifs.json'
-    async with get_file_lock(path):
-        with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
-
 async def load_pseudos_async():
     path = JOUEURS_DIR / 'discord_pseudos.json'
     async with get_file_lock(path):
@@ -390,7 +369,7 @@ async def save_pseudos_async(data):
         with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
 
 async def load_rivals_async():
-    path = CONFIG_DIR / 'rival_radar.json'
+    path = JOUEURS_DIR / 'rival_radar.json'
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
@@ -400,12 +379,12 @@ async def load_rivals_async():
     return {}
 
 async def save_rivals_async(data):
-    path = CONFIG_DIR / 'rival_radar.json'
+    path = JOUEURS_DIR / 'rival_radar.json'
     async with get_file_lock(path):
         with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
 
 async def load_dungeons_async():
-    path = CONFIG_DIR / 'forteresses_sessions.json'
+    path = JOUEURS_DIR / 'forteresses_sessions.json'
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
@@ -415,12 +394,12 @@ async def load_dungeons_async():
     return {"sessions": {}}
 
 async def save_dungeons_async(data):
-    path = CONFIG_DIR / 'forteresses_sessions.json'
+    path = JOUEURS_DIR / 'forteresses_sessions.json'
     async with get_file_lock(path):
         with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
 
 async def load_maintenance_async():
-    path = CONFIG_DIR / 'maintenance.json'
+    path = ADMINS_DIR / 'maintenance.json'
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
@@ -431,28 +410,13 @@ async def load_maintenance_async():
     return False
 
 async def save_maintenance_async(etat):
-    path = CONFIG_DIR / 'maintenance.json'
+    path = ADMINS_DIR / 'maintenance.json'
     async with get_file_lock(path):
         with open(path, 'w', encoding='utf-8') as f:
             json.dump({"maintenance_mode": etat}, f)
 
-async def load_diplo_async():
-    path = ALLIANCES_DIR / 'diplomatie.json'
-    async with get_file_lock(path):
-        if os.path.exists(path):
-            try:
-                with open(path, 'r', encoding='utf-8') as f: return json.load(f)
-            except Exception as e:
-                logger.error(f"❌ Erreur diplomatie.json : {e}")
-    return {}
-
-async def save_diplo_async(data):
-    path = ALLIANCES_DIR / 'diplomatie.json'
-    async with get_file_lock(path):
-        with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
-
 async def load_surveillance_async():
-    path = CONFIG_DIR / 'surveillance.json'
+    path = JOUEURS_DIR / 'surveillance.json'
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
@@ -465,7 +429,7 @@ async def load_surveillance_async():
     return {"players": {}, "alliances": {}}
 
 async def save_surveillance_async(data):
-    path = CONFIG_DIR / 'surveillance.json'
+    path = JOUEURS_DIR / 'surveillance.json'
     async with get_file_lock(path):
         with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
 

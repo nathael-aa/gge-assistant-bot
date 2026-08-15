@@ -14,6 +14,7 @@ from utils import (
     BOT_VERSION, 
     CONFIG_DIR,
     JOUEURS_DIR,
+    ADMINS_DIR,
     PaginationView, 
     MON_ID_DISCORD, 
     get_file_lock, 
@@ -26,7 +27,7 @@ from utils import (
 
 logger = logging.getLogger("GGE_Bot")
 
-CONTACTS_FILE = JOUEURS_DIR / 'contacts.json'
+CONTACTS_FILE = ADMINS_DIR / 'contacts.json'
 
 # ==========================================
 # ⚙️ CONFIGURATION CENTRALISÉE DE L'AIDE

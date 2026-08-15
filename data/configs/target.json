@@ -1,0 +1,131 @@
+{
+    "667448796015493122": {
+        "nom_discord": "redxiii6537",
+        "langue": "fr",
+        "gge_server": "E4K_FR1"
+    },
+    "986579962649776188": {
+        "nom_discord": "soulhunter.2000",
+        "langue": "de",
+        "gge_server": "E4K_FR1"
+    },
+    "765293568570556467": {
+        "nom_discord": "gabi.7765",
+        "langue": "fr",
+        "gge_server": "E4K_FR1"
+    },
+    "1285642146157691043": {
+        "nom_discord": "theo.craipain",
+        "langue": "fr",
+        "gge_server": "E4K_FR1"
+    },
+    "585620259424174086": {
+        "nom_discord": "k2gge",
+        "langue": "en",
+        "gge_server": "WORLD2"
+    },
+    "397819359680004106": {
+        "nom_discord": "galaxy_leasco",
+        "langue": "en",
+        "gge_server": "INT3"
+    },
+    "1135591956270026813": {
+        "nom_discord": "vitality_mk6250",
+        "langue": "fr",
+        "gge_server": "E4K_FR1"
+    },
+    "1346784682553118741": {
+        "nom_discord": "blauer_eisbaer",
+        "langue": "de",
+        "gge_server": "WORLD2"
+    },
+    "819594753305215006": {
+        "nom_discord": "electrocpr",
+        "langue": "en",
+        "gge_server": "WORLD2"
+    },
+    "936426432354205746": {
+        "nom_discord": ".lofdjf",
+        "langue": "en",
+        "gge_server": "WORLD2"
+    },
+    "540493769510748160": {
+        "nom_discord": "_nizar12_",
+        "langue": "en",
+        "gge_server": "WORLD2"
+    },
+    "1303113326426984611": {
+        "nom_discord": "bigmike_dukeres_noobtube",
+        "langue": "de",
+        "gge_server": "WORLD2"
+    },
+    "687017077076262956": {
+        "nom_discord": "mr.cpt.thegreat",
+        "langue": "en",
+        "gge_server": "WORLD2"
+    },
+    "765807320433033256": {
+        "nom_discord": "diq_v2",
+        "langue": "en",
+        "gge_server": "WORLD2"
+    },
+    "675087210453925888": {
+        "nom_discord": "vincenth8230",
+        "langue": "fr",
+        "gge_server": "E4K_FR1"
+    },
+    "339505462020145154": {
+        "nom_discord": "kager.",
+        "langue": "en",
+        "gge_server": "WORLD2"
+    },
+    "974968670583402546": {
+        "nom_discord": "kever_7",
+        "langue": "en",
+        "gge_server": "WORLD2"
+    },
+    "1505505741245513748": {
+        "nom_discord": "divinedevil099",
+        "langue": "en",
+        "gge_server": "WORLD2"
+    },
+    "968131581195726908": {
+        "nom_discord": "cluel3ss._.",
+        "langue": "en",
+        "gge_server": "WORLD2"
+    },
+    "711637388887195779": {
+        "nom_discord": "claudeyr",
+        "langue": "en",
+        "gge_server": "WORLD2"
+    },
+    "490068844967231489": {
+        "nom_discord": "angelotmx",
+        "langue": "en",
+        "gge_server": "FR1"
+    },
+    "1166375576685265040": {
+        "nom_discord": "hydrocat.d",
+        "langue": "fr",
+        "gge_server": "E4K_FR1",
+        "custom_rules": {
+            "min_dist": 30,
+            "tier_diff": 1,
+            "pp_min": -10000,
+            "pp_max": 10000,
+            "show_doves": false,
+            "ignore_tiers": false,
+            "only_with_alliance": false
+        }
+    },
+    "1331577207339880511": {
+        "nom_discord": "d004ofi_91900",
+        "langue": "fr",
+        "gge_server": "E4K_FR1"
+    },
+    "1438919200717410378": {
+        "nom_discord": "sis_sou",
+        "langue": "fr",
+        "gge_server": "E4K_FR1"
+    }
+}

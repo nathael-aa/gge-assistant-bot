@@ -16,6 +16,7 @@ from utils import (
     alliance_autocomplete, 
     setup_embed_footer, 
     CONFIG_DIR, 
+    SERVEURS_DIR,
     format_num, 
     generer_rapport_alliance_embed, 
     TRACKER_EVENTS,
@@ -26,7 +27,7 @@ from utils import (
 
 logger = logging.getLogger("GGE_Bot")
 
-CALENDRIER_FILE = CONFIG_DIR / 'calendrier.json'
+CALENDRIER_FILE = SERVEURS_DIR / 'calendrier.json'
 
 # ==========================================
 # 🛠️ CLASSE DE NAVIGATION UI (BOUTONS)

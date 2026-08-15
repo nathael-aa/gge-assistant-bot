@@ -14,7 +14,7 @@ from utils import (
     PaginationView, 
     get_api_headers,
     get_server_config,
-    CONFIG_DIR,
+    SERVEURS_DIR,
     setup_embed_footer,
     joueur_autocomplete,
     t,
@@ -23,7 +23,7 @@ from utils import (
 
 logger = logging.getLogger("GGE_Bot")
 
-STORM_CONFIG_PATH = CONFIG_DIR / 'storm_alerts.json'
+STORM_CONFIG_PATH = SERVEURS_DIR / 'storm_alerts.json'
 SERVEURS_DE_TEST = [1342424613660921908,1512165717380825310,1537532071898128566]
 
 async def load_storm_config():

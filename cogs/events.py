@@ -14,7 +14,7 @@ import logging
 from utils import (
     CONFIG_DIR, 
     JOUEURS_DIR,
-    ALLIANCES_DIR,
+    SERVEURS_DIR,
     t, 
     joueur_autocomplete, 
     alliance_autocomplete, 
@@ -29,8 +29,6 @@ from utils import (
     MON_ID_DISCORD,
     setup_embed_footer,
     generer_rapport_alliance_embed,
-    load_objectifs_async,
-    save_objectifs_async,
     load_configuration_async,
     load_pseudos_async,
     save_pseudos_async,
