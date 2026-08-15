@@ -82,7 +82,7 @@ class StormsCog(commands.Cog):
 
         self.active_alerts = []
 
-    # Création du groupe de commandes principal /storm
+    # Création du groupe de commande principal /storm
     storm_group = app_commands.Group(
         name="storm", 
         description="Commands for the Storm Islands event",
