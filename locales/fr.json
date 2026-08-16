@@ -245,7 +245,7 @@
   "fort_field_val_cd": "{e_compass} Position : `{x}:{y}` {e_empirerankings} Dernier roi : *{ancien}*\n**Statut : {status} {mins} min**",
   "fort_hist_empty": "{e_information} **{p}** n'a attaqué aucune forteresse enregistrée durant l'année écoulée.",
   "fort_hist_page_title": "{e_memberlist} Registre des frappes (Page {curr}/{tot})",
-  "fort_hist_stats": "**{e_stats} Bilan**\n{e_std_bullseye} **Total des attaques :** {tot}\n{e_std_gem_stone} **Gains estimés :** {rub} Rubis\n{e_std_world_map} **Royaume favori :** {rp} *( {pct}% des frappes )*\n{e_fire2} **Jour le plus actif :** {j} *( {jc} attaques )*",
+  "fort_hist_stats": "**{e_stats} Bilan**\n{e_std_bullseye} **Total des attaques :** {tot}\n{e_ruby} **Gains estimés :** {rub} Rubis\n{e_std_world_map} **Royaume favori :** {rp} *( {pct}% des frappes )*\n{e_fire2} **Jour le plus actif :** {j} *( {jc} attaques )*",
   "fort_hist_title": "{e_castle1} Historique des Pillages : {p}",
   "fort_realm_ice": "Glaces {e_dungeon2}",
   "fort_realm_peaks": "Pics {e_dungeon3}",

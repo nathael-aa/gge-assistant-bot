@@ -10,6 +10,7 @@ import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+from emojis import DICT_EMOJIS
 
 from utils import (
     CONFIG_DIR,
@@ -583,6 +584,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
     # ==========================================
     @app_commands.command(name="history", description="View a player's fortress attack history (up to 365 days)")
     @app_commands.autocomplete(player=joueur_autocomplete)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     async def f_history(self, interaction: discord.Interaction, player: str):
         try: await interaction.response.defer(ephemeral=False, thinking=True)
         except: return
@@ -631,7 +633,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         if not dungeons:
             return await interaction.followup.send(t(langue, "fort_hist_empty", p=vrai_nom, defaut=f"📭 **{vrai_nom}** n'a attaqué aucune forteresse enregistrée durant l'année écoulée."))
 
-        # On trie immédiatement la liste pour obtenir la date de la frappe la plus récente
+        # Tri pour avoir les plus récents en haut
         dungeons.sort(key=lambda x: x.get("attacked_at", ""), reverse=True)
         
         latest_attack_ts = int(discord.utils.utcnow().timestamp())
@@ -677,39 +679,55 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                 f"<:attaque:1512570903886692474> **Total des attaques :** {total_hits}\n"
                 f"<:ruby:1520135951576334536> **Gains estimés :** {rubies_str} Rubis\n"
                 f"<:words:1512574697223753798> **Royaume favori :** {royaume_prefere} *( {pct_kid:.1f}% des frappes )*\n"
-                f"<:crossbowman:1533429421581533244> **Jour le plus sanglant :** {jour_actif_str} *( {best_date_count} attaques )*"
+                f"<:crossbowman:1533429421581533244> **Jour le plus actif :** {jour_actif_str} *( {best_date_count} attaques )*"
             )
         )
 
-        # On limite aux 100 dernières attaques pour ne pas faire planter Discord
-        recent_dungeons = dungeons[:100]
-        
-        lignes = []
-        for d in recent_dungeons:
+        # ---------------------------------------------------------
+        # NOUVELLE LOGIQUE : GROUPEMENT DES DONNÉES JOUR PAR JOUR
+        # ---------------------------------------------------------
+        daily_stats = {}
+        for d in dungeons:
             kid = d.get("kid")
-            x = d.get("position_x")
-            y = d.get("position_y")
-            dt_str = d.get("attacked_at", "")
+            dt_str = d.get("attacked_at", "")[:10] # On extrait "YYYY-MM-DD"
             
-            realm_str = dict_royaumes.get(kid, f"M{kid}")
-            try:
-                dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
-                ts = int(dt.timestamp())
-                date_fmt = f"<t:{ts}:d> <t:{ts}:t>"
-            except:
-                date_fmt = "Date inconnue"
+            if not dt_str or not kid:
+                continue
                 
-            lignes.append(f"🔹 {date_fmt} │ {realm_str} ` {x}:{y} `")
+            if dt_str not in daily_stats:
+                daily_stats[dt_str] = {1: 0, 2: 0, 3: 0, "rubies": 0}
+                
+            daily_stats[dt_str][kid] += 1
+            
+            # Calcul des rubis de la frappe
+            rubies_gained = {1: 280, 2: 50, 3: 370}.get(kid, 0)
+            daily_stats[dt_str]["rubies"] += rubies_gained
+
+        lignes = []
+        # On trie les jours du plus récent au plus ancien
+        for day_str, stats in sorted(daily_stats.items(), reverse=True):
+            try:
+                day_obj = datetime.strptime(day_str, "%Y-%m-%d")
+                day_fmt = day_obj.strftime("%d/%m/%Y")
+            except:
+                day_fmt = day_str
+
+            details_royaumes = []
+            if stats[1] > 0: details_royaumes.append(f"{stats[1]} {DICT_EMOJIS.get('e_dungeon1', '🏰')}")
+            if stats[2] > 0: details_royaumes.append(f"{stats[2]} {DICT_EMOJIS.get('e_dungeon2', '🏰')}")
+            if stats[3] > 0: details_royaumes.append(f"{stats[3]} {DICT_EMOJIS.get('e_dungeon3', '🏰')}")
+            
+            texte_royaumes = " │ ".join(details_royaumes)
+            jour_rubis = f"{stats['rubies']:,}".replace(",", " ")
+            
+            lignes.append(f"📅 **{day_fmt}** : {texte_royaumes} ➔ **{jour_rubis}** {DICT_EMOJIS.get('e_ruby', '💎')}")
 
         embeds = []
-        chunk_size = 10 
+        chunk_size = 5 # On peut mettre 5 lignes par page car elles sont plus courtes
         nb_pages = max(1, (len(lignes) - 1) // chunk_size + 1)
 
         title = t(langue, "fort_hist_title", p=vrai_nom, defaut=f"<:fortresses:1512574700839239892> Historique des Pillages : {vrai_nom}")
         
-        if total_hits > 100:
-            stats_desc += "\n\n*(Registre des frappes limité aux 100 plus récentes pour la fluidité)*"
-
         for i in range(0, len(lignes), chunk_size):
             chunk = lignes[i:i+chunk_size]
             page_actuelle = (i // chunk_size) + 1
@@ -718,7 +736,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             embed.description = f"{lbl_date} <t:{latest_attack_ts}:F> (<t:{latest_attack_ts}:R>)\n\n{stats_desc}"
             
             field_value = "\n".join(chunk)
-            f_title = t(langue, "fort_hist_page_title", curr=page_actuelle, tot=nb_pages, defaut=f"<:memberlist:1512572899360378971> Registre des frappes (Page {page_actuelle}/{nb_pages})")
+            f_title = t(langue, "fort_hist_page_title", curr=page_actuelle, tot=nb_pages, defaut=f"<:memberlist:1512572899360378971> Rapports journaliers (Page {page_actuelle}/{nb_pages})")
             
             if field_value:
                 embed.add_field(name=f_title, value=field_value, inline=False)
