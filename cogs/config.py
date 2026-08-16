@@ -40,7 +40,7 @@ class ConfigCog(commands.Cog):
         
         lbl_ok = t(langue, "config_supported", defaut="🟢 Pris en charge")
         lbl_ko = t(langue, "config_unsupported", defaut="🔴 Non pris en charge")
-        lbl_unk = t(langue, "config_unknown", defaut="❓ Inconnu")
+        lbl_unk = t(langue, "config_unknown", defaut="🟠 Inconnu")
         
         # 💡 Ajout des labels de plateforme pour l'affichage
         lbl_mobile = t(langue, "platform_mobile", defaut="Mobile")
