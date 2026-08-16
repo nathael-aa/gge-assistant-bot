@@ -1,88 +1,56 @@
-# 🏰 GGE Assistant
+🏰 GGE Assistant
+GGE Assistant is the ultimate Swiss Army knife designed for the Goodgame Empire (GGE) and Empire: Four Kingdoms (E4K) community.
+A truly standalone Discord bot, it features a comprehensive arsenal of military intelligence, personal war radars, statistical analysis, and real-time server monitoring tools.
 
-**GGE Assistant** is the ultimate Swiss Army knife designed for the **Goodgame Empire (GGE)** and **Empire: Four Kingdoms (E4K)** community. 
-A truly standalone Discord bot, it features a comprehensive arsenal of military intelligence, alliance management, statistical analysis, and real-time server monitoring tools.
+🌐 Massive Multi-Server & Multilingual Support: Fully operational across 46 supported servers (including FR1, INT3, WORLD2, GB1, and many more!), with native support for French, English, and German.
 
-🌐 **Massive Multi-Server & Multilingual Support**: Fully operational across **46 supported servers** (including FR1, INT3, WORLD2, GB1, and many more!), with native support for French, English, and German.
+🚀 Core Features
+⚔️ Intelligence & Strategy (Warfare)
+Personal War Radar: Advanced target searching (/target) based on a highly customizable personal dashboard (configure your own PP limits, Tier differences, and Dove filters).
 
----
+Protection Tracker: Precise monitoring of enemy dove (protection) expiration times.
 
-## 🚀 Core Features
+Alliance Scanners: Analysis of Might (PP), enemy roster breakdown, and tracking of description changes (alliance walls).
 
-### ⚔️ Intelligence & Strategy (Warfare)
-* **Radars & Targets:** Movement detection, search for legal targets according to server rules (HR), and proximity analysis.
-* **Protection Tracker:** Precise monitoring of enemy dove (protection) expiration times.
-* **Alliance Scanners:** Analysis of Might (PP), enemy roster breakdown, and tracking of description changes (alliance walls).
+🏆 Events & Statistical Rankings
+Live Rankings: Dynamic pagination of ongoing events (Season, League, Outer Realms, Nomads, etc.).
 
-### 🏆 Events & Statistical Rankings
-* **Live Rankings:** Dynamic pagination of ongoing events (Season, League, Outer Realms, Nomads, etc.).
-* **Histories:** Detailed long-term tracking of player and alliance performances.
-* **Wheel of Affluence (WOA):** Statistical analysis of rewards and rankings.
+Storm Islands: Real-time automated tracking and alerts for Aquamarine islands (Spawns and Captures).
 
-### ⚙️ Automation & Scanners (Background)
-* Bash scripts (`auto_pa_daily.sh`) orchestrate invisible daily tasks.
-* **Server Scanner:** Complete map extraction to cache levels, positions, and statistics across all 46 active servers.
-* **Wall Scanner:** Archiving of alliance descriptions to detect secret pacts and hidden wars.
+Histories: Detailed long-term tracking of player and alliance performances.
 
----
+Wheel of Affluence (WOA): Statistical analysis of rewards and rankings.
 
-## 📜 Command List
+⚙️ Automation & Security (Background)
+GitHub Actions CI/CD: Daily automated security jobs including linting (Ruff), dependency audits (pip-audit), and container vulnerability scanning (Trivy).
 
-| Command | Description |
-| :--- | :--- |
-| `/help` | Displays the complete user manual for the bot. |
-| `/setup` | Configures the language and game server for this Discord server or your profile. |
-| `/link_account` | Links your Discord account to your GGE username. |
-| `/status` | Checks system health (Bot, NAS Storage, GGE-Tracker API). |
-| `/changelog` | Discover the latest features, fixes, and improvements to the bot. |
-| `/calendar` | Event calendar management and display. |
-| `/rank` | Live event analysis and rankings. |
-| `/leaderboard` | General server rankings (Might, Honor, etc.). |
-| `/player` | Detailed player information card. |
-| `/alliance` | Detailed alliance profile (Quick overview and paginated). |
-| `/history` | Displays a player's complete history. |
-| `/event_player` | Displays a player's latest score or history during an event. |
-| `/event_alliance`| Alliance ranking and participation in an event. |
-| `/compare_player`| Responsive comparative analysis and threat index calculation between two players. |
-| `/woa` | Wheel of Affluence analysis and statistics. |
-| `/radar` | Personal war radar. |
-| `/rival` | Competition radar (Restricted to Private Messages). |
-| `/fortress` | PVE Fortress radar (Sands, Fire, Peaks). |
-| `/alliance_scanner`| Real-time enemy roster analysis (Doves, Might, Targets). |
-| `/alliance_might`| Alliance Might history over X days. |
-| `/alliance_description`| Displays the history of the last 7 wall changes for an alliance. |
-| `/proximity` | Finds the closest enemy castles to your positions. |
-| `/target` | Finds legal targets based on chosen war rules. |
-| `/hr` | Checks if an attack between two players respects the chosen rules. |
-| `/dove` | Checks a player's protection (dove) end date and time. |
-| `/diplomacy` | Diplomatic relations management (Admins only). |
-| `/contact` | Sends an issue, bug, or suggestion directly to the developer. |
+Server Scanner: Complete map extraction to cache levels, positions, and statistics across all 46 active servers.
 
----
+Wall Scanner: Archiving of alliance descriptions to detect secret pacts and hidden wars.
 
 ## 🛠️ Project Architecture
 
 The project is structured modularly, separating Discord logic from background analysis scripts.
 
 ```text
-gge-assistant-bot/
+gge-assistant/
+├── .github/workflows/     # 🔒 GitHub Actions (Automated security scans & CI)
 ├── cogs/                  # Discord Modules (Slash commands sorted by theme)
-│   ├── admin.py, aide.py, classement.py, radar.py, guerre.py, profils.py...
-├── scanners/              # Asynchronous analysis scripts (GGE-Tracker API)
-│   ├── alerter.py
-│   └── server_scanner.py
-├── data/                  # 🔒 Local JSON databases & archives
-│   ├── alliances/         # Rulesets and diplomacy
-│   ├── configs/           # Block, user, and calendar configurations..
-│   ├── joueurs/           # Linked usernames and sessions
-│   └── server_scans/      # Global server snapshots
+│   ├── admin.py, storms.py, aide.py, classement.py, radar.py, guerre.py, scan_server.py...
+├── data/                  # 🔒 Local JSON databases & archives (Ignored in Git)
+│   ├── admins/            # Maintenance mode, blocklists, and contacts
+│   ├── configs/           # General configurations and user custom rules
+│   ├── joueurs/           # Linked usernames, active sessions, radars, and votes
+│   ├── serveurs/          # Server-specific setups (Calendars, Storm alerts)
+│   └── server_scans/      # Global server snapshots from the API
 ├── locales/               # Translation files (i18n)
 │   ├── en.json, fr.json, de.json
-├── logs/                  # 🔒 Activity logs organized by process
-├── auto_pa_daily.sh       # Cron/scanner task trigger script
+├── logs/                  # 🔒 Activity logs
 ├── discord_bot.py         # Main entry point (Bot initialization)
 ├── docker-compose.yaml    # Container orchestration
 ├── Dockerfile             # Application image build
-├── README.md              # Redame text document
+├── emojis.py              # Centralized emoji dictionary
+├── README.md              # Documentation
 ├── requirements.txt       # Python dependencies (discord.py, aiohttp, etc.)
-└── utils.py               # Shared utility functions
+├── ruff.toml              # Python linter and formatter configuration
+└── utils.py               # Shared utility functions and UI Views

@@ -1,36 +1,36 @@
-# DATA
-
-#admins
-data/admins/blocks.json
-data/admins/contacts.json
-data/admins/maintenance.json
-#configs
-data/configs/users.json
-#joueurs
-data/joueurs/rival_radar.json
-data/joueurs/forteresses_sessions.json
-data/joueurs/pseudos.json
-data/joueurs/surveillance.json
-data/joueurs/votes.json
-#serveurs
-data/serveurs/calendrier.json
-data/serveurs/storm_alerts.json
-#server_scans
-data/server_scans/
-
-# LOG
-logs/
-
-#COGS
-cogs/__pycache__
-
-# Les fichiers de configuration secrets
+# ----------------------------------
+# 🔐 SECRETS
+# ----------------------------------
 .env
 
-# Fichiers système et Python
+# ----------------------------------
+# 🗄️ BASES DE DONNÉES LOCALES
+# ----------------------------------
+# On ignore tout le dossier data/
+data/*
+
+# Mais on autorise Git à lire le dossier configs...
+!data/configs/
+# ... pour y ignorer tout son contenu...
+data/configs/*
+# ... SAUF le fameux fichier configuration.json !
+!data/configs/configuration.json
+
+# ----------------------------------
+# 📝 LOGS
+# ----------------------------------
+logs/
+
+# ----------------------------------
+# 🐍 CACHE PYTHON & SYSTÈME
+# ----------------------------------
+# Ignore tous les dossiers __pycache__ (cogs, locales, racine...)
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 .DS_Store
 
-# Autres
+# ----------------------------------
+# ⚙️ AUTRES FICHIERS GÉNÉRÉS
+# ----------------------------------
 commands.json
