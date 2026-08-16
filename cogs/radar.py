@@ -1,32 +1,30 @@
-# -*- coding: utf-8 -*-
-import os
+import asyncio
 import json
 import logging
-import asyncio
-import aiohttp
-import urllib.parse
+import os
 import traceback
+import urllib.parse
 from datetime import datetime
+
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
 from utils import (
-    BASE_DATA_PATH, 
+    BASE_DATA_PATH,
     CONFIG_DIR,
-    t,
-    joueur_autocomplete, 
-    alliance_autocomplete, 
-    format_num, 
     PaginationView,
-    setup_embed_footer,
-    load_surveillance_async,
-    save_surveillance_async,
-    load_configuration_async,
-    get_discord_timestamp,
-    get_server_config,   
+    alliance_autocomplete,
+    format_num,
     get_api_headers,
-    prompt_vote_if_lucky
+    get_server_config,
+    joueur_autocomplete,
+    load_configuration_async,
+    load_surveillance_async,
+    prompt_vote_if_lucky,
+    save_surveillance_async,
+    setup_embed_footer,
+    t,
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -224,7 +222,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             player_files = list((BASE_DATA_PATH / 'server_scans' / serveur).rglob('server_*.json'))
             if player_files:
                 latest = max(player_files, key=lambda p: p.stat().st_mtime)
-                with open(latest, 'r', encoding='utf-8') as f:
+                with open(latest, encoding='utf-8') as f:
                     local_data = json.load(f).get('players', {})
                     for p_name, p_info in local_data.items():
                         if p_name.lower() == player.lower():
@@ -518,7 +516,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 mtime = os.path.getmtime(path_users)
                 if mtime > self.users_cache_mtime:
                     try:
-                        with open(path_users, 'r', encoding='utf-8') as f:
+                        with open(path_users, encoding='utf-8') as f:
                             users_data = json.load(f)
                             self.users_lang_cache = {uid: info.get("langue", "fr") for uid, info in users_data.items()}
                         self.users_cache_mtime = mtime
@@ -663,7 +661,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     player_ids = [p_id for p_id, p_info in tracked_players]
                     
                     try:
-                        url_bulk = f"https://api.gge-tracker.com/api/v1/players"
+                        url_bulk = "https://api.gge-tracker.com/api/v1/players"
                         async with session.post(url_bulk, headers=headers, json=player_ids, timeout=10) as r:
                             if r.status == 200:
                                 bulk_data = (await r.json()).get("players", [])
@@ -780,7 +778,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     # --- ÉTAPE 3 : MOUVEMENTS GLOBAUX ---
                     # ==========================================
                     try:
-                        url_movements = f"https://api.gge-tracker.com/api/v1/server/movements?page=1&castleType=1&movementType=3"
+                        url_movements = "https://api.gge-tracker.com/api/v1/server/movements?page=1&castleType=1&movementType=3"
                         async with session.get(url_movements, headers=headers, timeout=5) as r:
                             if r.status == 200:
                                 movements = (await r.json()).get("movements", [])

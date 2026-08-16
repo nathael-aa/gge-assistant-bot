@@ -1,38 +1,30 @@
-# -*- coding: utf-8 -*-
-import os
-import json
 import asyncio
-import aiohttp
-import urllib.parse
+import json
+import logging
 import math
 import random
-import logging
-import time
-from datetime import datetime, timedelta
-from pathlib import Path
+import urllib.parse
+from datetime import datetime
+
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 import utils
 from utils import (
-    BASE_DATA_PATH, 
-    SERVEURS_DIR,  
-    JOUEURS_DIR,
-    CONFIG_DIR,     
-    _get_api_timestamp,
-    t,              
-    joueur_autocomplete, 
-    alliance_autocomplete, 
-    format_num, 
-    BOT_VERSION,
-    MON_ID_DISCORD,
-    setup_embed_footer,
-    get_cached_data,
+    BASE_DATA_PATH,
+    CONFIG_DIR,
     PaginationView,
-    get_api_headers,     
+    _get_api_timestamp,
+    alliance_autocomplete,
+    format_num,
+    get_api_headers,
+    get_cached_data,
     get_server_config,
-    prompt_vote_if_lucky
+    joueur_autocomplete,
+    prompt_vote_if_lucky,
+    setup_embed_footer,
+    t,
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -91,10 +83,9 @@ class TargetDashboardView(discord.ui.View):
         self.user_id = user_id
         self.langue = langue
         
-        if utils.USERS_CONFIG_CACHE is None:
-            utils.USERS_CONFIG_CACHE = {}
-            
-        self.config = utils.USERS_CONFIG_CACHE.get(user_id, {}).get("custom_rules", {
+        cache_users = utils.USERS_CONFIG_CACHE or {}
+
+        self.config = cache_users.get(user_id, {}).get("custom_rules", {
             "min_dist": 0, "tier_diff": 0, "pp_min": -3000000, "pp_max": 10000000,
             "show_doves": False, "ignore_tiers": False, "only_with_alliance": True
         })
@@ -156,14 +147,21 @@ class TargetDashboardView(discord.ui.View):
         await interaction.response.send_modal(TargetSetupModal(self, self.langue))
 
     def save_config(self):
-        if self.user_id not in utils.USERS_CONFIG_CACHE:
-            utils.USERS_CONFIG_CACHE[self.user_id] = {}
-        utils.USERS_CONFIG_CACHE[self.user_id]["custom_rules"] = self.config
-        
-        path_users = CONFIG_DIR / 'target.json'
+        '''
+        Écrit dans users.json (utilisé dans get_server_config) au
+        lieu du target.json (non utilisé) : donc les règles perso étaient
+        perdues à chaque redémarrage du bot ou /setup d'un autre utilisateur
+        '''
+        path_users = CONFIG_DIR / 'users.json'
         try:
+            data = {}
+            if path_users.exists():
+                with open(path_users, encoding='utf-8') as f:
+                    data = json.load(f)
+            data.setdefault(self.user_id, {})["custom_rules"] = self.config
             with open(path_users, 'w', encoding='utf-8') as f:
-                json.dump(utils.USERS_CONFIG_CACHE, f, indent=4)
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            utils.clear_config_cache()
         except Exception as e:
             logger.error(f"Erreur sauvegarde config perso : {e}")
 
@@ -171,7 +169,7 @@ class TargetDashboardView(discord.ui.View):
 # 🎛️ COMPOSANT UI : PAGINATION DES CIBLES + RELANCE EN DIRECT
 # ========================================================
 class CiblePaginationView(discord.ui.View):
-    def __init__(self, cog, attacker, sort_by, target_alliance, embeds, langue="fr"):
+    def __init__(self, cog, attacker, sort_by, target_alliance, embeds, langue="fr", owner_id=None):
         super().__init__(timeout=1800)
         self.cog = cog
         self.attacker = attacker
@@ -180,11 +178,25 @@ class CiblePaginationView(discord.ui.View):
         self.embeds = embeds
         self.current_page = 0
         self.langue = langue
-        
+        self.owner_id = owner_id
+
         self.btn_prev.label = t(langue, "guerre_btn_prev", defaut="Page Précédente")
         self.btn_next.label = t(langue, "guerre_btn_next", defaut="Page Suivante")
         self.btn_rerun.label = t(langue, "guerre_btn_rerun", defaut="Relancer une vague")
         self.update_buttons()
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        '''
+        Ce message est public : sans ce contrôle, n'importe quel membre du salon
+        peut cliquer 'Relancer une vague' et donc écraser le résultat de son auteur
+        avec un scan lancé sous sa propre configuration
+        '''
+        if self.owner_id is not None and interaction.user.id != self.owner_id:
+            # Si besoin d'afficher un message, commentaires à retirer :
+            # msg = t(self.langue, "guerre_err_not_owner", defaut="<:error:1512505075220611172> Seul l'auteur de la recherche peut utiliser ces boutons. Lance ta propre commande `/target search`.")
+            # await interaction.response.send_message(msg, ephemeral=True)
+            return False
+        return True
 
     def update_buttons(self):
         self.btn_prev.disabled = self.current_page == 0
@@ -345,7 +357,7 @@ class GuerreCog(commands.Cog):
             page_num = (i // chunk_size) + 1
             
             embed = discord.Embed(
-                title=t(langue, "guerre_prox_title", a=enemy_alliance, defaut=f"\<:attaque:1512570903886692474> Cibles de Proximité : {enemy_alliance}"), 
+                title=t(langue, "guerre_prox_title", a=enemy_alliance, defaut=rf"\<:attaque:1512570903886692474> Cibles de Proximité : {enemy_alliance}"), 
                 color=self.clr_proximite
             )
             
@@ -358,7 +370,7 @@ class GuerreCog(commands.Cog):
             lbl_coords = t(langue, "guerre_prox_field_coords", defaut="Coords :")
             lbl_pp = t(langue, "guerre_prox_field_pp", defaut="Puissance :")
             lbl_col_yes = t(langue, "guerre_prox_colombe", defaut="<:peace:1512503935892586566> **SOUS COLOMBE**")
-            lbl_col_no = t(langue, "guerre_prox_vuln", defaut="\<:attaque:1512570903886692474> **VULNÉRABLE**")
+            lbl_col_no = t(langue, "guerre_prox_vuln", defaut=r"\<:attaque:1512570903886692474> **VULNÉRABLE**")
 
             for j, tg in enumerate(chunk):
                 index_global = i + j + 1
@@ -532,7 +544,7 @@ class GuerreCog(commands.Cog):
         try:
             fichier_murs = BASE_DATA_PATH / 'murs_scans' / serveur / 'murs_alliances.json'
             if fichier_murs.exists():
-                with open(fichier_murs, 'r', encoding='utf-8') as f:
+                with open(fichier_murs, encoding='utf-8') as f:
                     for aname_json, desc in json.load(f).items():
                         if any(mot in str(desc).lower() for mot in mots_interdits_mur):
                             alliances_mur_alerte.append("".join(c for c in str(aname_json).lower() if c.isalnum()))
@@ -732,7 +744,7 @@ class GuerreCog(commands.Cog):
             await setup_embed_footer(embed, interaction, langue)
             embeds.append(embed)
 
-        view = CiblePaginationView(self, attacker, sort_by, target_alliance, embeds, langue)
+        view = CiblePaginationView(self, attacker, sort_by, target_alliance, embeds, langue, owner_id=interaction.user.id)
         
         if message_to_edit:
             await message_to_edit.edit(content=None, embed=embeds[0], view=view)
@@ -821,7 +833,7 @@ class GuerreCog(commands.Cog):
             try:
                 fichier_murs = BASE_DATA_PATH / 'murs_scans' / serveur / 'murs_alliances.json'
                 if fichier_murs.exists():
-                    with open(fichier_murs, 'r', encoding='utf-8') as f:
+                    with open(fichier_murs, encoding='utf-8') as f:
                         for nom_json, desc in json.load(f).items():
                             if "".join(c for c in str(nom_json).lower() if c.isalnum()) == d_alli_clean:
                                 desc_mur = str(desc).lower()

@@ -1,28 +1,22 @@
-# -*- coding: utf-8 -*-
-import os
 import json
 import logging
-import asyncio
-import aiohttp
-import urllib.parse
 import re
+import traceback
 from datetime import datetime, timedelta
-from bs4 import BeautifulSoup
+
 import discord
+from bs4 import BeautifulSoup
 from discord import app_commands
 from discord.ext import commands, tasks
 
 from utils import (
-    alliance_autocomplete, 
-    setup_embed_footer, 
-    CONFIG_DIR, 
     SERVEURS_DIR,
-    format_num, 
-    generer_rapport_alliance_embed, 
     TRACKER_EVENTS,
-    get_server_config, 
+    alliance_autocomplete,
+    generer_rapport_alliance_embed,
+    get_server_config,
+    setup_embed_footer,
     t,
-    prompt_vote_if_lucky
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -94,7 +88,7 @@ async def load_calendrier_async():
     if not CALENDRIER_FILE.exists():
         return {"guilds": {}, "notified": []}
     try:
-        with open(CALENDRIER_FILE, 'r', encoding='utf-8') as f:
+        with open(CALENDRIER_FILE, encoding='utf-8') as f:
             data = json.load(f)
             if "guilds" not in data:
                 return {"guilds": {}, "notified": data.get("notified", [])}
@@ -391,6 +385,16 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
 
     @tasks.loop(minutes=1)
     async def check_newshub_calendar_task(self):
+        # Garde-fou obligatoire : discord.py arrête définitivement une tasks.loop
+        # sur exception non rattrapée, sans jamais la relancer. Une réponse
+        # inattendue de l'API (points à null, date malformée) suffisait à couper
+        # les alertes d'événements pour TOUS les serveurs jusqu'au redémarrage
+        try:
+            await self._run_calendar_check()
+        except Exception:
+            logger.error(f"❌ [CALENDRIER CRASH] : {traceback.format_exc()}")
+
+    async def _run_calendar_check(self):
         maintenant = datetime.now()
         
         if getattr(self, "last_scrape_time", None) is None or (maintenant - self.last_scrape_time).total_seconds() > 7200:

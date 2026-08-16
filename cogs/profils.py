@@ -1,33 +1,28 @@
-# -*- coding: utf-8 -*-
-import os
-import json
 import asyncio
-import traceback
+import json
 import logging
+import traceback
 from datetime import datetime, timedelta
-from pathlib import Path
 from urllib.parse import quote
+
 import discord
 from discord import app_commands
 from discord.ext import commands
-import aiohttp
 
 from utils import (
-    BASE_DATA_PATH, 
-    CONFIG_DIR,
-    _get_api_timestamp,
-    t,
-    joueur_autocomplete, 
-    alliance_autocomplete, 
-    format_num, 
-    get_discord_timestamp, 
-    BOT_VERSION,
-    setup_embed_footer,
+    BASE_DATA_PATH,
     PaginationView,
-    get_server_config, 
+    _get_api_timestamp,
+    alliance_autocomplete,
+    format_num,
     get_api_headers,
     get_cached_data,
-    prompt_vote_if_lucky
+    get_discord_timestamp,
+    get_server_config,
+    joueur_autocomplete,
+    prompt_vote_if_lucky,
+    setup_embed_footer,
+    t,
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -466,7 +461,7 @@ class ProfilsCog(commands.Cog):
         except: pass
 
         if not p_id:
-            await interaction.followup.send(t(langue, "prof_hist_err_id", j=player, defaut=f"<:error:1512505075220611172> ID introuvable."))
+            await interaction.followup.send(t(langue, "prof_hist_err_id", j=player, defaut="<:error:1512505075220611172> ID introuvable."))
             return
 
         headers = await get_api_headers(interaction)
@@ -930,7 +925,7 @@ class ProfilsCog(commands.Cog):
                     latest = max(player_files, key=lambda p: p.stat().st_mtime)
                     
                     def _load_local_json():
-                        with open(latest, 'r', encoding='utf-8') as f:
+                        with open(latest, encoding='utf-8') as f:
                             return json.load(f)
                     
                     full_json = await asyncio.to_thread(_load_local_json)
@@ -1322,7 +1317,7 @@ class ProfilsCog(commands.Cog):
             carto_data = await r.json()
 
         if not carto_data:
-            return await interaction.followup.send(t(langue, "cmd_prop_empty", defaut=f"📭 L'alliance **{alliance}** ne possède aucune propriété spéciale."))
+            return await interaction.followup.send(t(langue, "cmd_prop_empty", defaut=f"📭 L'alliance **{alliance_name}** ne possède aucune propriété spéciale."))
 
         # --- 3. CONFIGURATION DES DONNÉES ---
         PROP_TYPES = {
@@ -1448,7 +1443,7 @@ class ProfilsCog(commands.Cog):
                     latest = max(player_files, key=lambda p: p.stat().st_mtime)
                     
                     def _load_local_json():
-                        with open(latest, 'r', encoding='utf-8') as f:
+                        with open(latest, encoding='utf-8') as f:
                             return json.load(f).get('players', {})
                             
                     local_data = await asyncio.to_thread(_load_local_json)
@@ -1655,7 +1650,7 @@ class ProfilsCog(commands.Cog):
                 color=self.clr_scanner
             )
             
-            desc_i18n = t(langue, "guerre_scan_desc", act=len(members), pro=len(colombes), vul=len(cibles_libres), tp=titre_page, defaut=f"<:players:1512504277392953426> **Membres Actifs :** {len(members)}\n<:peace:1512503935892586566> **Sous protection :** {len(colombes)}\n\<:attaque:1512570903886692474> **Cibles vulnérables :** {len(cibles_libres)}\n\n**{titre_page}**")
+            desc_i18n = t(langue, "guerre_scan_desc", act=len(members), pro=len(colombes), vul=len(cibles_libres), tp=titre_page, defaut=f"<:players:1512504277392953426> **Membres Actifs :** {len(members)}\n<:peace:1512503935892586566> **Sous protection :** {len(colombes)}\n<:attaque:1512570903886692474> **Cibles vulnérables :** {len(cibles_libres)}\n\n**{titre_page}**")
             
             lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
             embed.description = f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{desc_i18n}"

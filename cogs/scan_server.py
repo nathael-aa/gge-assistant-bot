@@ -1,13 +1,13 @@
-import discord
-from discord.ext import commands, tasks
-import aiohttp
 import asyncio
 import json
-from datetime import datetime, time, timezone
-from pathlib import Path
-import os
 import logging
+import os
 import traceback
+from datetime import UTC, datetime, time
+from pathlib import Path
+
+import aiohttp
+from discord.ext import commands, tasks
 
 logger = logging.getLogger("GGE_Bot")
 
@@ -54,7 +54,7 @@ class ScanCog(commands.Cog):
         active_servers = set()
         if self.configuration_path.exists():
             try:
-                with open(self.configuration_path, 'r', encoding='utf-8') as f:
+                with open(self.configuration_path, encoding='utf-8') as f:
                     config_data = json.load(f)
                 servers_status = config_data.get("active_servers", {})
                 for srv_name, is_active in servers_status.items():
@@ -167,7 +167,7 @@ class ScanCog(commands.Cog):
         return filepath
 
     # Lancement tous les jours à 00h30 UTC
-    @tasks.loop(time=time(hour=0, minute=30, tzinfo=timezone.utc))
+    @tasks.loop(time=time(hour=0, minute=30, tzinfo=UTC))
     async def daily_scan(self):
         logger.info("======================================================")
         logger.info("🌍 DÉMARRAGE DE LA ROUTINE MULTI-SERVEURS (ASYNC)")

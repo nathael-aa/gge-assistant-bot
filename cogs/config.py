@@ -1,13 +1,14 @@
-# -*- coding: utf-8 -*-
-import os
+import asyncio
 import json
+import os
+from pathlib import Path
+
 import discord
 from discord import app_commands
 from discord.ext import commands
-import asyncio
-from pathlib import Path
 
-from utils import CONFIG_DIR, t, get_server_config, MON_ID_DISCORD, load_configuration_async, clear_config_cache, prompt_vote_if_lucky
+from utils import CONFIG_DIR, clear_config_cache, get_server_config, load_configuration_async, t
+
 
 # ==========================================
 # 💾 SAUVEGARDE CONFIG UTILISATEURS (DMs)
@@ -16,7 +17,7 @@ async def load_users_config():
     path = CONFIG_DIR / 'users.json'
     if os.path.exists(path):
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, encoding='utf-8') as f:
                 return json.load(f)
         except: pass
     return {}

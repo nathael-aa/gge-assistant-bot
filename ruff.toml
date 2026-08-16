@@ -1,0 +1,10 @@
+# Configuration Ruff
+line-length = 120
+target-version = "py311"
+
+[lint]
+select = ["E4", "E9", "F", "I", "UP", "W605"]
+ignore = ["E722", "F841"]
+
+[lint.isort]
+known-first-party = ["cogs", "utils", "emojis"]

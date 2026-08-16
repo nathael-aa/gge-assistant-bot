@@ -1,30 +1,28 @@
-# -*- coding: utf-8 -*-
-import os
 import json
 import logging
-import asyncio
-import aiohttp
-import urllib.parse
+import os
 import traceback
-from datetime import datetime, timedelta
+import urllib.parse
 from collections import Counter
+from datetime import datetime, timedelta
+
+import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
 from utils import (
-    JOUEURS_DIR,      
-    CONFIG_DIR,       
-    t,                
-    joueur_autocomplete,
-    setup_embed_footer,
-    load_dungeons_async, 
-    save_dungeons_async,
-    get_cached_data,
+    CONFIG_DIR,
     PaginationView,
-    get_server_config,
     get_api_headers,
-    prompt_vote_if_lucky
+    get_cached_data,
+    get_server_config,
+    joueur_autocomplete,
+    load_dungeons_async,
+    prompt_vote_if_lucky,
+    save_dungeons_async,
+    setup_embed_footer,
+    t,
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -524,7 +522,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             path_users = CONFIG_DIR / 'users.json'
             if os.path.exists(path_users):
                 try:
-                    with open(path_users, 'r', encoding='utf-8') as f:
+                    with open(path_users, encoding='utf-8') as f:
                         users_data = json.load(f)
                 except: pass
 

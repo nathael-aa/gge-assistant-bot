@@ -1,31 +1,23 @@
-# -*- coding: utf-8 -*-
-import os
 import io
 import json
 import logging
-import urllib.parse
-import asyncio
+import os
 import re
 from datetime import datetime, timedelta
+
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 from utils import (
-    MON_ID_DISCORD, 
-    BOT_VERSION,       
-    BASE_DIR,       
-    CONFIG_DIR,     
-    t,              
-    load_blocks_async, 
-    save_blocks_async, 
-    PaginationView,
+    BASE_DIR,
     LOCALES_DIR,
+    MON_ID_DISCORD,
     charger_langues,
-    get_server_config,
-    load_maintenance_async,
+    load_blocks_async,
+    save_blocks_async,
+    save_maintenance_async,
     setup_embed_footer,
-    save_maintenance_async
+    t,
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -240,7 +232,7 @@ class AdminCog(commands.Cog):
         nb_serveurs = len(serveurs)
         
         # 1. Trier les serveurs par date d'ajout (du plus récent au plus ancien)
-        from datetime import datetime # Assure-toi que c'est importé en haut de ton fichier
+        from datetime import datetime  # Assure-toi que c'est importé en haut de ton fichier
         serveurs_tries = sorted(
             serveurs, 
             key=lambda g: g.me.joined_at if g.me and g.me.joined_at else datetime.min, 
@@ -402,7 +394,10 @@ class AdminCog(commands.Cog):
         """[CACHÉE] !i18n_sync : Scanne le code et met à jour les fichiers JSON."""
         if ctx.author.id != MON_ID_DISCORD: return
         
-        import os, re, json
+        import json
+        import os
+        import re
+
         from utils import BASE_DIR, LOCALES_DIR, charger_langues
         
         # 1. Scanner le code Python pour extraire les clés exactes
@@ -413,7 +408,7 @@ class AdminCog(commands.Cog):
             if '.git' in root or '__pycache__' in root: continue
             for file in files:
                 if file.endswith('.py'):
-                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
+                    with open(os.path.join(root, file), encoding='utf-8') as f:
                         cles_utilisees.update(pattern.findall(f.read()))
                         
         # 2. Ajouter manuellement les clés dynamiques
@@ -434,7 +429,7 @@ class AdminCog(commands.Cog):
         if not fr_file.exists():
             return await ctx.send("❌ Impossible de trouver `fr.json`.")
             
-        with open(fr_file, 'r', encoding='utf-8') as f:
+        with open(fr_file, encoding='utf-8') as f:
             fr_data = json.load(f)
             
         cles_existantes_fr = set(fr_data.keys())
@@ -457,7 +452,7 @@ class AdminCog(commands.Cog):
             lang_file = LOCALES_DIR / f'{lang}.json'
             if not lang_file.exists(): continue
             
-            with open(lang_file, 'r', encoding='utf-8') as f:
+            with open(lang_file, encoding='utf-8') as f:
                 lang_data = json.load(f)
                 
             l_existantes = set(lang_data.keys())
@@ -498,7 +493,7 @@ class AdminCog(commands.Cog):
             async with ctx.typing():
                 # On parcourt tous les fichiers .json dans le dossier locales
                 for fichier in LOCALES_DIR.glob("*.json"):
-                    with open(fichier, 'r', encoding='utf-8') as f:
+                    with open(fichier, encoding='utf-8') as f:
                         data = json.load(f)
                     
                     # Tri du dictionnaire par ordre alphabétique des clés
@@ -540,8 +535,9 @@ class AdminCog(commands.Cog):
         if ctx.author.id != MON_ID_DISCORD: return
         
         import csv
-        import re
         import io
+        import re
+
         from utils import LOCALES_DIR
         
         fr_file = LOCALES_DIR / 'fr.json'
@@ -551,9 +547,9 @@ class AdminCog(commands.Cog):
             return await ctx.send(f"❌ Impossible de trouver `fr.json` ou `{langue_cible}.json`.")
             
         import json
-        with open(fr_file, 'r', encoding='utf-8') as f:
+        with open(fr_file, encoding='utf-8') as f:
             fr_data = json.load(f)
-        with open(cible_file, 'r', encoding='utf-8') as f:
+        with open(cible_file, encoding='utf-8') as f:
             cible_data = json.load(f)
 
         # Création du fichier CSV en mémoire
@@ -603,7 +599,7 @@ class AdminCog(commands.Cog):
                 if file.endswith((".py", ".json", ".sh")):
                     filepath = os.path.join(root, file)
                     try:
-                        with open(filepath, "r", encoding="utf-8") as f:
+                        with open(filepath, encoding="utf-8") as f:
                             content = f.read()
                             matches = EMOJI_REGEX.findall(content)
                             for match in matches:
@@ -668,7 +664,7 @@ class AdminCog(commands.Cog):
                 if file.endswith((".py", ".json", ".sh")):
                     filepath = os.path.join(root, file)
                     try:
-                        with open(filepath, "r", encoding="utf-8") as f:
+                        with open(filepath, encoding="utf-8") as f:
                             content = f.read()
 
                         if old_text in content:
@@ -741,7 +737,7 @@ class AdminCog(commands.Cog):
                 if file.endswith((".py", ".json")):
                     filepath = os.path.join(root, file)
                     try:
-                        with open(filepath, "r", encoding="utf-8") as f:
+                        with open(filepath, encoding="utf-8") as f:
                             content = f.read()
                             
                         matches = emoji_regex.findall(content)
@@ -776,7 +772,7 @@ class AdminCog(commands.Cog):
         # 5. Gestion de l'export TXT si la limite est dépassée
         fichier_joint = None
         if len(missing_emojis) > 20:
-            embed.set_footer(text=f"⚠️ Affichage limité à 20. Consultez le fichier joint pour voir la liste complète.")
+            embed.set_footer(text="⚠️ Affichage limité à 20. Consultez le fichier joint pour voir la liste complète.")
             
             # Préparation du contenu du fichier texte
             lignes_rapport = [
@@ -835,7 +831,7 @@ class AdminCog(commands.Cog):
                 if file.endswith((".py", ".json")):
                     filepath = os.path.join(root, file)
                     try:
-                        with open(filepath, "r", encoding="utf-8") as f:
+                        with open(filepath, encoding="utf-8") as f:
                             lines = f.readlines()
                             
                         # On lit ligne par ligne pour te dire exactement où chercher

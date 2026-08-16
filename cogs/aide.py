@@ -1,28 +1,24 @@
-# -*- coding: utf-8 -*-
-import os
 import json
 import logging
+import os
 import shutil
-import aiohttp
+from datetime import datetime
 from pathlib import Path
-from datetime import datetime, timedelta
+
+import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from utils import (
-    BOT_VERSION, 
-    CONFIG_DIR,
-    JOUEURS_DIR,
     ADMINS_DIR,
-    PaginationView, 
-    MON_ID_DISCORD, 
-    get_file_lock, 
-    setup_embed_footer,
+    BOT_VERSION,
+    MON_ID_DISCORD,
     get_api_headers,
+    get_file_lock,
     get_server_config,
+    setup_embed_footer,
     t,
-    prompt_vote_if_lucky
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -426,7 +422,7 @@ class AideCog(commands.Cog):
             try:
                 tickets_existants = []
                 if os.path.exists(CONTACTS_FILE):
-                    with open(CONTACTS_FILE, 'r', encoding='utf-8') as f:
+                    with open(CONTACTS_FILE, encoding='utf-8') as f:
                         try: tickets_existants = json.load(f)
                         except json.JSONDecodeError: tickets_existants = []
 
