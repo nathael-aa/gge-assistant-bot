@@ -1,21 +1,31 @@
-# -*- coding: utf-8 -*-
-import os
-import io
+import asyncio
+import hashlib
+import hmac
 import json
 import logging
+import os
 import socket
-import asyncio
-import aiohttp
-import hmac
-import hashlib
-from aiohttp import web
 from datetime import datetime, timedelta
-from pathlib import Path
 from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
+
+import aiohttp
 import discord
+from aiohttp import web
 from discord.ext import commands, tasks
 
-from utils import TOKEN, TOPGG_TOKEN, BOT_VERSION, MON_ID_DISCORD, load_maintenance, load_blocks_async, get_cached_data, CACHE, charger_langues, CONFIG_DIR, get_server_config, t
+from utils import (
+    BOT_VERSION,
+    CACHE,
+    MON_ID_DISCORD,
+    TOKEN,
+    TOPGG_TOKEN,
+    charger_langues,
+    get_server_config,
+    load_blocks_async,
+    load_maintenance,
+    t,
+)
 
 # ==========================================
 # ⚙️ INITIALISATION DU BOT ET DES LOGS
@@ -339,7 +349,7 @@ class GGEAssistantBot(commands.Bot):
             # Méthode v1 (Nouvelle avec HMAC)
             try:
                 parts = dict(part.split('=') for part in signature_header.split(','))
-                message = f"{parts.get('t')}.{raw_body}".encode('utf-8')
+                message = f"{parts.get('t')}.{raw_body}".encode()
                 expected_sig = hmac.new(secret.encode('utf-8'), message, hashlib.sha256).hexdigest()
                 if not hmac.compare_digest(expected_sig, parts.get('v1')):
                     logger.warning("❌ [Webhook] Signature v1 invalide.")
@@ -388,7 +398,7 @@ class GGEAssistantBot(commands.Bot):
         votes_data = {}
         if VOTES_FILE.exists():
             try:
-                with open(VOTES_FILE, 'r', encoding='utf-8') as f:
+                with open(VOTES_FILE, encoding='utf-8') as f:
                     votes_data = json.load(f)
             except Exception:
                 pass
@@ -481,7 +491,7 @@ class GGEAssistantBot(commands.Bot):
         votes_data = {}
         if VOTES_FILE.exists():
             try:
-                with open(VOTES_FILE, 'r', encoding='utf-8') as f:
+                with open(VOTES_FILE, encoding='utf-8') as f:
                     votes_data = json.load(f)
             except Exception:
                 pass

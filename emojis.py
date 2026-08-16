@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 DICT_EMOJIS = {
     "e_2_": "<:2_:1512574740915818527>",
@@ -65,7 +64,6 @@ DICT_EMOJIS = {
     "e_samurai": "<:samurai:1512430844935929868>",
     "e_search": "<:search:1512504654183792690>",
     "e_stats": "<:stats:1512517930490003726>",
-    "e_std_alarm_clock": "<:clock:1535651534308642916>",
     "e_std_alarm_clock": "⏰",
     "e_std_ambulance": "🚑",
     "e_std_anchor": "⚓",

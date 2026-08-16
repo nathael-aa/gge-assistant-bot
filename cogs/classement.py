@@ -1,24 +1,25 @@
-import discord
 import asyncio
-import aiohttp
-from discord.ext import commands
-from discord import app_commands
-import urllib.parse
-import logging
 import json
+import logging
 import os
+import urllib.parse
+
+import discord
+from discord import app_commands
+from discord.ext import commands
 
 from utils import (
-    t, 
-    setup_embed_footer, 
+    PaginationView,
+    alliance_autocomplete,
+    get_api_headers,
+    get_cached_data,
     get_server_config,
     joueur_autocomplete,
-    alliance_autocomplete,
-    get_cached_data,
-    get_api_headers,
-    PaginationView,
-    prompt_vote_if_lucky
+    prompt_vote_if_lucky,
+    setup_embed_footer,
+    t,
 )
+
 
 class ClassementCog(commands.Cog):
     def __init__(self, bot):
@@ -38,7 +39,7 @@ class ClassementCog(commands.Cog):
         try:
             self.logger.info(f"📝 [Classement] Tentative de chargement du JSON à : {self.config_path}")
             if os.path.exists(self.config_path):
-                with open(self.config_path, "r", encoding="utf-8") as f:
+                with open(self.config_path, encoding="utf-8") as f:
                     config_data = json.load(f)
                     self.servers_map = config_data.get("servers", {})
                     self.event_ids = config_data.get("event_ids", {})
@@ -147,7 +148,7 @@ class ClassementCog(commands.Cog):
             elif lvl < 70: tranche = 5
             else: tranche = 6
             
-            nom_tranche_defaut = f"Niveaux 70+" if tranche == 6 else "Tranche Classique"
+            nom_tranche_defaut = "Niveaux 70+" if tranche == 6 else "Tranche Classique"
             nom_tranche = t(langue, f"stat_bracket_{tranche}", defaut=nom_tranche_defaut)
             bracket_icon = "<:lvl:1512571152524906596>"
         

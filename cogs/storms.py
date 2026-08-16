@@ -1,24 +1,22 @@
-# -*- coding: utf-8 -*-
-import asyncio
-from discord.ext import tasks
-import logging
-import urllib.parse
 import json
+import logging
 import os
+import urllib.parse
 from datetime import datetime
+
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from utils import (
-    PaginationView, 
+    SERVEURS_DIR,
+    PaginationView,
     get_api_headers,
     get_server_config,
-    SERVEURS_DIR,
-    setup_embed_footer,
     joueur_autocomplete,
+    prompt_vote_if_lucky,
+    setup_embed_footer,
     t,
-    prompt_vote_if_lucky
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -30,7 +28,7 @@ async def load_storm_config():
     if not os.path.exists(STORM_CONFIG_PATH):
         return {"guilds": {}, "notified": []}
     try:
-        with open(STORM_CONFIG_PATH, "r", encoding="utf-8") as f:
+        with open(STORM_CONFIG_PATH, encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {"guilds": {}, "notified": []}
@@ -768,6 +766,7 @@ class StormsCog(commands.Cog):
     # juste à empêcher !i18l_sync de supprimer ces clés dynamiques.
     # ==========================================
     def _dummy_i18n():
+        langue = "fr"  # jamais utilisé (?): rend juste les appels ci-dessous analysables pour le checker
         # --- Ressources Storms ---
         t(langue, "storm_res_aqua")
         t(langue, "storm_res_stone")

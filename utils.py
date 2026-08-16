@@ -1,15 +1,15 @@
-# -*- coding: utf-8 -*-
-import os
-import json
-import time
 import asyncio
+import json
 import logging
+import os
 import random
-from pathlib import Path
-from datetime import datetime, timedelta
-from discord import app_commands
-import discord
+import time
 import urllib.parse
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import discord
+from discord import app_commands
 
 logger = logging.getLogger("GGE_Bot")
 
@@ -55,7 +55,7 @@ async def get_server_config(interaction: discord.Interaction):
         path_users = CONFIG_DIR / 'users.json'
         if path_users.exists():
             try:
-                with open(path_users, 'r', encoding='utf-8') as f:
+                with open(path_users, encoding='utf-8') as f:
                     USERS_CONFIG_CACHE = json.load(f)
             except:
                 USERS_CONFIG_CACHE = {}
@@ -75,7 +75,7 @@ async def get_server_config(interaction: discord.Interaction):
             path_guilds = CONFIG_DIR / 'serveurs.json'
             if path_guilds.exists():
                 try:
-                    with open(path_guilds, 'r', encoding='utf-8') as f:
+                    with open(path_guilds, encoding='utf-8') as f:
                         GUILDS_CONFIG_CACHE = json.load(f)
                 except:
                     GUILDS_CONFIG_CACHE = {}
@@ -118,7 +118,7 @@ async def prompt_vote_if_lucky(interaction: discord.Interaction, probability_per
     # 1. Vérification du bouclier de 7 jours (Ultra-rapide, zéro API)
     if VOTES_FILE.exists():
         try:
-            with open(VOTES_FILE, 'r', encoding='utf-8') as f:
+            with open(VOTES_FILE, encoding='utf-8') as f:
                 votes_data = json.load(f)
             
             if user_id_str in votes_data:
@@ -231,7 +231,7 @@ def charger_langues():
     for fichier in LOCALES_DIR.glob("*.json"):
         langue = fichier.stem
         try:
-            with open(fichier, 'r', encoding='utf-8') as f:
+            with open(fichier, encoding='utf-8') as f:
                 _translations[langue] = json.load(f)
             logger.info(f"📚 Langue chargée : {langue.upper()} ({len(_translations[langue])} clés)")
         except Exception as e:
@@ -306,7 +306,7 @@ def load_maintenance():
     path = ADMINS_DIR / 'maintenance.json'
     if os.path.exists(path):
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, encoding='utf-8') as f:
                 return json.load(f).get("maintenance_mode", False)
         except Exception as e:
             logger.error(f"❌ Impossible de lire maintenance.json : {e}")
@@ -321,7 +321,7 @@ async def load_blocks_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, 'r', encoding='utf-8') as f:
+                with open(path, encoding='utf-8') as f:
                     BLOCKS_CACHE = json.load(f)
                     return BLOCKS_CACHE
             except Exception as e: 
@@ -343,7 +343,7 @@ async def load_configuration_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, 'r', encoding='utf-8') as f: return json.load(f)
+                with open(path, encoding='utf-8') as f: return json.load(f)
             except Exception as e: 
                 logger.error(f"❌ Erreur configuration.json : {e}")
         return {"servers": {}, "scan_minutes": {}}
@@ -358,7 +358,7 @@ async def load_pseudos_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, 'r', encoding='utf-8') as f: return json.load(f)
+                with open(path, encoding='utf-8') as f: return json.load(f)
             except Exception as e:
                 logger.error(f"❌ Erreur discord_pseudos.json : {e}")
     return {}
@@ -373,7 +373,7 @@ async def load_rivals_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, 'r', encoding='utf-8') as f: return json.load(f)
+                with open(path, encoding='utf-8') as f: return json.load(f)
             except Exception as e:
                 logger.error(f"❌ Erreur rival_radar.json : {e}")
     return {}
@@ -388,7 +388,7 @@ async def load_dungeons_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, 'r', encoding='utf-8') as f: return json.load(f)
+                with open(path, encoding='utf-8') as f: return json.load(f)
             except Exception as e:
                 logger.error(f"❌ Erreur forteresses_sessions.json : {e}")
     return {"sessions": {}}
@@ -403,7 +403,7 @@ async def load_maintenance_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, 'r', encoding='utf-8') as f:
+                with open(path, encoding='utf-8') as f:
                     return json.load(f).get("maintenance_mode", False)
             except Exception as e:
                 logger.error(f"❌ Erreur maintenance.json : {e}")
@@ -420,7 +420,7 @@ async def load_surveillance_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, 'r', encoding='utf-8') as f:
+                with open(path, encoding='utf-8') as f:
                     data = json.load(f)
                     if "alliances" not in data: data["alliances"] = {}
                     return data
@@ -501,7 +501,7 @@ async def get_cached_data(serveur="E4K_FR1"):
             if not player_files: return {}
             
             latest = max(player_files, key=lambda p: p.stat().st_mtime)
-            with open(latest, 'r', encoding='utf-8') as f: 
+            with open(latest, encoding='utf-8') as f: 
                 return json.load(f).get('players', {})
         except Exception as e: 
             logger.error(f"❌ [Cache] Erreur lors de la lecture lourde de {serveur} : {e}")

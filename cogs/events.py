@@ -1,42 +1,37 @@
-# -*- coding: utf-8 -*-
-import os
-import json
-import urllib.parse
 import asyncio
+import json
+import logging
+import os
+import urllib.parse
+from datetime import datetime
+
 import aiohttp
-from urllib.parse import quote
-from datetime import datetime, timedelta
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-import logging
 
 from utils import (
-    CONFIG_DIR, 
-    JOUEURS_DIR,
-    SERVEURS_DIR,
-    t, 
-    joueur_autocomplete, 
-    alliance_autocomplete, 
-    event_autocomplete, 
-    event_alliance_autocomplete, 
-    TRACKER_EVENTS, 
-    format_num, 
-    get_discord_timestamp, 
-    BOT_VERSION, 
-    PaginationView, 
-    get_cached_data,
-    MON_ID_DISCORD,
-    setup_embed_footer,
+    CONFIG_DIR,
+    TRACKER_EVENTS,
+    PaginationView,
+    alliance_autocomplete,
+    event_alliance_autocomplete,
+    event_autocomplete,
+    format_num,
     generer_rapport_alliance_embed,
+    get_api_headers,
+    get_cached_data,
+    get_discord_timestamp,
+    get_server_config,
+    joueur_autocomplete,
     load_configuration_async,
     load_pseudos_async,
-    save_pseudos_async,
     load_rivals_async,
+    prompt_vote_if_lucky,
+    save_pseudos_async,
     save_rivals_async,
-    get_api_headers,
-    get_server_config,
-    prompt_vote_if_lucky
+    setup_embed_footer,
+    t,
 )
 
 logger = logging.getLogger("GGE_Bot")
@@ -402,7 +397,7 @@ class EventsCog(commands.Cog):
 
         event_keys = TRACKER_EVENTS.get(event_name)
         if not event_keys:
-            return await interaction.followup.send(t(langue, "ev_err_unsupported", defaut=f"<:error:1512505075220611172> Événement inconnu ou non géré par l'API."))
+            return await interaction.followup.send(t(langue, "ev_err_unsupported", defaut="<:error:1512505075220611172> Événement inconnu ou non géré par l'API."))
 
         try:
             async with self.bot.session.get(f"{base_api}/statistics/player/{player_id}", headers=headers, timeout=10) as resp:
@@ -701,7 +696,7 @@ class EventsCog(commands.Cog):
             users_lang = {}
             if os.path.exists(path_users):
                 try:
-                    with open(path_users, 'r', encoding='utf-8') as f:
+                    with open(path_users, encoding='utf-8') as f:
                         users_data = json.load(f)
                         for uid, info in users_data.items():
                             users_lang[uid] = info.get("langue", "fr")
