@@ -720,7 +720,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             texte_royaumes = " │ ".join(details_royaumes)
             jour_rubis = f"{stats['rubies']:,}".replace(",", " ")
             
-            lignes.append(f"📅 **{day_fmt}** : {texte_royaumes} ➔ **{jour_rubis}** {DICT_EMOJIS.get('e_ruby', '💎')}")
+            lignes.append(f"• **{day_fmt}** : {texte_royaumes} ➔ **{jour_rubis}** {DICT_EMOJIS.get('e_ruby', '💎')}")
 
         embeds = []
         chunk_size = 5 # On peut mettre 5 lignes par page car elles sont plus courtes

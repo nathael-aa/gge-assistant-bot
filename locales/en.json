@@ -244,7 +244,7 @@
   "fort_field_val_avail": "{e_compass} Position: `{x}:{y}` {e_empirerankings} Last king: *{ancien}*\n**Status: {e_2_} Attackable now**",
   "fort_field_val_cd": "{e_compass} Position: `{x}:{y}` {e_empirerankings} Last king: *{ancien}*\n**Status: {status} {mins} min**",
   "fort_hist_empty": "{e_std_open_mailbox_with_lowered_flag} **{p}** has not attacked any recorded fortress over the past year.",
-  "fort_hist_page_title": "{e_memberlist} Strike Log (Page {curr}/{tot})",
+  "fort_hist_page_title": "{e_std_scroll} Strike Log (Page {curr}/{tot})",
   "fort_hist_stats": "**{e_stats} Summary**\n{e_std_bullseye} **Total Attacks:** {tot}\n{e_ruby} **Estimated Gains:** {rub} Rubies\n{e_std_world_map} **Favorite Realm:** {rp} *( {pct}% of strikes )*\n{e_fire2} **Most Active Day:** {j} *( {jc} attacks )*",
   "fort_hist_title": "{e_castle1} Looting History: {p}",
   "fort_realm_ice": "Ice {e_dungeon2}",

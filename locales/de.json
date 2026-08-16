@@ -244,7 +244,7 @@
   "fort_field_val_avail": "{e_compass} Position: `{x}:{y}` {e_empirerankings} Letzter König: *{ancien}*\n**Status: {e_2_} Jetzt angreifbar**",
   "fort_field_val_cd": "{e_compass} Position: `{x}:{y}` {e_empirerankings} Letzter König: *{ancien}*\n**Status: {status} {mins} Min**",
   "fort_hist_empty": "{e_std_open_mailbox_with_lowered_flag} **{p}** hat im vergangenen Jahr keine erfasste Festung angegriffen.",
-  "fort_hist_page_title": "{e_memberlist} Angriffsprotokoll (Seite {curr}/{tot})",
+  "fort_hist_page_title": "{e_std_scroll} Angriffsprotokoll (Seite {curr}/{tot})",
   "fort_hist_stats": "**{e_stats} Bilanz**\n{e_std_bullseye} **Angriffe insgesamt:** {tot}\n{e_ruby} **Geschätzter Gewinn:** {rub} Rubine\n{e_std_world_map} **Lieblingsreich:** {rp} *( {pct}% der Angriffe )*\n{e_fire2} **Aktivster Tag:** {j} *( {jc} Angriffe )*",
   "fort_hist_title": "{e_castle1} Plünderungsverlauf: {p}",
   "fort_realm_ice": "Eis {e_dungeon2}",
