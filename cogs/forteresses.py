@@ -10,8 +10,8 @@ import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-from emojis import DICT_EMOJIS
 
+from emojis import DICT_EMOJIS
 from utils import (
     CONFIG_DIR,
     PaginationView,
