@@ -705,5 +705,7 @@
   "welcome_step2_title": "{e_two} Entdecke die Werkzeuge",
   "welcome_step3_desc": "Um Benachrichtigungen über den Beginn und das Ende von Events zu erhalten, muss ein Administrator den Befehl </calendar setup:0> in einem dafür vorgesehenen Kanal verwenden. Danach könnt ihr </calendar track:0> nutzen, um automatisch die Ergebnisse eurer Allianzen bei jedem Event zu erhalten.",
   "welcome_step3_title": "{e_three} Spezifische Funktionen für Server-Administratoren",
-  "welcome_title": "{e_castle1} Danke, dass du den GGE Assistant hinzugefügt hast!"
+  "welcome_title": "{e_castle1} Danke, dass du den GGE Assistant hinzugefügt hast!",
+  "prof_info_val": "<:lvl:1512571152524906596> **Level:** {lvl} (Leg. {leg})\n<:listitem:1512573892596858960> **Spieler-ID:** `{pid}`\n{status}",
+  "prof_rank_desc": "<:might:1512574615422107818> **Macht:** {m_curr} (Max: `{m_max}`)\n<:honor2:1512573861521260544> **Ehre:** {h_curr} (Max: `{h_max}`)\n<:loot:1512439015570276553> **Beute:** {l_curr} (Max: `{l_max}`)"
 }

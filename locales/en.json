@@ -705,5 +705,7 @@
   "welcome_step2_title": "{e_two} Discover the Tools",
   "welcome_step3_desc": "To receive event start and end alerts, an administrator must use the </calendar setup:0> command in a dedicated channel. You can then use </calendar track:0> to automatically get your alliances' results at the end of each event.",
   "welcome_step3_title": "{e_three} Server Administrator Specifics",
-  "welcome_title": "{e_castle1} Thanks for adding GGE Assistant!"
+  "welcome_title": "{e_castle1} Thanks for adding GGE Assistant!",
+  "prof_info_val": "<:lvl:1512571152524906596> **Level:** {lvl} (Leg. {leg})\n<:listitem:1512573892596858960> **Player ID:** `{pid}`\n{status}",
+  "prof_rank_desc": "<:might:1512574615422107818> **Might:** {m_curr} (Max: `{m_max}`)\n<:honor2:1512573861521260544> **Honor:** {h_curr} (Max: `{h_max}`)\n<:loot:1512439015570276553> **Loot:** {l_curr} (Max: `{l_max}`)"
 }

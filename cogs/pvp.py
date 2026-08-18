@@ -30,129 +30,298 @@ from utils import (
 logger = logging.getLogger("GGE_Bot")
 
 # ========================================================
-# 🎛️ COMPOSANTS UI : DASHBOARD ET MODAL PERSO
+# 🎛️ COMPOSANTS UI : ASSISTANT DE CONFIGURATION (WIZARD)
 # ========================================================
-class TargetSetupModal(discord.ui.Modal):
-    # Les labels sont définis dynamiquement dans __init__
-    min_dist = discord.ui.TextInput(custom_id="min_dist", label="...", required=True)
-    tier_diff = discord.ui.TextInput(custom_id="tier_diff", label="...", required=True)
-    pp_min = discord.ui.TextInput(custom_id="pp_min", label="...", required=True)
-    pp_max = discord.ui.TextInput(custom_id="pp_max", label="...", required=True)
-
-    def __init__(self, dashboard_view, langue="en"):
-        # Titre du modal traduit
-        super().__init__(title=t(langue, "target_modal_title", defaut="⚙️ Personal Radar Rules"))
-        self.dashboard_view = dashboard_view
-        self.langue = langue
-        config = self.dashboard_view.config
+class CustomNumberModal(discord.ui.Modal):
+    def __init__(self, title, placeholder, wizard, key_to_update, next_step):
+        super().__init__(title=title)
+        self.wizard = wizard
+        self.key_to_update = key_to_update
+        self.next_step = next_step
         
-        # Traduction et pré-remplissage des champs
-        self.min_dist.label = t(langue, "target_modal_dist_lbl", defaut="Minimum distance (leagues)")
-        self.min_dist.placeholder = "Ex: 10"
-        self.min_dist.default = str(config.get("min_dist", 0))
-        
-        self.tier_diff.label = t(langue, "target_modal_tier_lbl", defaut="Max Tier difference")
-        self.tier_diff.placeholder = t(langue, "target_modal_tier_ph", defaut="0 = Same tier, 1 = +1 tier")
-        self.tier_diff.default = str(config.get("tier_diff", 0))
-        
-        self.pp_min.label = t(langue, "target_modal_ppmin_lbl", defaut="Max PP Difference (Downward)")
-        self.pp_min.placeholder = "Ex: -3000000"
-        self.pp_min.default = str(config.get("pp_min", -3000000))
-        
-        self.pp_max.label = t(langue, "target_modal_ppmax_lbl", defaut="Max PP Difference (Upward)")
-        self.pp_max.placeholder = "Ex: 10000000"
-        self.pp_max.default = str(config.get("pp_max", 10000000))
+        self.val_input = discord.ui.TextInput(
+            label="Valeur personnalisée",
+            placeholder=placeholder,
+            required=True,
+            max_length=15
+        )
+        self.add_item(self.val_input)
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
-            self.dashboard_view.config["min_dist"] = int(self.min_dist.value)
-            self.dashboard_view.config["tier_diff"] = int(self.tier_diff.value)
-            self.dashboard_view.config["pp_min"] = int(self.pp_min.value)
-            self.dashboard_view.config["pp_max"] = int(self.pp_max.value)
+            clean_val = self.val_input.value.replace(" ", "")
+            val = int(clean_val)
+            self.wizard.config[self.key_to_update] = val
+            self.wizard.step = self.next_step
+            await self.wizard.update_view(interaction)
         except ValueError:
-            err = t(self.langue, "target_modal_err_val", defaut="❌ **Error:** You must enter numbers only!")
-            return await interaction.response.send_message(err, ephemeral=True)
+            await interaction.response.send_message("❌ Valeur invalide, veuillez entrer uniquement un nombre (ex: -1000000 ou 50).", ephemeral=True)
 
-        self.dashboard_view.save_config()
-        self.dashboard_view.update_buttons()
-        await interaction.response.edit_message(embed=self.dashboard_view.generate_embed(), view=self.dashboard_view)
+class WizardButton(discord.ui.Button):
+    def __init__(self, label, value, step_target, wizard, key_to_update=None, style=discord.ButtonStyle.primary, row=0):
+        super().__init__(label=label, style=style, row=row)
+        self.value = value
+        self.step_target = step_target
+        self.wizard = wizard
+        self.key_to_update = key_to_update
 
-class TargetDashboardView(discord.ui.View):
-    def __init__(self, user_id, langue="en"):
-        super().__init__(timeout=None)
+    async def callback(self, interaction: discord.Interaction):
+        if self.key_to_update:
+            self.wizard.config[self.key_to_update] = self.value
+            
+            if self.key_to_update == "ignore_tiers" and self.value is True:
+                self.wizard.config["tier_diff"] = 0
+            elif self.key_to_update == "tier_diff":
+                self.wizard.config["ignore_tiers"] = False
+
+        self.wizard.step = self.step_target
+        await self.wizard.update_view(interaction)
+
+class CustomMinMaxModal(discord.ui.Modal):
+    def __init__(self, title, ph_min, ph_max, wizard, key_min, key_max, next_step):
+        super().__init__(title=title)
+        self.wizard = wizard
+        self.key_min = key_min
+        self.key_max = key_max
+        self.next_step = next_step
+        
+        self.val_min = discord.ui.TextInput(
+            label="Minimum (0 = Pas de min)",
+            placeholder=ph_min,
+            required=True,
+            default=str(wizard.config.get(key_min, 0))
+        )
+        self.val_max = discord.ui.TextInput(
+            label="Maximum (99999999 = Pas de max)",
+            placeholder=ph_max,
+            required=True,
+            default=str(wizard.config.get(key_max, 99999999))
+        )
+        self.add_item(self.val_min)
+        self.add_item(self.val_max)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            self.wizard.config[self.key_min] = int(self.val_min.value.replace(" ", ""))
+            self.wizard.config[self.key_max] = int(self.val_max.value.replace(" ", ""))
+            self.wizard.step = self.next_step
+            await self.wizard.update_view(interaction)
+        except ValueError:
+            await interaction.response.send_message("❌ Valeurs invalides, veuillez entrer uniquement des nombres.", ephemeral=True)
+
+class ToggleButton(discord.ui.Button):
+    def __init__(self, key, wizard, label_on, label_off, style_on=discord.ButtonStyle.success, style_off=discord.ButtonStyle.secondary, row=0):
+        self.wizard = wizard
+        self.key = key
+        is_on = self.wizard.config.get(key, False)
+        super().__init__(
+            label=label_on if is_on else label_off,
+            style=style_on if is_on else style_off,
+            row=row
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        self.wizard.config[self.key] = not self.wizard.config[self.key]
+        await self.wizard.update_view(interaction)
+
+class TargetWizard(discord.ui.View):
+    def __init__(self, user_id, langue="fr", current_config=None):
+        super().__init__(timeout=600)
         self.user_id = user_id
         self.langue = langue
-        
-        cache_users = utils.USERS_CONFIG_CACHE or {}
+        self.config = current_config or {
+            "min_dist": 0, "tier_diff": 0, "max_lvl_diff": 10, "pp_min": -3000000, "pp_max": 10000000,
+            "honor_min": 0, "honor_max": 99999999, "loot_min": 0, "loot_max": 999999999,
+            "show_doves": False, "ignore_tiers": False, "only_with_alliance": True,
+            "level_system": "tier"
+        }
+        self.step = 1
 
-        self.config = cache_users.get(user_id, {}).get("custom_rules", {
-            "min_dist": 0, "tier_diff": 0, "pp_min": -3000000, "pp_max": 10000000,
-            "show_doves": False, "ignore_tiers": False, "only_with_alliance": True
-        })
-        
-        # Traduction des boutons
-        self.btn_doves.label = t(langue, "target_dash_btn_doves", defaut="Doves")
-        self.btn_tiers.label = t(langue, "target_dash_btn_tiers", defaut="Ignore Tiers")
-        self.btn_alli.label = t(langue, "target_dash_btn_alli", defaut="Alliance Filter")
-        self.btn_numbers.label = t(langue, "target_dash_btn_numbers", defaut="Edit Numbers")
-        
-        self.update_buttons()
+    async def start(self, interaction: discord.Interaction, content=None):
+        await self.update_view(interaction, initial=True, content=content)
 
-    def update_buttons(self):
-        self.btn_doves.style = discord.ButtonStyle.success if self.config.get("show_doves") else discord.ButtonStyle.secondary
-        self.btn_tiers.style = discord.ButtonStyle.success if self.config.get("ignore_tiers") else discord.ButtonStyle.secondary
-        self.btn_alli.style = discord.ButtonStyle.success if self.config.get("only_with_alliance") else discord.ButtonStyle.secondary
+    async def update_view(self, interaction: discord.Interaction, initial=False, content=None):
+        self.clear_items()
+        embed = discord.Embed(color=discord.Color.blue())
 
-    def generate_embed(self):
-        title = t(self.langue, "target_dash_title", defaut="⚙️ Personal Radar Configuration")
-        embed = discord.Embed(title=title, color=discord.Color.blue())
-        
-        txt_doves = t(self.langue, "target_dash_on", defaut="✅ Included") if self.config.get("show_doves") else t(self.langue, "target_dash_off", defaut="❌ Hidden")
-        txt_tiers = t(self.langue, "target_dash_tiers_on", defaut="✅ Yes (No-limit)") if self.config.get("ignore_tiers") else t(self.langue, "target_dash_tiers_off", defaut="❌ No (Strict matching)")
-        txt_alli = t(self.langue, "target_dash_alli_on", defaut="✅ Yes") if self.config.get("only_with_alliance") else t(self.langue, "target_dash_alli_off", defaut="❌ No (Includes no-alliance)")
+        if self.step == 1:
+            embed.title = "📍 Étape 1/8 : La Distance"
+            embed.description = "À quelle **distance minimum** de ton château veux-tu chercher tes cibles ?"
+            self.add_item(WizardButton("Pas de minimum (0)", 0, 2, self, "min_dist"))
+            self.add_item(WizardButton("30 lieues", 30, 2, self, "min_dist"))
+            self.add_item(WizardButton("50 lieues", 50, 2, self, "min_dist"))
+            self.add_item(WizardButton("100 lieues", 100, 2, self, "min_dist"))
+            
+            b_custom = discord.ui.Button(label="⌨️ Saisir...", style=discord.ButtonStyle.secondary)
+            async def custom_cb_1(i):
+                await i.response.send_modal(CustomNumberModal("Distance Minimum", "Ex: 15", self, "min_dist", 2))
+            b_custom.callback = custom_cb_1
+            self.add_item(b_custom)
 
-        f1_name = t(self.langue, "target_dash_f1_name", defaut="🔢 Numeric Variables")
-        f1_val = t(self.langue, "target_dash_f1_val", d=self.config.get('min_dist'), t=self.config.get('tier_diff'), p1=self.config.get('pp_min'), p2=self.config.get('pp_max'), defaut=f"**Min distance** : {self.config.get('min_dist')} leagues\n**Tier diff** : +{self.config.get('tier_diff')}\n**PP diff** : {self.config.get('pp_min')} to +{self.config.get('pp_max')}")
-        
-        f2_name = t(self.langue, "target_dash_f2_name", defaut="🎛️ Advanced Filters")
-        f2_val = t(self.langue, "target_dash_f2_val", doves=txt_doves, tiers=txt_tiers, alli=txt_alli, defaut=f"**Doves** : {txt_doves}\n**Ignore Tiers** : {txt_tiers}\n**Alliance Only** : {txt_alli}")
+        elif self.step == 2:
+            embed.title = "⚖️ Étape 2/8 : Le Système de Niveau"
+            embed.description = "Certains serveurs (comme FR1) utilisent des **Paliers** (tranches communautaires), d'autres se basent sur le **Niveau global exact** (classique + légendaire).\nQuel système veux-tu utiliser ?"
 
-        embed.add_field(name=f1_name, value=f1_val, inline=False)
-        embed.add_field(name=f2_name, value=f2_val, inline=False)
-        return embed
+            btn_tier = discord.ui.Button(label="Système de Paliers (Classique)", style=discord.ButtonStyle.primary)
+            async def cb_tier(i):
+                self.config["level_system"] = "tier"
+                self.config["ignore_tiers"] = False
+                self.step = 3
+                await self.update_view(i)
+            btn_tier.callback = cb_tier
+            self.add_item(btn_tier)
 
-    @discord.ui.button(emoji="🕊️", custom_id="dash_doves")
-    async def btn_doves(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.config["show_doves"] = not self.config.get("show_doves")
-        self.save_config()
-        self.update_buttons()
-        await interaction.response.edit_message(embed=self.generate_embed(), view=self)
+            btn_lvl = discord.ui.Button(label="Niveau Global (Universel)", style=discord.ButtonStyle.primary)
+            async def cb_lvl(i):
+                self.config["level_system"] = "level"
+                self.config["ignore_tiers"] = False
+                self.step = 3
+                await self.update_view(i)
+            btn_lvl.callback = cb_lvl
+            self.add_item(btn_lvl)
 
-    @discord.ui.button(emoji="⚖️", custom_id="dash_tiers")
-    async def btn_tiers(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.config["ignore_tiers"] = not self.config.get("ignore_tiers")
-        self.save_config()
-        self.update_buttons()
-        await interaction.response.edit_message(embed=self.generate_embed(), view=self)
+            btn_ignore = discord.ui.Button(label="♾️ Ignorer l'écart", style=discord.ButtonStyle.danger)
+            async def cb_ignore(i):
+                self.config["ignore_tiers"] = True
+                self.step = 4
+                await self.update_view(i)
+            btn_ignore.callback = cb_ignore
+            self.add_item(btn_ignore)
 
-    @discord.ui.button(emoji="🛡️", custom_id="dash_alli")
-    async def btn_alli(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.config["only_with_alliance"] = not self.config.get("only_with_alliance")
-        self.save_config()
-        self.update_buttons()
-        await interaction.response.edit_message(embed=self.generate_embed(), view=self)
+            self.add_item(WizardButton("◀ Retour", None, 1, self, style=discord.ButtonStyle.secondary, row=1))
 
-    @discord.ui.button(emoji="🔢", style=discord.ButtonStyle.primary, row=1)
-    async def btn_numbers(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(TargetSetupModal(self, self.langue))
+        elif self.step == 3:
+            if self.config.get("level_system") == "tier":
+                embed.title = "⚖️ Étape 3/8 : L'Écart de Palier"
+                embed.description = "Combien de **paliers au-dessus** du tien acceptes-tu d'affronter ?"
+                self.add_item(WizardButton("Même palier (0)", 0, 4, self, "tier_diff"))
+                self.add_item(WizardButton("+1 Palier", 1, 4, self, "tier_diff"))
+                self.add_item(WizardButton("+2 Paliers", 2, 4, self, "tier_diff"))
+            else:
+                embed.title = "⚖️ Étape 3/8 : L'Écart de Niveau Global"
+                embed.description = "Jusqu'à combien de **niveaux (classique + légendaire)** au-dessus de toi acceptes-tu d'affronter ?"
+                self.add_item(WizardButton("Même niveau (+10 max)", 10, 4, self, "max_lvl_diff"))
+                self.add_item(WizardButton("+50 Niveaux", 50, 4, self, "max_lvl_diff"))
+                self.add_item(WizardButton("+150 Niveaux", 150, 4, self, "max_lvl_diff"))
+
+                b_custom = discord.ui.Button(label="⌨️ Saisir...", style=discord.ButtonStyle.secondary)
+                async def custom_cb_2(i):
+                    await i.response.send_modal(CustomNumberModal("Écart de Niveau Max", "Ex: 75", self, "max_lvl_diff", 4))
+                b_custom.callback = custom_cb_2
+                self.add_item(b_custom)
+
+            self.add_item(WizardButton("◀ Retour", None, 2, self, style=discord.ButtonStyle.secondary, row=1))
+
+        elif self.step == 4:
+            embed.title = "📉 Étape 4/8 : Puissance Minimum"
+            embed.description = "Jusqu'à combien de **puissance en MOINS** que toi acceptes-tu de frapper ?"
+            self.add_item(WizardButton("Même puissance (0)", 0, 5, self, "pp_min"))
+            self.add_item(WizardButton("- 2 Million", -2000000, 5, self, "pp_min"))
+            self.add_item(WizardButton("- 5 Millions", -5000000, 5, self, "pp_min"))
+            self.add_item(WizardButton("- 10 Millions", -10000000, 5, self, "pp_min"))
+            
+            b_custom = discord.ui.Button(label="⌨️ Saisir...", style=discord.ButtonStyle.secondary)
+            async def custom_cb_3(i):
+                await i.response.send_modal(CustomNumberModal("Puissance Minimum", "Ex: -2500000", self, "pp_min", 5))
+            b_custom.callback = custom_cb_3
+            self.add_item(b_custom)
+            
+            self.add_item(WizardButton("◀ Retour", None, 3, self, style=discord.ButtonStyle.secondary, row=1))
+
+        elif self.step == 5:
+            embed.title = "📈 Étape 5/8 : Puissance Maximum"
+            embed.description = "Jusqu'à combien de **puissance en PLUS** que toi acceptes-tu d'affronter ?"
+            self.add_item(WizardButton("Même puissance (0)", 0, 6, self, "pp_max"))
+            self.add_item(WizardButton("+ 2 Millions", 2000000, 6, self, "pp_max"))
+            self.add_item(WizardButton("+ 5 Millions", 5000000, 6, self, "pp_max"))
+            self.add_item(WizardButton("+ 10 Millions", 10000000, 6, self, "pp_max"))
+            
+            b_custom = discord.ui.Button(label="⌨️ Saisir...", style=discord.ButtonStyle.secondary)
+            async def custom_cb_4(i):
+                await i.response.send_modal(CustomNumberModal("Puissance Maximum", "Ex: 4500000", self, "pp_max", 6))
+            b_custom.callback = custom_cb_4
+            self.add_item(b_custom)
+            
+            self.add_item(WizardButton("◀ Retour", None, 4, self, style=discord.ButtonStyle.secondary, row=1))
+
+        elif self.step == 6:
+            embed.title = "🎖️ Étape 6/8 : L'Honneur"
+            embed.description = "Recherches-tu des cibles avec un montant d'Honneur spécifique ?"
+            
+            btn_ignore_honor = discord.ui.Button(label="♾️ Peu importe (Ignorer)", style=discord.ButtonStyle.primary)
+            async def cb_ignore_honor(i):
+                self.config["honor_min"] = 0
+                self.config["honor_max"] = 99999999
+                self.step = 7
+                await self.update_view(i)
+            btn_ignore_honor.callback = cb_ignore_honor
+            self.add_item(btn_ignore_honor)
+            
+            btn_custom = discord.ui.Button(label="⌨️ Saisir Min / Max", style=discord.ButtonStyle.secondary)
+            async def cb_honor(i):
+                await i.response.send_modal(CustomMinMaxModal("Filtre Honneur", "Min (Ex: 1000)", "Max (Ex: 99999)", self, "honor_min", "honor_max", 7))
+            btn_custom.callback = cb_honor
+            self.add_item(btn_custom)
+            
+            self.add_item(WizardButton("◀ Retour", None, 5, self, style=discord.ButtonStyle.secondary, row=1))
+
+        elif self.step == 7:
+            embed.title = "💰 Étape 7/8 : Le Butin (Loot)"
+            embed.description = "Veux-tu filtrer par quantité de butin disponible ?"
+            
+            btn_ignore_loot = discord.ui.Button(label="♾️ Peu importe (Ignorer)", style=discord.ButtonStyle.primary)
+            async def cb_ignore_loot(i):
+                self.config["loot_min"] = 0
+                self.config["loot_max"] = 999999999
+                self.step = 8
+                await self.update_view(i)
+            btn_ignore_loot.callback = cb_ignore_loot
+            self.add_item(btn_ignore_loot)
+            
+            btn_custom = discord.ui.Button(label="⌨️ Saisir Min / Max", style=discord.ButtonStyle.secondary)
+            async def cb_loot(i):
+                await i.response.send_modal(CustomMinMaxModal("Filtre Butin", "Min (Ex: 50000)", "Max (Ex: 9999999)", self, "loot_min", "loot_max", 8))
+            btn_custom.callback = cb_loot
+            self.add_item(btn_custom)
+            
+            self.add_item(WizardButton("◀ Retour", None, 6, self, style=discord.ButtonStyle.secondary, row=1))
+
+        elif self.step == 8:
+            embed.title = "🎛️ Étape 8/8 : Filtres avancés"
+            embed.description = "Derniers ajustements. Clique sur les boutons pour activer/désactiver les options :"
+            
+            self.add_item(ToggleButton("show_doves", self, "🕊️ Colombes : Visibles", "🕊️ Colombes : Masquées"))
+            self.add_item(ToggleButton("only_with_alliance", self, "🛡️ Alliance : Obligatoire", "🛡️ Alliance : Non requise"))
+            
+            b_finish = discord.ui.Button(label="✅ Enregistrer et Terminer", style=discord.ButtonStyle.primary, row=1)
+            async def finish_cb(i):
+                self.step = 9
+                self.save_config()
+                await self.update_view(i)
+            b_finish.callback = finish_cb
+            self.add_item(b_finish)
+            
+            self.add_item(WizardButton("◀ Retour", None, 7, self, style=discord.ButtonStyle.secondary, row=1))
+
+        elif self.step == 9:
+            embed = self.generate_summary_embed()
+            embed.color = discord.Color.green()
+            self.add_item(WizardButton("🔄 Modifier à nouveau", None, 1, self, style=discord.ButtonStyle.secondary))
+            
+            b_close = discord.ui.Button(label="❌ Fermer", style=discord.ButtonStyle.danger)
+            async def close_cb(i):
+                msg_fermeture = "✅ **Configuration sauvegardée et menu fermé.**\n*(Tu peux faire disparaître ce message en cliquant sur 'Ignorer le message' en bleu en bas).* "
+                await i.response.edit_message(content=msg_fermeture, embed=None, view=None)
+            b_close.callback = close_cb
+            self.add_item(b_close)
+
+        if initial:
+            await interaction.response.send_message(content=content, embed=embed, view=self, ephemeral=True)
+        else:
+            await interaction.response.edit_message(content=None, embed=embed, view=self)
 
     def save_config(self):
-        '''
-        Écrit dans users.json (utilisé dans get_server_config) au
-        lieu du target.json (non utilisé) : donc les règles perso étaient
-        perdues à chaque redémarrage du bot ou /setup d'un autre utilisateur
-        '''
-        path_users = CONFIG_DIR / 'users.json'
+        path_users = CONFIG_DIR / 'target.json'
         try:
             data = {}
             if path_users.exists():
@@ -164,6 +333,34 @@ class TargetDashboardView(discord.ui.View):
             utils.clear_config_cache()
         except Exception as e:
             logger.error(f"Erreur sauvegarde config perso : {e}")
+
+    def generate_summary_embed(self):
+        embed = discord.Embed(title="✅ Radar configuré avec succès !", description="Voici ton nouveau profil de recherche de cibles :")
+        
+        txt_doves = "✅ Incluses" if self.config.get("show_doves") else "❌ Masquées"
+        txt_alli = "✅ Oui" if self.config.get("only_with_alliance") else "❌ Non (Inclut les Sans-alliance)"
+
+        if self.config.get("ignore_tiers"):
+            txt_lvl_sys = "Aucun (Ignoré)"
+            txt_tiers = "✅ Oui (No-limit)"
+        elif self.config.get("level_system") == "tier":
+            txt_lvl_sys = f"Paliers Classiques (+{self.config.get('tier_diff')} Palier)"
+            txt_tiers = f"❌ Non (+{self.config.get('tier_diff')} Palier max)"
+        else:
+            txt_lvl_sys = f"Niveau Global (+{self.config.get('max_lvl_diff')} Niveaux)"
+            txt_tiers = f"❌ Non (+{self.config.get('max_lvl_diff')} Niveaux max)"
+
+        hon_str = f"{format_num(self.config.get('honor_min', 0))} à {format_num(self.config.get('honor_max', 99999999))}"
+        loot_str = f"{format_num(self.config.get('loot_min', 0))} à {format_num(self.config.get('loot_max', 999999999))}"
+
+        f1_val = f"**Distance min** : {self.config.get('min_dist')} lieues\n**Système Niv.** : {txt_lvl_sys}\n**Écart PP** : {format_num(self.config.get('pp_min'))} à +{format_num(self.config.get('pp_max'))}"
+        f2_val = f"**Honneur** : {hon_str}\n**Butin** : {loot_str}"
+        f3_val = f"**Colombes** : {txt_doves}\n**Ignorer Niveaux** : {txt_tiers}\n**Alliance** : {txt_alli}"
+
+        embed.add_field(name="🔢 Critères Principaux", value=f1_val, inline=False)
+        embed.add_field(name="🎯 Critères Secondaires", value=f2_val, inline=False)
+        embed.add_field(name="🎛️ Filtres Avancés", value=f3_val, inline=False)
+        return embed
 
 # ========================================================
 # 🎛️ COMPOSANT UI : PAGINATION DES CIBLES + RELANCE EN DIRECT
@@ -186,15 +383,7 @@ class CiblePaginationView(discord.ui.View):
         self.update_buttons()
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        '''
-        Ce message est public : sans ce contrôle, n'importe quel membre du salon
-        peut cliquer 'Relancer une vague' et donc écraser le résultat de son auteur
-        avec un scan lancé sous sa propre configuration
-        '''
         if self.owner_id is not None and interaction.user.id != self.owner_id:
-            # Si besoin d'afficher un message, commentaires à retirer :
-            # msg = t(self.langue, "guerre_err_not_owner", defaut="<:error:1512505075220611172> Seul l'auteur de la recherche peut utiliser ces boutons. Lance ta propre commande `/target search`.")
-            # await interaction.response.send_message(msg, ephemeral=True)
             return False
         return True
 
@@ -236,7 +425,6 @@ class CiblePaginationView(discord.ui.View):
 class GuerreCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-
         self.clr_proximite = discord.Color.from_rgb(204,0,0)
         self.clr_cible     = discord.Color.from_rgb(183,0,0)
         self.clr_hr        = discord.Color.from_rgb(146,0,0)
@@ -399,12 +587,18 @@ class GuerreCog(commands.Cog):
         description="Radar tools and rules arbitration based on your personal profile"
     )
 
-    @target_group.command(name="setup", description="Configure your personal radar rules")
+    @target_group.command(name="setup", description="Configure your personal radar rules step-by-step")
     async def target_setup(self, interaction: discord.Interaction):
         langue, _ = await get_server_config(interaction)
         user_id = str(interaction.user.id)
-        view = TargetDashboardView(user_id, langue)
-        await interaction.response.send_message(embed=view.generate_embed(), view=view, ephemeral=True)
+        
+        # Charger la config existante
+        import utils
+        current_rules = utils.USERS_CONFIG_CACHE.get(user_id, {}).get("custom_rules", None)
+        
+        # Lancer l'assistant (Wizard)
+        wizard = TargetWizard(user_id, langue, current_rules)
+        await wizard.start(interaction)
 
     @target_group.command(name="search", description="Find targets based on your personal rules")
     @app_commands.autocomplete(attacker=joueur_autocomplete)
@@ -416,9 +610,9 @@ class GuerreCog(commands.Cog):
         has_rules = utils.USERS_CONFIG_CACHE and user_id in utils.USERS_CONFIG_CACHE and "custom_rules" in utils.USERS_CONFIG_CACHE[user_id]
         
         if not has_rules:
-            view = TargetDashboardView(user_id, langue)
-            err_msg = t(langue, "target_err_no_setup", defaut="⚠️ **Stop!** You must configure your targeting rules first.\nHere is your dashboard to set up your custom radar:")
-            return await interaction.response.send_message(err_msg, embed=view.generate_embed(), view=view, ephemeral=True)
+            wizard = TargetWizard(user_id, langue)
+            err_msg = t(langue, "target_err_no_setup", defaut="⚠️ **Stop !** Tu dois d'abord configurer ton radar. Laisse-moi te guider :")
+            return await wizard.start(interaction, content=err_msg)
 
         try: await interaction.response.defer(thinking=True)
         except: return
@@ -434,9 +628,9 @@ class GuerreCog(commands.Cog):
         has_rules = utils.USERS_CONFIG_CACHE and user_id in utils.USERS_CONFIG_CACHE and "custom_rules" in utils.USERS_CONFIG_CACHE[user_id]
         
         if not has_rules:
-            view = TargetDashboardView(user_id, langue)
-            err_msg = t(langue, "target_err_no_setup", defaut="⚠️ **Stop!** You must configure your targeting rules first.\nHere is your dashboard to set up your custom radar:")
-            return await interaction.response.send_message(err_msg, embed=view.generate_embed(), view=view, ephemeral=True)
+            wizard = TargetWizard(user_id, langue)
+            err_msg = t(langue, "target_err_no_setup", defaut="⚠️ **Stop !** Tu dois d'abord configurer ton radar. Laisse-moi te guider :")
+            return await wizard.start(interaction, content=err_msg)
             
         try: await interaction.response.defer(thinking=True)
         except: return
@@ -456,18 +650,24 @@ class GuerreCog(commands.Cog):
             if leg <= 949: return 4
             return 5
 
-        # -----------------------------------------------------
-        # CHARGEMENT STRICT DES RÈGLES PERSOS DU JOUEUR
-        # -----------------------------------------------------
+        def get_abs_lvl(lvl, leg):
+            return lvl + leg
+
         user_id = str(interaction.user.id)
         user_rules = utils.USERS_CONFIG_CACHE.get(user_id, {}).get("custom_rules", {})
         
         config = {
             "nom": "Règles Personnelles",
             "check_api_limit": False,
+            "level_system": user_rules.get("level_system", "tier"),
             "allowed_tiers_relative": list(range(user_rules.get("tier_diff", 0) + 1)),
+            "max_lvl_diff": user_rules.get("max_lvl_diff", 10),
             "pp_offset_min": user_rules.get("pp_min", -3000000),
             "pp_offset_max": user_rules.get("pp_max", 10000000),
+            "honor_min": user_rules.get("honor_min", 0),
+            "honor_max": user_rules.get("honor_max", 99999999),
+            "loot_min": user_rules.get("loot_min", 0),
+            "loot_max": user_rules.get("loot_max", 999999999),
             "min_distance": user_rules.get("min_dist", 0),
             "ignore_tiers": user_rules.get("ignore_tiers", False),
             "affichage": {"max_attaques": "Variables", "cooldown": "Selon envies"}
@@ -475,15 +675,18 @@ class GuerreCog(commands.Cog):
         show_doves = user_rules.get("show_doves", False)
         only_with_alliance = user_rules.get("only_with_alliance", True)
 
-        def is_legal_target(a_pp, a_tier, a_lvl, t_pp, t_tier, t_lvl):
+        def is_legal_target(a_pp, a_tier, a_abs_lvl, t_pp, t_tier, t_abs_lvl):
             if not config.get("ignore_tiers", False):
-                diff_tier = t_tier - a_tier
-                allowed_tiers = config.get("allowed_tiers_relative", [0])
-                if diff_tier not in allowed_tiers: return False
-
-                if a_tier == 0 and t_tier == 0:
-                    max_lvl_diff = 10
-                    if abs(a_lvl - t_lvl) > max_lvl_diff: return False
+                if config["level_system"] == "tier":
+                    diff_tier = t_tier - a_tier
+                    allowed_tiers = config.get("allowed_tiers_relative", [0])
+                    if diff_tier not in allowed_tiers: return False
+                    
+                    if a_tier == 0 and t_tier == 0:
+                        if abs(a_abs_lvl - t_abs_lvl) > 10: return False
+                else:
+                    diff_lvl = t_abs_lvl - a_abs_lvl
+                    if diff_lvl > config.get("max_lvl_diff", 10): return False
 
             if "pp_offset_min" in config and t_pp < (a_pp + config["pp_offset_min"]): return False
             if "pp_offset_max" in config and t_pp > (a_pp + config["pp_offset_max"]): return False
@@ -539,6 +742,7 @@ class GuerreCog(commands.Cog):
         a_leg = int(a_info.get('legendary_level', a_info.get('legendaryLevel', 0)))
         a_pp = int(a_info.get('might_current', a_info.get('main_points', a_info.get('might', 0))))
         a_tier = get_tier(a_lvl, a_leg)
+        a_abs_lvl = get_abs_lvl(a_lvl, a_leg)
         
         mots_interdits_mur, alliances_mur_alerte = ["repos", "deuil", "hospitalisé"], []
         try:
@@ -580,14 +784,15 @@ class GuerreCog(commands.Cog):
             t_leg = int(t_info.get('legendary_level', 0))
             t_pp = int(t_info.get('main_points', 0))
             t_tier = get_tier(t_lvl, t_leg)
+            t_abs_lvl = get_abs_lvl(t_lvl, t_leg)
 
-            if not is_legal_target(a_pp, a_tier, a_lvl, t_pp, t_tier, t_lvl): continue
+            if not is_legal_target(a_pp, a_tier, a_abs_lvl, t_pp, t_tier, t_abs_lvl): continue
 
             has_wall_warning = (alli_clean in alliances_mur_alerte or any(mot in str(t_alliance).lower() for mot in mots_interdits_mur))
             
             pool_candidats.append({
                 "name": t_name, "alliance": str(t_alliance), "lvl": t_lvl, "leg": t_leg,
-                "tier": t_tier, "pp": t_pp, "honor": 0, "dist": 9999, "x": "???", "y": "???",
+                "tier": t_tier, "abs_lvl": t_abs_lvl, "pp": t_pp, "honor": 0, "loot": 0, "dist": 9999, "x": "???", "y": "???",
                 "is_upper_tier": (t_tier > a_tier), "wall_warning": has_wall_warning, "is_ghost": False,
                 "peace_disabled_at": t_info.get('peace_disabled_at', "null") 
             })
@@ -618,7 +823,9 @@ class GuerreCog(commands.Cog):
                                 t_cnd['leg'] = int(d.get('legendary_level', d.get('legendaryLevel', t_cnd['leg'])))
                                 t_cnd['pp'] = int(d.get('might_current', d.get('might', t_cnd['pp'])))
                                 t_cnd['honor'] = int(d.get('honor', 0)) 
+                                t_cnd['loot'] = int(d.get('loot_current', 0))
                                 t_cnd['tier'] = get_tier(t_cnd['lvl'], t_cnd['leg'])
+                                t_cnd['abs_lvl'] = get_abs_lvl(t_cnd['lvl'], t_cnd['leg'])
                                 t_cnd['is_upper_tier'] = (t_cnd['tier'] > a_tier)
                                 t_cnd['peace_disabled_at'] = d.get('peace_disabled_at', "null")
                                 if "updated_at" in d:
@@ -651,10 +858,16 @@ class GuerreCog(commands.Cog):
             for t_cnd in chunk_candidats:
                 if t_cnd['is_ghost'] or t_cnd['x'] == "???": continue
                 
-                if is_legal_target(a_pp, a_tier, a_lvl, t_cnd['pp'], t_cnd['tier'], t_cnd['lvl']):
-                    min_dist = config.get("min_distance", 0)
-                    if t_cnd['dist'] < min_dist: 
+                if is_legal_target(a_pp, a_tier, a_abs_lvl, t_cnd['pp'], t_cnd['tier'], t_cnd['abs_lvl']):
+                    if t_cnd['dist'] < config.get("min_distance", 0): 
                         continue
+                        
+                    # Nouveaux filtres Honneur et Butin
+                    if t_cnd['honor'] < config.get("honor_min", 0) or t_cnd['honor'] > config.get("honor_max", 99999999): 
+                        continue
+                    if t_cnd['loot'] < config.get("loot_min", 0) or t_cnd['loot'] > config.get("loot_max", 999999999): 
+                        continue
+                        
                     final_targets.append(t_cnd)
             
             await asyncio.sleep(0.15)
@@ -682,6 +895,7 @@ class GuerreCog(commands.Cog):
         lbl_palier = t(langue, "guerre_cible_field_palier", defaut="Palier")
         lbl_puiss = t(langue, "guerre_cible_field_pp", defaut="Puissance :")
         lbl_honneur = t(langue, "guerre_cible_field_honor", defaut="Honneur :")
+        lbl_loot = t(langue, "guerre_cible_field_loot", defaut="Butin :")
         lbl_dist = t(langue, "guerre_cible_field_dist", defaut="Distance :")
         lbl_coords = t(langue, "guerre_cible_field_coords", defaut="Coordonnées :")
         
@@ -719,7 +933,7 @@ class GuerreCog(commands.Cog):
 
                 warnings = []
                 if t_cnd['wall_warning']: warnings.append(t(langue, "guerre_warn_wall", defaut="\n<:error:1512505075220611172> **VÉRIFIEZ LE MUR :** Description d'alliance sensible !"))
-                if t_cnd['is_upper_tier'] and not config.get("ignore_tiers"): warnings.append(t(langue, "guerre_warn_tier", defaut="\n<:error:1512505075220611172> **RISQUE DE REPRESAILLES :** Joueur du palier supérieur !"))
+                if config.get("level_system") == "tier" and t_cnd['is_upper_tier'] and not config.get("ignore_tiers"): warnings.append(t(langue, "guerre_warn_tier", defaut="\n<:error:1512505075220611172> **RISQUE DE REPRESAILLES :** Joueur du palier supérieur !"))
                 if is_under_colombe: warnings.append(t(langue, "guerre_warn_peace", defaut="\n<:peace:1512503935892586566> **JOUEUR SOUS COLOMBE : Protection active (Inattaquable) !**"))
                 
                 warning_txt = "".join(warnings) if warnings else ""
@@ -729,6 +943,7 @@ class GuerreCog(commands.Cog):
                     f"<:lvl:1512571152524906596> {lbl_lvl} {t_cnd['lvl']}/{t_cnd['leg']} ({lbl_palier} {t_cnd['tier']})\n"
                     f"<:pp1:1512438903821570160> {lbl_puiss} {format_num(t_cnd['pp'])} {diff_txt}\n"
                     f"<:honor2:1512573861521260544> {lbl_honneur} **{format_num(t_cnd['honor'])}**\n"
+                    f"📦 {lbl_loot} **{format_num(t_cnd['loot'])}**\n"
                     f"<:map:1512573907788501242> {lbl_dist} **{dist_str}**\n"
                     f"<:coords:1512574624112578580> {lbl_coords} `{t_cnd['x']}:{t_cnd['y']}`\n"
                     f"{warning_txt}\n━━━━━━━━━━━━━━━━━━━━━━━"
@@ -767,7 +982,9 @@ class GuerreCog(commands.Cog):
         
         config = {
             "nom": "Règles Personnelles",
+            "level_system": user_rules.get("level_system", "tier"),
             "allowed_tiers_relative": list(range(user_rules.get("tier_diff", 0) + 1)),
+            "max_lvl_diff": user_rules.get("max_lvl_diff", 10),
             "pp_offset_min": user_rules.get("pp_min", -3000000),
             "pp_offset_max": user_rules.get("pp_max", 10000000),
             "min_distance": user_rules.get("min_dist", 0),
@@ -796,7 +1013,9 @@ class GuerreCog(commands.Cog):
 
         a_lvl, a_leg, a_pp = int(a_info.get('level', 0)), int(a_info.get('legendary_level', 0)), int(a_info.get('main_points', 0))
         d_lvl, d_leg, d_pp = int(d_info.get('level', 0)), int(d_info.get('legendary_level', 0)), int(d_info.get('main_points', 0))
+        
         a_tier, d_tier = get_tier(a_lvl, a_leg), get_tier(d_lvl, d_leg)
+        a_abs_lvl, d_abs_lvl = a_lvl + a_leg, d_lvl + d_leg
         
         a_alli = a_info.get('alliance') or a_info.get('alliance_name')
         if isinstance(a_alli, dict): a_alli = a_alli.get('name')
@@ -853,13 +1072,20 @@ class GuerreCog(commands.Cog):
             avertissements.append(t(langue, "guerre_hr_pp_diff_high", d1=format_num(d_pp - a_pp), defaut=f"<:pp1:1512438903821570160> **Défenseur plus fort** : Le défenseur a {format_num(d_pp - a_pp)} PP de plus que toi. Prudence."))
 
         if not config.get("ignore_tiers", False):
-            diff_tier = d_tier - a_tier
-            allowed_tiers = config.get("allowed_tiers_relative", [0])
-            
-            if diff_tier < min(allowed_tiers):
-                infractions.append(t(langue, "guerre_hr_tier_low", at=a_tier, dt=d_tier, defaut=f"<:lvl:1512571152524906596> **Écart de Palier** : Tu (Palier {a_tier}) n'as pas le droit d'attaquer un joueur de Palier inférieur ({d_tier})."))
-            elif diff_tier > max(allowed_tiers):
-                avertissements.append(t(langue, "guerre_hr_tier_high", dt=d_tier, defaut=f"<:lvl:1512571152524906596> **Niveau élevé** : Tu attaques un Palier supérieur ({d_tier}). Risque de représailles."))
+            if config["level_system"] == "tier":
+                diff_tier = d_tier - a_tier
+                allowed_tiers = config.get("allowed_tiers_relative", [0])
+                
+                if diff_tier < min(allowed_tiers):
+                    infractions.append(t(langue, "guerre_hr_tier_low", at=a_tier, dt=d_tier, defaut=f"<:lvl:1512571152524906596> **Écart de Palier** : Tu (Palier {a_tier}) n'as pas le droit d'attaquer un joueur de Palier inférieur ({d_tier})."))
+                elif diff_tier > max(allowed_tiers):
+                    avertissements.append(t(langue, "guerre_hr_tier_high", dt=d_tier, defaut=f"<:lvl:1512571152524906596> **Niveau élevé** : Tu attaques un Palier supérieur ({d_tier}). Risque de représailles."))
+            else:
+                diff_lvl = d_abs_lvl - a_abs_lvl
+                max_diff = config.get("max_lvl_diff", 10)
+                
+                if diff_lvl > max_diff:
+                    avertissements.append(t(langue, "guerre_hr_lvl_high", dl=diff_lvl, md=max_diff, defaut=f"<:lvl:1512571152524906596> **Niveau élevé** : Le défenseur a {diff_lvl} niveaux de plus que toi (Max autorisé: {max_diff}). Risque de représailles."))
 
         dist_txt = f"{int(distance)} lieues" if distance else t(langue, "guerre_prox_dist_unk", defaut="<:error:1512505075220611172> Inconnue")
 
@@ -907,7 +1133,6 @@ class GuerreCog(commands.Cog):
             embed.add_field(name=t(langue, "guerre_hr_res_gre_t", defaut="✅ ATTAQUE EN RÈGLES"), value=t(langue, "guerre_hr_res_gre_d", defaut="Aucune infraction ni avertissement détecté selon tes limites."), inline=False)
             await interaction.followup.send(embed=embed)
         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(GuerreCog(bot))

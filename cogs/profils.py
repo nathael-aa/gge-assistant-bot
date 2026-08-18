@@ -194,19 +194,42 @@ class ProfilsCog(commands.Cog):
                         status_txt = t(langue, "prof_status_peace", tp=ts_peace, defaut=f"<:peace:1512503935892586566> **Colombe :** Jusqu'au <t:{ts_peace}:R> (<t:{ts_peace}:t>)")
                 except: pass
 
-            info_val = (
-                f"<:lvl:1512571152524906596> **Niveau :** {data.get('level', 0)} (Lég. {data.get('legendary_level', 0)})\n"
-                f"<:listitem:1512573892596858960> **ID Joueur :** `{data.get('player_id', unk_id)}`\n"
-                f"{status_txt}"
+            info_val = t(
+                langue, 
+                "prof_info_val", 
+                lvl=data.get('level', 0), 
+                leg=data.get('legendary_level', 0), 
+                pid=data.get('player_id', unk_id), 
+                status=status_txt, 
+                defaut=(
+                    f"<:lvl:1512571152524906596> **Niveau :** {data.get('level', 0)} (Lég. {data.get('legendary_level', 0)})\n"
+                    f"<:listitem:1512573892596858960> **ID Joueur :** `{data.get('player_id', unk_id)}`\n"
+                    f"{status_txt}"
+                )
             )
             embed.add_field(name=info_title, value=info_val, inline=True)
             
             rank_title = t(langue, "prof_rank_title", defaut="<:empirerankings:1512574698301423847> Statistiques")
-            rank_desc = (
-                f"<:might:1512574615422107818> **Puissance :** {main_pts:,} (Max: `{might_all_time:,}`)\n"
-                f"<:honor2:1512573861521260544> **Honneur :** {honor_pts:,} (Max: `{max_honor:,}`)\n"
-                f"<:loot:1512439015570276553> **Pillage :** {loot_current:,} (Max: `{loot_all_time:,}`)"
-            ).replace(",", " ") 
+            
+            m_curr = f"{main_pts:,}".replace(",", " ")
+            m_max = f"{might_all_time:,}".replace(",", " ")
+            h_curr = f"{honor_pts:,}".replace(",", " ")
+            h_max = f"{max_honor:,}".replace(",", " ")
+            l_curr = f"{loot_current:,}".replace(",", " ")
+            l_max = f"{loot_all_time:,}".replace(",", " ")
+
+            rank_desc = t(
+                langue, 
+                "prof_rank_desc", 
+                m_curr=m_curr, m_max=m_max, 
+                h_curr=h_curr, h_max=h_max, 
+                l_curr=l_curr, l_max=l_max,
+                defaut=(
+                    f"<:might:1512574615422107818> **Puissance :** {m_curr} (Max: `{m_max}`)\n"
+                    f"<:honor2:1512573861521260544> **Honneur :** {h_curr} (Max: `{h_max}`)\n"
+                    f"<:loot:1512439015570276553> **Pillage :** {l_curr} (Max: `{l_max}`)"
+                )
+            )
             
             embed.add_field(name=rank_title, value=rank_desc, inline=True)
             

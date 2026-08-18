@@ -705,5 +705,7 @@
   "welcome_step2_title": "{e_two} Découvrir les Outils",
   "welcome_step3_desc": "Pour recevoir les alertes de début et de fin d'événements, un administrateur doit utiliser la commande </calendar setup:0> dans un salon dédié. Vous pourrez ensuite utiliser </calendar track:0> pour avoir les résultats de vos alliances à chaque événements, automatiquement.",
   "welcome_step3_title": "{e_three} Spécificités aux administrateur du serveur",
-  "welcome_title": "{e_castle1} Merci d'avoir ajouté GGE Assistant !"
+  "welcome_title": "{e_castle1} Merci d'avoir ajouté GGE Assistant !",
+  "prof_info_val": "<:lvl:1512571152524906596> **Niveau :** {lvl} (Lég. {leg})\n<:listitem:1512573892596858960> **ID Joueur :** `{pid}`\n{status}",
+  "prof_rank_desc": "<:might:1512574615422107818> **Puissance :** {m_curr} (Max: `{m_max}`)\n<:honor2:1512573861521260544> **Honneur :** {h_curr} (Max: `{h_max}`)\n<:loot:1512439015570276553> **Pillage :** {l_curr} (Max: `{l_max}`)"
 }
