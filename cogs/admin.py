@@ -275,7 +275,7 @@ class AdminCog(commands.Cog):
             nom_serveur = guild.name
             await guild.leave()
             
-            msg = t(self.admin_lang, "admin_leave_success", nom=nom_serveur, defaut=f"✅ Succès : Le bot a quitté le serveur **{nom_serveur**}.")
+            msg = t(self.admin_lang, "admin_leave_success", nom=nom_serveur, defaut=f"✅ Succès : Le bot a quitté le serveur **{nom_serveur}**.")
             await ctx.send(msg)
             logger.info(f"🚪 Le bot a quitté le serveur {nom_serveur} via commande admin.")
         except Exception as e:
@@ -319,22 +319,22 @@ class AdminCog(commands.Cog):
         requested_date = requested_date.lower()
         aujourd_hui = datetime.now().strftime("%Y-%m-%d")
         
-        logs_dir = BASE_DIR / 'logs' / 'general'
+        logs_dir = os.path.join(os.getcwd(), 'logs', 'general')
         
         if requested_date in ["aujourd'hui", "today", "j", ""]:
             target_date = aujourd_hui
-            file_path = logs_dir / 'discord_bot.log'
+            file_path = os.path.join(logs_dir, 'discord_bot.log')
         elif requested_date in ["hier", "yesterday", "h"]:
             target_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-            file_path = logs_dir / f'discord_bot_{target_date}.log'
+            file_path = os.path.join(logs_dir, f'discord_bot_{target_date}.log')
         else:
             target_date = requested_date
             if target_date == aujourd_hui:
-                file_path = logs_dir / 'discord_bot.log'
+                file_path = os.path.join(logs_dir, 'discord_bot.log')
             else:
-                file_path = logs_dir / f'discord_bot_{target_date}.log'
+                file_path = os.path.join(logs_dir, f'discord_bot_{target_date}.log')
 
-        if not file_path.exists():
+        if not os.path.exists(file_path):
             msg = t(self.admin_lang, "admin_log_not_found", date=target_date, defaut=f"❌ Impossible de trouver l'archive de logs pour le **{target_date}**.")
             return await ctx.send(msg)
 
