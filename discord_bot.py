@@ -30,16 +30,23 @@ from utils import (
 # ==========================================
 # ⚙️ INITIALISATION DU BOT ET DES LOGS
 # ==========================================
-os.makedirs('/app/logs/general', exist_ok=True)
-os.makedirs('/app/data', exist_ok=True)
+os.makedirs("/app/logs/general", exist_ok=True)
+os.makedirs("/app/data", exist_ok=True)
 
 logger = logging.getLogger("GGE_Bot")
 logger.setLevel(logging.INFO)
 
-formatter = logging.Formatter('%(asctime)s | [%(levelname)s] | %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+formatter = logging.Formatter("%(asctime)s | [%(levelname)s] | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
-file_handler = TimedRotatingFileHandler('/app/logs/general/discord_bot.log', when="midnight", interval=1, backupCount=31, encoding='utf-8-sig')
-def custom_log_namer(default_name): return default_name.replace(".log.", "_") + ".log"
+file_handler = TimedRotatingFileHandler(
+    "/app/logs/general/discord_bot.log", when="midnight", interval=1, backupCount=31, encoding="utf-8-sig"
+)
+
+
+def custom_log_namer(default_name):
+    return default_name.replace(".log.", "_") + ".log"
+
+
 file_handler.namer = custom_log_namer
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
@@ -48,8 +55,12 @@ console_handler = logging.StreamHandler()
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-print("\n" + "█"*60 + "\n" + "█" + " "*18 + "NOUVEAU DÉMARRAGE DU BOT" + " "*16 + "█\n" + "█"*60 + "\n", flush=True)
+print(
+    "\n" + "█" * 60 + "\n" + "█" + " " * 18 + "NOUVEAU DÉMARRAGE DU BOT" + " " * 16 + "█\n" + "█" * 60 + "\n",
+    flush=True,
+)
 logger.info("🟢 Démarrage du système de logs...")
+
 
 # ==========================================
 # 💌 MESSAGE DE BIENVENUE INTERACTIF
@@ -61,39 +72,55 @@ class WelcomeView(discord.ui.View):
     def get_welcome_embed(self, lang="fr"):
         title = t(lang, "welcome_title", defaut="<:guides:1533429318947045616> Welcome to GGE Assistant!")
         desc = t(lang, "welcome_desc", defaut="Here is how to get started:")
-        
+
         embed = discord.Embed(title=title, description=desc, color=0x0B1D51)
-        
+
         embed.add_field(
-            name=t(lang, "welcome_step1_title", defaut="<:one:1533556309838790796> Configuration"), 
-            value=t(lang, "welcome_step1_desc", defaut="Use </setup:0> to configure your profile."), 
-            inline=False
+            name=t(lang, "welcome_step1_title", defaut="<:one:1533556309838790796> Configuration"),
+            value=t(lang, "welcome_step1_desc", defaut="Use </setup:0> to configure your profile."),
+            inline=False,
         )
         embed.add_field(
-            name=t(lang, "welcome_step2_title", defaut="<:two:1533556308723109999> Tools"), 
-            value=t(lang, "welcome_step2_desc", defaut="Type </help:0> to see all commands."), 
-            inline=False
+            name=t(lang, "welcome_step2_title", defaut="<:two:1533556308723109999> Tools"),
+            value=t(lang, "welcome_step2_desc", defaut="Type </help:0> to see all commands."),
+            inline=False,
         )
         embed.add_field(
-            name=t(lang, "welcome_step3_title", defaut="<:three:1533556307511087144> Calendar"), 
-            value=t(lang, "welcome_step3_desc", defaut="Use </calendar setup:0> to get alerts."), 
-            inline=False
+            name=t(lang, "welcome_step3_title", defaut="<:three:1533556307511087144> Calendar"),
+            value=t(lang, "welcome_step3_desc", defaut="Use </calendar setup:0> to get alerts."),
+            inline=False,
         )
-        
+
         embed.set_footer(text=t(lang, "welcome_footer", defaut="Select your language below."))
         return embed
 
-    @discord.ui.button(label="Français", emoji="<:flagfrench:1535281050249601105>", style=discord.ButtonStyle.secondary, custom_id="welc_fr")
+    @discord.ui.button(
+        label="Français",
+        emoji="<:flagfrench:1535281050249601105>",
+        style=discord.ButtonStyle.secondary,
+        custom_id="welc_fr",
+    )
     async def btn_fr(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=self.get_welcome_embed("fr"))
 
-    @discord.ui.button(label="English", emoji="<:flagunitedkingdom:1535281046394769429>", style=discord.ButtonStyle.secondary, custom_id="welc_en")
+    @discord.ui.button(
+        label="English",
+        emoji="<:flagunitedkingdom:1535281046394769429>",
+        style=discord.ButtonStyle.secondary,
+        custom_id="welc_en",
+    )
     async def btn_en(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=self.get_welcome_embed("en"))
 
-    @discord.ui.button(label="Deutsch", emoji="<:flaggermany:1535281037716889750>", style=discord.ButtonStyle.secondary, custom_id="welc_de")
+    @discord.ui.button(
+        label="Deutsch",
+        emoji="<:flaggermany:1535281037716889750>",
+        style=discord.ButtonStyle.secondary,
+        custom_id="welc_de",
+    )
     async def btn_de(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=self.get_welcome_embed("de"))
+
 
 # ==========================================
 # 🤖 CLASSE PRINCIPALE DU BOT
@@ -103,7 +130,7 @@ class GGEAssistantBot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
-        super().__init__(command_prefix='!', intents=intents, help_command=None)
+        super().__init__(command_prefix="!", intents=intents, help_command=None)
         self.maintenance_mode = load_maintenance()
 
         self.tree.interaction_check = self.global_interaction_check
@@ -116,28 +143,28 @@ class GGEAssistantBot(commands.Bot):
         """Exporte le 'Slash Command Payload' incluant les groupes et sous-commandes."""
         try:
             payload = []
-            
+
             def process_command(cmd, group_name=""):
                 # Si c'est un groupe de commandes (ex: /target)
                 if isinstance(cmd, discord.app_commands.Group):
                     group_data = {
                         "name": f"{group_name}{cmd.name}",
                         "description": cmd.description,
-                        "type": 1, # Type 1 = CHAT_INPUT (Slash Command)
-                        "options": []
+                        "type": 1,  # Type 1 = CHAT_INPUT (Slash Command)
+                        "options": [],
                     }
-                    
+
                     # On parcourt les sous-commandes du groupe
                     for sub_cmd in cmd.commands:
                         # Discord gère les sous-commandes avec le type 1 ou 2 (Subcommand / Subcommand Group)
                         sub_data = {
                             "name": sub_cmd.name,
                             "description": sub_cmd.description,
-                            "type": 1, 
-                            "options": self.serialize_options(sub_cmd.options) if hasattr(sub_cmd, 'options') else []
+                            "type": 1,
+                            "options": self.serialize_options(sub_cmd.options) if hasattr(sub_cmd, "options") else [],
                         }
                         group_data["options"].append(sub_data)
-                        
+
                     payload.append(group_data)
                 else:
                     # Commande classique isolée (ex: /ping)
@@ -145,17 +172,17 @@ class GGEAssistantBot(commands.Bot):
                         "name": cmd.name,
                         "description": cmd.description,
                         "type": 1,
-                        "options": self.serialize_options(cmd.options) if hasattr(cmd, 'options') else []
+                        "options": self.serialize_options(cmd.options) if hasattr(cmd, "options") else [],
                     }
                     payload.append(cmd_data)
 
             # On parcourt l'arbre des commandes
             for cmd in self.tree.get_commands():
                 process_command(cmd)
-            
+
             with open("commands.json", "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=4, ensure_ascii=False)
-            
+
             logger.info("📄 [JSON] Commandes et sous-commandes actuelles générées avec succès.")
         except Exception as e:
             logger.error(f"❌ Erreur lors de l'export JSON : {e}")
@@ -168,12 +195,13 @@ class GGEAssistantBot(commands.Bot):
                 "name": opt.name,
                 "description": opt.description,
                 "type": opt.type.value,
-                "required": opt.required
+                "required": opt.required,
             }
-            if opt.autocomplete: opt_data["autocomplete"] = True
-            if hasattr(opt, 'choices') and opt.choices:
+            if opt.autocomplete:
+                opt_data["autocomplete"] = True
+            if hasattr(opt, "choices") and opt.choices:
                 opt_data["choices"] = [{"name": c.name, "value": c.value} for c in opt.choices]
-            if hasattr(opt, 'options') and opt.options:
+            if hasattr(opt, "options") and opt.options:
                 opt_data["options"] = self.serialize_options(opt.options)
             serialized.append(opt_data)
         return serialized
@@ -188,21 +216,21 @@ class GGEAssistantBot(commands.Bot):
 
         connecteur_ipv4 = aiohttp.TCPConnector(family=socket.AF_INET)
         self.session = aiohttp.ClientSession(connector=connecteur_ipv4)
-        
+
         logger.info("🔌 Chargement des modules ...")
         extensions = [
-            "cogs.admin", 
-            "cogs.aide", 
-            "cogs.calendrier", 
+            "cogs.admin",
+            "cogs.aide",
+            "cogs.calendrier",
             "cogs.classement",
-            "cogs.config", 
-            "cogs.events", 
-            "cogs.forteresses", 
-            "cogs.profils", 
+            "cogs.config",
+            "cogs.events",
+            "cogs.forteresses",
+            "cogs.profils",
             "cogs.radar",
             "cogs.scan_server",
             "cogs.storms",
-            "cogs.target", 
+            "cogs.target",
         ]
         for ext in extensions:
             try:
@@ -213,26 +241,26 @@ class GGEAssistantBot(commands.Bot):
 
         # 1. Synchronisation globale (pour le reste du monde)
         await self.tree.sync()
-        
+
         # 2. Synchronisation instantanée pour tes serveurs de test
-        SERVEURS_DE_TEST = [1342424613660921908, 1512165717380825310,1537532071898128566] 
-        
+        SERVEURS_DE_TEST = [1342424613660921908, 1512165717380825310, 1537532071898128566]
+
         for guild_id in SERVEURS_DE_TEST:
             try:
                 serveur = discord.Object(id=guild_id)
                 self.tree.copy_global_to(guild=serveur)
                 await self.tree.sync(guild=serveur)
-                
+
                 logger.info(f"⚡ [SYNC] Commandes forcées sur le serveur test ({guild_id})")
             except Exception as e:
                 logger.error(f"❌ [SYNC] Échec sur le serveur {guild_id} : {e}")
 
         self.export_commands_json()
-        
+
         if not self.flag_watcher_task.is_running():
             self.flag_watcher_task.start()
             logger.info("🛰️ [Tasks] flag_watcher_task initialisée dans le setup_hook.")
-            
+
         if not self.status_task.is_running():
             self.status_task.start()
             logger.info("🛰️ [Tasks] status_task initialisée dans le setup_hook.")
@@ -249,26 +277,26 @@ class GGEAssistantBot(commands.Bot):
 
         # 🟢 DÉMARRAGE DU SERVEUR WEBHOOK (Port 5011)
         self.web_app = web.Application()
-        self.web_app.router.add_post('/dblwebhook', self.vote_handler)
+        self.web_app.router.add_post("/dblwebhook", self.vote_handler)
         self.web_runner = web.AppRunner(self.web_app)
         await self.web_runner.setup()
-        
+
         # 0.0.0.0 veut dire qu'on accepte les connexions de l'extérieur du conteneur
-        self.web_site = web.TCPSite(self.web_runner, '0.0.0.0', 5011)
+        self.web_site = web.TCPSite(self.web_runner, "0.0.0.0", 5011)
         await self.web_site.start()
         logger.info("🌐 [Webhook] Serveur web en écoute sur le port 5011.")
 
     async def on_ready(self):
         charger_langues()
         logger.info(f"✅ Bot connecté en tant que {self.user} (ID: {self.user.id})")
-        
+
         if self.maintenance_mode:
             statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
             activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
-            target_status = discord.Status.dnd 
+            target_status = discord.Status.dnd
         else:
             activity = discord.Activity(type=discord.ActivityType.watching, name="/setup ➔ /help")
-            target_status = discord.Status.online 
+            target_status = discord.Status.online
 
         await self.change_presence(activity=activity, status=target_status)
         logger.info(f"📡 Statut mis à jour : {activity.name} | Pastille : {target_status}")
@@ -277,15 +305,17 @@ class GGEAssistantBot(commands.Bot):
     # 📥 SUIVI DES AJOUTS / RETRAITS DU BOT
     # ==========================================
     async def on_guild_join(self, guild: discord.Guild):
-        logger.info(f"🎉 [NOUVEAU SERVEUR] Le bot a rejoint '{guild.name}' (ID: {guild.id}) | Membres : {guild.member_count}")
-        
+        logger.info(
+            f"🎉 [NOUVEAU SERVEUR] Le bot a rejoint '{guild.name}' (ID: {guild.id}) | Membres : {guild.member_count}"
+        )
+
         channel_to_send = guild.system_channel
         if not channel_to_send or not channel_to_send.permissions_for(guild.me).send_messages:
             for channel in guild.text_channels:
                 if channel.permissions_for(guild.me).send_messages:
                     channel_to_send = channel
                     break
-                    
+
         if channel_to_send:
             view = WelcomeView()
             embed_initial = view.get_welcome_embed("en")
@@ -302,19 +332,23 @@ class GGEAssistantBot(commands.Bot):
     # ==========================================
     @tasks.loop(seconds=15)
     async def flag_watcher_task(self):
-        flag_path = Path('/app/data/scan.flag')
-        
+        flag_path = Path("/app/data/scan.flag")
+
         if flag_path.exists():
             if not self.scan_flag_detected:
-                logger.info("⚡ [Watcher] Fichier scan.flag détecté. Un scan global du serveur est en cours d'exécution...")
+                logger.info(
+                    "⚡ [Watcher] Fichier scan.flag détecté. Un scan global du serveur est en cours d'exécution..."
+                )
                 self.scan_flag_detected = True
         else:
             if self.scan_flag_detected:
-                logger.info("🔄 [Watcher] Fichier scan.flag effacé ! Fin des écritures détectée. Actualisation de la RAM...")
+                logger.info(
+                    "🔄 [Watcher] Fichier scan.flag effacé ! Fin des écritures détectée. Actualisation de la RAM..."
+                )
                 self.scan_flag_detected = False
                 try:
                     for srv in CACHE:
-                        CACHE[srv]['last_refresh'] = 0 
+                        CACHE[srv]["last_refresh"] = 0
                     logger.info("✅ [Watcher] Le cache mémoire sera réactualisé à la prochaine commande.")
                 except Exception as e:
                     logger.error(f"❌ [Watcher] Échec : {e}")
@@ -332,21 +366,23 @@ class GGEAssistantBot(commands.Bot):
 
         nb_serveurs = len(self.guilds)
         nb_membres = sum(guild.member_count for guild in self.guilds if guild.member_count)
-        
+
         def compter_serveurs_gge():
-            dossier_serveurs = Path('/app/data/server_scans')
+            dossier_serveurs = Path("/app/data/server_scans")
             if dossier_serveurs.exists():
                 return sum(1 for d in dossier_serveurs.iterdir() if d.is_dir())
             return 0
-            
+
         nb_gge_serveurs = await asyncio.to_thread(compter_serveurs_gge)
 
         statuts = [
             discord.Activity(type=discord.ActivityType.listening, name="⚙️ /setup | Start here"),
             discord.Activity(type=discord.ActivityType.watching, name="📖 /help | All commands"),
-            discord.Activity(type=discord.ActivityType.watching, name=f"🌍 {nb_serveurs} servers | 👥 {nb_membres} users"),
+            discord.Activity(
+                type=discord.ActivityType.watching, name=f"🌍 {nb_serveurs} servers | 👥 {nb_membres} users"
+            ),
             discord.Activity(type=discord.ActivityType.competing, name=f"⚔️ {nb_gge_serveurs} GGE servers"),
-            discord.Activity(type=discord.ActivityType.playing, name=f"🚀 {BOT_VERSION}")
+            discord.Activity(type=discord.ActivityType.playing, name=f"🚀 {BOT_VERSION}"),
         ]
 
         if self.custom_status:
@@ -366,31 +402,31 @@ class GGEAssistantBot(commands.Bot):
     # ==========================================
     async def vote_handler(self, request):
         secret = "whs_c7babaae2778a44fca787c43be391732e3924c5790907857e61b15b397e3fc32"
-        
+
         signature_header = request.headers.get("x-topgg-signature")
         auth_header = request.headers.get("Authorization")
-        
+
         raw_body = await request.text()
-        
+
         # --- 1. VÉRIFICATION DE SÉCURITÉ ---
         if signature_header:
             # Méthode v1 (Nouvelle avec HMAC)
             try:
-                parts = dict(part.split('=') for part in signature_header.split(','))
+                parts = dict(part.split("=") for part in signature_header.split(","))
                 message = f"{parts.get('t')}.{raw_body}".encode()
-                expected_sig = hmac.new(secret.encode('utf-8'), message, hashlib.sha256).hexdigest()
-                if not hmac.compare_digest(expected_sig, parts.get('v1')):
+                expected_sig = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
+                if not hmac.compare_digest(expected_sig, parts.get("v1")):
                     logger.warning("❌ [Webhook] Signature v1 invalide.")
                     return web.Response(status=401, text="Signature invalide")
             except Exception:
                 return web.Response(status=400, text="Erreur de calcul v1")
-                
+
         elif auth_header:
             # Méthode v0 (Ancienne avec Header)
             if auth_header != secret:
                 logger.warning("❌ [Webhook] Mot de passe v0 invalide.")
                 return web.Response(status=401, text="Mauvais mot de passe v0")
-                
+
         else:
             logger.warning(f"❌ [Webhook] Requête refusée (ni v0, ni v1). Headers : {request.headers}")
             return web.Response(status=401, text="Missing auth")
@@ -422,11 +458,11 @@ class GGEAssistantBot(commands.Bot):
             logger.info(f"✅ [Webhook] Vrai vote reçu ! Application du bouclier pour {user_id}.")
 
         # --- 4. SAUVEGARDE (Bouclier 7j) ---
-        VOTES_FILE = Path('/app/data/configs/votes.json')
+        VOTES_FILE = Path("/app/data/configs/votes.json")
         votes_data = {}
         if VOTES_FILE.exists():
             try:
-                with open(VOTES_FILE, encoding='utf-8') as f:
+                with open(VOTES_FILE, encoding="utf-8") as f:
                     votes_data = json.load(f)
             except Exception:
                 pass
@@ -435,7 +471,7 @@ class GGEAssistantBot(commands.Bot):
         votes_data[str(user_id)] = (now + timedelta(days=7)).isoformat()
 
         try:
-            with open(VOTES_FILE, 'w', encoding='utf-8') as f:
+            with open(VOTES_FILE, "w", encoding="utf-8") as f:
                 json.dump(votes_data, f, indent=4)
         except Exception as e:
             logger.error(f"❌ [Webhook] Erreur lors de la sauvegarde : {e}")
@@ -446,8 +482,9 @@ class GGEAssistantBot(commands.Bot):
             if user:
                 # 1. On cherche la langue du joueur dans le cache RAM
                 from utils import USERS_CONFIG_CACHE
-                langue = "en" # Anglais par défaut
-                
+
+                langue = "en"  # Anglais par défaut
+
                 user_data = USERS_CONFIG_CACHE.get(str(user_id))
                 if user_data and isinstance(user_data, dict):
                     langue = user_data.get("lang", user_data.get("langue", "en"))
@@ -466,11 +503,7 @@ class GGEAssistantBot(commands.Bot):
                 description = t(langue, "vote_thanks_desc", defaut=desc_defaut)
 
                 # 4. Envoi de l'embed
-                embed = discord.Embed(
-                    title=titre,
-                    description=description,
-                    color=discord.Color.brand_green()
-                )
+                embed = discord.Embed(title=titre, description=description, color=discord.Color.brand_green())
                 await user.send(embed=embed)
         except Exception:
             pass
@@ -482,10 +515,10 @@ class GGEAssistantBot(commands.Bot):
     # ==========================================
     @tasks.loop(hours=12)
     async def sync_topgg_votes_task(self):
-        VOTES_FILE = Path('/app/data/configs/votes.json')
-        
+        VOTES_FILE = Path("/app/data/configs/votes.json")
+
         # Si pas de token, on annule
-        if not getattr(self, 'topgg_token', None):
+        if not getattr(self, "topgg_token", None):
             return
 
         # 🟢 1. REQUÊTE DIRECTE À L'API (Format v1)
@@ -499,18 +532,18 @@ class GGEAssistantBot(commands.Bot):
                     err_txt = await r.text()
                     logger.error(f"❌ [Top.gg] Erreur API ({r.status}) : {err_txt}")
                     return
-                
+
                 raw_voters = await r.json()
-                
+
                 # Extraction ultra-robuste des IDs
                 for v in raw_voters:
                     if isinstance(v, dict):
                         recent_voters_ids.append(str(v.get("id", "")))
                     else:
                         recent_voters_ids.append(str(v))
-                        
+
                 recent_voters_ids = [uid for uid in recent_voters_ids if uid]
-                
+
         except Exception as e:
             logger.error(f"❌ [Top.gg] Erreur de requête aiohttp : {e}")
             return
@@ -519,7 +552,7 @@ class GGEAssistantBot(commands.Bot):
         votes_data = {}
         if VOTES_FILE.exists():
             try:
-                with open(VOTES_FILE, encoding='utf-8') as f:
+                with open(VOTES_FILE, encoding="utf-8") as f:
                     votes_data = json.load(f)
             except Exception:
                 pass
@@ -531,13 +564,13 @@ class GGEAssistantBot(commands.Bot):
         for uid, deadline_iso in votes_data.items():
             if datetime.fromisoformat(deadline_iso) < now:
                 keys_to_delete.append(uid)
-        
+
         # On utilise notre nouvelle liste d'IDs (recent_voters_ids)
         for uid in recent_voters_ids:
             if uid not in votes_data or uid in keys_to_delete:
                 votes_data[uid] = (now + timedelta(days=7)).isoformat()
                 if uid in keys_to_delete:
-                    keys_to_delete.remove(uid) 
+                    keys_to_delete.remove(uid)
                 updated = True
 
         for uid in keys_to_delete:
@@ -546,7 +579,7 @@ class GGEAssistantBot(commands.Bot):
 
         if updated:
             try:
-                with open(VOTES_FILE, 'w', encoding='utf-8') as f:
+                with open(VOTES_FILE, "w", encoding="utf-8") as f:
                     json.dump(votes_data, f, indent=4)
                 logger.info("✅ [Top.gg] Base des votes mise à jour via API v1 (Boucliers 7j attribués/nettoyés).")
             except Exception as e:
@@ -561,7 +594,7 @@ class GGEAssistantBot(commands.Bot):
     # ==========================================
     @tasks.loop(minutes=30)
     async def post_server_count_task(self):
-        if not getattr(self, 'topgg_token', None):
+        if not getattr(self, "topgg_token", None):
             return
 
         url = f"https://top.gg/api/bots/{self.user.id}/stats"
@@ -588,19 +621,25 @@ class GGEAssistantBot(commands.Bot):
         if interaction.type == discord.InteractionType.autocomplete:
             return True
 
-        cmd_name = interaction.command.qualified_name if interaction.command else interaction.data.get("name", "inconnue")
-        
+        cmd_name = (
+            interaction.command.qualified_name if interaction.command else interaction.data.get("name", "inconnue")
+        )
+
         langue, _ = await get_server_config(interaction)
-        
+
         # --- 1. SYSTÈME DE LOGS ---
         try:
             if interaction.type == discord.InteractionType.application_command:
                 lieu = interaction.guild.name if interaction.guild else "Message Privé"
                 params = []
+
                 def extract_options(opts):
                     for opt in opts:
-                        if opt.get("type") in (1, 2): extract_options(opt.get("options", []))
-                        elif "value" in opt: params.append(f"{opt.get('name')}: {opt.get('value')}")
+                        if opt.get("type") in (1, 2):
+                            extract_options(opt.get("options", []))
+                        elif "value" in opt:
+                            params.append(f"{opt.get('name')}: {opt.get('value')}")
+
                 extract_options(interaction.data.get("options", []))
                 options_txt = f" | ⚙️ [{', '.join(params)}]" if params else ""
                 logger.info(f"📝 [COMMANDE] {interaction.user.name} a lancé `/{cmd_name}` sur [{lieu}]{options_txt}")
@@ -609,47 +648,77 @@ class GGEAssistantBot(commands.Bot):
 
         # --- 2. VÉRIFICATION DE LA CONFIGURATION (AVEC CACHE RAM) ---
         commandes_libres = ["setup", "help", "contact", "changelog"]
-        
+
         if cmd_name not in commandes_libres:
             config_ok = False
-            
+
             # On l'importe ICI, à la volée, pour avoir la valeur la plus récente !
             from utils import USERS_CONFIG_CACHE
-            
+
             # Vérification ultra-rapide en RAM
             if USERS_CONFIG_CACHE and str(interaction.user.id) in USERS_CONFIG_CACHE:
                 config_ok = True
-            
+
             if not config_ok:
                 if interaction.type == discord.InteractionType.application_command:
-                    msg = t(langue, "bot_err_config_dm", defaut="⚠️ **Halte là !**\nTu n'as pas encore configuré ton profil personnel. Utilise la commande </setup:0> pour définir ton serveur et ta langue avant d'utiliser le bot.")
+                    msg = t(
+                        langue,
+                        "bot_err_config_dm",
+                        defaut="⚠️ **Halte là !**\nTu n'as pas encore configuré ton profil personnel. Utilise la commande </setup:0> pour définir ton serveur et ta langue avant d'utiliser le bot.",
+                    )
                     await interaction.response.send_message(msg, ephemeral=True)
                 return False
 
         # --- 2.5. VÉRIFICATION DES COMMANDES STRICTEMENT PRIVÉES (DM ONLY) ---
         commandes_privees = [
-            "fortress", "fortress scan", "fortress stop",
-            "rival", "rival start", "rival add", "rival list", "rival stop",
-            "radar", "radar add", "radar remove", "radar list",
-            "radar alliance", "radar alliance add", "radar alliance remove"
+            "fortress",
+            "fortress scan",
+            "fortress stop",
+            "rival",
+            "rival start",
+            "rival add",
+            "rival list",
+            "rival stop",
+            "radar",
+            "radar add",
+            "radar remove",
+            "radar list",
+            "radar alliance",
+            "radar alliance add",
+            "radar alliance remove",
         ]
 
         if interaction.guild and cmd_name in commandes_privees:
             if interaction.type == discord.InteractionType.application_command:
-                msg = t(langue, "err_dm_only", defaut="<:error:1512505075220611172> Cette commande est uniquement utilisable en **Messages Privés**.")
+                msg = t(
+                    langue,
+                    "err_dm_only",
+                    defaut="<:error:1512505075220611172> Cette commande est uniquement utilisable en **Messages Privés**.",
+                )
                 await interaction.response.send_message(msg, ephemeral=True)
             return False
 
         # --- 2.6. VÉRIFICATION DES COMMANDES STRICTEMENT SERVEUR (GUILD ONLY) ---
         commandes_serveur = [
-            "calendar", "calendar setup", "calendar track", "calendar untrack",
-            "event_goal_set", "event_summary",
-            "diplomacy", "diplomacy add", "diplomacy remove", "diplomacy list"
+            "calendar",
+            "calendar setup",
+            "calendar track",
+            "calendar untrack",
+            "event_goal_set",
+            "event_summary",
+            "diplomacy",
+            "diplomacy add",
+            "diplomacy remove",
+            "diplomacy list",
         ]
 
         if not interaction.guild and cmd_name in commandes_serveur:
             if interaction.type == discord.InteractionType.application_command:
-                msg = t(langue, "err_guild_only", defaut="<:error:1512505075220611172> Cette commande est uniquement utilisable sur des **Serveurs Discord**.")
+                msg = t(
+                    langue,
+                    "err_guild_only",
+                    defaut="<:error:1512505075220611172> Cette commande est uniquement utilisable sur des **Serveurs Discord**.",
+                )
                 await interaction.response.send_message(msg, ephemeral=True)
             return False
 
@@ -660,9 +729,13 @@ class GGEAssistantBot(commands.Bot):
         # --- 4. MAINTENANCE GLOBALE ---
         if self.maintenance_mode:
             if interaction.type == discord.InteractionType.application_command:
-                msg = t(langue, "bot_err_maintenance", defaut="🚧 **En cours de maintenance !**\nMes gobelins travaillent pour réactiver l'ensemble des fonctionnalités au plus vite.")
+                msg = t(
+                    langue,
+                    "bot_err_maintenance",
+                    defaut="🚧 **En cours de maintenance !**\nMes gobelins travaillent pour réactiver l'ensemble des fonctionnalités au plus vite.",
+                )
                 await interaction.response.send_message(msg, ephemeral=True)
-            return False 
+            return False
 
         # --- 5. CHARGEMENT DES RÈGLES DE BANS ---
         blocks_data = await load_blocks_async()
@@ -673,7 +746,9 @@ class GGEAssistantBot(commands.Bot):
         if cmd_name in global_cmds:
             if interaction.type == discord.InteractionType.application_command:
                 reason = global_cmds[cmd_name]
-                msg = t(langue, "bot_err_cmd_blocked", reason=reason, defaut=f"⛔ **Commande désactivée** :\n> {reason}")
+                msg = t(
+                    langue, "bot_err_cmd_blocked", reason=reason, defaut=f"⛔ **Commande désactivée** :\n> {reason}"
+                )
                 await interaction.response.send_message(msg, ephemeral=True)
             return False
 
@@ -681,36 +756,48 @@ class GGEAssistantBot(commands.Bot):
         user_id_str = str(interaction.user.id)
         if user_id_str in blocked_users:
             user_blocks = blocked_users[user_id_str]
-            
+
             if "ALL" in user_blocks:
                 if interaction.type == discord.InteractionType.application_command:
-                    reason = user_blocks['ALL']
-                    msg = t(langue, "bot_err_user_blocked_all", reason=reason, defaut=f"🛑 **Accès refusé** :\n> {reason}")
+                    reason = user_blocks["ALL"]
+                    msg = t(
+                        langue, "bot_err_user_blocked_all", reason=reason, defaut=f"🛑 **Accès refusé** :\n> {reason}"
+                    )
                     await interaction.response.send_message(msg, ephemeral=True)
                 return False
-            
+
             if cmd_name in user_blocks:
                 if interaction.type == discord.InteractionType.application_command:
                     reason = user_blocks[cmd_name]
-                    msg = t(langue, "bot_err_user_blocked_cmd", reason=reason, defaut=f"🛑 **Accès restreint** :\n> {reason}")
+                    msg = t(
+                        langue,
+                        "bot_err_user_blocked_cmd",
+                        reason=reason,
+                        defaut=f"🛑 **Accès restreint** :\n> {reason}",
+                    )
                     await interaction.response.send_message(msg, ephemeral=True)
                 return False
 
         return True
 
     async def close(self):
-        if hasattr(self, 'flag_watcher_task'): self.flag_watcher_task.cancel()
-        if hasattr(self, 'status_task'): self.status_task.cancel()
-        if hasattr(self, 'sync_topgg_votes_task'): self.sync_topgg_votes_task.cancel()
-        if hasattr(self, 'post_server_count_task'): self.post_server_count_task.cancel()
-        if hasattr(self, 'web_site'):
+        if hasattr(self, "flag_watcher_task"):
+            self.flag_watcher_task.cancel()
+        if hasattr(self, "status_task"):
+            self.status_task.cancel()
+        if hasattr(self, "sync_topgg_votes_task"):
+            self.sync_topgg_votes_task.cancel()
+        if hasattr(self, "post_server_count_task"):
+            self.post_server_count_task.cancel()
+        if hasattr(self, "web_site"):
             await self.web_site.stop()
             await self.web_runner.cleanup()
-        session = getattr(self, 'session', None)
-        if session: 
+        session = getattr(self, "session", None)
+        if session:
             await session.close()
-            
+
         await super().close()
+
 
 bot = GGEAssistantBot()
 
