@@ -8,7 +8,10 @@ import discord
 from discord.ext import commands
 
 from utils import (
+    BASE_DIR,
+    LOCALES_DIR,
     MON_ID_DISCORD,
+    charger_langues,
     load_blocks_async,
     save_blocks_async,
     save_maintenance_async,
