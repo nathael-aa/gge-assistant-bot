@@ -1,5 +1,4 @@
 import io
-import json
 import logging
 import os
 import re
@@ -9,10 +8,7 @@ import discord
 from discord.ext import commands
 
 from utils import (
-    BASE_DIR,
-    LOCALES_DIR,
     MON_ID_DISCORD,
-    charger_langues,
     load_blocks_async,
     save_blocks_async,
     save_maintenance_async,
@@ -230,28 +226,22 @@ class AdminCog(commands.Cog):
         serveurs = self.bot.guilds
         nb_serveurs = len(serveurs)
         
-        # 1. Trier les serveurs par date d'ajout (du plus récent au plus ancien)
-        from datetime import datetime  # Assure-toi que c'est importé en haut de ton fichier
         serveurs_tries = sorted(
             serveurs, 
             key=lambda g: g.me.joined_at if g.me and g.me.joined_at else datetime.min, 
             reverse=True
         )
 
-        # 2. Créer la liste avec les nouvelles infos
         liste_serveurs = []
         for g in serveurs_tries:
-            # Date d'ajout du bot
             if g.me and g.me.joined_at:
                 ts = int(g.me.joined_at.timestamp())
                 date_str = f"<t:{ts}:d>"
             else:
                 date_str = "Inconnue"
             
-            # Propriétaire du serveur
             proprio = f"{g.owner.name}" if g.owner else "Inconnu"
                 
-            # Format d'affichage compact et riche
             ligne = f"• **{g.name}** (`{g.id}`) | 👑 {proprio} | 👥 {g.member_count} | 📥 {date_str}"
             liste_serveurs.append(ligne)
             
@@ -285,7 +275,7 @@ class AdminCog(commands.Cog):
             nom_serveur = guild.name
             await guild.leave()
             
-            msg = t(self.admin_lang, "admin_leave_success", nom=nom_serveur, defaut=f"✅ Succès : Le bot a quitté le serveur **{nom_serveur}**.")
+            msg = t(self.admin_lang, "admin_leave_success", nom=nom_serveur, defaut=f"✅ Succès : Le bot a quitté le serveur **{nom_serveur**}.")
             await ctx.send(msg)
             logger.info(f"🚪 Le bot a quitté le serveur {nom_serveur} via commande admin.")
         except Exception as e:
@@ -300,18 +290,16 @@ class AdminCog(commands.Cog):
         """[CACHÉE] !scan_manuel : Lance manuellement les scanners."""
         if ctx.author.id != MON_ID_DISCORD: return
 
-        msg = await ctx.send("⏳ **Lancement manuel des scanners...** (Scan Serveur asynchrone)")
+        await ctx.send("⏳ **Lancement manuel des scanners...** (Scan Serveur asynchrone)")
 
         try:
             logger.info(f"🚀 Lancement manuel du ServerScanner par {ctx.author.name}")
             
-            # 1. On va chercher le cog ScanCog qui est chargé dans le bot
             scan_server = self.bot.get_cog("ScanCog")
             
             if scan_server is None:
                 return await ctx.send("❌ **Erreur :** Le module `ScanCog` n'est pas chargé dans le bot.")
 
-            # 2. On lance la fonction, mais cette fois en utilisant scan_server au lieu de self !
             await scan_server.daily_scan.coro(scan_server)
             
             await ctx.send("✅ **Tous les scans manuels sont terminés avec succès !**")
@@ -370,14 +358,9 @@ class AdminCog(commands.Cog):
     @commands.command(name="setstatus")
     async def setstatus(self, ctx, *, message: str = None):
         """[Admin] Ajoute ou retire un message de statut personnalisé."""
-        from utils import MON_ID_DISCORD
-        
-        # Sécurité : On vérifie que c'est bien toi. 
-        # Si ce n'est pas toi, le bot ignore silencieusement (pas de message d'erreur).
         if ctx.author.id != MON_ID_DISCORD:
             return 
 
-        # On modifie la variable du bot en direct
         self.bot.custom_status = message
 
         if message:
@@ -417,16 +400,13 @@ class AdminCog(commands.Cog):
     # 🧹 SYNCHRONISATION, TRI ET SÉCURITÉ I18N
     # ==========================================
     @commands.command(name="i18n_sync", aliases=["sortlang", "sort_locales"], hidden=True)
-    @commands.is_owner() # Réservé EXCLUSIVEMENT au créateur du bot
+    @commands.is_owner()
     async def i18n_sync(self, ctx):
         """[CACHÉE] !i18n_sync : Scanne, Trie et Synchronise les fichiers JSON avec sécurité."""
         import json
-        import os
         import re
-        import io
         from utils import BASE_DIR, LOCALES_DIR, charger_langues
 
-        # 1. Scanner le code Python pour extraire les clés
         pattern = re.compile(r'\bt\s*\(\s*[^,]+,\s*["\']([a-zA-Z0-9_]+)["\']')
         cles_utilisees = set()
 
@@ -437,7 +417,6 @@ class AdminCog(commands.Cog):
                     with open(os.path.join(root, file), encoding='utf-8') as f:
                         cles_utilisees.update(pattern.findall(f.read()))
 
-        # 2. Ajouter manuellement les clés dynamiques (Mois, Événements...)
         for i in range(1, 13): 
             cles_utilisees.add(f"month_{i:02d}")
 
@@ -448,7 +427,6 @@ class AdminCog(commands.Cog):
             "cal_ev_nobility"
         ])
 
-        # 3. Charger tous les fichiers JSON
         locales_data = {}
         for fichier in LOCALES_DIR.glob("*.json"):
             with open(fichier, encoding='utf-8') as f:
@@ -462,11 +440,9 @@ class AdminCog(commands.Cog):
 
         supprimer_cles = False
 
-        # 4. Sécurité : Fichier TXT et confirmation si des clés vont être supprimées
         if inutiles_fr:
             liste_inutiles_txt = "\n".join(sorted(inutiles_fr))
             
-            # Création du fichier .txt en mémoire
             file_bytes = io.BytesIO(liste_inutiles_txt.encode('utf-8'))
             discord_file = discord.File(fp=file_bytes, filename="cles_orphelines.txt")
 
@@ -492,7 +468,6 @@ class AdminCog(commands.Cog):
         else:
             msg = await ctx.send("🔄 Scan en cours, aucune clé à supprimer détectée...")
 
-        # 5. Appliquer les modifications sur le fichier de référence (FR)
         if supprimer_cles:
             for c in inutiles_fr:
                 fr_data.pop(c, None)
@@ -503,7 +478,6 @@ class AdminCog(commands.Cog):
         fr_data_sorted = dict(sorted(fr_data.items()))
         locales_data["fr"] = fr_data_sorted
 
-        # 6. Appliquer la structure de référence (FR) aux autres langues, et tout trier
         for lang, data in locales_data.items():
             if lang == "fr": continue
             
@@ -519,16 +493,13 @@ class AdminCog(commands.Cog):
                     
             locales_data[lang] = dict(sorted(data.items()))
 
-        # 7. Sauvegarder dans les fichiers avec l'indentation parfaite
         for lang, data in locales_data.items():
             fichier = LOCALES_DIR / f"{lang}.json"
             with open(fichier, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
 
-        # 8. Recharger en mémoire
         charger_langues()
 
-        # 9. Rapport de fin
         action_txt = "🗑️ Supprimées" if supprimer_cles else "💾 Ignorées (Conservées)"
         desc = (
             f"**Fichiers traités :** `{len(locales_data)}`\n"
@@ -554,24 +525,20 @@ class AdminCog(commands.Cog):
     async def i18n_export(self, ctx, langue_cible: str = "en"):
         """[CACHÉE] !i18n_export [langue] : Génère un CSV pour les traducteurs communautaires."""
         import csv
-        import io
+        import json
         import re
 
-        from utils import LOCALES_DIR
-        
         fr_file = LOCALES_DIR / 'fr.json'
         cible_file = LOCALES_DIR / f'{langue_cible}.json'
         
         if not fr_file.exists() or not cible_file.exists():
             return await ctx.send(f"❌ Impossible de trouver `fr.json` ou `{langue_cible}.json`.")
             
-        import json
         with open(fr_file, encoding='utf-8') as f:
             fr_data = json.load(f)
         with open(cible_file, encoding='utf-8') as f:
             cible_data = json.load(f)
 
-        # Création du fichier CSV en mémoire
         output = io.StringIO()
         writer = csv.writer(output, delimiter=';')
         
@@ -607,11 +574,9 @@ class AdminCog(commands.Cog):
         msg_wait = await ctx.send("⏳ **Scan du code en cours...**")
         
         emojis_found = {}
-        # Dossiers à ignorer pour accélérer le scan
         exclude_dirs = [".git", "__pycache__", "venv", "logs", "data"]
 
         for root, dirs, files in os.walk(BASE_DIR):
-            # Filtrer les dossiers exclus
             dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
             
             for file in files:
@@ -625,7 +590,6 @@ class AdminCog(commands.Cog):
                                 animated, name, emoji_id = match
                                 full_emoji = f"<{animated}:{name}:{emoji_id}>"
                                 
-                                # Pour l'affichage plus propre, on ne garde que le chemin relatif
                                 rel_path = os.path.relpath(filepath, BASE_DIR)
                                 
                                 if full_emoji not in emojis_found:
@@ -662,11 +626,9 @@ class AdminCog(commands.Cog):
         """[CACHÉE] !replace_raw [ancien] [nouveau] : Remplacement strict de texte."""
         if ctx.author.id != MON_ID_DISCORD: return
 
-        # 1. On nettoie les guillemets ou backticks
         old_text = old_text.strip('`"')
         new_text = new_text.strip('`"')
 
-        # 2. 🛡️ L'ASTUCE ULTIME : on convertit les crochets en vrais chevrons !
         old_text = old_text.replace('[', '<').replace(']', '>')
         new_text = new_text.replace('[', '<').replace(']', '>')
 
@@ -731,19 +693,15 @@ class AdminCog(commands.Cog):
 
         msg_wait = await ctx.send("⏳ **Scanner d'émojis en cours d'analyse...**")
         
-        # 1. Récupérer tous les IDs des émojis (Serveurs + Application)
         bot_emoji_ids = {str(e.id) for e in self.bot.emojis}
         
         try:
-            # Récupération des émojis uploadés sur le portail développeur
             app_emojis = await self.bot.fetch_application_emojis()
             for e in app_emojis:
                 bot_emoji_ids.add(str(e.id))
         except Exception as e:
-            # En cas d'erreur de connexion à l'API, on l'affiche dans la console
             print(f"Impossible de récupérer les émojis d'application : {e}")
         
-        # 2. Regex pour capturer les émojis normaux et animés dans le code
         emoji_regex = re.compile(r"<(a?):([a-zA-Z0-9_]+):(\d+)>")
         
         missing_emojis = {}
@@ -769,18 +727,15 @@ class AdminCog(commands.Cog):
                     except Exception:
                         pass
 
-        # 3. Résultat si tout va bien
         if not missing_emojis:
             return await msg_wait.edit(content="✅ **Parfait !** Le bot a les droits sur **TOUS** les émojis présents dans le code.")
 
-        # 4. Résultat s'il y a des émojis manquants
         embed = discord.Embed(
             title="⚠️ Émojis inaccessibles détectés",
             description=f"Le bot ne possède pas les droits pour **{len(missing_emojis)}** émojis trouvés dans le code.",
             color=discord.Color.orange()
         )
         
-        # Ajout des 20 premiers dans l'embed pour un aperçu rapide
         count = 0
         for emoji_tag, files_set in missing_emojis.items():
             if count < 20:
@@ -788,12 +743,10 @@ class AdminCog(commands.Cog):
                 embed.add_field(name=f"`{emoji_tag}`", value=f"📁 {files_list}", inline=False)
                 count += 1
 
-        # 5. Gestion de l'export TXT si la limite est dépassée
         fichier_joint = None
         if len(missing_emojis) > 20:
             embed.set_footer(text="⚠️ Affichage limité à 20. Consultez le fichier joint pour voir la liste complète.")
             
-            # Préparation du contenu du fichier texte
             lignes_rapport = [
                 "==========================================",
                 f"🚨 RAPPORT DES ÉMOJIS FANTÔMES ({len(missing_emojis)} trouvés)",
@@ -806,13 +759,11 @@ class AdminCog(commands.Cog):
                 
             contenu_complet = "\n".join(lignes_rapport)
             
-            # Création du fichier directement en mémoire (sans l'écrire sur le disque)
             buffer = io.BytesIO(contenu_complet.encode('utf-8'))
             fichier_joint = discord.File(fp=buffer, filename="emojis_fantomes_rapport.txt")
         else:
             embed.set_footer(text="Fin du rapport.")
 
-        # 6. Envoi final
         await msg_wait.delete()
         if fichier_joint:
             await ctx.send(embed=embed, file=fichier_joint)
@@ -829,10 +780,6 @@ class AdminCog(commands.Cog):
 
         msg_wait = await ctx.send("🔍 **Recherche des émojis malformés en cours...**")
         
-        # Nos cibles :
-        # 1. Un double chevron entrant (ex: <<:events4:12345>)
-        # 2. Une fin d'émoji suivie de chiffres puis d'un chevron (ex: >123456789>)
-        # 3. Un double chevron sortant (ex: <:events4:12345>>)
         bad_patterns = [
             r"<<a?:[a-zA-Z0-9_]+:\d+>", 
             r">\d+>",
@@ -853,23 +800,19 @@ class AdminCog(commands.Cog):
                         with open(filepath, encoding="utf-8") as f:
                             lines = f.readlines()
                             
-                        # On lit ligne par ligne pour te dire exactement où chercher
                         for i, line in enumerate(lines):
                             for regex in regexes:
                                 matches = regex.findall(line)
                                 if matches:
                                     if file not in erreurs_trouvees:
                                         erreurs_trouvees[file] = []
-                                    # On note le numéro de la ligne et l'erreur exacte
                                     erreurs_trouvees[file].append(f"Ligne {i+1} : `{matches[0]}`")
                     except Exception:
                         pass
 
-        # Si le code est propre
         if not erreurs_trouvees:
             return await msg_wait.edit(content="✅ **Code 100% propre !** Aucune balise malformée (`<<:` ou `>>` ou `>ID>`) n'a été détectée.")
 
-        # S'il y a des erreurs
         embed = discord.Embed(
             title="⚠️ Syntaxe d'émoji cassée",
             description="J'ai trouvé des restes de mauvais copier-coller dans ces fichiers :",
@@ -877,7 +820,6 @@ class AdminCog(commands.Cog):
         )
         
         for file, erreurs in erreurs_trouvees.items():
-            # On affiche les 10 premières erreurs par fichier pour ne pas surcharger l'embed
             valeur = "\n".join(erreurs[:10])
             if len(erreurs) > 10:
                 valeur += f"\n*... et {len(erreurs) - 10} autres erreurs.*"
