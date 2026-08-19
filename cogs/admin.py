@@ -76,7 +76,6 @@ class AdminCog(commands.Cog):
         embed.add_field(
             name="🌐 Traductions (i18n)",
             value="`!i18n_sync` ➔ Scanne le code et met à jour les `.json`.\n"
-                  "`!sort_locales` ➔ Trie tous les fichiers de langue JSON par ordre alphabétique.\n"
                   "`!i18n_export [lang]` ➔ Génère un `.csv` pour les traducteurs.",
             inline=False
         )
@@ -387,153 +386,173 @@ class AdminCog(commands.Cog):
             await ctx.send("🗑️ Le message personnalisé a été retiré de la rotation.")
 
     # ==========================================
-    # 🧹 NETTOYAGE ET SYNCHRONISATION I18N
+    # 🧹 VUE DE CONFIRMATION (SÉCURITÉ I18N)
     # ==========================================
-    @commands.command(name="i18n_sync", hidden=True)
+    class I18nConfirmView(discord.ui.View):
+        def __init__(self, ctx):
+            super().__init__(timeout=120)
+            self.ctx = ctx
+            self.delete = False
+            self.responded = False
+
+        @discord.ui.button(label="🗑️ Supprimer les clés", style=discord.ButtonStyle.danger)
+        async def btn_delete(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.ctx.author.id: return
+            self.delete = True
+            self.responded = True
+            for item in self.children: item.disabled = True
+            await interaction.response.edit_message(view=self)
+            self.stop()
+
+        @discord.ui.button(label="💾 Conserver (Trier & Ajouter)", style=discord.ButtonStyle.success)
+        async def btn_keep(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.ctx.author.id: return
+            self.delete = False
+            self.responded = True
+            for item in self.children: item.disabled = True
+            await interaction.response.edit_message(view=self)
+            self.stop()
+
+    # ==========================================
+    # 🧹 SYNCHRONISATION, TRI ET SÉCURITÉ I18N
+    # ==========================================
+    @commands.command(name="i18n_sync", aliases=["sortlang", "sort_locales"], hidden=True)
+    @commands.is_owner() # Réservé EXCLUSIVEMENT au créateur du bot
     async def i18n_sync(self, ctx):
-        """[CACHÉE] !i18n_sync : Scanne le code et met à jour les fichiers JSON."""
-        if ctx.author.id != MON_ID_DISCORD: return
-        
+        """[CACHÉE] !i18n_sync : Scanne, Trie et Synchronise les fichiers JSON avec sécurité."""
         import json
         import os
         import re
-
+        import io
         from utils import BASE_DIR, LOCALES_DIR, charger_langues
-        
-        # 1. Scanner le code Python pour extraire les clés exactes
+
+        # 1. Scanner le code Python pour extraire les clés
         pattern = re.compile(r'\bt\s*\(\s*[^,]+,\s*["\']([a-zA-Z0-9_]+)["\']')
         cles_utilisees = set()
-        
+
         for root, dirs, files in os.walk(BASE_DIR):
             if '.git' in root or '__pycache__' in root: continue
             for file in files:
                 if file.endswith('.py'):
                     with open(os.path.join(root, file), encoding='utf-8') as f:
                         cles_utilisees.update(pattern.findall(f.read()))
-                        
-        # 2. Ajouter manuellement les clés dynamiques
+
+        # 2. Ajouter manuellement les clés dynamiques (Mois, Événements...)
         for i in range(1, 13): 
             cles_utilisees.add(f"month_{i:02d}")
-            
+
         cles_utilisees.update([
             "cal_ev_nomad", "cal_ev_samurai", "cal_ev_bloodcrow", "cal_ev_realms", 
             "cal_ev_storm", "cal_ev_berimond", "cal_ev_bladecoast", "cal_ev_rift", 
             "cal_ev_tournament", "cal_ev_horizon", "cal_ev_outer", "cal_ev_patronage", 
             "cal_ev_nobility"
         ])
-        
-        log_msg = []
-        
-        # 3. Traitement de FR.JSON
-        fr_file = LOCALES_DIR / 'fr.json'
-        if not fr_file.exists():
-            return await ctx.send("❌ Impossible de trouver `fr.json`.")
-            
-        with open(fr_file, encoding='utf-8') as f:
-            fr_data = json.load(f)
-            
+
+        # 3. Charger tous les fichiers JSON
+        locales_data = {}
+        for fichier in LOCALES_DIR.glob("*.json"):
+            with open(fichier, encoding='utf-8') as f:
+                locales_data[fichier.stem] = json.load(f)
+
+        fr_data = locales_data.get("fr", {})
         cles_existantes_fr = set(fr_data.keys())
+        
         manquantes_fr = cles_utilisees - cles_existantes_fr
         inutiles_fr = cles_existantes_fr - cles_utilisees
-        
-        for c in manquantes_fr: 
+
+        supprimer_cles = False
+
+        # 4. Sécurité : Fichier TXT et confirmation si des clés vont être supprimées
+        if inutiles_fr:
+            liste_inutiles_txt = "\n".join(sorted(inutiles_fr))
+            
+            # Création du fichier .txt en mémoire
+            file_bytes = io.BytesIO(liste_inutiles_txt.encode('utf-8'))
+            discord_file = discord.File(fp=file_bytes, filename="cles_orphelines.txt")
+
+            embed_warn = discord.Embed(
+                title="⚠️ Clés inutilisées détectées",
+                description=(
+                    f"J'ai trouvé **{len(inutiles_fr)}** clés dans le fichier de référence `fr.json` "
+                    f"qui n'apparaissent plus dans ton code Python.\n\n"
+                    f"📄 **Ouvre le fichier texte ci-joint pour voir la liste complète sans troncature !**\n\n"
+                    "Que veux-tu faire ?"
+                ),
+                color=discord.Color.orange()
+            )
+            
+            view = self.I18nConfirmView(ctx)
+            msg = await ctx.send(embed=embed_warn, view=view, file=discord_file)
+            
+            await view.wait()
+            if not view.responded:
+                return await msg.edit(content="⏱️ **Délai expiré.** Action annulée par sécurité.", embed=None, view=None)
+            
+            supprimer_cles = view.delete
+        else:
+            msg = await ctx.send("🔄 Scan en cours, aucune clé à supprimer détectée...")
+
+        # 5. Appliquer les modifications sur le fichier de référence (FR)
+        if supprimer_cles:
+            for c in inutiles_fr:
+                fr_data.pop(c, None)
+                
+        for c in manquantes_fr:
             fr_data[c] = "[TODO] Texte manquant"
-        for c in inutiles_fr: 
-            del fr_data[c]
             
-        fr_data = dict(sorted(fr_data.items()))
-        with open(fr_file, 'w', encoding='utf-8') as f:
-            json.dump(fr_data, f, indent=2, ensure_ascii=False)
+        fr_data_sorted = dict(sorted(fr_data.items()))
+        locales_data["fr"] = fr_data_sorted
+
+        # 6. Appliquer la structure de référence (FR) aux autres langues, et tout trier
+        for lang, data in locales_data.items():
+            if lang == "fr": continue
             
-        log_msg.append(f"🇫🇷 **fr.json** : {len(manquantes_fr)} ajoutées, {len(inutiles_fr)} supprimées.")
-        
-        # 4. Traitement des autres langues (en, de) par rapport au fichier
-        for lang in ['en', 'de']:
-            lang_file = LOCALES_DIR / f'{lang}.json'
-            if not lang_file.exists(): continue
-            
-            with open(lang_file, encoding='utf-8') as f:
-                lang_data = json.load(f)
-                
-            l_existantes = set(lang_data.keys())
-            l_manquantes = set(fr_data.keys()) - l_existantes
-            l_inutiles = l_existantes - set(fr_data.keys())
-            
-            for c in l_manquantes: 
-                texte_aide = fr_data[c]
-                lang_data[c] = f"[TODO] {texte_aide}" if texte_aide != "[TODO] Texte manquant" else "[TODO] Texte manquant"
-                
-            for c in l_inutiles: 
-                del lang_data[c]
-                
-            lang_data = dict(sorted(lang_data.items()))
-            with open(lang_file, 'w', encoding='utf-8') as f:
-                json.dump(lang_data, f, indent=2, ensure_ascii=False)
-                
-            log_msg.append(f"🌐 **{lang}.json** : {len(l_manquantes)} ajoutées, {len(l_inutiles)} supprimées.")
-            
-        # 5. Recharger les langues en mémoire vive
+            cles_lang = list(data.keys())
+            for c in cles_lang:
+                if c not in fr_data_sorted:
+                    data.pop(c, None)
+                    
+            for c in fr_data_sorted.keys():
+                if c not in data:
+                    val = fr_data_sorted[c]
+                    data[c] = f"[TODO] {val}" if val != "[TODO] Texte manquant" else "[TODO] Texte manquant"
+                    
+            locales_data[lang] = dict(sorted(data.items()))
+
+        # 7. Sauvegarder dans les fichiers avec l'indentation parfaite
+        for lang, data in locales_data.items():
+            fichier = LOCALES_DIR / f"{lang}.json"
+            with open(fichier, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+
+        # 8. Recharger en mémoire
         charger_langues()
+
+        # 9. Rapport de fin
+        action_txt = "🗑️ Supprimées" if supprimer_cles else "💾 Ignorées (Conservées)"
+        desc = (
+            f"**Fichiers traités :** `{len(locales_data)}`\n"
+            f"**Total des clés (après tri) :** `{len(fr_data_sorted)}`\n\n"
+            f"➕ **Clés ajoutées :** `{len(manquantes_fr)}`\n"
+            f"{action_txt} **:** `{len(inutiles_fr)}`\n\n"
+            f"🟢 *Les langues ont été rechargées et triées alphabétiquement.* \n"
+            f"*(Cherche '[TODO]' dans tes fichiers JSON pour voir ce qu'il faut traduire !)*"
+        )
         
-        embed = discord.Embed(title="🧹 Synchronisation i18n Terminée", description="\n".join(log_msg), color=discord.Color.green())
-        embed.set_footer(text="Ouvre tes fichiers JSON et cherche '[TODO]' pour voir ce qu'il reste à traduire !")
-        await ctx.send(embed=embed)
-
-    # ==========================================
-    # 🛠️ COMMANDE ADMIN : TRI DES LANGUES (Préfixe)
-    # ==========================================
-    @commands.command(name="sort_locales", aliases=["sortlang"])
-    @commands.is_owner() # Réservé EXCLUSIVEMENT au créateur du bot
-    async def sort_locales(self, ctx: commands.Context):
-        fichiers_traites = 0
-        cles_totales = 0
-
-        try:
-            # Affiche "Le bot écrit..." le temps du traitement
-            async with ctx.typing():
-                # On parcourt tous les fichiers .json dans le dossier locales
-                for fichier in LOCALES_DIR.glob("*.json"):
-                    with open(fichier, encoding='utf-8') as f:
-                        data = json.load(f)
-                    
-                    # Tri du dictionnaire par ordre alphabétique des clés
-                    sorted_data = dict(sorted(data.items()))
-                    
-                    # Réécriture du fichier avec le dictionnaire trié et une belle indentation
-                    with open(fichier, 'w', encoding='utf-8') as f:
-                        json.dump(sorted_data, f, indent=4, ensure_ascii=False)
-                    
-                    fichiers_traites += 1
-                    cles_totales += len(sorted_data)
-
-                # On recharge la mémoire du bot avec les fichiers fraîchement triés
-                charger_langues()
-
-            # Message de confirmation
-            embed = discord.Embed(
-                title="🛠️ Nettoyage des Langues Terminé",
-                description=f"Le tri alphabétique a été appliqué avec succès !\n\n**Fichiers traités :** `{fichiers_traites}`\n**Clés triées :** `{cles_totales}`\n**Statut :** 🟢 *Rechargées en mémoire*",
-                color=discord.Color.green()
-            )
-            await ctx.send(embed=embed)
-
-        except Exception as e:
-            # Gestion d'erreur au cas où un JSON est mal formaté
-            embed_err = discord.Embed(
-                title="❌ Erreur lors du tri",
-                description=f"Une erreur est survenue lors du traitement des fichiers :\n```python\n{e}\n```",
-                color=discord.Color.red()
-            )
-            await ctx.send(embed=embed_err)
+        embed_success = discord.Embed(title="✨ Synchronisation Terminée", description=desc, color=discord.Color.green())
+        
+        if isinstance(msg, discord.Message):
+            await msg.edit(content=None, embed=embed_success, view=None)
+        else:
+            await ctx.send(embed=embed_success)
 
     # ==========================================
     # 📤 EXPORTATION POUR LES TRADUCTEURS (CSV)
     # ==========================================
     @commands.command(name="i18n_export", hidden=True)
+    @commands.is_owner()
     async def i18n_export(self, ctx, langue_cible: str = "en"):
         """[CACHÉE] !i18n_export [langue] : Génère un CSV pour les traducteurs communautaires."""
-        if ctx.author.id != MON_ID_DISCORD: return
-        
         import csv
         import io
         import re

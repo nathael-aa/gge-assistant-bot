@@ -78,12 +78,7 @@ HELP_CONFIG = {
         "title_key": "help_cat_guerre",
         "commands": [
             {"name": "/alliance scanner", "desc_key": "help_cmd_alliance_scanner"},
-            {"name": "/target", "desc_key": "help_cmd_target"},
-            {"name": "/proximity", "desc_key": "help_cmd_proximity"},
-            {"name": "/hr", "desc_key": "help_cmd_hr"},
-            {"name": "/diplomacy add", "desc_key": "help_cmd_diplomacy_add"},
-            {"name": "/diplomacy remove", "desc_key": "help_cmd_diplomacy_remove"},
-            {"name": "/diplomacy list", "desc_key": "help_cmd_diplomacy_list"}
+            {"name": "/target (setup / search)", "desc_key": "help_cmd_target_group"}
         ]
     },
     "events": {

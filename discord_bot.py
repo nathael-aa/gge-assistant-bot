@@ -113,22 +113,50 @@ class GGEAssistantBot(commands.Bot):
         self.custom_status = None
 
     def export_commands_json(self):
-        """Exporte uniquement le 'Slash Command Payload' minimal requis."""
+        """Exporte le 'Slash Command Payload' incluant les groupes et sous-commandes."""
         try:
             payload = []
+            
+            def process_command(cmd, group_name=""):
+                # Si c'est un groupe de commandes (ex: /target)
+                if isinstance(cmd, discord.app_commands.Group):
+                    group_data = {
+                        "name": f"{group_name}{cmd.name}",
+                        "description": cmd.description,
+                        "type": 1, # Type 1 = CHAT_INPUT (Slash Command)
+                        "options": []
+                    }
+                    
+                    # On parcourt les sous-commandes du groupe
+                    for sub_cmd in cmd.commands:
+                        # Discord gère les sous-commandes avec le type 1 ou 2 (Subcommand / Subcommand Group)
+                        sub_data = {
+                            "name": sub_cmd.name,
+                            "description": sub_cmd.description,
+                            "type": 1, 
+                            "options": self.serialize_options(sub_cmd.options) if hasattr(sub_cmd, 'options') else []
+                        }
+                        group_data["options"].append(sub_data)
+                        
+                    payload.append(group_data)
+                else:
+                    # Commande classique isolée (ex: /ping)
+                    cmd_data = {
+                        "name": cmd.name,
+                        "description": cmd.description,
+                        "type": 1,
+                        "options": self.serialize_options(cmd.options) if hasattr(cmd, 'options') else []
+                    }
+                    payload.append(cmd_data)
+
+            # On parcourt l'arbre des commandes
             for cmd in self.tree.get_commands():
-                cmd_data = {
-                    "name": cmd.name,
-                    "description": cmd.description,
-                    "type": 1,
-                    "options": self.serialize_options(cmd.options) if hasattr(cmd, 'options') else []
-                }
-                payload.append(cmd_data)
+                process_command(cmd)
             
             with open("commands.json", "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=4, ensure_ascii=False)
             
-            logger.info("📄 [JSON] Commandes actuelles générées avec succès.")
+            logger.info("📄 [JSON] Commandes et sous-commandes actuelles générées avec succès.")
         except Exception as e:
             logger.error(f"❌ Erreur lors de l'export JSON : {e}")
 
@@ -170,11 +198,11 @@ class GGEAssistantBot(commands.Bot):
             "cogs.config", 
             "cogs.events", 
             "cogs.forteresses", 
-            "cogs.pvp", 
             "cogs.profils", 
             "cogs.radar",
             "cogs.scan_server",
             "cogs.storms",
+            "cogs.target", 
         ]
         for ext in extensions:
             try:

@@ -100,6 +100,7 @@ DICT_EMOJIS = {
     "e_std_red_heart": "❤️",
     "e_std_robot": "🤖",
     "e_std_rocket": "🚀",
+    "e_keyboard": "⌨️",
     "e_std_satellite": "<:status:1533435056087896164>",
     "e_std_satellite_antenna": "<:status:1533435056087896164>",
     "e_std_scroll": "<:book:1535657877799444500>r",
@@ -125,4 +126,9 @@ DICT_EMOJIS = {
     "e_yellowbullet": "<:yellowbullet:1534908820675887348>",
     "e_heart": "<a:pinkhearts:1536862210578456656>",
     "e_marshal": "<:stalwartmarshal:1533429333388165130>",
+    "e_check": "<:check:1539731558489923594>",
+    "e_nocheck": "<:nocheck:1539731557357588540>",
+    "e_next": "<:nextpage:1533554128230420590>",
+    "e_last": "<:lastpage:1533554126984581283>",
+    "e_casleruin": "<:ruins:1512573747448512644>",
 }
