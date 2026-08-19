@@ -14,12 +14,9 @@ import utils
 from utils import (
     BASE_DATA_PATH,
     CONFIG_DIR,
-    PaginationView,
-    _get_api_timestamp,
     alliance_autocomplete,
     format_num,
     get_api_headers,
-    get_cached_data,
     get_server_config,
     joueur_autocomplete,
     prompt_vote_if_lucky,
