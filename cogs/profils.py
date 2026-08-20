@@ -100,6 +100,8 @@ class ProfilsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.bdd_chemin = BASE_DATA_PATH / "bdd_items_gge.json"
+        # Server Command
+        self.clr_server = discord.Color.from_rgb(255, 244, 230)
         # Purple for player group
         self.clr_joueur = discord.Color.from_rgb(223, 204, 241)
         self.clr_historique = discord.Color.from_rgb(200, 183, 216)
@@ -124,27 +126,20 @@ class ProfilsCog(commands.Cog):
         session = self.bot.session
 
         # ----------------------------------------------------
-        # 1. RÉCUPÉRATION DES DONNÉES LOCALES (Scan Quotidien)
+        # 1. RÉCUPÉRATION DES DONNÉES LOCALES & API
         # ----------------------------------------------------
         local_data = {}
-        scan_duration = 0
         try:
-            # Recherche du fichier de scan local
             scan_dir = BASE_DATA_PATH / "server_scans" / serveur
             if scan_dir.exists():
-                # On prend le fichier JSON le plus récent du dossier
                 fichiers = list(scan_dir.glob("*.json"))
                 if fichiers:
                     latest_file = max(fichiers, key=lambda p: p.stat().st_mtime)
                     with open(latest_file, encoding="utf-8") as f:
                         local_data = json.load(f)
-                        scan_duration = local_data.get("scan_duration", 0)
-        except Exception as e:
-            logger.warning(f"Impossible de lire le scan local pour le serveur {serveur} : {e}")
+        except:
+            pass
 
-        # ----------------------------------------------------
-        # 2. RÉCUPÉRATION DES DONNÉES API
-        # ----------------------------------------------------
         api_data = {}
         try:
             url = "https://api.gge-tracker.com/api/v1/server/statistics"
@@ -152,13 +147,12 @@ class ProfilsCog(commands.Cog):
                 if r.status == 200:
                     data = await r.json()
                     if isinstance(data, list) and len(data) > 0:
-                        api_data = data[0]  # On prend le premier élément de la liste
+                        api_data = data[0]  # Le plus récent est toujours le premier
                     elif isinstance(data, dict):
                         api_data = data
         except Exception as e:
             logger.error(f"Erreur API /server/statistics : {e}")
 
-        # Si l'API est vide et le local aussi, on arrête là
         if not api_data and not local_data:
             err_msg = t(
                 langue,
@@ -168,138 +162,166 @@ class ProfilsCog(commands.Cog):
             return await interaction.followup.send(err_msg)
 
         # ----------------------------------------------------
-        # 3. EXTRACTION ET FORMATAGE DES VARIABLES
+        # 2. EXTRACTION ET FORMATAGE (Chiffres entiers)
         # ----------------------------------------------------
+        def fmt(n):
+            if n is None:
+                return "0"
+            return f"{int(n):,}".replace(",", " ")
+
+        def format_var(val):
+            if val is None:
+                val = 0
+            if val > 0:
+                return f"📈 (+{fmt(val)})"
+            elif val < 0:
+                return f"📉 ({fmt(val)})"
+            return "➖"
+
         # Démographie
         p_count = api_data.get("players_count") or local_data.get("total_players", 0)
         a_count = api_data.get("alliance_count") or local_data.get("stats", {}).get("total_alliances", 0)
         p_peace = api_data.get("players_in_peace", 0)
-        p_renamed = api_data.get("players_who_changed_name", 0)
-        a_renamed = api_data.get("alliances_changed_name", 0)
+        p_chg_alli = api_data.get("players_who_changed_alliance", 0)
+        p_chg_name = api_data.get("players_who_changed_name", 0)
 
-        # Économie & Puissance
+        # Puissance
         t_might = api_data.get("total_might", 0)
         a_might = api_data.get("avg_might", 0)
         m_might = api_data.get("max_might", 0)
-        a_loot = api_data.get("avg_loot", 0)
+        v_might_str = format_var(api_data.get("variation_might", 0))
+
+        # Butin
         t_loot = api_data.get("total_loot", 0)
-        v_might = api_data.get("variation_might", 0)
+        a_loot = api_data.get("avg_loot", 0)
+        m_loot = api_data.get("max_loot", 0)
+        v_loot_str = format_var(api_data.get("variation_loot", 0))
 
-        # Événements (Points globaux)
-        ev_nomads = api_data.get("event_nomad_points", 0)
-        ev_samurai = api_data.get("event_samurai_points", 0)
-        ev_bloodcrow = api_data.get("event_bloodcrow_points", 0)
-        ev_realms = api_data.get("event_war_realms_points", 0)
-        ev_berimond = api_data.get("event_berimond_kingdom_points", 0)
+        # Honneur
+        t_honor = api_data.get("total_honor", 0)
+        a_honor = api_data.get("avg_honor", 0)
+        v_honor_str = format_var(api_data.get("variation_honor", 0))
 
-        # Dates
+        # Date de mise à jour (Priorité à l'API)
         created_at_raw = api_data.get("created_at") or local_data.get("scan_date")
-        timestamp_str = ""
+        timestamp_str = "Récemment"
         if created_at_raw:
             try:
-                # Retrait du 'Z' ou ajustement du format ISO
-                clean_date = str(created_at_raw).replace("Z", "+00:00")
-                dt = datetime.fromisoformat(clean_date)
-                ts = int(dt.timestamp())
-                timestamp_str = f"<t:{ts}:R>"
+                dt = datetime.fromisoformat(str(created_at_raw).replace("Z", "+00:00"))
+                timestamp_str = f"<t:{int(dt.timestamp())}:R>"
             except:
-                timestamp_str = created_at_raw
+                pass
+
+        # ----------------------------------------------------
+        # 3. IDENTIFICATION DE L'ÉVÉNEMENT ACTIF
+        # ----------------------------------------------------
+        events_map = [
+            ("event_nomad_points", "{e_nomads}", "server_ev_name_nomads", "event_nomad_players"),
+            ("event_samurai_points", "{e_samurai}", "server_ev_name_samurai", "event_samurai_players"),
+            ("event_bloodcrow_points", "{e_bloodcrow}", "server_ev_name_bloodcrow", "event_bloodcrow_players"),
+            ("event_war_realms_points", "{e_war_realms}", "server_ev_name_realms", "event_war_realms_players"),
+            (
+                "event_berimond_kingdom_points",
+                "{e_berimond}",
+                "server_ev_name_berimond",
+                "event_berimond_kingdom_players",
+            ),
+        ]
+
+        active_events = []
+        for pts_key, emoji_tag, name_key, players_key in events_map:
+            pts = api_data.get(pts_key, 0)
+            if pts and pts > 0:
+                nom_ev = t(langue, name_key, defaut="Événement")
+                parts = api_data.get(players_key, 0)
+
+                ligne_ev = t(
+                    langue,
+                    "server_ev_val",
+                    icon=emoji_tag,
+                    name=nom_ev,
+                    pts=fmt(pts),
+                    part=fmt(parts),
+                    defaut="{icon} **{name}**\n• Points : **{pts}**\n• Participants : **{part}**",
+                )
+                active_events.append(ligne_ev)
 
         # ----------------------------------------------------
         # 4. CONSTRUCTION DE L'EMBED
         # ----------------------------------------------------
-        titre = t(langue, "server_title", serv=serveur.upper(), defaut="{e_icon_world} Statistics - Server {serv}")
-        desc = t(
-            langue,
-            "server_desc",
-            ts=timestamp_str,
-            defaut="Global overview of the server based on the last database scan ({ts}).",
+        titre = t(
+            langue, "server_title", serv=serveur.upper(), defaut="{e_icon_world} Statistiques Globales - Serveur {serv}"
         )
+        desc = t(langue, "server_desc", ts=timestamp_str, defaut="Actualisation des données : {ts}")
 
-        embed = discord.Embed(title=titre, description=desc, color=discord.Color.teal())
+        # 👉 On utilise ta couleur de classe ici :
+        embed = discord.Embed(title=titre, description=desc, color=self.clr_server)
 
-        # Bloc 1 : Démographie
-        lbl_pop_title = t(langue, "server_pop_title", defaut="{e_players} Demographics")
-        lbl_pop_val = t(
+        # RANGÉE 1 : Démographie & Événement
+        lbl_demo_title = t(langue, "server_demo_title", defaut="{e_players} Démographie")
+        lbl_demo_val = t(
             langue,
-            "server_pop_val",
-            p=format_num(p_count),
-            a=format_num(a_count),
-            peace=format_num(p_peace),
-            renamed=format_num(p_renamed),
+            "server_demo_val",
+            p=fmt(p_count),
+            a=fmt(a_count),
+            peace=fmt(p_peace),
+            c_alli=fmt(p_chg_alli),
+            c_name=fmt(p_chg_name),
             defaut=(
-                "• Players: **{p}**\n"
-                "• Alliances: **{a}**\n"
-                "• Under protection {e_peace}: **{peace}**\n"
-                "• Name changes: **{renamed}**"
+                "• Joueurs : **{p}**\n"
+                "• Alliances : **{a}**\n"
+                "• Sous colombe {e_peace} : **{peace}**\n"
+                "• Transferts d'alliance : **{c_alli}**\n"
+                "• Changements de pseudo : **{c_name}**"
             ),
         )
-        embed.add_field(name=lbl_pop_title, value=lbl_pop_val, inline=True)
+        embed.add_field(name=lbl_demo_title, value=lbl_demo_val, inline=True)
 
-        # Bloc 2 : Économie & Puissance
-        var_emoji = "📈" if v_might > 0 else "📉" if v_might < 0 else "➖"
-
-        lbl_eco_title = t(langue, "server_eco_title", defaut="{e_stats} Economy & Might")
-        lbl_eco_val = t(
-            langue,
-            "server_eco_val",
-            tm=format_num(t_might),
-            am=format_num(a_might),
-            mm=format_num(m_might),
-            al=format_num(a_loot),
-            var=var_emoji,
-            defaut=(
-                "• Total Might: **{tm}** {var}\n• Avg Might: **{am}**\n• Max Might: **{mm}**\n• Avg Loot: **{al}**"
-            ),
+        lbl_ev_title = t(langue, "server_ev_title", defaut="{e_events4} Événement Actif")
+        lbl_ev_val = (
+            "\n\n".join(active_events)
+            if active_events
+            else t(langue, "server_ev_none", defaut="*Aucun événement en cours.*")
         )
-        embed.add_field(name=lbl_eco_title, value=lbl_eco_val, inline=True)
-
-        # Espace pour forcer le retour à la ligne
-        embed.add_field(name="\u200b", value="\u200b", inline=False)
-
-        # Bloc 3 : Événements
-        lbl_ev_title = t(langue, "server_ev_title", defaut="{e_events4} Active Events Points")
-
-        ev_lines = []
-        if ev_nomads > 0:
-            ev_lines.append(
-                t(langue, "server_ev_nomads", pts=format_num(ev_nomads), defaut="{e_nomads} Nomads: **{pts}**")
-            )
-        if ev_samurai > 0:
-            ev_lines.append(
-                t(langue, "server_ev_samurai", pts=format_num(ev_samurai), defaut="{e_samurai} Samurai: **{pts}**")
-            )
-        if ev_bloodcrow > 0:
-            ev_lines.append(
-                t(
-                    langue,
-                    "server_ev_bloodcrow",
-                    pts=format_num(ev_bloodcrow),
-                    defaut="{e_bloodcrow} Bloodcrows: **{pts}**",
-                )
-            )
-        if ev_realms > 0:
-            ev_lines.append(
-                t(langue, "server_ev_realms", pts=format_num(ev_realms), defaut="{e_war_realms} War Realms: **{pts}**")
-            )
-        if ev_berimond > 0:
-            ev_lines.append(
-                t(langue, "server_ev_berimond", pts=format_num(ev_berimond), defaut="{e_berimond} Berimond: **{pts}**")
-            )
-
-        if not ev_lines:
-            lbl_ev_val = t(langue, "server_ev_none", defaut="*No active event data currently recorded.*")
-        else:
-            lbl_ev_val = "\n".join(ev_lines)
-
         embed.add_field(name=lbl_ev_title, value=lbl_ev_val, inline=True)
 
-        # Bloc 4 : Données Techniques (Scan)
-        lbl_tech_title = t(langue, "server_tech_title", defaut="{e_working} System Status")
-        lbl_tech_val = t(
-            langue, "server_tech_val", d=round(scan_duration, 1), defaut="• Last scan duration: **{d} seconds**"
+        embed.add_field(name="\u200b", value="\u200b", inline=False)  # Ligne de séparation
+
+        # RANGÉE 2 : Puissance, Honneur, Butin
+        lbl_might_title = t(langue, "server_might_title", defaut="{e_pp1} Puissance")
+        lbl_might_val = t(
+            langue,
+            "server_might_val",
+            t=fmt(t_might),
+            var=v_might_str,
+            avg=fmt(a_might),
+            max=fmt(m_might),
+            defaut="• Globale : **{t}**\n{var}\n• Moyenne : **{avg}**\n• Top 1 : **{max}**",
         )
-        embed.add_field(name=lbl_tech_title, value=lbl_tech_val, inline=True)
+        embed.add_field(name=lbl_might_title, value=lbl_might_val, inline=True)
+
+        lbl_honor_title = t(langue, "server_honor_title", defaut="{e_honor} Honneur")
+        lbl_honor_val = t(
+            langue,
+            "server_honor_val",
+            t=fmt(t_honor),
+            var=v_honor_str,
+            avg=fmt(a_honor),
+            defaut="• Global : **{t}**\n{var}\n• Moyen : **{avg}**",
+        )
+        embed.add_field(name=lbl_honor_title, value=lbl_honor_val, inline=True)
+
+        lbl_loot_title = t(langue, "server_loot_title", defaut="{e_loot} Butin")
+        lbl_loot_val = t(
+            langue,
+            "server_loot_val",
+            t=fmt(t_loot),
+            var=v_loot_str,
+            avg=fmt(a_loot),
+            max=fmt(m_loot),
+            defaut="• Global : **{t}**\n{var}\n• Moyen : **{avg}**\n• Top 1 : **{max}**",
+        )
+        embed.add_field(name=lbl_loot_title, value=lbl_loot_val, inline=True)
 
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed)
