@@ -20,6 +20,7 @@ from utils import (
     MON_ID_DISCORD,
     TOKEN,
     TOPGG_TOKEN,
+    JOUEURS_DIR,
     charger_langues,
     get_server_config,
     load_blocks_async,
@@ -458,7 +459,7 @@ class GGEAssistantBot(commands.Bot):
             logger.info(f"✅ [Webhook] Vrai vote reçu ! Application du bouclier pour {user_id}.")
 
         # --- 4. SAUVEGARDE (Bouclier 7j) ---
-        VOTES_FILE = Path("/app/data/configs/votes.json")
+        VOTES_FILE = JOUEURS_DIR / "votes.json"
         votes_data = {}
         if VOTES_FILE.exists():
             try:
@@ -515,7 +516,7 @@ class GGEAssistantBot(commands.Bot):
     # ==========================================
     @tasks.loop(hours=12)
     async def sync_topgg_votes_task(self):
-        VOTES_FILE = Path("/app/data/configs/votes.json")
+        VOTES_FILE = JOUEURS_DIR / "votes.json"
 
         # Si pas de token, on annule
         if not getattr(self, "topgg_token", None):

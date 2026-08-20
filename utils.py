@@ -126,8 +126,10 @@ async def prompt_vote_if_lucky(interaction: discord.Interaction, probability_per
                 deadline = datetime.fromisoformat(votes_data[user_id_str])
                 if datetime.now() < deadline:
                     return  # Le joueur a son bouclier actif, on le laisse tranquille !
-        except Exception:
-            pass
+                    
+        except Exception as e:
+            # On remplace le "pass" par un print/log pour traquer le bug
+            print(f"❌ [DEBUG VOTE] Erreur lors de la lecture du bouclier : {e}")
 
     # 2. Le tirage (Dé virtuel) - On ne le lance que s'il n'est pas protégé
     if random.randint(1, 100) > probability_percent:
