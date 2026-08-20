@@ -17,10 +17,10 @@ from discord.ext import commands, tasks
 from utils import (
     BOT_VERSION,
     CACHE,
+    JOUEURS_DIR,
     MON_ID_DISCORD,
     TOKEN,
     TOPGG_TOKEN,
-    JOUEURS_DIR,
     charger_langues,
     get_server_config,
     load_blocks_async,
