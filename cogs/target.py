@@ -31,8 +31,10 @@ logger = logging.getLogger("GGE_Bot")
 # 🎛️ UI COMPONENTS : SEARCH ENGINE WIZARD
 # ========================================================
 class WizardButton(discord.ui.Button):
-    def __init__(self, label, step_target, wizard, action="ignore", style=discord.ButtonStyle.primary, row=0):
-        super().__init__(label=label, style=style, row=row)
+    def __init__(
+        self, label, step_target, wizard, action="ignore", style=discord.ButtonStyle.primary, row=0, emoji=None
+    ):
+        super().__init__(label=label, style=style, row=row, emoji=emoji)
         self.step_target = step_target
         self.wizard = wizard
         self.action = action
@@ -118,6 +120,8 @@ class ToggleButton(discord.ui.Button):
         wizard,
         label_on,
         label_off,
+        emoji_on=None,
+        emoji_off=None,
         style_on=discord.ButtonStyle.success,
         style_off=discord.ButtonStyle.secondary,
         row=0,
@@ -126,13 +130,21 @@ class ToggleButton(discord.ui.Button):
         self.key = key
         self.label_on = label_on
         self.label_off = label_off
+        self.emoji_on = emoji_on
+        self.emoji_off = emoji_off
         is_on = self.wizard.config.get(key, False)
-        super().__init__(label=label_on if is_on else label_off, style=style_on if is_on else style_off, row=row)
+        super().__init__(
+            label=label_on if is_on else label_off,
+            emoji=emoji_on if is_on else emoji_off,
+            style=style_on if is_on else style_off,
+            row=row,
+        )
 
     async def callback(self, interaction: discord.Interaction):
         self.wizard.config[self.key] = not self.wizard.config[self.key]
         is_on = self.wizard.config[self.key]
         self.label = self.label_on if is_on else self.label_off
+        self.emoji = self.emoji_on if is_on else self.emoji_off
         self.style = discord.ButtonStyle.success if is_on else discord.ButtonStyle.secondary
         await self.wizard.update_view(interaction)
 
@@ -146,7 +158,9 @@ class CycleButton(discord.ui.Button):
         current_val = self.wizard.config.get(key, states[0]["value"])
         current_state = next((s for s in states if s["value"] == current_val), states[0])
 
-        super().__init__(label=current_state["label"], style=current_state["style"], row=row)
+        super().__init__(
+            label=current_state["label"], emoji=current_state.get("emoji"), style=current_state["style"], row=row
+        )
 
     async def callback(self, interaction: discord.Interaction):
         current_val = self.wizard.config.get(self.key, self.states[0]["value"])
@@ -156,6 +170,7 @@ class CycleButton(discord.ui.Button):
 
         self.wizard.config[self.key] = next_state["value"]
         self.label = next_state["label"]
+        self.emoji = next_state.get("emoji")
         self.style = next_state["style"]
         await self.wizard.update_view(interaction)
 
@@ -192,12 +207,12 @@ class TargetWizard(discord.ui.View):
         self.clear_items()
         embed = discord.Embed(color=discord.Color.blue())
 
-        lbl_ignore = t(self.langue, "wizard_btn_ignore", defaut="♾️ Doesn't matter")
-        lbl_custom = t(self.langue, "wizard_btn_custom", defaut="⌨️ Enter Min / Max")
-        lbl_back = t(self.langue, "wizard_btn_back", defaut="◀ Back")
+        lbl_ignore = t(self.langue, "wizard_btn_ignore", defaut="Doesn't matter")
+        lbl_custom = t(self.langue, "wizard_btn_custom", defaut="Enter Min / Max")
+        lbl_back = t(self.langue, "wizard_btn_back", defaut="Back")
 
         if self.step == 1:
-            embed.title = t(self.langue, "wizard_s1_title", defaut="Step 1/7 : Absolute Level")
+            embed.title = t(self.langue, "wizard_s1_title", defaut="{e_std_balance_scale} Step 1/7 : Absolute Level")
             embed.description = t(
                 self.langue,
                 "wizard_s1_desc",
@@ -209,8 +224,8 @@ class TargetWizard(discord.ui.View):
                 ),
             )
 
-            self.add_item(WizardButton(lbl_ignore, 2, self, action="ignore_lvl"))
-            btn_custom = discord.ui.Button(label=lbl_custom, style=discord.ButtonStyle.secondary)
+            self.add_item(WizardButton(lbl_ignore, 2, self, action="ignore_lvl", emoji="♾️"))
+            btn_custom = discord.ui.Button(label=lbl_custom, style=discord.ButtonStyle.secondary, emoji="⌨️")
 
             async def cb_custom(i):
                 titre = t(self.langue, "wizard_m1_title", defaut="Level Filter")
@@ -224,11 +239,11 @@ class TargetWizard(discord.ui.View):
             self.add_item(btn_custom)
 
         elif self.step == 2:
-            embed.title = t(self.langue, "wizard_s2_title", defaut="Step 2/7 : Might")
+            embed.title = t(self.langue, "wizard_s2_title", defaut="{e_pp1} Step 2/7 : Might")
             embed.description = t(self.langue, "wizard_s2_desc", defaut="What might range are you looking for?")
 
-            self.add_item(WizardButton(lbl_ignore, 3, self, action="ignore_pp"))
-            btn_custom = discord.ui.Button(label=lbl_custom, style=discord.ButtonStyle.secondary)
+            self.add_item(WizardButton(lbl_ignore, 3, self, action="ignore_pp", emoji="♾️"))
+            btn_custom = discord.ui.Button(label=lbl_custom, style=discord.ButtonStyle.secondary, emoji="⌨️")
 
             async def cb_custom(i):
                 titre = t(self.langue, "wizard_m2_title", defaut="Might Filter")
@@ -238,14 +253,16 @@ class TargetWizard(discord.ui.View):
 
             btn_custom.callback = cb_custom
             self.add_item(btn_custom)
-            self.add_item(WizardButton(lbl_back, 1, self, action="back", style=discord.ButtonStyle.secondary, row=1))
+            self.add_item(
+                WizardButton(lbl_back, 1, self, action="back", style=discord.ButtonStyle.secondary, row=1, emoji="◀")
+            )
 
         elif self.step == 3:
-            embed.title = t(self.langue, "wizard_s3_title", defaut="Step 3/7 : Distance")
+            embed.title = t(self.langue, "wizard_s3_title", defaut="{e_compass} Step 3/7 : Distance")
             embed.description = t(self.langue, "wizard_s3_desc", defaut="How far from your main castle?")
 
-            self.add_item(WizardButton(lbl_ignore, 4, self, action="ignore_dist"))
-            btn_custom = discord.ui.Button(label=lbl_custom, style=discord.ButtonStyle.secondary)
+            self.add_item(WizardButton(lbl_ignore, 4, self, action="ignore_dist", emoji="♾️"))
+            btn_custom = discord.ui.Button(label=lbl_custom, style=discord.ButtonStyle.secondary, emoji="⌨️")
 
             async def cb_custom(i):
                 titre = t(self.langue, "wizard_m3_title", defaut="Distance Filter")
@@ -255,18 +272,18 @@ class TargetWizard(discord.ui.View):
 
             btn_custom.callback = cb_custom
             self.add_item(btn_custom)
-            self.add_item(WizardButton(lbl_back, 2, self, action="back", style=discord.ButtonStyle.secondary, row=1))
-
-        elif self.step == 4:
-            embed.title = t(self.langue, "wizard_s4_title", defaut="Step 4/7 : Honor")
-            embed.description = t(
-                self.langue,
-                "wizard_s4_desc",
-                defaut="Are you looking for a specific amount of Honor?",
+            self.add_item(
+                WizardButton(lbl_back, 2, self, action="back", style=discord.ButtonStyle.secondary, row=1, emoji="◀")
             )
 
-            self.add_item(WizardButton(lbl_ignore, 5, self, action="ignore_honor"))
-            btn_custom = discord.ui.Button(label=lbl_custom, style=discord.ButtonStyle.secondary)
+        elif self.step == 4:
+            embed.title = t(self.langue, "wizard_s4_title", defaut="{e_honor} Step 4/7 : Honor")
+            embed.description = t(
+                self.langue, "wizard_s4_desc", defaut="Are you looking for a specific amount of Honor?"
+            )
+
+            self.add_item(WizardButton(lbl_ignore, 5, self, action="ignore_honor", emoji="♾️"))
+            btn_custom = discord.ui.Button(label=lbl_custom, style=discord.ButtonStyle.secondary, emoji="⌨️")
 
             async def cb_custom(i):
                 titre = t(self.langue, "wizard_m4_title", defaut="Honor Filter")
@@ -276,18 +293,18 @@ class TargetWizard(discord.ui.View):
 
             btn_custom.callback = cb_custom
             self.add_item(btn_custom)
-            self.add_item(WizardButton(lbl_back, 3, self, action="back", style=discord.ButtonStyle.secondary, row=1))
-
-        elif self.step == 5:
-            embed.title = t(self.langue, "wizard_s5_title", defaut="Step 5/7 : Glory")
-            embed.description = t(
-                self.langue,
-                "wizard_s5_desc",
-                defaut="Are you looking for a specific amount of Glory?",
+            self.add_item(
+                WizardButton(lbl_back, 3, self, action="back", style=discord.ButtonStyle.secondary, row=1, emoji="◀")
             )
 
-            self.add_item(WizardButton(lbl_ignore, 6, self, action="ignore_glory"))
-            btn_custom = discord.ui.Button(label=lbl_custom, style=discord.ButtonStyle.secondary)
+        elif self.step == 5:
+            embed.title = t(self.langue, "wizard_s5_title", defaut="{e_glory} Step 5/7 : Glory")
+            embed.description = t(
+                self.langue, "wizard_s5_desc", defaut="Are you looking for a specific amount of Glory?"
+            )
+
+            self.add_item(WizardButton(lbl_ignore, 6, self, action="ignore_glory", emoji="♾️"))
+            btn_custom = discord.ui.Button(label=lbl_custom, style=discord.ButtonStyle.secondary, emoji="⌨️")
 
             async def cb_custom(i):
                 titre = t(self.langue, "wizard_m5_title", defaut="Glory Filter")
@@ -297,18 +314,18 @@ class TargetWizard(discord.ui.View):
 
             btn_custom.callback = cb_custom
             self.add_item(btn_custom)
-            self.add_item(WizardButton(lbl_back, 4, self, action="back", style=discord.ButtonStyle.secondary, row=1))
-
-        elif self.step == 6:
-            embed.title = t(self.langue, "wizard_s6_title", defaut="Step 6/7 : Loot")
-            embed.description = t(
-                self.langue,
-                "wizard_s6_desc",
-                defaut="Want to target players with available resources?",
+            self.add_item(
+                WizardButton(lbl_back, 4, self, action="back", style=discord.ButtonStyle.secondary, row=1, emoji="◀")
             )
 
-            self.add_item(WizardButton(lbl_ignore, 7, self, action="ignore_loot"))
-            btn_custom = discord.ui.Button(label=lbl_custom, style=discord.ButtonStyle.secondary)
+        elif self.step == 6:
+            embed.title = t(self.langue, "wizard_s6_title", defaut="{e_loot} Step 6/7 : Loot")
+            embed.description = t(
+                self.langue, "wizard_s6_desc", defaut="Want to target players with available resources?"
+            )
+
+            self.add_item(WizardButton(lbl_ignore, 7, self, action="ignore_loot", emoji="♾️"))
+            btn_custom = discord.ui.Button(label=lbl_custom, style=discord.ButtonStyle.secondary, emoji="⌨️")
 
             async def cb_custom(i):
                 titre = t(self.langue, "wizard_m6_title", defaut="Loot Filter")
@@ -318,33 +335,41 @@ class TargetWizard(discord.ui.View):
 
             btn_custom.callback = cb_custom
             self.add_item(btn_custom)
-            self.add_item(WizardButton(lbl_back, 5, self, action="back", style=discord.ButtonStyle.secondary, row=1))
+            self.add_item(
+                WizardButton(lbl_back, 5, self, action="back", style=discord.ButtonStyle.secondary, row=1, emoji="◀")
+            )
 
         elif self.step == 7:
-            embed.title = t(self.langue, "wizard_s7_title", defaut="Step 7/7 : Advanced Filters")
+            embed.title = t(self.langue, "wizard_s7_title", defaut="{e_parameters} Step 7/7 : Advanced Filters")
             embed.description = t(self.langue, "wizard_s7_desc", defaut="Final adjustments before saving:")
 
             d_on = t(self.langue, "wizard_btn_dove_on", defaut="Doves: Included")
             d_off = t(self.langue, "wizard_btn_dove_off", defaut="Doves: Hidden")
-            self.add_item(ToggleButton("show_doves", self, d_on, d_off))
+            e_dove = t(self.langue, "e_std_dove", defaut="{e_std_dove}")
+            self.add_item(ToggleButton("show_doves", self, d_on, d_off, emoji_on=e_dove, emoji_off=e_dove))
 
             a_on = t(self.langue, "wizard_btn_alli_on", defaut="Alliance: Mandatory")
             a_off = t(self.langue, "wizard_btn_alli_off", defaut="Alliance: Not required")
-            self.add_item(ToggleButton("only_with_alliance", self, a_on, a_off))
+            e_alli = t(self.langue, "e_alliance", defaut="{e_alliance}")
+            self.add_item(ToggleButton("only_with_alliance", self, a_on, a_off, emoji_on=e_alli, emoji_off=e_alli))
 
             lbl_all = t(self.langue, "wizard_btn_act_all", defaut="Active & Ruins")
             lbl_act = t(self.langue, "wizard_btn_act_on", defaut="Active Players (Only)")
             lbl_inact = t(self.langue, "wizard_btn_act_off", defaut="Ruins (Only)")
 
+            e_green = t(self.langue, "e_std_green_circle", defaut="{e_std_green_circle}")
+            e_sleep = t(self.langue, "e_std_sleeping_face", defaut="{e_std_sleeping_face}")
+
             activity_states = [
-                {"label": lbl_all, "value": "all", "style": discord.ButtonStyle.primary},
-                {"label": lbl_act, "value": "active", "style": discord.ButtonStyle.success},
-                {"label": lbl_inact, "value": "inactive", "style": discord.ButtonStyle.secondary},
+                {"label": lbl_all, "value": "all", "style": discord.ButtonStyle.primary, "emoji": "♾️"},
+                {"label": lbl_act, "value": "active", "style": discord.ButtonStyle.success, "emoji": e_green},
+                {"label": lbl_inact, "value": "inactive", "style": discord.ButtonStyle.secondary, "emoji": e_sleep},
             ]
             self.add_item(CycleButton("activity_filter", self, activity_states, row=1))
 
             lbl_excl = t(self.langue, "wizard_btn_exclude", defaut="Alliances to exclude")
-            btn_excl = discord.ui.Button(label=lbl_excl, style=discord.ButtonStyle.secondary, row=1)
+            e_prohib = t(self.langue, "e_std_prohibited", defaut="{e_std_prohibited}")
+            btn_excl = discord.ui.Button(label=lbl_excl, style=discord.ButtonStyle.secondary, row=1, emoji=e_prohib)
 
             async def cb_excl(i):
                 titre = t(self.langue, "wizard_m7_title", defaut="Exclude alliances")
@@ -356,7 +381,7 @@ class TargetWizard(discord.ui.View):
             self.add_item(btn_excl)
 
             lbl_save = t(self.langue, "wizard_btn_save", defaut="Save Filter")
-            b_finish = discord.ui.Button(label=lbl_save, style=discord.ButtonStyle.primary, row=2)
+            b_finish = discord.ui.Button(label=lbl_save, style=discord.ButtonStyle.primary, row=2, emoji="✅")
 
             async def finish_cb(i):
                 self.step = 8
@@ -366,17 +391,21 @@ class TargetWizard(discord.ui.View):
             b_finish.callback = finish_cb
             self.add_item(b_finish)
 
-            self.add_item(WizardButton(lbl_back, 6, self, action="back", style=discord.ButtonStyle.secondary, row=2))
+            self.add_item(
+                WizardButton(lbl_back, 6, self, action="back", style=discord.ButtonStyle.secondary, row=2, emoji="◀")
+            )
 
         elif self.step == 8:
             embed = self.generate_summary_embed()
             embed.color = discord.Color.green()
 
             lbl_edit = t(self.langue, "wizard_btn_edit", defaut="Edit Filter")
-            self.add_item(WizardButton(lbl_edit, 1, self, action="back", style=discord.ButtonStyle.secondary))
+            self.add_item(
+                WizardButton(lbl_edit, 1, self, action="back", style=discord.ButtonStyle.secondary, emoji="🔄")
+            )
 
             lbl_close = t(self.langue, "wizard_btn_close", defaut="Close")
-            b_close = discord.ui.Button(label=lbl_close, style=discord.ButtonStyle.danger)
+            b_close = discord.ui.Button(label=lbl_close, style=discord.ButtonStyle.danger, emoji="❌")
 
             async def close_cb(i):
                 msg_fermeture = t(
@@ -425,11 +454,11 @@ class TargetWizard(discord.ui.View):
 
         act = self.config.get("activity_filter", "all")
         if act == "active":
-            txt_act = t(self.langue, "wizard_val_act", defaut="Active only")
+            txt_act = t(self.langue, "wizard_val_act", defaut="{e_std_green_circle} Active only")
         elif act == "inactive":
-            txt_act = t(self.langue, "wizard_val_inact", defaut="Ruins only")
+            txt_act = t(self.langue, "wizard_val_inact", defaut="{e_std_sleeping_face} Ruins only")
         else:
-            txt_act = t(self.langue, "wizard_val_all", defaut="Active & Ruins")
+            txt_act = t(self.langue, "wizard_val_all", defaut="♾️ Active & Ruins")
 
         l_lvl = t(self.langue, "wizard_lbl_lvl", defaut="Levels")
         l_pp = t(self.langue, "wizard_lbl_pp", defaut="Might")
@@ -457,9 +486,9 @@ class TargetWizard(discord.ui.View):
             f"**{l_col}** : {txt_doves}\n**{l_for}** : {txt_alli}\n**{l_act}** : {txt_act}\n**{l_excl}** : {txt_excl}"
         )
 
-        t1 = t(self.langue, "wizard_t1", defaut="Core Criteria")
-        t2 = t(self.langue, "wizard_t2", defaut="Reward Criteria")
-        t3 = t(self.langue, "wizard_t3", defaut="Advanced Filters")
+        t1 = t(self.langue, "wizard_t1", defaut="🎯 Core Criteria")
+        t2 = t(self.langue, "wizard_t2", defaut="💰 Reward Criteria")
+        t3 = t(self.langue, "wizard_t3", defaut="🎛️ Advanced Filters")
 
         embed.add_field(name=t1, value=f1_val, inline=False)
         embed.add_field(name=t2, value=f2_val, inline=False)
@@ -622,7 +651,7 @@ class TargetCog(commands.Cog):
         # ----------------------------------------------------
         # SETUP: GET ORIGIN PLAYER
         # ----------------------------------------------------
-        loading_title = t(langue, "target_load_title", defaut="GGE-Tracker Radar Scan...")
+        loading_title = t(langue, "target_load_title", defaut="📡 GGE-Tracker Radar Scan...")
         loading_desc = t(langue, "target_load_desc", defaut="Querying database directly and sorting...")
 
         loading_embed = discord.Embed(title=loading_title, color=discord.Color.orange())
@@ -668,7 +697,7 @@ class TargetCog(commands.Cog):
                 langue,
                 "target_err_atk_not_found",
                 atk=origin_player,
-                defaut="Cannot locate player on the map to calculate distances.",
+                defaut="{e_error} Cannot locate player on the map to calculate distances.",
             )
             if message_to_edit:
                 await message_to_edit.edit(content=err_msg, embed=None, view=None)
@@ -898,7 +927,9 @@ class TargetCog(commands.Cog):
         # FINAL DISPLAY
         # ----------------------------------------------------
         if not final_targets:
-            empty_msg = t(langue, "target_err_no_target_valid", defaut="No player matching your filters was found.")
+            empty_msg = t(
+                langue, "target_err_no_target_valid", defaut="{e_error} No player matching your filters was found."
+            )
             if message_to_edit:
                 await message_to_edit.edit(content=empty_msg, embed=None, view=None)
             else:
@@ -941,14 +972,14 @@ class TargetCog(commands.Cog):
                 "target_res_title",
                 a=a_name_real,
                 t=titre_alliance,
-                defaut=f"Scan Results from {a_name_real}{titre_alliance}",
+                defaut=f"{{e_attaque}} Scan Results from {a_name_real}{titre_alliance}",
             )
             desc_emb = t(
                 langue,
                 "target_res_desc",
                 shown=len(best_targets),
                 total=len(final_targets),
-                defaut=f"**{len(best_targets)} targets displayed** (randomly selected from {len(final_targets)} valid targets found).\n━━━━━━━━━━━━━━━━━━━━━━━",
+                defaut=f"{{e_icon_search}} **{len(best_targets)} targets displayed** (randomly selected from {len(final_targets)} valid targets found).\n━━━━━━━━━━━━━━━━━━━━━━━",
             )
 
             embed = discord.Embed(title=titre_emb, color=self.clr_cible)
@@ -976,7 +1007,9 @@ class TargetCog(commands.Cog):
                         pass
 
                 target_icon = (
-                    t(langue, "e_peace", defaut="🕊️") if is_under_colombe else t(langue, "e_players", defaut="👤")
+                    t(langue, "emoji_peace", defaut="{e_peace}")
+                    if is_under_colombe
+                    else t(langue, "emoji_players", defaut="{e_players}")
                 )
 
                 warnings = []
@@ -985,7 +1018,7 @@ class TargetCog(commands.Cog):
                         t(
                             langue,
                             "target_warn_wall",
-                            defaut="\n**CHECK WALL:** Sensitive alliance description!",
+                            defaut="\n{e_error} **CHECK WALL:** Sensitive alliance description!",
                         )
                     )
                 if is_under_colombe:
@@ -993,21 +1026,21 @@ class TargetCog(commands.Cog):
                         t(
                             langue,
                             "target_warn_peace",
-                            defaut="\n**PLAYER UNDER DOVE: Protection active!**",
+                            defaut="\n{e_peace} **PLAYER UNDER DOVE: Protection active!**",
                         )
                     )
 
                 warning_txt = "".join(warnings) if warnings else ""
 
                 description_cible = (
-                    f"{t(langue, 'e_alliance_icon', defaut='🛡️')} {lbl_alli} **{t_cnd['alliance']}**\n"
-                    f"{t(langue, 'e_lvl', defaut='⭐')} {lbl_lvl} {t_cnd['lvl']}/{t_cnd['leg']}\n"
-                    f"{t(langue, 'e_pp1', defaut='⚔️')} {lbl_puiss} **{format_num(t_cnd['pp'])}**\n"
-                    f"{t(langue, 'e_honor', defaut='🎖️')} {lbl_honneur} **{format_num(t_cnd['honor'])}**\n"
-                    f"{t(langue, 'e_glory', defaut='🌟')} {lbl_gloire} **{format_num(t_cnd['glory'])}**\n"
-                    f"{t(langue, 'e_loot', defaut='📦')} {lbl_loot} **{format_num(t_cnd['loot'])}**\n"
-                    f"{t(langue, 'e_compass', defaut='📍')} {lbl_dist} **{dist_str}**\n"
-                    f"{t(langue, 'e_map', defaut='🗺️')} {lbl_coords} `{t_cnd['x']}:{t_cnd['y']}`\n"
+                    f"{t(langue, 'emoji_alliance_icon', defaut='{e_alliance_icon}')} {lbl_alli} **{t_cnd['alliance']}**\n"
+                    f"{t(langue, 'emoji_lvl', defaut='{e_lvl}')} {lbl_lvl} {t_cnd['lvl']}/{t_cnd['leg']}\n"
+                    f"{t(langue, 'emoji_pp1', defaut='{e_pp1}')} {lbl_puiss} **{format_num(t_cnd['pp'])}**\n"
+                    f"{t(langue, 'emoji_honor', defaut='{e_honor}')} {lbl_honneur} **{format_num(t_cnd['honor'])}**\n"
+                    f"{t(langue, 'emoji_glory', defaut='{e_glory}')} {lbl_gloire} **{format_num(t_cnd['glory'])}**\n"
+                    f"{t(langue, 'emoji_loot', defaut='{e_loot}')} {lbl_loot} **{format_num(t_cnd['loot'])}**\n"
+                    f"{t(langue, 'emoji_compass', defaut='{e_compass}')} {lbl_dist} **{dist_str}**\n"
+                    f"{t(langue, 'emoji_map', defaut='{e_map}')} {lbl_coords} `{t_cnd['x']}:{t_cnd['y']}`\n"
                     f"{warning_txt}\n━━━━━━━━━━━━━━━━━━━━━━━"
                 )
 
@@ -1028,7 +1061,7 @@ class TargetCog(commands.Cog):
                 tot=nb_pages,
                 defaut=f"Page {page_num}/{nb_pages}",
             )
-            val_spy = t(langue, "target_cible_footer_spy", defaut="**SPY REQUIRED** before attack.")
+            val_spy = t(langue, "target_cible_footer_spy", defaut="{e_icon_name} **SPY REQUIRED** before attack.")
             embed.add_field(name=titre_page, value=val_spy, inline=False)
 
             await setup_embed_footer(embed, interaction, langue)
