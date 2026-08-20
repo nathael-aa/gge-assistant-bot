@@ -27,9 +27,9 @@ from utils import (
 logger = logging.getLogger("GGE_Bot")
 
 
-# ========================================================
+# =======================================================
 # 🎛️ UI COMPONENTS : SEARCH ENGINE WIZARD
-# ========================================================
+# =======================================================
 class WizardButton(discord.ui.Button):
     def __init__(
         self, label, step_target, wizard, action="ignore", style=discord.ButtonStyle.primary, row=0, emoji=None
