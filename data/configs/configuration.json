@@ -22,6 +22,45 @@
     "E4K_ARAB1": false, "E4K_IN1": false, "E4K_ID1": false, "E4K_ASIA1": false,
     "E4K_US2": false, "E4K_RU2": false, "E4K_INT3": false, "E4K_INT4": false, "E4K_WORLD1": false
   },
+  "special_servers": [
+  "FR1",
+  "RO1",
+  "CZ1",
+  "IT1",
+  "SA1",
+  "DE1",
+  "NL1",
+  "E4K_BR1",
+  "E4K_HANT1",
+  "E4K_CN1",
+  "TR1",
+  "BR1",
+  "GR1",
+  "ES1",
+  "HU1",
+  "INT3",
+  "PARTNER_SP3",
+  "BG1",
+  "AU1",
+  "US1",
+  "E4K_RU1",
+  "WORLD1",
+  "WORLD2",
+  "IN1",
+  "ASIA",
+  "E4K_INT2",
+  "E4K_FR1",
+  "E4K_DE1",
+  "E4K_DE2"
+  ],
+  "live_api_commands": {
+    "groups": [
+      "storm",
+      "fortress"
+    ],
+    "specific": [
+    ]
+  },
   "servers": {
     "int1": "EmpireEx",
     "de1": "EmpireEx_2",

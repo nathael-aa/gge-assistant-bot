@@ -4,6 +4,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import socket
 from datetime import datetime, timedelta
 from logging.handlers import TimedRotatingFileHandler
@@ -17,6 +18,7 @@ from discord.ext import commands, tasks
 from utils import (
     BOT_VERSION,
     CACHE,
+    CONFIG_DIR,
     JOUEURS_DIR,
     MON_ID_DISCORD,
     TOKEN,
@@ -243,19 +245,6 @@ class GGEAssistantBot(commands.Bot):
         # 1. Synchronisation globale (pour le reste du monde)
         await self.tree.sync()
 
-        # 2. Nettoyage des anciennes commandes locales sur les serveurs de test
-        SERVEURS_DE_TEST = [1342424613660921908, 1512165717380825310, 1537532071898128566]
-
-        for guild_id in SERVEURS_DE_TEST:
-            try:
-                serveur = discord.Object(id=guild_id)
-                self.tree.clear_commands(guild=serveur)  # 👈 On vide l'arbre local
-                await self.tree.sync(guild=serveur)  # 👈 On envoie l'arbre vide à Discord
-
-                logger.info(f"🧹 [SYNC] Anciennes commandes locales effacées sur le serveur ({guild_id})")
-            except Exception as e:
-                pass
-
         self.export_commands_json()
 
         if not self.flag_watcher_task.is_running():
@@ -273,6 +262,10 @@ class GGEAssistantBot(commands.Bot):
         if not self.post_server_count_task.is_running():
             self.post_server_count_task.start()
             logger.info("🛰️ [Tasks] post_server_count_task initialisée dans le setup_hook.")
+
+        if not self.update_special_servers_task.is_running():
+            self.update_special_servers_task.start()
+            logger.info("🛰️ [Tasks] update_special_servers_task initialisée dans le setup_hook.")
 
         self.add_view(WelcomeView())
 
@@ -591,6 +584,51 @@ class GGEAssistantBot(commands.Bot):
         await self.wait_until_ready()
 
     # ==========================================
+    # 🔄 TÂCHE : SYNCHRO DES SERVEURS SPÉCIAUX (24H)
+    # ==========================================
+    @tasks.loop(hours=24)
+    async def update_special_servers_task(self):
+        url = "https://raw.githubusercontent.com/gge-tracker/gge-tracker/refs/heads/main/gge-tracker-backend-api/src/api/enums/gge-tracker-special-servers.enums.ts"
+
+        try:
+            # 1. On va chercher le fichier brut sur GitHub
+            async with self.session.get(url, timeout=10) as r:
+                if r.status == 200:
+                    text = await r.text()
+
+                    # 2. On utilise une Regex pour trouver les mots avant le "="
+                    # (Composés de lettres majuscules, chiffres et underscores)
+                    nouveaux_serveurs = re.findall(r"([A-Z0-9_]+)\s*=", text)
+
+                    if nouveaux_serveurs:
+                        config_file = CONFIG_DIR / "configuration.json"
+
+                        if config_file.exists():
+                            with open(config_file, encoding="utf-8") as f:
+                                config_data = json.load(f)
+
+                            serveurs_actuels = config_data.get("special_servers", [])
+
+                            # 3. On met à jour uniquement s'il y a une différence
+                            if set(nouveaux_serveurs) != set(serveurs_actuels):
+                                config_data["special_servers"] = nouveaux_serveurs
+
+                                with open(config_file, "w", encoding="utf-8") as f:
+                                    json.dump(config_data, f, indent=4, ensure_ascii=False)
+
+                                logger.info(
+                                    f"🔄 [GitHub Sync] Liste des serveurs spéciaux mise à jour ({len(nouveaux_serveurs)} serveurs)."
+                                )
+                else:
+                    logger.warning(f"⚠️ [GitHub Sync] Impossible d'accéder au GitHub GGE-Tracker (Erreur {r.status})")
+        except Exception as e:
+            logger.error(f"❌ [GitHub Sync] Erreur lors de la mise à jour des serveurs spéciaux : {e}")
+
+    @update_special_servers_task.before_loop
+    async def before_update_special_servers(self):
+        await self.wait_until_ready()
+
+    # ==========================================
     # 📈 TÂCHE : MISE À JOUR DU NOMBRE DE SERVEURS TOP.GG
     # ==========================================
     @tasks.loop(minutes=30)
@@ -626,7 +664,7 @@ class GGEAssistantBot(commands.Bot):
             interaction.command.qualified_name if interaction.command else interaction.data.get("name", "inconnue")
         )
 
-        langue, _ = await get_server_config(interaction)
+        langue, serveur = await get_server_config(interaction)
 
         # --- 1. SYSTÈME DE LOGS ---
         try:
@@ -723,6 +761,36 @@ class GGEAssistantBot(commands.Bot):
                 await interaction.response.send_message(msg, ephemeral=True)
             return False
 
+        # --- 2.7. VÉRIFICATION DES SERVEURS SPÉCIAUX (COMPTE ESPION REQUIS) ---
+        try:
+            config_file = CONFIG_DIR / "configuration.json"
+            if config_file.exists():
+                with open(config_file, encoding="utf-8") as f:
+                    config_data = json.load(f)
+                    serveurs_speciaux = config_data.get("special_servers", [])
+                    live_config = config_data.get("live_api_commands", {})
+
+                    groupes_live = live_config.get("groups", [])
+                    commandes_live = live_config.get("specific", [])
+
+                # On extrait le premier mot (le groupe parent, ex: "storm" pour "storm isles")
+                base_cmd = cmd_name.split(" ")[0]
+
+                # 🛠️ MODIF ICI : On vérifie si le groupe ou le nom complet est dans la liste live
+                if base_cmd in groupes_live or cmd_name in groupes_live or cmd_name in commandes_live:
+                    # ... et que le serveur du joueur n'a pas de compte espion
+                    if serveur and serveur not in serveurs_speciaux:
+                        if interaction.type == discord.InteractionType.application_command:
+                            msg = t(
+                                langue,
+                                "err_unsupported_special",
+                                defaut="⚠️ La commande n'est actuellement pas supportée pour ton serveur de jeu GGE. Pour avoir plus d'informations, merci d'utiliser /support.",
+                            )
+                            await interaction.response.send_message(msg, ephemeral=True)
+                        return False  # 🛑 On bloque la commande
+        except Exception as e:
+            logger.error(f"❌ Erreur lors de la vérification des serveurs spéciaux : {e}")
+
         # --- 3. BYPASS : Le créateur a toujours accès au reste ---
         if interaction.user.id == MON_ID_DISCORD:
             return True
@@ -790,6 +858,8 @@ class GGEAssistantBot(commands.Bot):
             self.sync_topgg_votes_task.cancel()
         if hasattr(self, "post_server_count_task"):
             self.post_server_count_task.cancel()
+        if hasattr(self, "update_special_servers_task"):
+            self.update_special_servers_task.cancel()
         if hasattr(self, "web_site"):
             await self.web_site.stop()
             await self.web_runner.cleanup()
