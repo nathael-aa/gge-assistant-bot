@@ -11,6 +11,7 @@ from discord.ext import commands
 
 from utils import (
     BASE_DATA_PATH,
+    DICT_EMOJIS,
     PaginationView,
     _get_api_timestamp,
     alliance_autocomplete,
@@ -164,9 +165,9 @@ class ProfilsCog(commands.Cog):
             )
             return await interaction.followup.send(err_msg)
 
-        # ---------------------------------------------------
+        # ----------------------------------------------------
         # 2. EXTRACTION ET COMPARAISON
-        # ---------------------------------------------------
+        # ----------------------------------------------------
         def fmt(n):
             if n is None:
                 return "0"
@@ -180,9 +181,9 @@ class ProfilsCog(commands.Cog):
                 return float(api_current[key]) - float(api_previous[key])
             return 0
 
-        # 👉 Utilisation des clés pour les flèches via t()
-        e_up = t(langue, "e_std_chart_increasing", defaut="📈")
-        e_down = t(langue, "e_std_chart_decreasing", defaut="📉")
+        # 👉 Utilisation du dictionnaire d'émojis en direct
+        e_up = DICT_EMOJIS.get("e_std_chart_increasing", "📈")
+        e_down = DICT_EMOJIS.get("e_std_chart_decreasing", "📉")
 
         def format_var(val):
             if val == 0:

@@ -14,6 +14,7 @@ import utils
 from utils import (
     BASE_DATA_PATH,
     CONFIG_DIR,
+    DICT_EMOJIS,
     alliance_autocomplete,
     format_num,
     get_api_headers,
@@ -207,18 +208,18 @@ class TargetWizard(discord.ui.View):
         self.clear_items()
         embed = discord.Embed(color=discord.Color.blue())
 
-        # 🟢 Extraction des émojis via le dictionnaire global
-        e_next = t(self.langue, "e_next", defaut="{e_next}")
-        e_last = t(self.langue, "e_last", defaut="{e_last}")
-        e_check = t(self.langue, "e_check", defaut="{e_check}")
-        e_nocheck = t(self.langue, "e_nocheck", defaut="{e_nocheck}")
-        e_refresh = t(self.langue, "e_refresh", defaut="{e_refresh}")
-        e_keyboard = t(self.langue, "e_keyboard", defaut="{e_keyboard}")
-        e_dove = t(self.langue, "e_std_dove", defaut="{e_std_dove}")
-        e_alli = t(self.langue, "e_alliance", defaut="{e_alliance}")
-        e_green = t(self.langue, "e_std_green_circle", defaut="{e_std_green_circle}")
-        e_sleep = t(self.langue, "e_std_sleeping_face", defaut="{e_std_sleeping_face}")
-        e_prohib = t(self.langue, "e_std_prohibited", defaut="{e_std_prohibited}")
+        # 🟢 Extraction des émojis via le dictionnaire global directement
+        e_next = DICT_EMOJIS.get("e_next", "⏭️")
+        e_last = DICT_EMOJIS.get("e_last", "⏮️")
+        e_check = DICT_EMOJIS.get("e_check", "✅")
+        e_nocheck = DICT_EMOJIS.get("e_nocheck", "❌")
+        e_refresh = DICT_EMOJIS.get("e_refresh", "🔄")
+        e_keyboard = DICT_EMOJIS.get("e_keyboard", "⌨️")
+        e_dove = DICT_EMOJIS.get("e_std_dove", "🕊️")
+        e_alli = DICT_EMOJIS.get("e_alliance", "🛡️")
+        e_green = DICT_EMOJIS.get("e_std_green_circle", "🟢")
+        e_sleep = DICT_EMOJIS.get("e_std_sleeping_face", "😴")
+        e_prohib = DICT_EMOJIS.get("e_std_prohibited", "🚫")
         e_ignore = "♾️"  # Fallback unicode simple pour "Ignore"
 
         lbl_ignore = t(self.langue, "wizard_btn_ignore", defaut="Doesn't matter")
@@ -526,13 +527,13 @@ class CiblePaginationView(discord.ui.View):
         self.owner_id = owner_id
 
         self.btn_prev.label = t(langue, "target_btn_prev", defaut="Previous Page")
-        self.btn_prev.emoji = t(langue, "e_last", defaut="{e_last}")
+        self.btn_prev.emoji = DICT_EMOJIS.get("e_last", "⏮️")
 
         self.btn_next.label = t(langue, "target_btn_next", defaut="Next Page")
-        self.btn_next.emoji = t(langue, "e_next", defaut="{e_next}")
+        self.btn_next.emoji = DICT_EMOJIS.get("e_next", "⏭️")
 
         self.btn_rerun.label = t(langue, "target_btn_rerun", defaut="Rerun scan")
-        self.btn_rerun.emoji = t(langue, "e_refresh", defaut="{e_refresh}")
+        self.btn_rerun.emoji = DICT_EMOJIS.get("e_refresh", "🔄")
 
         self.update_buttons()
 
@@ -977,6 +978,18 @@ class TargetCog(commands.Cog):
         lbl_dist = t(langue, "target_cible_field_dist", defaut="Distance:")
         lbl_coords = t(langue, "target_cible_field_coords", defaut="Coordinates:")
 
+        # 🟢 Extraction des émojis pour l'affichage final
+        e_peace = DICT_EMOJIS.get("e_peace", "🕊️")
+        e_players = DICT_EMOJIS.get("e_players", "👤")
+        e_alli_icon = DICT_EMOJIS.get("e_alliance_icon", "🛡️")
+        e_lvl = DICT_EMOJIS.get("e_lvl", "⭐")
+        e_pp1 = DICT_EMOJIS.get("e_pp1", "⚔️")
+        e_honor = DICT_EMOJIS.get("e_honor", "🎖️")
+        e_glory = DICT_EMOJIS.get("e_glory", "🌟")
+        e_loot = DICT_EMOJIS.get("e_loot", "📦")
+        e_compass = DICT_EMOJIS.get("e_compass", "📍")
+        e_map = DICT_EMOJIS.get("e_map", "🗺️")
+
         for i in range(0, len(best_targets), chunk_size):
             chunk = best_targets[i : i + chunk_size]
             page_num = (i // chunk_size) + 1
@@ -1020,11 +1033,7 @@ class TargetCog(commands.Cog):
                     except:
                         pass
 
-                target_icon = (
-                    t(langue, "e_peace", defaut="{e_peace}")
-                    if is_under_colombe
-                    else t(langue, "e_players", defaut="{e_players}")
-                )
+                target_icon = e_peace if is_under_colombe else e_players
 
                 warnings = []
                 if t_cnd["wall_warning"]:
@@ -1047,14 +1056,14 @@ class TargetCog(commands.Cog):
                 warning_txt = "".join(warnings) if warnings else ""
 
                 description_cible = (
-                    f"{t(langue, 'e_alliance_icon', defaut='{e_alliance_icon}')} {lbl_alli} **{t_cnd['alliance']}**\n"
-                    f"{t(langue, 'e_lvl', defaut='{e_lvl}')} {lbl_lvl} {t_cnd['lvl']}/{t_cnd['leg']}\n"
-                    f"{t(langue, 'e_pp1', defaut='{e_pp1}')} {lbl_puiss} **{format_num(t_cnd['pp'])}**\n"
-                    f"{t(langue, 'e_honor', defaut='{e_honor}')} {lbl_honneur} **{format_num(t_cnd['honor'])}**\n"
-                    f"{t(langue, 'e_glory', defaut='{e_glory}')} {lbl_gloire} **{format_num(t_cnd['glory'])}**\n"
-                    f"{t(langue, 'e_loot', defaut='{e_loot}')} {lbl_loot} **{format_num(t_cnd['loot'])}**\n"
-                    f"{t(langue, 'e_compass', defaut='{e_compass}')} {lbl_dist} **{dist_str}**\n"
-                    f"{t(langue, 'e_map', defaut='{e_map}')} {lbl_coords} `{t_cnd['x']}:{t_cnd['y']}`\n"
+                    f"{e_alli_icon} {lbl_alli} **{t_cnd['alliance']}**\n"
+                    f"{e_lvl} {lbl_lvl} {t_cnd['lvl']}/{t_cnd['leg']}\n"
+                    f"{e_pp1} {lbl_puiss} **{format_num(t_cnd['pp'])}**\n"
+                    f"{e_honor} {lbl_honneur} **{format_num(t_cnd['honor'])}**\n"
+                    f"{e_glory} {lbl_gloire} **{format_num(t_cnd['glory'])}**\n"
+                    f"{e_loot} {lbl_loot} **{format_num(t_cnd['loot'])}**\n"
+                    f"{e_compass} {lbl_dist} **{dist_str}**\n"
+                    f"{e_map} {lbl_coords} `{t_cnd['x']}:{t_cnd['y']}`\n"
                     f"{warning_txt}\n━━━━━━━━━━━━━━━━━━━━━━━"
                 )
 
