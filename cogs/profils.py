@@ -140,20 +140,23 @@ class ProfilsCog(commands.Cog):
         except:
             pass
 
-        api_data = {}
+        api_current = {}
+        api_previous = {}
         try:
             url = "https://api.gge-tracker.com/api/v1/server/statistics"
             async with session.get(url, headers=headers, timeout=10) as r:
                 if r.status == 200:
                     data = await r.json()
                     if isinstance(data, list) and len(data) > 0:
-                        api_data = data[0]  # Le plus récent est toujours le premier
+                        api_current = data[0]  # Le plus récent
+                        if len(data) > 1:
+                            api_previous = data[1]  # L'avant-dernier pour la comparaison
                     elif isinstance(data, dict):
-                        api_data = data
+                        api_current = data
         except Exception as e:
             logger.error(f"Erreur API /server/statistics : {e}")
 
-        if not api_data and not local_data:
+        if not api_current and not local_data:
             err_msg = t(
                 langue,
                 "server_err_no_data",
@@ -162,48 +165,76 @@ class ProfilsCog(commands.Cog):
             return await interaction.followup.send(err_msg)
 
         # ----------------------------------------------------
-        # 2. EXTRACTION ET FORMATAGE (Chiffres entiers)
+        # 2. EXTRACTION ET COMPARAISON
         # ----------------------------------------------------
         def fmt(n):
             if n is None:
                 return "0"
             return f"{int(n):,}".replace(",", " ")
 
+        def get_val(key, default=0):
+            return api_current.get(key) or local_data.get(key, local_data.get("stats", {}).get(key, default))
+
+        def get_diff(key):
+            if api_previous and api_current.get(key) is not None and api_previous.get(key) is not None:
+                return float(api_current[key]) - float(api_previous[key])
+            return 0
+
+        # 👉 Utilisation des clés pour les flèches via t()
+        e_up = t(langue, "e_std_chart_increasing", defaut="📈")
+        e_down = t(langue, "e_std_chart_decreasing", defaut="📉")
+
         def format_var(val):
-            if val is None:
-                val = 0
-            if val > 0:
-                return f"📈 (+{fmt(val)})"
-            elif val < 0:
-                return f"📉 ({fmt(val)})"
-            return "➖"
+            if val == 0:
+                return ""
+            elif val > 0:
+                return f" {e_up} (+`{fmt(val)}`)"
+            else:
+                return f" {e_down} (`{fmt(val)}`)"
 
         # Démographie
-        p_count = api_data.get("players_count") or local_data.get("total_players", 0)
-        a_count = api_data.get("alliance_count") or local_data.get("stats", {}).get("total_alliances", 0)
-        p_peace = api_data.get("players_in_peace", 0)
-        p_chg_alli = api_data.get("players_who_changed_alliance", 0)
-        p_chg_name = api_data.get("players_who_changed_name", 0)
+        p_count = get_val("players_count")
+        a_count = get_val("alliance_count") or get_val("total_alliances")
+        p_peace = get_val("players_in_peace")
+        p_chg_alli = get_val("players_who_changed_alliance")
+        p_chg_name = get_val("players_who_changed_name")
+
+        p_count_var = format_var(get_diff("players_count"))
+        a_count_var = format_var(get_diff("alliance_count"))
+        p_peace_var = format_var(get_diff("players_in_peace"))
+
+        # Niveau Moyen (Logique Légendaire 70/X)
+        avg_lvl_raw = get_val("avg_level")
+        avg_lvl = f"70/{int(avg_lvl_raw) - 70}" if avg_lvl_raw > 70 else str(int(avg_lvl_raw))
+
+        lvl_diff = get_diff("avg_level")
+        lvl_var = (
+            f" {e_up} (+`{round(lvl_diff, 2)}`)"
+            if lvl_diff > 0
+            else f" {e_down} (`{round(lvl_diff, 2)}`)"
+            if lvl_diff < 0
+            else ""
+        )
 
         # Puissance
-        t_might = api_data.get("total_might", 0)
-        a_might = api_data.get("avg_might", 0)
-        m_might = api_data.get("max_might", 0)
-        v_might_str = format_var(api_data.get("variation_might", 0))
+        t_might = get_val("total_might")
+        a_might = get_val("avg_might")
+        m_might = get_val("max_might")
+        v_might_str = format_var(get_diff("total_might"))
 
         # Butin
-        t_loot = api_data.get("total_loot", 0)
-        a_loot = api_data.get("avg_loot", 0)
-        m_loot = api_data.get("max_loot", 0)
-        v_loot_str = format_var(api_data.get("variation_loot", 0))
+        t_loot = get_val("total_loot")
+        a_loot = get_val("avg_loot")
+        m_loot = get_val("max_loot")
+        v_loot_str = format_var(get_diff("total_loot"))
 
         # Honneur
-        t_honor = api_data.get("total_honor", 0)
-        a_honor = api_data.get("avg_honor", 0)
-        v_honor_str = format_var(api_data.get("variation_honor", 0))
+        t_honor = get_val("total_honor")
+        a_honor = get_val("avg_honor")
+        v_honor_str = format_var(get_diff("total_honor"))
 
-        # Date de mise à jour (Priorité à l'API)
-        created_at_raw = api_data.get("created_at") or local_data.get("scan_date")
+        # Date de mise à jour (Priorité absolue à l'API)
+        created_at_raw = api_current.get("created_at") or local_data.get("scan_date")
         timestamp_str = "Récemment"
         if created_at_raw:
             try:
@@ -213,79 +244,40 @@ class ProfilsCog(commands.Cog):
                 pass
 
         # ----------------------------------------------------
-        # 3. IDENTIFICATION DE L'ÉVÉNEMENT ACTIF
-        # ----------------------------------------------------
-        events_map = [
-            ("event_nomad_points", "{e_nomads}", "server_ev_name_nomads", "event_nomad_players"),
-            ("event_samurai_points", "{e_samurai}", "server_ev_name_samurai", "event_samurai_players"),
-            ("event_bloodcrow_points", "{e_bloodcrow}", "server_ev_name_bloodcrow", "event_bloodcrow_players"),
-            ("event_war_realms_points", "{e_war_realms}", "server_ev_name_realms", "event_war_realms_players"),
-            (
-                "event_berimond_kingdom_points",
-                "{e_berimond}",
-                "server_ev_name_berimond",
-                "event_berimond_kingdom_players",
-            ),
-        ]
-
-        active_events = []
-        for pts_key, emoji_tag, name_key, players_key in events_map:
-            pts = api_data.get(pts_key, 0)
-            if pts and pts > 0:
-                nom_ev = t(langue, name_key, defaut="Événement")
-                parts = api_data.get(players_key, 0)
-
-                ligne_ev = t(
-                    langue,
-                    "server_ev_val",
-                    icon=emoji_tag,
-                    name=nom_ev,
-                    pts=fmt(pts),
-                    part=fmt(parts),
-                    defaut="{icon} **{name}**\n• Points : **{pts}**\n• Participants : **{part}**",
-                )
-                active_events.append(ligne_ev)
-
-        # ----------------------------------------------------
-        # 4. CONSTRUCTION DE L'EMBED
+        # 3. CONSTRUCTION DE L'EMBED
         # ----------------------------------------------------
         titre = t(
             langue, "server_title", serv=serveur.upper(), defaut="{e_icon_world} Statistiques Globales - Serveur {serv}"
         )
         desc = t(langue, "server_desc", ts=timestamp_str, defaut="Actualisation des données : {ts}")
 
-        # 👉 On utilise ta couleur de classe ici :
         embed = discord.Embed(title=titre, description=desc, color=self.clr_server)
 
-        # RANGÉE 1 : Démographie & Événement
+        # RANGÉE 1 : Démographie
         lbl_demo_title = t(langue, "server_demo_title", defaut="{e_players} Démographie")
         lbl_demo_val = t(
             langue,
             "server_demo_val",
             p=fmt(p_count),
+            vp=p_count_var,
             a=fmt(a_count),
+            va=a_count_var,
+            lvl=avg_lvl,
+            vlvl=lvl_var,
             peace=fmt(p_peace),
+            vpeace=p_peace_var,
             c_alli=fmt(p_chg_alli),
             c_name=fmt(p_chg_name),
             defaut=(
-                "• Joueurs : **{p}**\n"
-                "• Alliances : **{a}**\n"
-                "• Sous colombe {e_peace} : **{peace}**\n"
-                "• Transferts d'alliance : **{c_alli}**\n"
-                "• Changements de pseudo : **{c_name}**"
+                "• Joueurs : `{p}`{vp}\n"
+                "• Alliances : `{a}`{va}\n"
+                "• Niveau moyen : `{lvl}`{vlvl}\n"
+                "• Sous colombe {e_peace} : `{peace}`{vpeace}\n"
+                "• Transferts d'alliance : `{c_alli}`\n"
+                "• Changements de pseudo : `{c_name}`"
             ),
         )
-        embed.add_field(name=lbl_demo_title, value=lbl_demo_val, inline=True)
-
-        lbl_ev_title = t(langue, "server_ev_title", defaut="{e_events4} Événement Actif")
-        lbl_ev_val = (
-            "\n\n".join(active_events)
-            if active_events
-            else t(langue, "server_ev_none", defaut="*Aucun événement en cours.*")
-        )
-        embed.add_field(name=lbl_ev_title, value=lbl_ev_val, inline=True)
-
-        embed.add_field(name="\u200b", value="\u200b", inline=False)  # Ligne de séparation
+        embed.add_field(name=lbl_demo_title, value=lbl_demo_val, inline=False)
 
         # RANGÉE 2 : Puissance, Honneur, Butin
         lbl_might_title = t(langue, "server_might_title", defaut="{e_pp1} Puissance")
@@ -296,7 +288,7 @@ class ProfilsCog(commands.Cog):
             var=v_might_str,
             avg=fmt(a_might),
             max=fmt(m_might),
-            defaut="• Globale : **{t}**\n{var}\n• Moyenne : **{avg}**\n• Top 1 : **{max}**",
+            defaut="• Globale : `{t}`{var}\n• Moyenne : `{avg}`\n• Top 1 : `{max}`",
         )
         embed.add_field(name=lbl_might_title, value=lbl_might_val, inline=True)
 
@@ -307,7 +299,7 @@ class ProfilsCog(commands.Cog):
             t=fmt(t_honor),
             var=v_honor_str,
             avg=fmt(a_honor),
-            defaut="• Global : **{t}**\n{var}\n• Moyen : **{avg}**",
+            defaut="• Global : `{t}`{var}\n• Moyen : `{avg}`",
         )
         embed.add_field(name=lbl_honor_title, value=lbl_honor_val, inline=True)
 
@@ -319,7 +311,7 @@ class ProfilsCog(commands.Cog):
             var=v_loot_str,
             avg=fmt(a_loot),
             max=fmt(m_loot),
-            defaut="• Global : **{t}**\n{var}\n• Moyen : **{avg}**\n• Top 1 : **{max}**",
+            defaut="• Global : `{t}`{var}\n• Moyen : `{avg}`\n• Top 1 : `{max}`",
         )
         embed.add_field(name=lbl_loot_title, value=lbl_loot_val, inline=True)
 
