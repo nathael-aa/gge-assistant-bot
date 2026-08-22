@@ -243,18 +243,18 @@ class GGEAssistantBot(commands.Bot):
         # 1. Synchronisation globale (pour le reste du monde)
         await self.tree.sync()
 
-        # 2. Synchronisation instantanée pour tes serveurs de test
+        # 2. Nettoyage des anciennes commandes locales sur les serveurs de test
         SERVEURS_DE_TEST = [1342424613660921908, 1512165717380825310, 1537532071898128566]
 
         for guild_id in SERVEURS_DE_TEST:
             try:
                 serveur = discord.Object(id=guild_id)
-                self.tree.copy_global_to(guild=serveur)
-                await self.tree.sync(guild=serveur)
+                self.tree.clear_commands(guild=serveur)  # 👈 On vide l'arbre local
+                await self.tree.sync(guild=serveur)  # 👈 On envoie l'arbre vide à Discord
 
-                logger.info(f"⚡ [SYNC] Commandes forcées sur le serveur test ({guild_id})")
+                logger.info(f"🧹 [SYNC] Anciennes commandes locales effacées sur le serveur ({guild_id})")
             except Exception as e:
-                logger.error(f"❌ [SYNC] Échec sur le serveur {guild_id} : {e}")
+                pass
 
         self.export_commands_json()
 

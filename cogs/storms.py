@@ -22,7 +22,6 @@ from utils import (
 logger = logging.getLogger("GGE_Bot")
 
 STORM_CONFIG_PATH = SERVEURS_DIR / "storm_alerts.json"
-SERVEURS_DE_TEST = [1342424613660921908, 1512165717380825310, 1537532071898128566]
 
 
 async def load_storm_config():
@@ -86,9 +85,7 @@ class StormsCog(commands.Cog):
         self.active_alerts = []
 
     # Création du groupe de commande principal /storm
-    storm_group = app_commands.Group(
-        name="storm", description="Commands for the Storm Islands event", guild_ids=SERVEURS_DE_TEST
-    )
+    storm_group = app_commands.Group(name="storm", description="Commands for the Storm Islands event")
 
     # ========================================================
     # ⚔️ COMMANDE : /storm forts

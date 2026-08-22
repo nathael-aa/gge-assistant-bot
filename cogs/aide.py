@@ -62,6 +62,7 @@ HELP_CONFIG = {
         "color": discord.Color.from_rgb(50, 214, 50),
         "title_key": "help_cat_profils",
         "commands": [
+            {"name": "/server", "desc_key": "help_cmd_server"},
             {"name": "/player profile", "desc_key": "help_cmd_player_profile"},
             {"name": "/player history", "desc_key": "help_cmd_player_history"},
             {"name": "/player dove", "desc_key": "help_cmd_player_dove"},
@@ -106,6 +107,7 @@ HELP_CONFIG = {
             {"name": "/radar alliance (add / remove)", "desc_key": "help_cmd_radar_alliance_group"},
             {"name": "/rival (start / stop / add / list)", "desc_key": "help_cmd_rival_group"},
             {"name": "/fortress (scan / stop)", "desc_key": "help_cmd_fortress_group"},
+            {"name": "/storm (forts / isles / occupier / status / setup / stop)", "desc_key": "help_cmd_storm_group"},
         ],
     },
 }
@@ -602,6 +604,7 @@ class AideCog(commands.Cog):
         t(langue, "help_cmd_vote")
 
         # --- Commandes : Profils ---
+        t(langue, "help_cmd_server")
         t(langue, "help_cmd_player_profile")
         t(langue, "help_cmd_player_history")
         t(langue, "help_cmd_player_dove")
@@ -613,12 +616,7 @@ class AideCog(commands.Cog):
 
         # --- Commandes : Guerre ---
         t(langue, "help_cmd_alliance_scanner")
-        t(langue, "help_cmd_target")
-        t(langue, "help_cmd_proximity")
-        t(langue, "help_cmd_hr")
-        t(langue, "help_cmd_diplomacy_add")
-        t(langue, "help_cmd_diplomacy_remove")
-        t(langue, "help_cmd_diplomacy_list")
+        t(langue, "help_cmd_target_group")
 
         # --- Commandes : Events ---
         t(langue, "help_cmd_event_player")
@@ -633,6 +631,7 @@ class AideCog(commands.Cog):
         t(langue, "help_cmd_radar_alliance_group")
         t(langue, "help_cmd_rival_group")
         t(langue, "help_cmd_fortress_group")
+        t(langue, "help_cmd_storm_group")
 
         # --- Éléments du Select Menu ---
         t(langue, "help_placeholder")
