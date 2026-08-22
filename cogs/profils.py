@@ -164,9 +164,9 @@ class ProfilsCog(commands.Cog):
             )
             return await interaction.followup.send(err_msg)
 
-        # ----------------------------------------------------
+        # ---------------------------------------------------
         # 2. EXTRACTION ET COMPARAISON
-        # ----------------------------------------------------
+        # ---------------------------------------------------
         def fmt(n):
             if n is None:
                 return "0"
