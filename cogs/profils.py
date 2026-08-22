@@ -149,9 +149,9 @@ class ProfilsCog(commands.Cog):
                 if r.status == 200:
                     data = await r.json()
                     if isinstance(data, list) and len(data) > 0:
-                        api_current = data[0]  # Le plus récent
+                        api_current = data[-1]  # Le VRAI plus récent (à la fin de la liste)
                         if len(data) > 1:
-                            api_previous = data[1]  # L'avant-dernier pour la comparaison
+                            api_previous = data[-2]  # L'avant-dernier pour la comparaison
                     elif isinstance(data, dict):
                         api_current = data
         except Exception as e:
