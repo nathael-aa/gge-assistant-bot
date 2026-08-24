@@ -15,7 +15,6 @@ from utils import (
     load_blocks_async,
     save_blocks_async,
     save_maintenance_async,
-    setup_embed_footer,
     t,
 )
 
@@ -52,7 +51,7 @@ class AdminCog(commands.Cog):
             "`!restart` ➔ Redémarre le bot (via Docker).\n"
             "`!reload [cogs.nom]` ➔ Recharge un module à chaud.\n"
             "`!setstatus [msg]` ➔ Ajoute/retire un statut personnalisé.\n"
-            "`!scan_manuel` ➔ Lance `auto_pa_daily.sh` en fond.\n"
+            "`!scan_manuel [ALL/SRV]` ➔ Lance le scanner de joueurs.\n"
             "`!log [date]` ➔ Télécharge les logs.",
             inline=False,
         )
@@ -332,37 +331,45 @@ class AdminCog(commands.Cog):
             serveurs, key=lambda g: g.me.joined_at if g.me and g.me.joined_at else datetime.min, reverse=True
         )
 
-        liste_serveurs = []
+        liste_serveurs_txt = [
+            f"=== RAPPORT DES SERVEURS GGE ASSISTANT ({nb_serveurs} serveurs) ===",
+            f"Généré le : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
+        ]
+
         for g in serveurs_tries:
+            # Pour un fichier texte, on utilise une date lisible classique au lieu du Markdown Discord
             if g.me and g.me.joined_at:
-                ts = int(g.me.joined_at.timestamp())
-                date_str = f"<t:{ts}:d>"
+                date_str = g.me.joined_at.strftime("%Y-%m-%d")
             else:
                 date_str = "Inconnue"
 
             proprio = f"{g.owner.name}" if g.owner else "Inconnu"
 
-            ligne = f"• **{g.name}** (`{g.id}`) | 👑 {proprio} | 👥 {g.member_count} | 📥 {date_str}"
-            liste_serveurs.append(ligne)
+            ligne = f"• {g.name} (ID: {g.id}) | Propriétaire: {proprio} | Membres: {g.member_count} | Ajout: {date_str}"
+            liste_serveurs_txt.append(ligne)
 
-        texte_serveurs = "\n".join(liste_serveurs)
+        texte_complet = "\n".join(liste_serveurs_txt)
 
-        trunc_msg = t(self.admin_lang, "admin_servers_trunc", defaut="\n\n... *(Liste tronquée)*")
-        if len(texte_serveurs) > 1900:
-            texte_serveurs = texte_serveurs[:1850] + trunc_msg
+        # 1. Création du fichier en mémoire (évite de créer un fichier physique sur le NAS)
+        fichier_virtuel = io.BytesIO(texte_complet.encode("utf-8-sig"))
+        fichier_discord = discord.File(fp=fichier_virtuel, filename=f"GGE_Servers_{nb_serveurs}.txt")
 
+        # 2. Création de l'embed de résumé
         embed_title = t(self.admin_lang, "admin_servers_title", defaut="🤖 Serveurs connectés")
+
         embed_desc = t(
             self.admin_lang,
-            "admin_servers_desc",
+            "admin_servers_desc_file",
             count=nb_serveurs,
-            liste=texte_serveurs,
-            defaut=f"Le bot est actuellement présent sur **{nb_serveurs} serveurs** :\n\n{texte_serveurs}",
+            defaut=f"Le bot est actuellement présent sur **{nb_serveurs} serveurs**.\n📄 *La liste complète et détaillée est disponible dans le fichier ci-joint.*",
         )
 
         embed = discord.Embed(title=embed_title, description=embed_desc, color=discord.Color.blue())
-        await setup_embed_footer(embed, ctx, self.admin_lang)
-        await ctx.send(embed=embed)
+
+        # 3. Footer manuel pour corriger l'erreur d'interaction contextuelle
+        embed.set_footer(text=f"Total : {nb_serveurs} serveurs | GGE Assistant Admin")
+
+        await ctx.send(embed=embed, file=fichier_discord)
 
     @commands.command(name="bot_leave", hidden=True)
     async def admin_quitter(self, ctx, server_id: str):
@@ -399,28 +406,47 @@ class AdminCog(commands.Cog):
     # 🚀 DÉCLENCHEMENT MANUEL DES SCANNERS
     # ==========================================
     @commands.command(name="scan_manuel", hidden=True)
-    async def scan_manuel(self, ctx):
-        """[CACHÉE] !scan_manuel : Lance manuellement les scanners."""
+    async def scan_manuel(self, ctx, cible: str = "ALL"):
+        """[CACHÉE] !scan_manuel [ALL/Serveur] : Lance manuellement le scanner (Tous ou un seul)."""
         if ctx.author.id != MON_ID_DISCORD:
             return
 
-        await ctx.send("⏳ **Lancement manuel des scanners...** (Scan Serveur asynchrone)")
+        cible = cible.upper()
+        scan_server = self.bot.get_cog("ScanCog")
 
-        try:
-            logger.info(f"🚀 Lancement manuel du ServerScanner par {ctx.author.name}")
+        if scan_server is None:
+            return await ctx.send("❌ **Erreur :** Le module `ScanCog` n'est pas chargé dans le bot.")
 
-            scan_server = self.bot.get_cog("ScanCog")
+        if cible == "ALL":
+            await ctx.send("⏳ **Lancement manuel du scanner GLOBAL...** (Tous les serveurs)")
+            try:
+                logger.info(f"🚀 Lancement manuel du ServerScanner GLOBAL par {ctx.author.name}")
+                await scan_server.daily_scan.coro(scan_server)
+                await ctx.send("✅ **Scan global terminé avec succès !**")
+            except Exception as e:
+                logger.error(f"❌ Erreur critique scan manuel (ALL) : {e}")
+                await ctx.send(f"⚠️ **Erreur lors de l'exécution (ALL) :**\n```py\n{e}\n```")
 
-            if scan_server is None:
-                return await ctx.send("❌ **Erreur :** Le module `ScanCog` n'est pas chargé dans le bot.")
+        else:
+            await ctx.send(f"⏳ **Lancement du scanner ciblé sur le serveur : `{cible}`...**")
+            try:
+                logger.info(f"🚀 Lancement manuel du ServerScanner ({cible}) par {ctx.author.name}")
 
-            await scan_server.daily_scan.coro(scan_server)
-
-            await ctx.send("✅ **Tous les scans manuels sont terminés avec succès !**")
-
-        except Exception as e:
-            logger.error(f"❌ Erreur critique scan manuel : {e}")
-            await ctx.send(f"⚠️ **Erreur lors de l'exécution :**\n```py\n{e}\n```")
+                if hasattr(scan_server, "scan_specific_server"):
+                    reussite = await scan_server.scan_specific_server(cible)
+                    if reussite:
+                        await ctx.send(f"✅ **Scan manuel terminé avec succès pour `{cible}` !**")
+                    else:
+                        await ctx.send(
+                            f"❌ **Échec du scan pour `{cible}`.** Le nom du serveur est peut-être incorrect (ex: `E4K_FR1`)."
+                        )
+                else:
+                    await ctx.send(
+                        "⚠️ **Attention :** La fonction `scan_specific_server` est introuvable dans `ScanCog`."
+                    )
+            except Exception as e:
+                logger.error(f"❌ Erreur critique scan manuel ({cible}) : {e}")
+                await ctx.send(f"⚠️ **Erreur lors de l'exécution ({cible}) :**\n```py\n{e}\n```")
 
     # ==========================================
     # 📜 EXTRACTION DU JOURNAL SYSTÈME (LOGS)

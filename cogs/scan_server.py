@@ -183,6 +183,28 @@ class ScanCog(commands.Cog):
 
         return filepath
 
+    async def scan_specific_server(self, server_name: str):
+        """Scanne uniquement un serveur spécifique et sauvegarde les résultats."""
+        server_name = server_name.upper()
+        logger.info("======================================================")
+        logger.info(f"🌍 DÉMARRAGE DU SCAN MANUEL CIBLÉ : {server_name}")
+        logger.info("======================================================")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                # On triche un peu sur l'index (1/1) pour l'affichage des logs
+                result = await self.scan_server(session, server_name, 1, 1)
+
+                if result:
+                    players, duration = result
+                    await asyncio.to_thread(self.save_results, players, duration, server_name)
+                    return True
+            return False
+        except Exception as e:
+            logger.error(f"❌ Erreur lors du scan spécifique de {server_name} : {e}")
+            logger.error(traceback.format_exc())
+            raise e
+
     # Lancement tous les jours à 00h30 UTC
     @tasks.loop(time=time(hour=0, minute=30, tzinfo=UTC))
     async def daily_scan(self):
