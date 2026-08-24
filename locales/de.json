@@ -12,6 +12,8 @@
     "admin_servers_desc": "Der Bot ist derzeit auf **{count} Servern** vertreten:\n\n{liste}",
     "admin_servers_title": "{e_std_robot} Verbundene Server",
     "admin_servers_trunc": "\n\n... *(Liste gekürzt)*",
+    "fort_lbl_last_scan": "Letzter API-Scan:",
+    "storm_status_desc_v2": "**Saisonstart:** {season}\n**Letzter Scan:** {scan}\n**Abgedeckter Radius:** {radius} Felder\n\n<:aquamarineforts:1512162154890133506> **Verfolgte Festungen:** {forts}\n<:aquamarineiles:1512162072249765908> **Verfolgte Inseln:** {isles}",
     "admin_sync_error": "{e_error} Fehler bei der Synchronisierung: {error}",
     "admin_sync_start": "{e_std_hourglass_not_done} Synchronisierung des Befehlsbaums läuft...",
     "admin_sync_success": "{e_greencirclebullet} Der Baum wurde erfolgreich synchronisiert! ({count} Befehle verfügbar)",

@@ -80,7 +80,7 @@ class StormsCog(commands.Cog):
         self.clr_occupier = discord.Color.from_rgb(137, 196, 199)
         self.clr_status = discord.Color.from_rgb(132, 206, 209)
         self.clr_setup = discord.Color.from_rgb(144, 232, 219)
-        self.api_base = "https://api-beta.gge-tracker.com/api/v1/"
+        self.api_base = "https://api.gge-tracker.com/api/v1/"
 
         self.active_alerts = []
 
@@ -510,6 +510,7 @@ class StormsCog(commands.Cog):
                 )
             data = await r.json()
 
+        # 1. Parsing de la date du dernier scan
         last_scan = data.get("last_scan_at", "")
         try:
             ts_scan = int(datetime.fromisoformat(last_scan.replace("Z", "+00:00")).timestamp())
@@ -517,19 +518,30 @@ class StormsCog(commands.Cog):
         except:
             scan_str = t(langue, "storm_status_unknown", defaut="Unknown")
 
+        # 2. NOUVEAU : Parsing de la date de début de saison
+        season_start = data.get("season_started_at", "")
+        try:
+            ts_season = int(datetime.fromisoformat(season_start.replace("Z", "+00:00")).timestamp())
+            season_str = f"<t:{ts_season}:D>"  # Format date courte Discord (ex: 1 August 2026)
+        except:
+            season_str = t(langue, "storm_status_unknown", defaut="Unknown")
+
         embed = discord.Embed(
             title=t(langue, "cmd_storm_status_title", defaut="<:status:1533435056087896164> Storm Islands Status"),
             color=self.clr_status,
         )
 
+        # 3. Mise à jour de la description avec la nouvelle variable (clé v2)
         desc = t(
             langue,
-            "storm_status_desc",
+            "storm_status_desc_v2",
+            season=season_str,
             scan=scan_str,
             radius=data.get("scan_radius", 0),
             forts=data.get("forts_count", 0),
             isles=data.get("isles_count", 0),
             defaut=(
+                f"**Season Started:** {season_str}\n"
                 f"**Last Scan:** {scan_str}\n"
                 f"**Covered Radius:** {data.get('scan_radius', 0)} tiles\n\n"
                 f"<:aquamarineforts:1512162154890133506> **Tracked Forts:** {data.get('forts_count', 0):,}\n"

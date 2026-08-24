@@ -93,6 +93,21 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
     async def cog_unload(self):
         self.dungeon_spy_task.cancel()
 
+    async def fetch_meta_scan(self, session: aiohttp.ClientSession, headers: dict) -> str:
+        """Récupère l'heure du dernier scan global des forteresses."""
+        url = f"{self.base_api}/dungeons/meta"
+        try:
+            async with session.get(url, headers=headers, timeout=5) as r:
+                if r.status == 200:
+                    data = await r.json()
+                    last_scan = data.get("last_scan_at", "")
+                    if last_scan:
+                        dt = datetime.fromisoformat(last_scan.replace("Z", "+00:00"))
+                        return f"<t:{int(dt.timestamp())}:R>"
+        except:
+            pass
+        return "❓ Inconnu"
+
     # ==========================================
     # 🧠 MÉTHODE : VÉRIFICATION EN DIRECT
     # ==========================================
@@ -361,12 +376,17 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         except Exception as e:
             logger.error(f"❌ [FORTERESSES] Erreur API Globale: {e}")
 
+        # 🟢 APPEL DU META-SCAN
+        last_scan_str = await self.fetch_meta_scan(session, headers)
+        lbl_last_scan = t(langue, "fort_lbl_last_scan", defaut="Dernier scan API :")
+        txt_last_scan = f"\n*📡 {lbl_last_scan} {last_scan_str}*"
+
         # ------------------------------------------------------------------
         # 🟢 CONSTRUCTION DES RÉSULTATS : CIBLES DISPONIBLES
         # ------------------------------------------------------------------
         if cibles_dispo:
             cibles_dispo.sort(key=lambda c: c["dist"] if c["dist"] != -1.0 else 99999)
-            vivier = cibles_dispo[:30]  # On prend les 30 plus proches avant de chaîner
+            vivier = cibles_dispo[:30]
             cibles_a_envoyer = self.chain_targets_by_coordinates(vivier)[:10]
 
             sessions_modifiees = False
@@ -378,12 +398,14 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                 langue, "fort_title_avail", defaut="<:attaque:1512570903886692474> CIBLES DISPONIBLES IMMÉDIATEMENT"
             )
             embed = discord.Embed(title=titre, color=discord.Color.green())
-            embed.description = t(
+
+            embed_desc_base = t(
                 langue,
                 "fort_desc_avail",
                 count=len(cibles_a_envoyer),
                 defaut=f"Le guet a repéré **{len(cibles_a_envoyer)}** forteresse(s) prête(s) au pillage :",
             )
+            embed.description = embed_desc_base + txt_last_scan
 
             for idx, c in enumerate(cibles_a_envoyer, start=1):
                 dist_str = (
@@ -463,7 +485,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                 sessions_modifiees = True
 
             embed = discord.Embed(title=embed_title, color=embed_color)
-            embed.description = embed_desc
+            embed.description = embed_desc + txt_last_scan
 
             for idx, c in enumerate(cibles_finales, start=1):
                 dist_str = (

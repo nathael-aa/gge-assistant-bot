@@ -2114,7 +2114,7 @@ class ProfilsCog(commands.Cog):
             return await interaction.followup.send(msg)
 
         # --- 3. RÉCUPÉRATION DES MURS VIA L'ID TROUVÉ ---
-        api_url = f"https://api-beta.gge-tracker.com/api/v1/alliances/id/{alliance_id}"
+        api_url = f"https://api.gge-tracker.com/api/v1/alliances/id/{alliance_id}"
 
         try:
             async with session.get(api_url, headers=headers, timeout=10) as response:
