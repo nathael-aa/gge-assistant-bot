@@ -669,7 +669,8 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             maintenant = discord.utils.utcnow()
 
             config_data = await load_configuration_async()
-            server_scan_minutes = config_data.get("scan_minutes", {})
+            # 💡 MODIFICATION : Lecture depuis la nouvelle structure unifiée
+            servers_info = config_data.get("servers_info", {})
 
             data = await load_surveillance_async()
             players = data.get("players", {})
@@ -708,7 +709,15 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 targets_by_server[srv]["players"].append((p_id, p_info))
 
             for serveur, targets in targets_by_server.items():
-                minute_cible = server_scan_minutes.get(serveur, 46)
+                # 💡 MODIFICATION : On va chercher les minutes de scan dans servers_info
+                # Si le serveur n'est pas trouvé ou n'a pas de minutes, on utilise 46 par défaut
+                srv_data = servers_info.get(serveur, {})
+                minute_cible = srv_data.get("scan_minutes")
+
+                # Fallback sécurisé au cas où scan_minutes est None dans le JSON
+                if minute_cible is None:
+                    minute_cible = 46
+
                 minutes_valides = [
                     minute_cible,
                     (minute_cible + 5) % 60,

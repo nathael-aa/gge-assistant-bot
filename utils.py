@@ -17,6 +17,7 @@ logger = logging.getLogger("GGE_Bot")
 # ⚙️ GESTION DES CHEMINS & DOSSIER
 # ==========================================
 BASE_DIR = Path(__file__).parent
+
 LOCALES_DIR = BASE_DIR / "locales"
 BASE_DATA_PATH = BASE_DIR / "data"
 
@@ -373,7 +374,7 @@ async def load_configuration_async():
                     return json.load(f)
             except Exception as e:
                 logger.error(f"❌ Erreur configuration.json : {e}")
-        return {"servers": {}, "scan_minutes": {}}
+        return {"servers_info": {}}
 
 
 async def save_configuration_async(data):

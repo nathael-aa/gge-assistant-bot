@@ -41,11 +41,20 @@ class ClassementCog(commands.Cog):
             if os.path.exists(self.config_path):
                 with open(self.config_path, encoding="utf-8") as f:
                     config_data = json.load(f)
-                    self.servers_map = config_data.get("servers", {})
+
+                    # 💡 NOUVELLE LOGIQUE : On lit 'servers_info' et on extrait 'api_name'
+                    servers_info = config_data.get("servers_info", {})
+                    self.servers_map = {
+                        srv_name.lower(): srv_data.get("api_name")
+                        for srv_name, srv_data in servers_info.items()
+                        if isinstance(srv_data, dict) and srv_data.get("api_name")
+                    }
+
                     self.event_ids = config_data.get("event_ids", {})
                     self.brackets_map = config_data.get("brackets", {})
+
                 self.logger.info(
-                    f"📝 [Classement] Fichier chargé ! Serveurs: {len(self.servers_map)}, Events: {len(self.event_ids)}"
+                    f"📝 [Classement] Fichier chargé ! Serveurs API: {len(self.servers_map)}, Events: {len(self.event_ids)}"
                 )
             else:
                 self.logger.warning(

@@ -50,6 +50,7 @@ class AdminCog(commands.Cog):
             "`!m` ➔ Active/Désactive le mode maintenance.\n"
             "`!restart` ➔ Redémarre le bot (via Docker).\n"
             "`!reload [cogs.nom]` ➔ Recharge un module à chaud.\n"
+            "`!sync_servers` ➔ Force la mise à jour immédiate de la liste des serveurs depuis le GitHub officiel (synchronise les accès et les pastilles 🌟/🟢/🔴).\n"
             "`!setstatus [msg]` ➔ Ajoute/retire un statut personnalisé.\n"
             "`!scan_manuel [ALL/SRV]` ➔ Lance le scanner de joueurs.\n"
             "`!log [date]` ➔ Télécharge les logs.",
@@ -447,6 +448,103 @@ class AdminCog(commands.Cog):
             except Exception as e:
                 logger.error(f"❌ Erreur critique scan manuel ({cible}) : {e}")
                 await ctx.send(f"⚠️ **Erreur lors de l'exécution ({cible}) :**\n```py\n{e}\n```")
+
+    @commands.command(name="sync_servers", hidden=True)
+    async def sync_servers(self, ctx):
+        """[CACHÉE] !sync_servers : Force la synchronisation de la liste des serveurs via XML."""
+        if ctx.author.id != MON_ID_DISCORD:
+            return
+
+        import json
+        import xml.etree.ElementTree as ET
+
+        from utils import CONFIG_DIR
+
+        msg_wait = await ctx.send("⏳ **Téléchargement du XML de GGE-Tracker en cours...**")
+
+        url = "https://ggetracker.github.io/i18n/servers.xml"
+        try:
+            async with self.bot.session.get(url, timeout=10) as r:
+                if r.status != 200:
+                    return await msg_wait.edit(content=f"❌ Erreur {r.status} lors de l'accès au XML de GGE-Tracker.")
+
+                xml_text = await r.text()
+                root = ET.fromstring(xml_text)
+
+                config_file = CONFIG_DIR / "configuration.json"
+                if not config_file.exists():
+                    return await msg_wait.edit(content="❌ Fichier `configuration.json` introuvable.")
+
+                with open(config_file, encoding="utf-8") as f:
+                    config_data = json.load(f)
+
+                anciennes_infos = config_data.get("servers_info", {})
+                vieux_scan_minutes = config_data.get("scan_minutes", {})
+                vieux_noms_api = config_data.get("servers", {})
+
+                nouveau_servers_info = {}
+
+                # 💡 LA CORRECTION EST ICI : on ajoute './/' pour fouiller dans le XML
+                for server in root.findall(".//server"):
+                    name_elem = server.find("name")
+                    enabled_elem = server.find("enabled")
+                    featured_elem = server.find("featured")
+
+                    if name_elem is not None and name_elem.text:
+                        name = name_elem.text.strip()
+
+                        is_enabled = (
+                            (enabled_elem.text.strip().lower() == "true")
+                            if (enabled_elem is not None and enabled_elem.text)
+                            else False
+                        )
+                        is_featured = (
+                            (featured_elem.text.strip().lower() == "true")
+                            if (featured_elem is not None and featured_elem.text)
+                            else False
+                        )
+
+                        minutes = anciennes_infos.get(name, {}).get("scan_minutes")
+                        if minutes is None:
+                            minutes = vieux_scan_minutes.get(name)
+
+                        api_name = anciennes_infos.get(name, {}).get("api_name")
+                        if api_name is None:
+                            api_name = vieux_noms_api.get(name.lower())
+
+                        nouveau_servers_info[name] = {
+                            "enabled": is_enabled,
+                            "featured": is_featured,
+                            "scan_minutes": minutes,
+                            "api_name": api_name,
+                        }
+
+                if not nouveau_servers_info:
+                    return await msg_wait.edit(
+                        content="❌ **Erreur de lecture XML** : 0 serveurs trouvés. Le format du fichier a peut-être changé."
+                    )
+
+                if nouveau_servers_info != anciennes_infos:
+                    config_data["servers_info"] = nouveau_servers_info
+
+                    # 💡 OPTIONNEL : Nettoyage automatique des anciennes clés
+                    config_data.pop("active_servers", None)
+                    config_data.pop("special_servers", None)
+                    config_data.pop("scan_minutes", None)
+                    config_data.pop("servers", None)
+
+                    with open(config_file, "w", encoding="utf-8") as f:
+                        json.dump(config_data, f, indent=4, ensure_ascii=False)
+
+                    msg = f"✅ **Synchronisation réussie !**\nLa base de données a été unifiée et mise à jour avec **{len(nouveau_servers_info)} serveurs**."
+                else:
+                    msg = f"✅ **Synchronisation réussie !**\nAucune modification détectée (les **{len(nouveau_servers_info)} serveurs** sont déjà parfaitement à jour)."
+
+                await msg_wait.edit(content=msg)
+
+        except Exception as e:
+            logger.error(f"❌ [Admin] Erreur lors de la synchronisation forcée des serveurs : {e}")
+            await msg_wait.edit(content=f"❌ Erreur lors de la synchronisation : `{e}`")
 
     # ==========================================
     # 📜 EXTRACTION DU JOURNAL SYSTÈME (LOGS)

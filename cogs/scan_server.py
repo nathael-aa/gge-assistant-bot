@@ -49,16 +49,18 @@ class ScanCog(commands.Cog):
             logger.error(f"❌ Impossible d'envoyer l'alerte Discord : {e}")
 
     def get_active_servers(self):
-        """Récupère la liste des serveurs depuis le fichier de config"""
+        """Récupère la liste des serveurs ACTIFS depuis le fichier de config unifié"""
         active_servers = set()
         if self.configuration_path.exists():
             try:
                 with open(self.configuration_path, encoding="utf-8") as f:
                     config_data = json.load(f)
-                servers_status = config_data.get("active_servers", {})
-                for srv_name, is_active in servers_status.items():
-                    if is_active is True:
+
+                servers_info = config_data.get("servers_info", {})
+                for srv_name, data in servers_info.items():
+                    if isinstance(data, dict) and data.get("enabled") is True:
                         active_servers.add(srv_name.upper())
+
             except Exception as e:
                 logger.error(f"❌ Erreur lecture configuration.json : {e}")
 

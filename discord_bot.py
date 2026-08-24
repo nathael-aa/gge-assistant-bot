@@ -4,8 +4,8 @@ import hmac
 import json
 import logging
 import os
-import re
 import socket
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
@@ -263,8 +263,8 @@ class GGEAssistantBot(commands.Bot):
             self.post_server_count_task.start()
             logger.info("🛰️ [Tasks] post_server_count_task initialisée dans le setup_hook.")
 
-        if not self.update_special_servers_task.is_running():
-            self.update_special_servers_task.start()
+        if not self.update_servers_task.is_running():
+            self.update_servers_task.start()
             logger.info("🛰️ [Tasks] update_special_servers_task initialisée dans le setup_hook.")
 
         self.add_view(WelcomeView())
@@ -350,7 +350,7 @@ class GGEAssistantBot(commands.Bot):
     # ==========================================
     # 🔄 BOUCLE DE ROTATION DES STATUTS
     # ==========================================
-    @tasks.loop(seconds=30)
+    @tasks.loop(seconds=20)
     async def status_task(self):
         if self.maintenance_mode:
             statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
@@ -584,49 +584,136 @@ class GGEAssistantBot(commands.Bot):
         await self.wait_until_ready()
 
     # ==========================================
-    # 🔄 TÂCHE : SYNCHRO DES SERVEURS SPÉCIAUX (24H)
+    # 🔄 TÂCHE : SYNCHRO ET UNIFICATION DES SERVEURS (3H)
     # ==========================================
-    @tasks.loop(hours=24)
-    async def update_special_servers_task(self):
-        url = "https://raw.githubusercontent.com/gge-tracker/gge-tracker/refs/heads/main/gge-tracker-backend-api/src/api/enums/gge-tracker-special-servers.enums.ts"
+    @tasks.loop(hours=3)
+    async def update_servers_task(self):
+
+        url = "https://ggetracker.github.io/i18n/servers.xml"
+        webhook_url = "https://discord.com/api/webhooks/1525853187280474222/Y4fycCy0IW019tZCMhGOdJzS1vqg7wSYn1ZEhtVO2o9Atuwr8ek-zieIsN9kG86Ndlcq"
 
         try:
-            # 1. On va chercher le fichier brut sur GitHub
             async with self.session.get(url, timeout=10) as r:
                 if r.status == 200:
-                    text = await r.text()
+                    xml_text = await r.text()
+                    root = ET.fromstring(xml_text)
 
-                    # 2. On utilise une Regex pour trouver les mots avant le "="
-                    # (Composés de lettres majuscules, chiffres et underscores)
-                    nouveaux_serveurs = re.findall(r"([A-Z0-9_]+)\s*=", text)
+                    config_file = CONFIG_DIR / "configuration.json"
+                    if not config_file.exists():
+                        return logger.error("❌ Fichier de configuration introuvable.")
 
-                    if nouveaux_serveurs:
-                        config_file = CONFIG_DIR / "configuration.json"
+                    with open(config_file, encoding="utf-8") as f:
+                        config_data = json.load(f)
 
-                        if config_file.exists():
-                            with open(config_file, encoding="utf-8") as f:
-                                config_data = json.load(f)
+                    anciennes_infos = config_data.get("servers_info", {})
+                    vieux_scan_minutes = config_data.get("scan_minutes", {})
+                    vieux_noms_api = config_data.get("servers", {})
 
-                            serveurs_actuels = config_data.get("special_servers", [])
+                    nouveau_servers_info = {}
 
-                            # 3. On met à jour uniquement s'il y a une différence
-                            if set(nouveaux_serveurs) != set(serveurs_actuels):
-                                config_data["special_servers"] = nouveaux_serveurs
+                    for server in root.findall(".//server"):
+                        name_elem = server.find("name")
+                        enabled_elem = server.find("enabled")
+                        featured_elem = server.find("featured")
 
-                                with open(config_file, "w", encoding="utf-8") as f:
-                                    json.dump(config_data, f, indent=4, ensure_ascii=False)
+                        if name_elem is not None and name_elem.text:
+                            name = name_elem.text.strip()
 
-                                logger.info(
-                                    f"🔄 [GitHub Sync] Liste des serveurs spéciaux mise à jour ({len(nouveaux_serveurs)} serveurs)."
+                            is_enabled = (
+                                (enabled_elem.text.strip().lower() == "true")
+                                if (enabled_elem is not None and enabled_elem.text)
+                                else False
+                            )
+                            is_featured = (
+                                (featured_elem.text.strip().lower() == "true")
+                                if (featured_elem is not None and featured_elem.text)
+                                else False
+                            )
+
+                            minutes = anciennes_infos.get(name, {}).get("scan_minutes")
+                            if minutes is None:
+                                minutes = vieux_scan_minutes.get(name)
+
+                            api_name = anciennes_infos.get(name, {}).get("api_name")
+                            if api_name is None:
+                                api_name = vieux_noms_api.get(name.lower())
+
+                            nouveau_servers_info[name] = {
+                                "enabled": is_enabled,
+                                "featured": is_featured,
+                                "scan_minutes": minutes,
+                                "api_name": api_name,
+                            }
+
+                    # 🔍 DÉTECTION DES NOUVEAUTÉS POUR LE WEBHOOK ADMIN
+                    nouveaux_serveurs = []
+                    changements_featured = []
+
+                    for name, new_data in nouveau_servers_info.items():
+                        if name not in anciennes_infos:
+                            nouveaux_serveurs.append(name)
+                        else:
+                            old_featured = anciennes_infos[name].get("featured", False)
+                            if old_featured != new_data["featured"]:
+                                etat = "🌟 Activées (Featured)" if new_data["featured"] else "❌ Désactivées"
+                                changements_featured.append(f"• **{name}** ➔ Fonctions avancées : {etat}")
+
+                    # On ne sauvegarde que si l'API a changé des statuts ou ajouté un serveur
+                    vieilles_cles_presentes = any(
+                        k in config_data for k in ["active_servers", "special_servers", "scan_minutes", "servers"]
+                    )
+
+                    if nouveau_servers_info != anciennes_infos or vieilles_cles_presentes:
+                        config_data["servers_info"] = nouveau_servers_info
+
+                        # Nettoyage optionnel des vieilles clés
+                        config_data.pop("active_servers", None)
+                        config_data.pop("special_servers", None)
+                        config_data.pop("scan_minutes", None)
+                        config_data.pop("servers", None)
+
+                        with open(config_file, "w", encoding="utf-8") as f:
+                            json.dump(config_data, f, indent=4, ensure_ascii=False)
+
+                        logger.info(
+                            f"🔄 [XML Sync] Base de données unifiée mise à jour avec {len(nouveau_servers_info)} serveurs."
+                        )
+
+                        # 📢 ENVOI DE L'ALERTE WEBHOOK ADMIN SI CHANGEMENT NOTABLE
+                        if nouveaux_serveurs or changements_featured:
+                            desc_parts = ["Le XML de GGE-Tracker a évolué :"]
+
+                            if nouveaux_serveurs:
+                                desc_parts.append(
+                                    "\n🌍 **Nouveaux serveurs détectés :**\n"
+                                    + "\n".join([f"• `{s}`" for s in nouveaux_serveurs])
                                 )
-                else:
-                    logger.warning(f"⚠️ [GitHub Sync] Impossible d'accéder au GitHub GGE-Tracker (Erreur {r.status})")
-        except Exception as e:
-            logger.error(f"❌ [GitHub Sync] Erreur lors de la mise à jour des serveurs spéciaux : {e}")
 
-    @update_special_servers_task.before_loop
-    async def before_update_special_servers(self):
-        await self.wait_until_ready()
+                            if changements_featured:
+                                desc_parts.append(
+                                    "\n⭐ **Changements de fonctionnalités avancées :**\n"
+                                    + "\n".join(changements_featured)
+                                )
+
+                            payload = {
+                                "embeds": [
+                                    {
+                                        "title": "🔄 Alerte Synchro GGE-Tracker",
+                                        "description": "\n".join(desc_parts),
+                                        "color": 3447003,
+                                        "timestamp": datetime.now().isoformat(),
+                                    }
+                                ]
+                            }
+                            try:
+                                async with self.session.post(self.webhook_url, json=payload) as resp:
+                                    pass
+                            except Exception as webhook_err:
+                                logger.error(f"❌ Erreur envoi webhook admin synchro : {webhook_err}")
+                else:
+                    logger.warning(f"⚠️ [XML Sync] Impossible d'accéder au XML (Erreur {r.status})")
+        except Exception as e:
+            logger.error(f"❌ [XML Sync] Erreur lors de l'unification des serveurs : {e}")
 
     # ==========================================
     # 📈 TÂCHE : MISE À JOUR DU NOMBRE DE SERVEURS TOP.GG
@@ -767,19 +854,24 @@ class GGEAssistantBot(commands.Bot):
             if config_file.exists():
                 with open(config_file, encoding="utf-8") as f:
                     config_data = json.load(f)
-                    serveurs_speciaux = config_data.get("special_servers", [])
-                    live_config = config_data.get("live_api_commands", {})
 
+                    # 💡 MODIFICATION : On utilise la nouvelle structure unifiée
+                    servers_info = config_data.get("servers_info", {})
+
+                    live_config = config_data.get("live_api_commands", {})
                     groupes_live = live_config.get("groups", [])
                     commandes_live = live_config.get("specific", [])
 
                 # On extrait le premier mot (le groupe parent, ex: "storm" pour "storm isles")
                 base_cmd = cmd_name.split(" ")[0]
 
-                # 🛠️ MODIF ICI : On vérifie si le groupe ou le nom complet est dans la liste live
+                # On vérifie si le groupe ou le nom complet est dans la liste live
                 if base_cmd in groupes_live or cmd_name in groupes_live or cmd_name in commandes_live:
-                    # ... et que le serveur du joueur n'a pas de compte espion
-                    if serveur and serveur not in serveurs_speciaux:
+                    # 💡 MODIFICATION : On vérifie l'attribut "featured" du serveur
+                    is_featured = servers_info.get(serveur, {}).get("featured", False)
+
+                    # ... et si le serveur du joueur n'a pas de compte espion (pas featured)
+                    if serveur and not is_featured:
                         if interaction.type == discord.InteractionType.application_command:
                             msg = t(
                                 langue,
@@ -858,8 +950,8 @@ class GGEAssistantBot(commands.Bot):
             self.sync_topgg_votes_task.cancel()
         if hasattr(self, "post_server_count_task"):
             self.post_server_count_task.cancel()
-        if hasattr(self, "update_special_servers_task"):
-            self.update_special_servers_task.cancel()
+        if hasattr(self, "update_servers_task"):
+            self.update_servers_task.cancel()
         if hasattr(self, "web_site"):
             await self.web_site.stop()
             await self.web_runner.cleanup()

@@ -1,308 +1,4 @@
 {
-    "active_servers": {
-        "E4K_FR1": true,
-        "E4K_DE1": true,
-        "E4K_DE2": true,
-        "E4K_US1": true,
-        "E4K_INT2": true,
-        "E4K_CN1": true,
-        "E4K_GB1": true,
-        "E4K_RU1": true,
-        "E4K_HANT1": true,
-        "E4K_BR1": true,
-        "E4K_WORLD2": true,
-        "FR1": true,
-        "DE1": true,
-        "INT1": true,
-        "INT2": true,
-        "INT3": true,
-        "WORLD1": true,
-        "WORLD2": true,
-        "ES1": true,
-        "ES2": true,
-        "IT1": true,
-        "TR1": true,
-        "NL1": true,
-        "HU1": true,
-        "HU2": true,
-        "PL1": true,
-        "PT1": true,
-        "SK1": true,
-        "SKN1": true,
-        "RU1": true,
-        "RO1": true,
-        "BG1": true,
-        "GB1": true,
-        "BR1": true,
-        "US1": true,
-        "AU1": true,
-        "JP1": true,
-        "IN1": true,
-        "CN1": true,
-        "GR1": true,
-        "SA1": true,
-        "AE1": true,
-        "EG1": true,
-        "ARAB1": true,
-        "ASIA": true,
-        "HANT1": true,
-        "PARTNER_SP3": false,
-        "GLOBAL": false,
-        "E4K_ES1": false,
-        "E4K_PL1": false,
-        "E4K_IT1": false,
-        "E4K_TR1": false,
-        "E4K_NL1": true,
-        "E4K_PT1": true,
-        "E4K_GR1": false,
-        "E4K_RO1": false,
-        "E4K_HU1": false,
-        "E4K_CZ1": false,
-        "E4K_SK1": false,
-        "E4K_BG1": false,
-        "E4K_HR1": false,
-        "E4K_SE1": false,
-        "E4K_NO1": false,
-        "E4K_FI1": false,
-        "E4K_DK1": false,
-        "E4K_JP1": false,
-        "E4K_KR1": false,
-        "E4K_TW1": false,
-        "E4K_INT1": false,
-        "CZ1": true,
-        "HIS1": false,
-        "LT1": false,
-        "E4K_SKN1": true,
-        "E4K_HIS1": false,
-        "E4K_PH1": false,
-        "E4K_AR1": false,
-        "E4K_MX1": false,
-        "E4K_ARAB1": false,
-        "E4K_IN1": false,
-        "E4K_ID1": false,
-        "E4K_ASIA1": false,
-        "E4K_US2": false,
-        "E4K_RU2": false,
-        "E4K_INT3": false,
-        "E4K_INT4": true,
-        "E4K_WORLD1": false
-    },
-    "special_servers": [
-        "FR1",
-        "RO1",
-        "CZ1",
-        "IT1",
-        "SA1",
-        "DE1",
-        "NL1",
-        "E4K_BR1",
-        "E4K_HANT1",
-        "E4K_CN1",
-        "TR1",
-        "BR1",
-        "GR1",
-        "ES1",
-        "HU1",
-        "INT3",
-        "PARTNER_SP3",
-        "BG1",
-        "AU1",
-        "US1",
-        "E4K_RU1",
-        "WORLD1",
-        "WORLD2",
-        "IN1",
-        "ASIA",
-        "E4K_INT2",
-        "E4K_FR1",
-        "E4K_DE1",
-        "E4K_DE2"
-    ],
-    "live_api_commands": {
-        "groups": [
-            "storm",
-            "fortress"
-        ],
-        "specific": []
-    },
-    "servers": {
-        "int1": "EmpireEx",
-        "de1": "EmpireEx_2",
-        "fr1": "EmpireEx_3",
-        "cz1": "EmpireEx_4",
-        "pl1": "EmpireEx_5",
-        "pt1": "EmpireEx_6",
-        "int2": "EmpireEx_7",
-        "es1": "EmpireEx_8",
-        "it1": "EmpireEx_9",
-        "tr1": "EmpireEx_10",
-        "nl1": "EmpireEx_11",
-        "hu1": "EmpireEx_12",
-        "skn1": "EmpireEx_13",
-        "ru1": "EmpireEx_14",
-        "ro1": "EmpireEx_15",
-        "bg1": "EmpireEx_16",
-        "hu2": "EmpireEx_17",
-        "sk1": "EmpireEx_18",
-        "gb1": "EmpireEx_19",
-        "br1": "EmpireEx_20",
-        "us1": "EmpireEx_21",
-        "au1": "EmpireEx_22",
-        "kr1": "EmpireEx_23",
-        "jp1": "EmpireEx_24",
-        "his1": "EmpireEx_25",
-        "in1": "EmpireEx_26",
-        "cn1": "EmpireEx_27",
-        "gr1": "EmpireEx_28",
-        "lt1": "EmpireEx_29",
-        "sa1": "EmpireEx_32",
-        "ae1": "EmpireEx_33",
-        "eg1": "EmpireEx_34",
-        "arab1": "EmpireEx_35",
-        "asia": "EmpireEx_36",
-        "hant1": "EmpireEx_37",
-        "es2": "EmpireEx_38",
-        "int3": "EmpireEx_43",
-        "world1": "EmpireEx_46",
-        "world2": "EmpireEx_49",
-        "global": null,
-        "partner_sp3": null,
-        "e4k_ro1": null,
-        "e4k_hu1": null,
-        "e4k_cz1": null,
-        "e4k_sk1": null,
-        "e4k_bg1": null,
-        "e4k_hr1": null,
-        "e4k_se1": null,
-        "e4k_no1": null,
-        "e4k_fi1": null,
-        "e4k_dk1": null,
-        "e4k_tw1": null,
-        "e4k_int1": null,
-        "e4k_de1": "EmpirefourkingdomsExGG",
-        "e4k_fr1": "EmpirefourkingdomsExGG_2",
-        "e4k_pl1": "EmpirefourkingdomsExGG_3",
-        "e4k_us1": "EmpirefourkingdomsExGG_4",
-        "e4k_gb1": "EmpirefourkingdomsExGG_5",
-        "e4k_nl1": "EmpirefourkingdomsExGG_6",
-        "e4k_es1": "EmpirefourkingdomsExGG_7",
-        "e4k_pt1": "EmpirefourkingdomsExGG_8",
-        "e4k_it1": "EmpirefourkingdomsExGG_9",
-        "e4k_ru1": "EmpirefourkingdomsExGG_10",
-        "e4k_skn1": "EmpirefourkingdomsExGG_11",
-        "e4k_his1": "EmpirefourkingdomsExGG_12",
-        "e4k_br1": "EmpirefourkingdomsExGG_13",
-        "e4k_jp1": "EmpirefourkingdomsExGG_14",
-        "e4k_kr1": "EmpirefourkingdomsExGG_15",
-        "e4k_cn1": "EmpirefourkingdomsExGG_16",
-        "e4k_au1": "EmpirefourkingdomsExGG_17",
-        "e4k_ph1": "EmpirefourkingdomsExGG_18",
-        "e4k_ar1": "EmpirefourkingdomsExGG_19",
-        "e4k_mx1": "EmpirefourkingdomsExGG_20",
-        "e4k_int2": "EmpirefourkingdomsExGG_21",
-        "e4k_tr1": "EmpirefourkingdomsExGG_22",
-        "e4k_gr1": "EmpirefourkingdomsExGG_23",
-        "e4k_arab1": "EmpirefourkingdomsExGG_24",
-        "e4k_in1": "EmpirefourkingdomsExGG_25",
-        "e4k_id1": "EmpirefourkingdomsExGG_26",
-        "e4k_asia1": "EmpirefourkingdomsExGG_27",
-        "e4k_de2": "EmpirefourkingdomsExGG_28",
-        "e4k_us2": "EmpirefourkingdomsExGG_29",
-        "e4k_hant1": "EmpirefourkingdomsExGG_30",
-        "e4k_ru2": "EmpirefourkingdomsExGG_31",
-        "e4k_int3": "EmpirefourkingdomsExGG_32",
-        "e4k_int4": "EmpirefourkingdomsExGG_34",
-        "e4k_world1": "EmpirefourkingdomsExGG_36",
-        "e4k_world2": "EmpirefourkingdomsExGG_37"
-    },
-    "scan_minutes": {
-        "FR1": 10,
-        "DE1": 41,
-        "INT1": 32,
-        "INT2": 2,
-        "INT3": 1,
-        "WORLD1": 6,
-        "WORLD2": 6,
-        "GLOBAL": null,
-        "ES1": 34,
-        "ES2": 41,
-        "IT1": 14,
-        "TR1": 10,
-        "NL1": 4,
-        "HU1": 1,
-        "HU2": 21,
-        "PL1": 16,
-        "PT1": 10,
-        "SK1": 22,
-        "SKN1": 42,
-        "RU1": 35,
-        "RO1": 6,
-        "BG1": 7,
-        "GB1": 40,
-        "BR1": 14,
-        "US1": 10,
-        "AU1": 20,
-        "JP1": 7,
-        "IN1": 30,
-        "CN1": 36,
-        "GR1": 36,
-        "SA1": 32,
-        "AE1": 23,
-        "EG1": 40,
-        "ARAB1": 16,
-        "ASIA1": null,
-        "HANT1": 23,
-        "PARTNER_SP3": 50,
-        "CZ1": 4,
-        "HIS1": null,
-        "LT1": null,
-        "E4K_FR1": 43,
-        "E4K_DE1": 36,
-        "E4K_DE2": 45,
-        "E4K_US1": 49,
-        "E4K_INT2": 49,
-        "E4K_CN1": 22,
-        "E4K_GB1": 45,
-        "E4K_RU1": 48,
-        "E4K_HANT1": 45,
-        "E4K_BR1": 47,
-        "E4K_WORLD2": 34,
-        "E4K_ES1": null,
-        "E4K_PL1": null,
-        "E4K_IT1": null,
-        "E4K_TR1": null,
-        "E4K_NL1": 39,
-        "E4K_PT1": 34,
-        "E4K_GR1": null,
-        "E4K_RO1": null,
-        "E4K_HU1": null,
-        "E4K_CZ1": null,
-        "E4K_SK1": null,
-        "E4K_BG1": null,
-        "E4K_HR1": null,
-        "E4K_SE1": null,
-        "E4K_NO1": null,
-        "E4K_FI1": null,
-        "E4K_DK1": null,
-        "E4K_JP1": null,
-        "E4K_KR1": null,
-        "E4K_TW1": null,
-        "E4K_INT1": null,
-        "E4K_SKN1": 33,
-        "E4K_HIS1": null,
-        "E4K_PH1": null,
-        "E4K_AR1": null,
-        "E4K_MX1": null,
-        "E4K_ARAB1": null,
-        "E4K_IN1": null,
-        "E4K_ID1": null,
-        "E4K_ASIA1": null,
-        "E4K_US2": null,
-        "E4K_RU2": null,
-        "E4K_INT3": null,
-        "E4K_INT4": 36,
-        "E4K_WORLD1": null
-    },
     "event_ids": {
         "achievements": 1,
         "plunder": 2,
@@ -347,5 +43,319 @@
         "4": "Légendaire 650 - 949",
         "5": "Légendaire 950+",
         "6": "Niveau 70"
+    },
+    "servers_info": {
+        "ASIA": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": null,
+            "api_name": "EmpireEx_36"
+        },
+        "GB1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 40,
+            "api_name": "EmpireEx_19"
+        },
+        "EG1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 40,
+            "api_name": "EmpireEx_34"
+        },
+        "SKN1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 42,
+            "api_name": "EmpireEx_13"
+        },
+        "SK1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 22,
+            "api_name": "EmpireEx_18"
+        },
+        "FR1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 10,
+            "api_name": "EmpireEx_3"
+        },
+        "DE1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 41,
+            "api_name": "EmpireEx_2"
+        },
+        "RO1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 6,
+            "api_name": "EmpireEx_15"
+        },
+        "CZ1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 4,
+            "api_name": "EmpireEx_4"
+        },
+        "NL1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 4,
+            "api_name": "EmpireEx_11"
+        },
+        "WORLD1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 6,
+            "api_name": "EmpireEx_46"
+        },
+        "WORLD2": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 6,
+            "api_name": "EmpireEx_49"
+        },
+        "INT3": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 1,
+            "api_name": "EmpireEx_43"
+        },
+        "US1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 10,
+            "api_name": "EmpireEx_21"
+        },
+        "TR1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 10,
+            "api_name": "EmpireEx_10"
+        },
+        "PT1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 10,
+            "api_name": "EmpireEx_6"
+        },
+        "BR1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 14,
+            "api_name": "EmpireEx_20"
+        },
+        "IN1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 30,
+            "api_name": "EmpireEx_26"
+        },
+        "IT1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 14,
+            "api_name": "EmpireEx_9"
+        },
+        "PL1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 16,
+            "api_name": "EmpireEx_5"
+        },
+        "AU1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 20,
+            "api_name": "EmpireEx_22"
+        },
+        "ARAB1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 16,
+            "api_name": "EmpireEx_35"
+        },
+        "HANT1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 23,
+            "api_name": "EmpireEx_37"
+        },
+        "HU1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 1,
+            "api_name": "EmpireEx_12"
+        },
+        "HU2": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 21,
+            "api_name": "EmpireEx_17"
+        },
+        "ES1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 34,
+            "api_name": "EmpireEx_8"
+        },
+        "ES2": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 41,
+            "api_name": "EmpireEx_38"
+        },
+        "SA1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 32,
+            "api_name": "EmpireEx_32"
+        },
+        "AE1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 23,
+            "api_name": "EmpireEx_33"
+        },
+        "INT1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 32,
+            "api_name": "EmpireEx"
+        },
+        "INT2": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 2,
+            "api_name": "EmpireEx_7"
+        },
+        "RU1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 35,
+            "api_name": "EmpireEx_14"
+        },
+        "CN1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 36,
+            "api_name": "EmpireEx_27"
+        },
+        "BG1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 7,
+            "api_name": "EmpireEx_16"
+        },
+        "JP1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 7,
+            "api_name": "EmpireEx_24"
+        },
+        "GR1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 36,
+            "api_name": "EmpireEx_28"
+        },
+        "E4K_BR1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 47,
+            "api_name": "EmpirefourkingdomsExGG_13"
+        },
+        "E4K_HANT1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 45,
+            "api_name": "EmpirefourkingdomsExGG_30"
+        },
+        "E4K_FR1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 43,
+            "api_name": "EmpirefourkingdomsExGG_2"
+        },
+        "E4K_DE1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 36,
+            "api_name": "EmpirefourkingdomsExGG"
+        },
+        "E4K_DE2": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 45,
+            "api_name": "EmpirefourkingdomsExGG_28"
+        },
+        "E4K_PT1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 34,
+            "api_name": "EmpirefourkingdomsExGG_8"
+        },
+        "E4K_SKN1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 33,
+            "api_name": "EmpirefourkingdomsExGG_11"
+        },
+        "E4K_NL1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 39,
+            "api_name": "EmpirefourkingdomsExGG_6"
+        },
+        "E4K_US1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 49,
+            "api_name": "EmpirefourkingdomsExGG_4"
+        },
+        "E4K_INT2": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 49,
+            "api_name": "EmpirefourkingdomsExGG_21"
+        },
+        "E4K_INT4": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 36,
+            "api_name": "EmpirefourkingdomsExGG_34"
+        },
+        "E4K_CN1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 22,
+            "api_name": "EmpirefourkingdomsExGG_16"
+        },
+        "E4K_GB1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 45,
+            "api_name": "EmpirefourkingdomsExGG_5"
+        },
+        "E4K_RU1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 48,
+            "api_name": "EmpirefourkingdomsExGG_10"
+        },
+        "E4K_WORLD2": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 34,
+            "api_name": "EmpirefourkingdomsExGG_37"
+        },
+        "PARTNER_SP3": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 50,
+            "api_name": null
+        }
     }
 }

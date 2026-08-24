@@ -1079,7 +1079,8 @@ class EventsCog(commands.Cog):
 
             # 🔄 1. Lecture ultra-propre avec ta nouvelle fonction
             config_data = await load_configuration_async()
-            server_scan_minutes = config_data.get("scan_minutes", {})
+            # 💡 MODIFICATION : On lit le nouveau dictionnaire unifié
+            servers_info = config_data.get("servers_info", {})
 
             data = await load_rivals_async()
             if not data:
@@ -1103,8 +1104,11 @@ class EventsCog(commands.Cog):
             for user_id, config in list(data.items()):
                 serveur = config.get("serveur", "E4K_FR1").upper()
 
-                # ⏱️ Récupération propre de la minute (46 par défaut)
-                minute_cible = server_scan_minutes.get(serveur)
+                # 💡 MODIFICATION : Récupération propre de la minute depuis servers_info
+                srv_data = servers_info.get(serveur, {})
+                minute_cible = srv_data.get("scan_minutes")
+
+                # Fallback sécurisé
                 if minute_cible is None:
                     minute_cible = 46
 
