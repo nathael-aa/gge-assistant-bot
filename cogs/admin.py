@@ -49,9 +49,11 @@ class AdminCog(commands.Cog):
             name="⚙️ Système & Scripts",
             value="`!sync` ➔ Synchronise les commandes Slash.\n"
             "`!m` ➔ Active/Désactive le mode maintenance.\n"
+            "`!restart` ➔ Redémarre le bot (via Docker).\n"
+            "`!reload [cogs.nom]` ➔ Recharge un module à chaud.\n"
             "`!setstatus [msg]` ➔ Ajoute/retire un statut personnalisé.\n"
             "`!scan_manuel` ➔ Lance `auto_pa_daily.sh` en fond.\n"
-            "`!log [date]` ➔ Télécharge les logs (ex: *today, hier, 2026-07-08*).",
+            "`!log [date]` ➔ Télécharge les logs.",
             inline=False,
         )
 
@@ -159,6 +161,41 @@ class AdminCog(commands.Cog):
 
             activity = discord.Activity(type=discord.ActivityType.watching, name="/setup ➔ /help")
             await self.bot.change_presence(activity=activity, status=discord.Status.online)
+
+    # ==========================================
+    # 🔄 REDÉMARRAGE DU BOT (DOCKER)
+    # ==========================================
+    @commands.command(name="restart", aliases=["reboot"], hidden=True)
+    async def restart_bot(self, ctx):
+        """[CACHÉE] !restart : Redémarre le bot (Nécessite Docker 'restart: always')."""
+        if ctx.author.id != MON_ID_DISCORD:
+            return
+
+        msg = t(
+            self.admin_lang,
+            "admin_restart",
+            defaut="🔄 **Redémarrage en cours...** Le bot se déconnecte et devrait revenir dans quelques secondes.",
+        )
+        await ctx.send(msg)
+
+        logger.warning(f"🔄 Redémarrage forcé déclenché par l'administrateur ({ctx.author.name})")
+
+        await self.bot.close()
+
+    # ==========================================
+    # 🔄 RELOAD D'UN COG
+    # ==========================================
+    @commands.command(name="reload", hidden=True)
+    async def reload_cog(self, ctx, extension: str):
+        """[CACHÉE] !reload [cogs.nom] : Recharge un module à chaud."""
+        if ctx.author.id != MON_ID_DISCORD:
+            return
+
+        try:
+            await self.bot.reload_extension(extension)
+            await ctx.send(f"✅ Module `{extension}` rechargé avec succès !")
+        except Exception as e:
+            await ctx.send(f"❌ Erreur lors du rechargement :\n```py\n{e}\n```")
 
     # ==========================================
     # ⛔ VIDEUR : ZONE DE BLOCAGE DES COMMANDES
