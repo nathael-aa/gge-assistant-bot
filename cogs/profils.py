@@ -2044,7 +2044,7 @@ class ProfilsCog(commands.Cog):
     # ========================================================
     # 📜 COMMANDE : DESCRIPTION ALLIANCE (API GGE Tracker)
     # ========================================================
-    @alliance_group.command(name="description", description="View the history of the last 7 wall changes")
+    @alliance_group.command(name="description", description="View the history of the last wall changes")
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     async def alliance_description(self, interaction: discord.Interaction, alliance_name: str):
         try:
@@ -2061,6 +2061,8 @@ class ProfilsCog(commands.Cog):
                 t(langue, "prof_desc_err_tech", defaut="❌ Erreur système (Session fermée).")
             )
 
+        from urllib.parse import quote
+
         safe_alliance = quote(str(alliance_name))
         alliance_id = None
 
@@ -2074,11 +2076,13 @@ class ProfilsCog(commands.Cog):
                     if target:
                         alliance_id = target.get("alliance_id") or target.get("id") or target.get("allianceId")
         except Exception as e:
-            logger.warning(f"⚠️ [Description Alliance] API /name/ injoignable pour {alliance_name} : {e}")
+            self.logger.warning(f"⚠️ [Description Alliance] API /name/ injoignable pour {alliance_name} : {e}")
 
         # --- 2. RECHERCHE DE L'ID (PLAN B : SCAN LOCAL) ---
         if not alliance_id:
             try:
+                from utils import BASE_DATA_PATH  # Assure-toi que c'est bien importé en haut de ton fichier
+
                 player_files = list((BASE_DATA_PATH / "server_scans" / serveur).rglob("server_*.json"))
                 if player_files:
                     latest = max(player_files, key=lambda p: p.stat().st_mtime)
@@ -2102,7 +2106,7 @@ class ProfilsCog(commands.Cog):
                                 alliance_id = str(aid)
                                 break
             except Exception as e:
-                logger.error(f"❌ [Description Alliance] Erreur Plan B (Scan local) pour {alliance_name} : {e}")
+                self.logger.error(f"❌ [Description Alliance] Erreur Plan B (Scan local) pour {alliance_name} : {e}")
 
         if not alliance_id:
             msg = t(
@@ -2131,23 +2135,22 @@ class ProfilsCog(commands.Cog):
                 if isinstance(data, list) and data:
                     data = data[0]
         except Exception as e:
-            logger.error(f"❌ Erreur API GGE Tracker (Murs) : {e}")
+            self.logger.error(f"❌ Erreur API GGE Tracker (Murs) : {e}")
             return await interaction.followup.send(
                 t(langue, "prof_desc_err_tech", defaut="❌ Erreur technique lors de la connexion à l'API.")
             )
 
-        # --- 4. TRAITEMENT DES DONNÉES ET GESTION DES MURS VIDES ---
+        # --- 4. TRAITEMENT DES DONNÉES ---
         nom_alliance = data.get("alliance_name", alliance_name)
         desc_actuelle = data.get("description")
         historique = data.get("description_history") or []
 
-        # 🛑 Si l'API renvoie des champs totalement vides, le serveur n'est probablement pas encore supporté pour les murs
         if not desc_actuelle and not historique:
             msg_unsupported = t(
                 langue,
                 "prof_desc_unsupported",
                 srv=serveur,
-                defaut=f"⚠️ Cette commande ne fonctionne pas encore sur le serveur demandé (**{serveur}**), ou a rencontré un problème pour cette alliance.",
+                defaut=f"⚠️ Cette commande ne fonctionne pas encore sur le serveur demandé (**{serveur}**), ou le mur est totalement vide.",
             )
             return await interaction.followup.send(msg_unsupported)
 
@@ -2156,7 +2159,7 @@ class ProfilsCog(commands.Cog):
                 return "*(Mur vide ou non renseigné)*"
             return text.replace("<br />", "\n").replace("<br/>", "\n").replace("<br>", "\n").strip()
 
-        # --- 5. CRÉATION DE L'EMBED (Recherche de la date la plus récente) ---
+        # Récupération de la date
         dates_trouvees = []
         if data.get("updated_at"):
             dates_trouvees.append(data.get("updated_at"))
@@ -2166,7 +2169,8 @@ class ProfilsCog(commands.Cog):
             if entry.get("created_at"):
                 dates_trouvees.append(entry.get("created_at"))
 
-        # On extrait la date la plus récente parmi toutes celles trouvées
+        from datetime import datetime
+
         if dates_trouvees:
             latest_str = max(dates_trouvees)
             if latest_str.endswith("Z"):
@@ -2176,50 +2180,31 @@ class ProfilsCog(commands.Cog):
             except:
                 actualisation_dt = discord.utils.utcnow()
         else:
-            # Plan de secours : on utilise la fonction _get_api_timestamp de ton fichier
-            actualisation_dt = _get_api_timestamp(data)
+            actualisation_dt = discord.utils.utcnow()
 
         ts_act = int(actualisation_dt.timestamp())
 
-        lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
-        str_date_header = f"{lbl_date} <t:{ts_act}:F> (<t:{ts_act}:R>)\n\n"
-        desc_i18n = t(
-            langue,
-            "prof_desc_embed_desc",
-            l=len(historique) + 1,
-            defaut="Analyse du mur d'alliance depuis le GGE Tracker.",
+        # --- 5. PRÉPARATION DES BLOCS DE TEXTE ---
+        # On va créer une liste avec tous les murs (Actuel + 14 historiques)
+        murs_blocks = []
+
+        # Ajout du mur actuel
+        murs_blocks.append(
+            {
+                "name": t(langue, "prof_desc_current", defaut="📝 Description Actuelle"),
+                "value": clean_desc(desc_actuelle),
+            }
         )
 
-        embed = discord.Embed(
-            title=t(
-                langue,
-                "prof_desc_embed_title",
-                a=nom_alliance.upper(),
-                defaut=f"Archives Alliance : {nom_alliance.upper()}",
-            ),
-            description=str_date_header + desc_i18n,
-            color=self.clr_descalli,
-        )
-
-        # A) Champ de la description Actuelle
-        curr_txt = t(langue, "prof_desc_current", defaut="📝 Description Actuelle")
-        valeur_actuelle = f">>> {clean_desc(desc_actuelle)}"
-        if len(valeur_actuelle) > 1020:
-            valeur_actuelle = valeur_actuelle[:1017] + "..."
-        embed.add_field(name=curr_txt, value=valeur_actuelle, inline=False)
-
-        # B) Champs de l'Historique (Anciennes descriptions)
+        # Ajout de l'historique (limité à 14 pour éviter de faire trop de pages, mais tu peux augmenter)
         if historique:
             historique_trie = sorted(historique, key=lambda x: x.get("created_at", ""), reverse=True)
-
-            for entry in historique_trie[:6]:
+            for entry in historique_trie[:14]:
                 try:
                     date_brute = entry.get("created_at", "")
                     if date_brute.endswith("Z"):
                         date_brute = date_brute[:-1] + "+00:00"
-
-                    dt_obj = datetime.fromisoformat(date_brute)
-                    ts_change = int(dt_obj.timestamp())
+                    ts_change = int(datetime.fromisoformat(date_brute).timestamp())
 
                     header_title = t(
                         langue,
@@ -2227,27 +2212,59 @@ class ProfilsCog(commands.Cog):
                         ts=ts_change,
                         defaut=f"🕰️ Ancienne version (Remplacée le <t:{ts_change}:d> à <t:{ts_change}:t>)",
                     )
-
                     texte_affiche = clean_desc(entry.get("old_description", ""))
-                    valeur_champ = f">>> {texte_affiche}"
-                    if len(valeur_champ) > 1020:
-                        valeur_champ = valeur_champ[:1017] + "..."
-
-                    embed.add_field(name=header_title, value=valeur_champ, inline=False)
+                    murs_blocks.append({"name": header_title, "value": texte_affiche})
                 except Exception as e:
-                    logger.warning(f"⚠️ Erreur de parsing date historique pour {nom_alliance} : {e}")
+                    self.logger.warning(f"⚠️ Erreur de parsing date historique pour {nom_alliance} : {e}")
                     continue
-        else:
-            embed.set_footer(
-                text=t(
-                    langue,
-                    "prof_desc_no_history",
-                    defaut="Aucun historique d'ancien mur n'a été trouvé pour le moment.",
-                )
+
+        # --- 6. PAGINATION (3 murs par page max) ---
+        lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
+        str_date_header = f"{lbl_date} <t:{ts_act}:F> (<t:{ts_act}:R>)\n\n"
+        desc_i18n = t(
+            langue,
+            "prof_desc_embed_desc",
+            l=len(murs_blocks),
+            defaut="Analyse du mur d'alliance depuis le GGE Tracker.",
+        )
+
+        embed_title = t(
+            langue,
+            "prof_desc_embed_title",
+            a=nom_alliance.upper(),
+            defaut=f"Archives Alliance : {nom_alliance.upper()}",
+        )
+
+        embeds = []
+        chunks = [murs_blocks[i : i + 3] for i in range(0, len(murs_blocks), 3)]
+
+        for i, chunk in enumerate(chunks):
+            embed = discord.Embed(
+                title=embed_title,
+                description=str_date_header + desc_i18n,
+                color=getattr(
+                    self, "clr_descalli", discord.Color.blue()
+                ),  # Fallback couleur si clr_descalli n'est pas def
             )
 
-        await setup_embed_footer(embed, interaction, langue)
-        await interaction.followup.send(embed=embed)
+            for block in chunk:
+                valeur_champ = f">>> {block['value']}"
+                # Sécurité Discord : 1024 caractères max par champ
+                if len(valeur_champ) > 1020:
+                    valeur_champ = valeur_champ[:1017] + "..."
+
+                embed.add_field(name=block["name"], value=valeur_champ, inline=False)
+
+            embed.set_footer(text=f"Page {i + 1}/{len(chunks)}")
+            await setup_embed_footer(embed, interaction, langue)
+            embeds.append(embed)
+
+        # Envoi avec ou sans boutons de pagination
+        if len(embeds) == 1:
+            await interaction.followup.send(embed=embeds[0])
+        else:
+            view = PaginationView(embeds)
+            await interaction.followup.send(embed=embeds[0], view=view)
 
     # ==========================================
     # 🔍 COMMANDE : ALLIANCE SCANNER

@@ -308,7 +308,7 @@ def get_file_lock(filepath):
 # ==========================================
 # 🔧 Footer global
 # ==========================================
-BOT_VERSION = "GGE Assistant • Version 1.2.0"
+BOT_VERSION = "GGE Assistant • Version 1.2.1"
 
 
 async def setup_embed_footer(

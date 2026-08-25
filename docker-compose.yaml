@@ -5,6 +5,9 @@ services:
     build: .
     container_name: gge-assistant
     restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     ports:
       - "60001:5011"
     env_file:
