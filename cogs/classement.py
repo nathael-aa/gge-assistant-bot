@@ -18,7 +18,7 @@ from utils import (
     t,
 )
 
-# --- FONCTIONS UTILITAIRES POUR ALLÉGER LE CODE ---
+# -- FONCTIONS UTILITAIRES POUR ALLÉGER LE CODE --
 
 
 def get_emo(langue, default_emo):
