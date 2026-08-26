@@ -1,4 +1,11 @@
 {
+    "live_api_commands": {
+        "groups": [
+            "storm",
+            "fortress"
+        ],
+        "specific": []
+    },
     "event_ids": {
         "achievements": 1,
         "plunder": 2,

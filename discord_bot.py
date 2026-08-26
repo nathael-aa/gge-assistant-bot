@@ -672,6 +672,10 @@ class GGEAssistantBot(commands.Bot):
                         config_data.pop("scan_minutes", None)
                         config_data.pop("servers", None)
 
+                        if "live_api_commands" not in config_data:
+                            config_data["live_api_commands"] = {"groups": ["storm", "fortress"], "specific": []}
+
+                        # On sauvegarde le fichier
                         with open(config_file, "w", encoding="utf-8") as f:
                             json.dump(config_data, f, indent=4, ensure_ascii=False)
 

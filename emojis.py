@@ -142,4 +142,10 @@ DICT_EMOJIS = {
     "e_level_title_1": "<:title_level_1:1541935068241727488>",
     "e_level_title_2": "<:title_level_2:1541935067234959473>",
     "e_level_title_3": "<:title_level_3:1541935065968287845>",
+    "e_discordlogo": "<:discordlogo:1542171293074587729>",
+    "e_website": "<:website:1542172920468602910>",
+    "e_ggelogo": "<:ggelogo:1512573855779262695>",
+    "e_generalsforumlogo": "<:generalforum:1542174618612146251>",
+    "e_share": "<:share:1542205484382167080>",
+    "e_dev": "<:developer:1542207399476330497>",
 }

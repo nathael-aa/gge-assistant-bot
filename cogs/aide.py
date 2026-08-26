@@ -14,6 +14,7 @@ from utils import (
     ADMINS_DIR,
     BOT_VERSION,
     MON_ID_DISCORD,
+    PaginationView,
     get_api_headers,
     get_file_lock,
     get_server_config,
@@ -55,6 +56,7 @@ HELP_CONFIG = {
             {"name": "/support", "desc_key": "help_cmd_support"},
             {"name": "/contact", "desc_key": "help_cmd_contact"},
             {"name": "/vote", "desc_key": "help_cmd_vote"},
+            {"name": "/discover", "desc_key": "help_cmd_discover"},
         ],
     },
     "profils": {
@@ -79,7 +81,7 @@ HELP_CONFIG = {
         "title_key": "help_cat_guerre",
         "commands": [
             {"name": "/alliance scanner", "desc_key": "help_cmd_alliance_scanner"},
-            {"name": "/target (setup / search)", "desc_key": "help_cmd_target_group"},
+            {"name": "/target (setup / search)", "desc_key": "help_cmd_target_group", "wip": True},
         ],
     },
     "events": {
@@ -103,14 +105,79 @@ HELP_CONFIG = {
         "color": discord.Color.from_rgb(255, 174, 25),
         "title_key": "help_cat_radars",
         "commands": [
-            {"name": "/radar (add / remove / list)", "desc_key": "help_cmd_radar_group"},
-            {"name": "/radar alliance (add / remove)", "desc_key": "help_cmd_radar_alliance_group"},
-            {"name": "/rival (start / stop / add / list)", "desc_key": "help_cmd_rival_group"},
-            {"name": "/fortress (scan / stop)", "desc_key": "help_cmd_fortress_group"},
-            {"name": "/storm (forts / isles / occupier / status / setup / stop)", "desc_key": "help_cmd_storm_group"},
+            {"name": "/radar (add / remove / list)", "desc_key": "help_cmd_radar_group", "advanced": False},
+            {"name": "/radar alliance (add / remove)", "desc_key": "help_cmd_radar_alliance_group", "advanced": False},
+            {"name": "/rival (start / stop / add / list)", "desc_key": "help_cmd_rival_group", "advanced": False},
+            {"name": "/fortress (scan / stop)", "desc_key": "help_cmd_fortress_group", "advanced": True},
+            {
+                "name": "/storm (forts / isles / occupier / status / setup / stop)",
+                "desc_key": "help_cmd_storm_group",
+                "advanced": True,
+            },
         ],
     },
 }
+
+
+# ==========================================
+# 🌟 LISTE DES PROJETS À DÉCOUVRIR
+# ==========================================
+PROJECTS_LIST = [
+    {
+        "title_key": "cmd_disc_gge_tracker_title",
+        "desc_key": "cmd_disc_gge_tracker_desc",
+        "default_title": "{e_players} GGE-Tracker",
+        "default_desc": "La référence web pour consulter des données datant de plusieurs mois, regroupant aussi de nombreux outils pour aider les joueurs ! Notre bot utilise fièrement leur excellente API pour fonctionner en temps réel.",
+        "links": [
+            {
+                "label_key": "btn_website",
+                "label_defaut": "Site Web",
+                "url": "https://gge-tracker.com/",
+                "emoji": "<:website:1542172920468602910>",
+            },
+            {
+                "label_key": "btn_discord",
+                "label_defaut": "Discord",
+                "url": "https://discord.gg/eb6WSHQqYh",
+                "emoji": "<:discordlogo:1542171293074587729>",
+            },
+            {
+                "label_key": "btn_api",
+                "label_defaut": "API",
+                "url": "https://docs.gge-tracker.com/",
+                "emoji": "<:developer:1542207399476330497>",
+            },
+        ],
+    },
+    {
+        "title_key": "cmd_disc_ranking_title",
+        "desc_key": "cmd_disc_ranking_desc",
+        "default_title": "{e_ggelogo} GGE Ranking",
+        "default_desc": "Le site web historique pour consulter tous ses classements en jeu depuis un navigateur web et en direct.",
+        "links": [
+            {
+                "label_key": "btn_website",
+                "label_defaut": "Site Web",
+                "url": "https://danadum.github.io/empire-rankings/",
+                "emoji": "<:website:1542172920468602910>",
+            }
+        ],
+    },
+    {
+        "title_key": "cmd_disc_generalsforum_title",
+        "desc_key": "cmd_disc_generalsforum_desc",
+        "default_title": "{e_generalsforumlogo} Generals Forum",
+        "default_desc": "Un site web combinant des aperçus sur les objets en jeu, des simulateurs et des calculateurs. Mis à jour régulièrement.",
+        "links": [
+            {
+                "label_key": "btn_website",
+                "label_defaut": "Site Web",
+                "url": "https://generalsforum.com/",
+                "emoji": "<:website:1542172920468602910>",
+            }
+        ],
+    },
+]
 
 
 # ==========================================
@@ -172,9 +239,30 @@ class HelpSelect(discord.ui.Select):
             )
             embed.description = desc
         else:
+            # --- Légende des capacités serveur ---
+            legende = t(
+                self.langue,
+                "help_legend",
+                defaut="🟢 `Standard` ｜ 🌟 `Fonctions Avancées` ｜ {e_working} `En travaux`\n\n---\n",
+            )
+            embed.description = legende
+
             for cmd in cat_data["commands"]:
                 cmd_desc = t(self.langue, cmd["desc_key"], defaut="> *Description manquante*")
-                embed.add_field(name=f"**`{cmd['name']}`**", value=f"{cmd_desc}", inline=False)
+
+                # --- Attribution dynamique de l'emoji (Priorité au WIP) ---
+                is_wip = cmd.get("wip", False)
+                is_advanced = cmd.get("advanced", False)
+
+                if is_wip:
+                    # On le passe dans t() pour que ton système traduise le tag {e_working}
+                    emoji_statut = t(self.langue, "dummy_wip_icon", defaut="{e_working}")
+                elif is_advanced:
+                    emoji_statut = "🌟"
+                else:
+                    emoji_statut = "🟢"
+
+                embed.add_field(name=f"{emoji_statut} **`{cmd['name']}`**", value=f"{cmd_desc}", inline=False)
 
         await setup_embed_footer(embed, interaction, self.langue)
         await interaction.response.edit_message(embed=embed, view=self.view)
@@ -193,11 +281,13 @@ class AideCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+        self.clr_discover = discord.Color.from_rgb(88, 101, 242)  # Bleu "Blurple"
         self.clr_statut = discord.Color.from_rgb(255, 207, 64)  # Gold1
         self.clr_news = discord.Color.from_rgb(255, 191, 0)  # Gold2
         self.clr_vote = discord.Color.from_rgb(232, 198, 112)  # Gold3
         self.clr_support = discord.Color.from_rgb(241, 213, 143)  # Gold4
         self.clr_contact = discord.Color.from_rgb(247, 226, 173)  # Gold5
+        self.clr_discover = discord.Color.from_rgb(0, 153, 255)  # Bleu
 
     # ==========================================
     # 📖 COMMANDE : HELP
@@ -411,6 +501,64 @@ class AideCog(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     # ========================================================
+    # 🌍 COMMANDE : DISCOVER
+    # ========================================================
+    @app_commands.command(name="discover", description="Discover useful tools and community projects for GGE")
+    async def discover(self, interaction: discord.Interaction):
+        langue, _ = await get_server_config(interaction)
+
+        embeds = []
+        projets_par_page = 3
+
+        # On découpe la liste en paquets (chunks)
+        for i in range(0, len(PROJECTS_LIST), projets_par_page):
+            chunk = PROJECTS_LIST[i : i + projets_par_page]
+
+            embed = discord.Embed(
+                title=t(langue, "cmd_discover_title", defaut="🚀 Découvertes & Projets de la Communauté"),
+                description=t(
+                    langue,
+                    "cmd_discover_desc",
+                    defaut="Découvrez des outils incroyables créés par la communauté pour enrichir votre expérience sur Goodgame Empire !\n",
+                ),
+                color=self.clr_discover,
+            )
+
+            for project in chunk:
+                # La fonction t() traduira toute seule les {e_...}
+                titre_traduit = t(langue, project["title_key"], defaut=project["default_title"])
+                desc_traduit = t(langue, project["desc_key"], defaut=project["default_desc"])
+
+                # Création des liens cliquables en texte (Markdown)
+                links_text = []
+                for link in project.get("links", []):
+                    label = t(langue, link["label_key"], defaut=link["label_defaut"])
+                    links_text.append(f"{link['emoji']} **[{label}]({link['url']})**")
+
+                # MISE EN FORME AMÉLIORÉE 🎨
+                # 1. On met la description en citation (> )
+                desc_formatee = f"> *{desc_traduit}*"
+
+                # 2. On utilise un point (•) pour séparer les liens
+                barre_liens = "  •  ".join(links_text)
+
+                # 3. On ajoute \u200b à la fin pour forcer un espace vide entre les projets
+                final_value = f"{desc_formatee}\n\n{barre_liens}\n\u200b"
+
+                embed.add_field(name=titre_traduit, value=final_value, inline=False)
+
+            await setup_embed_footer(embed, interaction, langue)
+            embeds.append(embed)
+
+        # S'il n'y a qu'une seule page, on l'envoie direct
+        if len(embeds) == 1:
+            await interaction.response.send_message(embed=embeds[0])
+        # Sinon, on utilise ta vue de pagination
+        else:
+            view = PaginationView(embeds)
+            await interaction.response.send_message(embed=embeds[0], view=view)
+
+    # ========================================================
     # 🆘 COMMANDE : SUPPORT
     # ========================================================
     @app_commands.command(name="support", description="Get the invite link to the official support server")
@@ -583,6 +731,7 @@ class AideCog(commands.Cog):
 
         # --- Titres & Catégories ---
         t(langue, "help_home_title")
+        t(langue, "help_legend")
         t(langue, "aide_p0_desc")
         t(langue, "help_cat_config")
         t(langue, "help_cat_communaute")
@@ -590,19 +739,17 @@ class AideCog(commands.Cog):
         t(langue, "help_cat_guerre")
         t(langue, "help_cat_events")
         t(langue, "help_cat_radars")
-
         # --- Commandes : Config ---
         t(langue, "help_cmd_setup")
         t(langue, "help_cmd_link_account")
         t(langue, "help_cmd_status")
         t(langue, "help_cmd_help")
-
         # --- Commandes : Communauté ---
         t(langue, "help_cmd_news")
         t(langue, "help_cmd_support")
         t(langue, "help_cmd_contact")
         t(langue, "help_cmd_vote")
-
+        t(langue, "help_cmd_discover")
         # --- Commandes : Profils ---
         t(langue, "help_cmd_server")
         t(langue, "help_cmd_player_profile")
@@ -613,11 +760,9 @@ class AideCog(commands.Cog):
         t(langue, "help_cmd_alliance_might")
         t(langue, "help_cmd_alliance_property")
         t(langue, "help_cmd_alliance_desc")
-
         # --- Commandes : Guerre ---
         t(langue, "help_cmd_alliance_scanner")
         t(langue, "help_cmd_target_group")
-
         # --- Commandes : Events ---
         t(langue, "help_cmd_event_player")
         t(langue, "help_cmd_event_alliance")
@@ -625,14 +770,12 @@ class AideCog(commands.Cog):
         t(langue, "help_cmd_rank_group")
         t(langue, "help_cmd_leaderboard_group")
         t(langue, "help_cmd_woa_group")
-
         # --- Commandes : Radars ---
         t(langue, "help_cmd_radar_group")
         t(langue, "help_cmd_radar_alliance_group")
         t(langue, "help_cmd_rival_group")
         t(langue, "help_cmd_fortress_group")
         t(langue, "help_cmd_storm_group")
-
         # --- Éléments du Select Menu ---
         t(langue, "help_placeholder")
         t(langue, "help_menu_home")
@@ -643,6 +786,18 @@ class AideCog(commands.Cog):
         t(langue, "help_menu_guerre")
         t(langue, "help_menu_events")
         t(langue, "help_menu_radars")
+        # --- Projets Discover ---
+        t(langue, "cmd_discover_title")
+        t(langue, "cmd_discover_desc")
+        t(langue, "cmd_disc_gge_tracker_title")
+        t(langue, "cmd_disc_gge_tracker_desc")
+        t(langue, "cmd_disc_ranking_title")
+        t(langue, "cmd_disc_ranking_desc")
+        t(langue, "cmd_disc_generalsforum_title")
+        t(langue, "cmd_disc_generalsforum_desc")
+        t(langue, "btn_website")
+        t(langue, "btn_discord")
+        t(langue, "btn_api")
 
 
 async def setup(bot: commands.Bot):
