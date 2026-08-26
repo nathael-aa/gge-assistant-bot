@@ -268,9 +268,9 @@ def t(langue: str, cle: str, defaut: str = None, **kwargs) -> str:
     return texte
 
 
-# ==========================================
+# =========================================
 # ⚙️ VARIABLES GLOBALES & CACHE
-# ==========================================
+# =========================================
 MON_ID_DISCORD = 1166375576685265040
 TOKEN = os.getenv("DISCORD_TOKEN")
 TOPGG_TOKEN = os.getenv("TOPGG_TOKEN")
