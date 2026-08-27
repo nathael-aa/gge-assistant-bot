@@ -243,9 +243,10 @@ class HelpSelect(discord.ui.Select):
             legende = t(
                 self.langue,
                 "help_legend",
-                defaut="🟢 `Standard` ｜ 🌟 `Fonctions Avancées` ｜ {e_working} `En travaux`\n\n---\n",
+                defaut="🟢 `Standard` ｜ 🌟 `Fonctions Avancées` ｜ {e_working} `En travaux`",
             )
-            embed.description = legende
+
+            embed.description = f"{legende}\n\u200b"
 
             for cmd in cat_data["commands"]:
                 cmd_desc = t(self.langue, cmd["desc_key"], defaut="> *Description manquante*")
@@ -255,8 +256,7 @@ class HelpSelect(discord.ui.Select):
                 is_advanced = cmd.get("advanced", False)
 
                 if is_wip:
-                    # On le passe dans t() pour que ton système traduise le tag {e_working}
-                    emoji_statut = t(self.langue, "dummy_wip_icon", defaut="{e_working}")
+                    emoji_statut = t(self.langue, "format_wip", defaut="{e_working}")
                 elif is_advanced:
                     emoji_statut = "🌟"
                 else:

@@ -148,4 +148,5 @@ DICT_EMOJIS = {
     "e_generalsforumlogo": "<:generalforum:1542174618612146251>",
     "e_share": "<:share:1542205484382167080>",
     "e_dev": "<:developer:1542207399476330497>",
+    "e_w2chatlogo": "<:w2chat_logo:1542290796416467026>",
 }
