@@ -13,8 +13,9 @@ data/*
 !data/configs/
 # ... pour y ignorer tout son contenu...
 data/configs/*
-# ... SAUF le fameux fichier configuration.json !
+# ... SAUF le fameux fichier configuration.json et event_mapping.json!
 !data/configs/configuration.json
+!data/configs/event_mapping.json
 
 # ----------------------------------
 # 📝 LOGS

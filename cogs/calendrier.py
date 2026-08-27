@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import re
@@ -10,6 +11,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from utils import (
+    CONFIG_DIR,
     SERVEURS_DIR,
     TRACKER_EVENTS,
     alliance_autocomplete,
@@ -22,42 +24,44 @@ from utils import (
 logger = logging.getLogger("GGE_Bot")
 
 CALENDRIER_FILE = SERVEURS_DIR / "calendrier.json"
+MAPPING_FILE = CONFIG_DIR / "event_mapping.json"
 
 
 # ==========================================
-# 🛠️ CLASSE DE NAVIGATION UI (BOUTONS)
+# 🛠️ CLASSE DE NAVIGATION UI (AVEC TIMEOUT)
 # ==========================================
 class CalendarNavView(discord.ui.View):
-    def __init__(self, embeds_dict, current_page, langue="fr"):
-        super().__init__(timeout=None)
+    def __init__(self, embeds_dict, current_page, langue="fr", timeout=900):  # 900s = 15 minutes
+        super().__init__(timeout=timeout)
         self.embeds = embeds_dict
         self.current_page = current_page
         self.langue = langue
-
-        self.btn_past = discord.ui.Button(
-            label=t(langue, "cal_btn_past", defaut="Historique"),
-            emoji="<:lastpage:1533554126984581283>",
-            custom_id="cal_past",
-        )
-        self.btn_past.callback = self.callback_past
+        self.message = None  # Sert à garder la trace du message pour le timeout
 
         self.btn_main = discord.ui.Button(
-            label=t(langue, "cal_btn_main", defaut="Actuels & À venir"),
-            emoji="<:main:1535282885769171006>",
+            label=t(langue, "cal_btn_main", defaut="Résumé Complet"),
+            emoji="<:book:1535657877799444500>",
             custom_id="cal_main",
         )
         self.btn_main.callback = self.callback_main
 
         self.btn_future = discord.ui.Button(
-            label=t(langue, "cal_btn_future", defaut="À venir (Uniquement)"),
-            emoji="<:nextpage:1533554128230420590>",
+            label=t(langue, "cal_btn_future", defaut="À venir (7j)"),
+            emoji="<:clock:1535651534308642916>",
             custom_id="cal_future",
         )
         self.btn_future.callback = self.callback_future
 
-        self.add_item(self.btn_past)
+        self.btn_alliance = discord.ui.Button(
+            label=t(langue, "cal_btn_alliance", defaut="Événements d'Alliances"),
+            emoji="<:alliance_icon:1512574688415580242>",
+            custom_id="cal_alliance",
+        )
+        self.btn_alliance.callback = self.callback_alliance
+
         self.add_item(self.btn_main)
         self.add_item(self.btn_future)
+        self.add_item(self.btn_alliance)
 
         self.update_buttons()
 
@@ -70,11 +74,6 @@ class CalendarNavView(discord.ui.View):
                 child.disabled = False
                 child.style = discord.ButtonStyle.secondary
 
-    async def callback_past(self, interaction: discord.Interaction):
-        self.current_page = "past"
-        self.update_buttons()
-        await interaction.response.edit_message(embed=self.embeds["past"], view=self)
-
     async def callback_main(self, interaction: discord.Interaction):
         self.current_page = "main"
         self.update_buttons()
@@ -84,6 +83,26 @@ class CalendarNavView(discord.ui.View):
         self.current_page = "future"
         self.update_buttons()
         await interaction.response.edit_message(embed=self.embeds["future"], view=self)
+
+    async def callback_alliance(self, interaction: discord.Interaction):
+        self.current_page = "alliance"
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.embeds["alliance"], view=self)
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except Exception:
+                pass
+
+
+def generate_event_id(event_key, ts_start):
+    """Génère un ID court (4-5 caractères) prévisible pour l'événement"""
+    raw_str = f"{event_key}_{ts_start}"
+    return hashlib.md5(raw_str.encode()).hexdigest()[:5]
 
 
 async def load_calendrier_async():
@@ -109,116 +128,27 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
         self.bot = bot
         self.cached_events = []
         self.last_scrape_time = None
-        self.event_mapping = {
-            "samurai invasion": {
-                "name_key": "cal_ev_samurai",
-                "name_default": "Samouraï",
-                "emoji": "<:samurai:1512430844935929868>",
-                "color": 0xBF0000,
-                "tracker_name": "Samouraïs",
-                "start": "11:00",
-                "end": "09:00",
-            },
-            "nomad invasion": {
-                "name_key": "cal_ev_nomad",
-                "name_default": "Nomade",
-                "emoji": "<:nomads:1512431070719774750>",
-                "color": 0xEDC951,
-                "tracker_name": "Nomades",
-                "start": "11:00",
-                "end": "09:00",
-            },
-            "bloodcrow invasion": {
-                "name_key": "cal_ev_bloodcrow",
-                "name_default": "Corbeaux de Sang",
-                "emoji": "<:bloodcrow:1512430942990368928>",
-                "color": 0xEDC951,
-                "tracker_name": "Corbeaux de Sang",
-                "start": "11:00",
-                "end": "09:00",
-            },
-            "war of the realms": {
-                "name_key": "cal_ev_realms",
-                "name_default": "Guerre des Royaumes",
-                "emoji": "<:war_realms:1512573773658980504>",
-                "color": 0xA69EB0,
-                "tracker_name": "Guerre des Royaumes",
-                "start": "11:00",
-                "end": "09:00",
-            },
-            "berimond": {
-                "name_key": "cal_ev_berimond",
-                "name_default": "Bérimond",
-                "emoji": "<:berimond:1512430901756428390>",
-                "color": 0x4B86B4,
-                "tracker_name": "Bataille de Bérimond",
-                "start": "11:00",
-                "end": "08:30",
-            },
-            "bladecoast": {
-                "name_key": "cal_ev_bladecoast",
-                "name_default": "Côte Tranchante",
-                "emoji": "<:bladecoast:1514704235894407399>",
-                "color": 0xBFB5B2,
-                "tracker_name": None,
-                "start": "11:00",
-                "end": "09:00",
-            },
-            "rift raid": {
-                "name_key": "cal_ev_rift",
-                "name_default": "Raid de la Faille",
-                "emoji": "<:riftraid:1514704237206966272>",
-                "color": 0xFB2E01,
-                "tracker_name": None,
-                "start": "11:00",
-                "end": "09:00",
-            },
-            "grand tournament": {
-                "name_key": "cal_ev_tournament",
-                "name_default": "Grand Tournoi",
-                "emoji": "<:grandtournament:1514704234128343040>",
-                "color": 0x03396C,
-                "tracker_name": None,
-                "start": "11:00",
-                "end": "12:00",
-            },
-            "beyond the horizon": {
-                "name_key": "cal_ev_horizon",
-                "name_default": "Au-delà de l'horizon",
-                "emoji": "<:bth:1512574690441302026>",
-                "color": 0x006666,
-                "tracker_name": None,
-                "start": "11:00",
-                "end": "00:40",
-            },
-            "outer realms": {
-                "name_key": "cal_ev_outer",
-                "name_default": "Royaumes extérieurs",
-                "emoji": "<:outerrealmsicon:1512573734404231329>",
-                "color": 0xFFE28A,
-                "tracker_name": None,
-                "start": "11:00",
-                "end": "00:40",
-            },
-            "imperial patronage": {
-                "name_key": "cal_ev_patronage",
-                "name_default": "Patronage impérial",
-                "emoji": "<:patronage:1514704230106140874>",
-                "color": 0xE8702A,
-                "tracker_name": None,
-                "start": "11:00",
-                "end": "09:30",
-            },
-            "grand nobility contest": {
-                "name_key": "cal_ev_nobility",
-                "name_default": "Grand concours de noblesse",
-                "emoji": "<:ltpe:1514704228801708052>",
-                "color": 0xE8702A,
-                "tracker_name": None,
-                "start": "11:00",
-                "end": "09:00",
-            },
-        }
+        self.event_mapping = self.load_event_mapping()
+
+    def load_event_mapping(self):
+        """Charge la configuration des événements depuis le fichier JSON externe"""
+        if not MAPPING_FILE.exists():
+            logger.error(f"❌ Le fichier {MAPPING_FILE} est introuvable !")
+            return {}
+
+        try:
+            with open(MAPPING_FILE, encoding="utf-8") as f:
+                mapping = json.load(f)
+
+            # Convertir les couleurs hexadécimales string ("0xBF0000") en entiers pour Discord
+            for key, data in mapping.items():
+                if isinstance(data.get("color"), str) and data["color"].startswith("0x"):
+                    data["color"] = int(data["color"], 16)
+
+            return mapping
+        except Exception as e:
+            logger.error(f"❌ Erreur lors de la lecture de {MAPPING_FILE} : {e}")
+            return {}
 
     async def load_cache_from_file(self):
         data = await load_calendrier_async()
@@ -237,7 +167,8 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                 if end_dt >= limite_retention:
                     uid = f"{ev['key']}_{int(start_dt.timestamp())}"
                     if uid not in seen_uids:
-                        events_actifs.append({"key": ev["key"], "start": start_dt, "end": end_dt})
+                        ev_id = ev.get("id", hashlib.md5(uid.encode()).hexdigest()[:5])
+                        events_actifs.append({"id": ev_id, "key": ev["key"], "start": start_dt, "end": end_dt})
                         seen_uids.add(uid)
             except Exception as e:
                 logger.error(f"❌ Erreur lecture date: {e}")
@@ -250,7 +181,9 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
         serialized = []
 
         for ev in self.cached_events:
-            serialized.append({"key": ev["key"], "start": ev["start"].isoformat(), "end": ev["end"].isoformat()})
+            serialized.append(
+                {"id": ev.get("id"), "key": ev["key"], "start": ev["start"].isoformat(), "end": ev["end"].isoformat()}
+            )
 
         data["cached_events"] = serialized
         await save_calendrier_async(data)
@@ -394,7 +327,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             await interaction.followup.send(msg_fail)
 
     # ==========================================
-    # 📆 COMMANDE CURRENT (NAVIGATION INTÉGRÉE)
+    # 📆 COMMANDE CURRENT (VUE DAMIER + IDS + TRI)
     # ==========================================
     @app_commands.command(name="current", description="Displays the complete calendar of events")
     async def c_current(self, interaction: discord.Interaction):
@@ -413,13 +346,39 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
 
         maintenant = datetime.now()
 
-        events_past = []
-        events_main = []
-        events_future = []
+        # 1. L'ordre d'affichage désiré
+        event_order = [
+            "samurai invasion",
+            "nomad invasion",
+            "bloodcrow invasion",
+            "war of the realms",
+            "berimond",
+            "outer realms",
+            "beyond the horizon",
+            "grand nobility contest",
+            "rift raid",
+            "grand tournament",
+            "bladecoast",
+            "imperial patronage",
+        ]
+
+        # 2. Quels sont les événements d'alliance ?
+        alliance_events_keys = ["grand tournament", "rift raid", "beyond the horizon"]
+
+        # Structure : { "Nom de l'onglet": { "Titre de la carte": ["ligne 1", "ligne 2"] } }
+        onglets_data = {
+            "main": {},  # Absolument tout
+            "future": {},  # À venir dans 7j
+            "alliance": {},  # Seulement Tournoi, Faille, Horizon
+        }
 
         events_tries = sorted(events, key=lambda x: x["start"])
 
         for ev in events_tries:
+            # Filtre pour ignorer le passé
+            if ev["end"] < maintenant:
+                continue
+
             meta = self.event_mapping.get(ev["key"])
             if not meta:
                 continue
@@ -428,18 +387,29 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             ts_end = int(ev["end"].timestamp())
 
             nom_event_traduit = t(langue, meta["name_key"], defaut=meta["name_default"])
-            ligne = f"{meta['emoji']} **{nom_event_traduit}** : <t:{ts_start}:d> ➔ <t:{ts_end}:d>"
+            titre_carte = f"{meta['emoji']} **{nom_event_traduit}**"
 
-            if ev["end"] < maintenant:
-                events_past.append(ligne)
-            else:
-                events_main.append(ligne)
-                if ev["start"] > maintenant:
-                    events_future.append(ligne)
+            ligne_date = f"• <t:{ts_start}:d> ➔ <t:{ts_end}:d>"
+
+            # 🟢 Onglet Main : On affiche tout !
+            onglets_data["main"].setdefault(ev["key"], {"titre": titre_carte, "lignes": []})["lignes"].append(
+                ligne_date
+            )
+
+            # 🛡️ Onglet Alliance : Que les 3 events choisis
+            if ev["key"] in alliance_events_keys:
+                onglets_data["alliance"].setdefault(ev["key"], {"titre": titre_carte, "lignes": []})["lignes"].append(
+                    ligne_date
+                )
+
+            # 🚀 Onglet Future : Uniquement ce qui commence dans le futur, max 7 jours
+            if ev["start"] > maintenant and (ev["start"] - maintenant).days <= 7:
+                onglets_data["future"].setdefault(ev["key"], {"titre": titre_carte, "lignes": []})["lignes"].append(
+                    ligne_date
+                )
 
         last_scrape = getattr(self, "last_scrape_time", None)
         ts_last_scan = int(last_scrape.timestamp()) if last_scrape else int(datetime.now().timestamp())
-
         texte_maj = t(
             langue,
             "cal_last_update",
@@ -448,26 +418,55 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
         )
         empty_txt = t(langue, "cal_empty_cat", defaut="*Aucun événement dans cette catégorie pour le moment.*")
 
-        async def build_embed(titre, liste_lignes, color):
-            desc = f"{texte_maj}\n\n" + ("\n".join(liste_lignes) if liste_lignes else empty_txt)
+        # Fonction de construction de l'embed avec la limitation à 2 colonnes
+        async def build_embed(titre, onglet_cle, color):
+            desc = f"{texte_maj}\n\u200b"
+            donnees = onglets_data[onglet_cle]
+
+            if not donnees:
+                desc += f"\n{empty_txt}"
+                emb = discord.Embed(title=titre, description=desc, color=color)
+                await setup_embed_footer(emb, interaction, langue)
+                return emb
+
             emb = discord.Embed(title=titre, description=desc, color=color)
+
+            # On trie les cartes selon TON ordre spécifique
+            cartes_triees = []
+            for key in event_order:
+                if key in donnees:
+                    cartes_triees.append(donnees[key])
+
+            # Ajout de toutes les autres clés qui ne seraient pas dans ton 'event_order' (sécurité)
+            for key, data in donnees.items():
+                if key not in event_order:
+                    cartes_triees.append(data)
+
+            # L'ASTUCE DES DEUX COLONNES (Damier)
+            field_count = 0
+            for carte in cartes_triees:
+                emb.add_field(name=carte["titre"], value="\n".join(carte["lignes"]), inline=True)
+                field_count += 1
+
+                # Si on a placé 2 cartes, on force le retour à la ligne avec un champ invisible
+                if field_count % 2 == 0:
+                    emb.add_field(name="\u200b", value="\u200b", inline=False)
+
             await setup_embed_footer(emb, interaction, langue)
             return emb
 
         embeds_dict = {
-            "past": await build_embed(
-                t(langue, "cal_title_past", defaut="⏳ Événements Passés (30 derniers jours)"), events_past, 0x95A5A6
-            ),
-            "main": await build_embed(
-                t(langue, "cal_title_main", defaut="📅 Événements Actuels & À venir"), events_main, 0x3498DB
-            ),
+            "main": await build_embed(t(langue, "cal_title_main", defaut="📅 Résumé des Événements"), "main", 0xDFE3EE),
             "future": await build_embed(
-                t(langue, "cal_title_future", defaut="🚀 Événements Futurs Uniquement"), events_future, 0x2ECC71
+                t(langue, "cal_title_future", defaut="🚀 Prochainement (7 jours)"), "future", 0xFFCC5C
+            ),
+            "alliance": await build_embed(
+                t(langue, "cal_title_alliance", defaut="🛡️ Événements d'Alliances"), "alliance", 0x36802D
             ),
         }
 
         view = CalendarNavView(embeds_dict, "main", langue)
-        await interaction.followup.send(embed=embeds_dict["main"], view=view)
+        view.message = await interaction.followup.send(embed=embeds_dict["main"], view=view, wait=True)
 
     # ==========================================
     # 🕵️‍♂️ MOTEUR D'EXTRACTION HTML (BS4 LECTURE PLATE)
@@ -499,7 +498,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                         current_event = matched_key
 
                     if current_event:
-                        matches = re.findall(r"(\d{2}[/.-]\d{2})\s*(?:-|à|to|au)\s*(\d{2}[/.-]\d{2})", text_lower)
+                        matches = re.findall(r"(\d{2}[/.-]\d{2})[/.-]?\s*(?:-|à|to|au)\s*(\d{2}[/.-]\d{2})", text_lower)
                         for start_str, end_str in matches:
                             try:
                                 start_str = start_str.replace(".", "/").replace("-", "/")
@@ -516,7 +515,10 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
 
                                 uid = f"{current_event}_{int(start_dt.timestamp())}"
                                 if uid not in seen_signatures:
-                                    found_events.append({"key": current_event, "start": start_dt, "end": end_dt})
+                                    event_id = hashlib.md5(uid.encode()).hexdigest()[:5]
+                                    found_events.append(
+                                        {"id": event_id, "key": current_event, "start": start_dt, "end": end_dt}
+                                    )
                                     seen_signatures.add(uid)
                             except Exception:
                                 continue
@@ -528,10 +530,6 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
 
     @tasks.loop(minutes=1)
     async def check_newshub_calendar_task(self):
-        # Garde-fou obligatoire : discord.py arrête définitivement une tasks.loop
-        # sur exception non rattrapée, sans jamais la relancer. Une réponse
-        # inattendue de l'API (points à null, date malformée) suffisait à couper
-        # les alertes d'événements pour TOUS les serveurs jusqu'au redémarrage
         try:
             await self._run_calendar_check()
         except Exception:
@@ -704,12 +702,10 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                                 except:
                                                     pass
 
-                # L'ajout à la mémoire se fait dans tous les cas pour ignorer les vieux événements
                 notified.append(uid_end)
                 modifie = True
 
         if modifie:
-            # 💡 LE FIX EST ICI : On passe la mémoire de 60 à 500 événements !
             if len(notified) > 500:
                 notified = notified[-500:]
             data["notified"] = notified
