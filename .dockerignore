@@ -1,1 +1,24 @@
+# Système NAS
 #recycle/
+@eaDir/
+
+# Git & GitHub
+.git/
+.gitignore
+.github/
+
+# Caches Python & Linter
+.ruff_cache/
+__pycache__/
+cogs/__pycache__/
+locales/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Fichiers lourds
+data/
+logs/
+
+# Fichiers générés automatiquement par le bot
+commands.json
