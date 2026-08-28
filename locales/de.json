@@ -26,7 +26,7 @@
     "alert_storm_spawned_desc": "**{name}** ist jetzt auf der Karte verfügbar!\n{e_compass} Koordinaten: `{x}:{y}`",
     "alert_storm_spawned_title": "{e_aquamarineiles} Insel ist erschienen!",
     "alert_storm_title": "{e_aquamarineiles} Sturminsel-Alarm",
-    "bot_activity_maintenance": "{e_working}IN WARTUNG{e_working}",
+    "bot_activity_maintenance": "🛠️ In Wartung 🛠️",
     "bot_err_cmd_blocked": "{e_tomatobulletpoint} **Befehl deaktiviert**:\n> {reason}",
     "bot_err_config_dm": "{e_warning} **Halt, warte!**\nDu hast dein persönliches Profil noch nicht eingerichtet. Verwende den Befehl </setup:0>, um deinen Server und deine Sprache festzulegen, bevor du den Bot nutzt.",
     "bot_err_maintenance": "{e_working} **Wartungsarbeiten laufen!**\nMeine Kobolde arbeiten daran, alle Funktionen so schnell wie möglich wiederherzustellen.",

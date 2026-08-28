@@ -198,7 +198,7 @@ class AdminCog(commands.Cog):
                 defaut="🚧 **Mode Maintenance : 🔴 ACTIVÉ**\n*Le bot ignore toutes les commandes Slash.*",
             )
             await ctx.send(msg)
-            statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
+            statut_maint = t("en", "bot_activity_maintenance", defaut="🛠️ Under Maintenance 🛠️")
             activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
             await self.bot.change_presence(activity=activity, status=discord.Status.dnd)
         else:

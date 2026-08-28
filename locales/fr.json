@@ -26,7 +26,7 @@
     "alert_storm_spawned_desc": "**{name}** est maintenant disponible sur la carte !\n{e_compass} Coordonnées : `{x}:{y}`",
     "alert_storm_spawned_title": "{e_aquamarineiles} L'île est apparue !",
     "alert_storm_title": "{e_aquamarineiles} Île Orageuse en approche !",
-    "bot_activity_maintenance": "{e_working}EN MAINTENANCE{e_working}",
+    "bot_activity_maintenance": "🛠️ En Maintenance 🛠️",
     "bot_err_cmd_blocked": "{e_warning} **Commande désactivée** :\n> {reason}",
     "bot_err_config_dm": "{e_warning} **Halte là !**\nTu n'as pas encore configuré ton profil personnel. Utilise la commande </setup:0> pour définir ton serveur et ta langue avant d'utiliser le bot.",
     "bot_err_maintenance": "{e_working} **En cours de maintenance !**\nMes gobelins travaillent pour réactiver l'ensemble des fonctionnalités au plus vite.",
