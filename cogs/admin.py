@@ -1496,6 +1496,7 @@ class AdminCog(commands.Cog):
         import aiohttp
 
         cmd_name = interaction.data.get("name", "inconnue")
+        timestamp_discord = int(datetime.now().timestamp())
 
         def format_opts(opts):
             res = []
@@ -1519,9 +1520,7 @@ class AdminCog(commands.Cog):
         embed.add_field(
             name="🛡️ Serveur", value=f"{interaction.guild.name if interaction.guild else 'Message Privé'}", inline=True
         )
-        embed.add_field(
-            name="📅 Date & Heure", value=f"<t:{timestamp_discord}:f>", inline=True
-        )
+        embed.add_field(name="📅 Date & Heure", value=f"<t:{timestamp_discord}:f>", inline=True)
         embed.add_field(name="🎯 Compte surveillé", value=f"`{match_trouve}`", inline=False)
         embed.add_field(name="💻 Commande", value=f"`/{cmd_name} {opts_str}`", inline=False)
 
