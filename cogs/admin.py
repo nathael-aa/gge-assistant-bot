@@ -1442,10 +1442,6 @@ class AdminCog(commands.Cog):
         if interaction.type != discord.InteractionType.application_command:
             return
 
-        # On ignore tes propres commandes (pas besoin de t'espionner toi-même)
-        if interaction.user.id == MON_ID_DISCORD:
-            return
-
         import json
 
         from utils import ADMINS_DIR  # 💡 CORRECTION : Import de ADMINS_DIR
@@ -1523,7 +1519,10 @@ class AdminCog(commands.Cog):
         embed.add_field(
             name="🛡️ Serveur", value=f"{interaction.guild.name if interaction.guild else 'Message Privé'}", inline=True
         )
-        embed.add_field(name="🎯 Déclenché par", value=f"`{match_trouve}`", inline=False)
+        embed.add_field(
+            name="📅 Date & Heure", value=f"<t:{timestamp_discord}:f>", inline=True
+        )
+        embed.add_field(name="🎯 Compte surveillé", value=f"`{match_trouve}`", inline=False)
         embed.add_field(name="💻 Commande", value=f"`/{cmd_name} {opts_str}`", inline=False)
 
         try:
