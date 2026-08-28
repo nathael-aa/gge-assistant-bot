@@ -284,6 +284,24 @@ class GGEAssistantBot(commands.Bot):
         charger_langues()
         logger.info(f"✅ Bot connecté en tant que {self.user} (ID: {self.user.id})")
 
+        # 📢 WEBHOOK ADMIN : Bot en ligne
+        webhook_systeme = "https://discord.com/api/webhooks/1542928722561077389/v47MYXZKS-XIh9_vpqiEczY9p5KbHGcbM732SS3rrTRnMnRllAGQHLD4xTCFrZs1C-Bd"
+        if webhook_systeme.startswith("http"):
+            payload = {
+                "username": "GGE Console 🟢",
+                "embeds": [
+                    {
+                        "title": "🚀 Démarrage Réussi",
+                        "description": f"Le bot est connecté et opérationnel.\n**Serveurs actuels :** `{len(self.guilds)}`",
+                        "color": 0x3498DB,  # Bleu
+                    }
+                ],
+            }
+            try:
+                await self.session.post(webhook_systeme, json=payload)
+            except:
+                pass
+
         if self.maintenance_mode:
             statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
             activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
@@ -303,6 +321,26 @@ class GGEAssistantBot(commands.Bot):
             f"🎉 [NOUVEAU SERVEUR] Le bot a rejoint '{guild.name}' (ID: {guild.id}) | Membres : {guild.member_count}"
         )
 
+        # 📢 WEBHOOK ADMIN : Nouveau serveur
+        webhook_servers = "https://discord.com/api/webhooks/1542928212152156320/MPhCbqCEuhoRZggK-DNzNb3uJVO_3oZUvphiyAT9JVeSgbK4OlhOx6yI-4GqiP5nhQZs"
+        if webhook_servers.startswith("http"):
+            proprio = guild.owner.name if guild.owner else "Inconnu"
+            payload = {
+                "username": "GGE Serveurs 📈",
+                "embeds": [
+                    {
+                        "title": "🎉 Nouveau Serveur Rejoint !",
+                        "description": f"**Nom :** `{guild.name}`\n**ID :** `{guild.id}`\n**Membres :** `{guild.member_count}`\n**Propriétaire :** `{proprio}`",
+                        "color": 0x2ECC71,  # Vert
+                    }
+                ],
+            }
+            try:
+                await self.session.post(webhook_servers, json=payload)
+            except:
+                pass
+
+        # Message de bienvenue standard (ton code existant)
         channel_to_send = guild.system_channel
         if not channel_to_send or not channel_to_send.permissions_for(guild.me).send_messages:
             for channel in guild.text_channels:
@@ -320,6 +358,24 @@ class GGEAssistantBot(commands.Bot):
 
     async def on_guild_remove(self, guild: discord.Guild):
         logger.warning(f"👋 [DÉPART SERVEUR] Le bot a été retiré de '{guild.name}' (ID: {guild.id})")
+
+        # 📢 WEBHOOK ADMIN : Départ d'un serveur
+        webhook_servers = "https://discord.com/api/webhooks/1542928339369725974/eT8HDAcwyv0R6du94i7MMqvXFPClJyKYeZaryLLw488oARtjWurO_Pa4YN9RzsoTNrCI"
+        if webhook_servers.startswith("http"):
+            payload = {
+                "username": "GGE Serveurs 📉",
+                "embeds": [
+                    {
+                        "title": "👋 Serveur Quitté",
+                        "description": f"**Nom :** `{guild.name}`\n**ID :** `{guild.id}`\n**Membres perdus :** `{guild.member_count}`",
+                        "color": 0xE74C3C,  # Rouge
+                    }
+                ],
+            }
+            try:
+                await self.session.post(webhook_servers, json=payload)
+            except:
+                pass
 
     # ==========================================
     # 🛰️ BOUCLE DE VEILLE DE FIN DE SCAN (scan.flag)
@@ -446,10 +502,29 @@ class GGEAssistantBot(commands.Bot):
             return web.Response(status=400, text="Missing user ID")
 
         # --- 3. GESTION DU TYPE (TEST ou VOTE) ---
+        webhook_votes = "https://discord.com/api/webhooks/1542929105757143120/gLCxqAh8kvTaUMIF_1lKaZgPa9sVywRs72CmZieJPtI0uYiYm_hhIcEkCorJKk7zlM2n"
+
         if event_type in ["test", "webhook.test"]:
             logger.info(f"✅ [Webhook] TEST RÉUSSI ! La liaison avec Top.gg est parfaite (Test par {user_id}).")
         else:
             logger.info(f"✅ [Webhook] Vrai vote reçu ! Application du bouclier pour {user_id}.")
+
+            # 📢 WEBHOOK ADMIN : Alerte de Vote !
+            if webhook_votes.startswith("http"):
+                payload = {
+                    "username": "GGE Top.gg 🏆",
+                    "embeds": [
+                        {
+                            "title": "🌟 Nouveau Vote reçu !",
+                            "description": f"Un joueur (ID: `<@{user_id}>`) vient de voter pour le bot sur Top.gg !\nSon bouclier anti-pubs est activé pour 7 jours.",
+                            "color": 0xFFD700,  # Doré
+                        }
+                    ],
+                }
+                try:
+                    self.loop.create_task(self.session.post(webhook_votes, json=payload))
+                except:
+                    pass
 
         # --- 4. SAUVEGARDE (Bouclier 7j) ---
         VOTES_FILE = JOUEURS_DIR / "votes.json"
@@ -590,7 +665,7 @@ class GGEAssistantBot(commands.Bot):
     async def update_servers_task(self):
 
         url = "https://ggetracker.github.io/i18n/servers.xml"
-        webhook_url = "https://discord.com/api/webhooks/1525853187280474222/Y4fycCy0IW019tZCMhGOdJzS1vqg7wSYn1ZEhtVO2o9Atuwr8ek-zieIsN9kG86Ndlcq"
+        webhook_url = "https://discord.com/api/webhooks/1542925605920833576/jn9OjaioUAzMyaq9VmlLlKOk0XcXowajz1pgRTR5QBy-_Zvp2uT-YcJP31Sj-ski_FcL"
 
         try:
             async with self.session.get(url, timeout=10) as r:
@@ -710,7 +785,7 @@ class GGEAssistantBot(commands.Bot):
                                 ]
                             }
                             try:
-                                async with self.session.post(self.webhook_url, json=payload) as resp:
+                                async with self.session.post(webhook_url, json=payload) as resp:
                                     pass
                             except Exception as webhook_err:
                                 logger.error(f"❌ Erreur envoi webhook admin synchro : {webhook_err}")
@@ -747,6 +822,25 @@ class GGEAssistantBot(commands.Bot):
     # ==========================================
     # 🛑 LE VIDEUR UNIQUE ET UNIVERSEL
     # ==========================================
+    WEBHOOK_SYSTEME = "https://discord.com/api/webhooks/1542926665498230815/ejtJY-55vCS0w6zKq0u-BRrsO_NByJV7NvGCx9NHwRib_Hlp8QUHivbieexu_i5aAlQ-"
+
+    async def _send_system_alert(
+        self, interaction: discord.Interaction, titre: str, description: str, couleur: int = 0xFF0000
+    ):
+        """Fonction interne pour envoyer des alertes système en arrière-plan."""
+        webhook_url = getattr(self, "WEBHOOK_SYSTEME", None)
+        if not webhook_url or webhook_url.startswith("https://discord.com/api/webhooks/TON/"):
+            return
+
+        embed = discord.Embed(title=titre, description=description, color=couleur)
+        embed.set_footer(text=f"Utilisateur : {interaction.user.name} ({interaction.user.id})")
+
+        try:
+            webhook = discord.Webhook.from_url(webhook_url, session=self.session)
+            await webhook.send(embed=embed, username="GGE Système 🚨")
+        except Exception as e:
+            logger.error(f"❌ Erreur Webhook Système : {e}")
+
     async def global_interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.type == discord.InteractionType.autocomplete:
             return True
@@ -756,6 +850,38 @@ class GGEAssistantBot(commands.Bot):
         )
 
         langue, serveur = await get_server_config(interaction)
+
+        # --- 0. BOUCLIER ANTI-SPAM (RAM) ---
+        import time
+
+        if not hasattr(self, "_spam_cache"):
+            self._spam_cache = {}
+
+        # Le créateur (toi) n'est jamais bloqué par l'anti-spam
+        if interaction.user.id != MON_ID_DISCORD:
+            user_id = interaction.user.id
+            now = time.time()
+
+            # On conserve uniquement les commandes lancées dans les 10 dernières secondes
+            self._spam_cache[user_id] = [t for t in self._spam_cache.get(user_id, []) if now - t < 10]
+            self._spam_cache[user_id].append(now)
+
+            # Si plus de 6 commandes en 10 secondes = SPAM
+            if len(self._spam_cache[user_id]) > 6:
+                if len(self._spam_cache[user_id]) == 7:  # On alerte une seule fois pour ne pas se spammer soi-même
+                    msg = t(langue, "err_spam", defaut="⚠️ Tu vas trop vite ! Patiente quelques secondes.")
+                    await interaction.response.send_message(msg, ephemeral=True)
+
+                    # 🚨 ALERTE WEBHOOK : Détection de spam
+                    self.bot.loop.create_task(
+                        self._send_system_alert(
+                            interaction,
+                            "⚠️ Alerte Spam",
+                            f"{interaction.user.mention} a lancé trop de commandes en moins de 10 secondes (`/{cmd_name}`).",
+                            0xFFA500,  # Orange
+                        )
+                    )
+                return False  # On bloque silencieusement les requêtes suivantes
 
         # --- 1. SYSTÈME DE LOGS ---
         try:
@@ -775,6 +901,14 @@ class GGEAssistantBot(commands.Bot):
                 logger.info(f"📝 [COMMANDE] {interaction.user.name} a lancé `/{cmd_name}` sur [{lieu}]{options_txt}")
         except Exception as e:
             logger.error(f"⚠️ Erreur lors de l'écriture du log : {e}")
+            # 🚨 ALERTE WEBHOOK : Crash Console (Logs)
+            self.bot.loop.create_task(
+                self._send_system_alert(
+                    interaction,
+                    "🐛 Erreur Console (Logs)",
+                    f"Impossible d'écrire le log pour `/{cmd_name}`.\n```py\n{e}\n```",
+                )
+            )
 
         # --- 2. VÉRIFICATION DE LA CONFIGURATION (AVEC CACHE RAM) ---
         commandes_libres = ["setup", "help", "contact", "changelog"]
@@ -854,27 +988,25 @@ class GGEAssistantBot(commands.Bot):
 
         # --- 2.7. VÉRIFICATION DES SERVEURS SPÉCIAUX (COMPTE ESPION REQUIS) ---
         try:
+            import json
+
+            from utils import CONFIG_DIR
+
             config_file = CONFIG_DIR / "configuration.json"
             if config_file.exists():
                 with open(config_file, encoding="utf-8") as f:
                     config_data = json.load(f)
 
-                    # 💡 MODIFICATION : On utilise la nouvelle structure unifiée
                     servers_info = config_data.get("servers_info", {})
-
                     live_config = config_data.get("live_api_commands", {})
                     groupes_live = live_config.get("groups", [])
                     commandes_live = live_config.get("specific", [])
 
-                # On extrait le premier mot (le groupe parent, ex: "storm" pour "storm isles")
                 base_cmd = cmd_name.split(" ")[0]
 
-                # On vérifie si le groupe ou le nom complet est dans la liste live
                 if base_cmd in groupes_live or cmd_name in groupes_live or cmd_name in commandes_live:
-                    # 💡 MODIFICATION : On vérifie l'attribut "featured" du serveur
                     is_featured = servers_info.get(serveur, {}).get("featured", False)
 
-                    # ... et si le serveur du joueur n'a pas de compte espion (pas featured)
                     if serveur and not is_featured:
                         if interaction.type == discord.InteractionType.application_command:
                             msg = t(
@@ -883,9 +1015,17 @@ class GGEAssistantBot(commands.Bot):
                                 defaut="⚠️ La commande n'est actuellement pas supportée pour ton serveur de jeu GGE. Pour avoir plus d'informations, merci d'utiliser /support.",
                             )
                             await interaction.response.send_message(msg, ephemeral=True)
-                        return False  # 🛑 On bloque la commande
+                        return False
         except Exception as e:
             logger.error(f"❌ Erreur lors de la vérification des serveurs spéciaux : {e}")
+            # 🚨 ALERTE WEBHOOK : Crash Console (Lecture Config)
+            self.bot.loop.create_task(
+                self._send_system_alert(
+                    interaction,
+                    "🐛 Erreur Console (Vérification Serveur)",
+                    f"Impossible de valider le serveur de l'utilisateur.\n```py\n{e}\n```",
+                )
+            )
 
         # --- 3. BYPASS : Le créateur a toujours accès au reste ---
         if interaction.user.id == MON_ID_DISCORD:
@@ -929,6 +1069,16 @@ class GGEAssistantBot(commands.Bot):
                         langue, "bot_err_user_blocked_all", reason=reason, defaut=f"🛑 **Accès refusé** :\n> {reason}"
                     )
                     await interaction.response.send_message(msg, ephemeral=True)
+
+                    # 🚨 ALERTE WEBHOOK : Tentative de contournement ou forcing
+                    self.bot.loop.create_task(
+                        self._send_system_alert(
+                            interaction,
+                            "🛑 Intrusion bloquée (Ban ALL)",
+                            f"Un utilisateur banni a tenté de forcer le passage sur `/{cmd_name}`.\nRaison du ban : {reason}",
+                            0x8B0000,  # Rouge sombre
+                        )
+                    )
                 return False
 
             if cmd_name in user_blocks:
@@ -941,6 +1091,16 @@ class GGEAssistantBot(commands.Bot):
                         defaut=f"🛑 **Accès restreint** :\n> {reason}",
                     )
                     await interaction.response.send_message(msg, ephemeral=True)
+
+                    # 🚨 ALERTE WEBHOOK : Utilisateur banni d'une commande
+                    self.bot.loop.create_task(
+                        self._send_system_alert(
+                            interaction,
+                            "🛑 Intrusion bloquée (Ban Commande)",
+                            f"Un utilisateur a tenté d'utiliser sa commande restreinte `/{cmd_name}`.\nRaison du ban : {reason}",
+                            0x8B0000,
+                        )
+                    )
                 return False
 
         return True

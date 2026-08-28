@@ -442,15 +442,15 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                 if key not in event_order:
                     cartes_triees.append(data)
 
-            # L'ASTUCE DES DEUX COLONNES (Damier)
+            # L'ASTUCE DES DEUX COLONNES (Damier sans espace vertical)
             field_count = 0
             for carte in cartes_triees:
                 emb.add_field(name=carte["titre"], value="\n".join(carte["lignes"]), inline=True)
                 field_count += 1
 
-                # Si on a placé 2 cartes, on force le retour à la ligne avec un champ invisible
+                # On ajoute une 3ème colonne invisible au lieu d'un saut de ligne !
                 if field_count % 2 == 0:
-                    emb.add_field(name="\u200b", value="\u200b", inline=False)
+                    emb.add_field(name="\u200b", value="\u200b", inline=True)
 
             await setup_embed_footer(emb, interaction, langue)
             return emb
@@ -547,14 +547,26 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             limite_retention = maintenant - timedelta(days=30)
             events_actifs = [ev for ev in getattr(self, "cached_events", []) if ev["end"] >= limite_retention]
 
+            # 🔥 NOUVEAU : Chargement de la liste noire
+            data = await load_calendrier_async()
+            deleted_events = data.get("deleted_events", [])
+
             if nouveaux_events:
-                ids_existants = {f"{ev['key']}_{int(ev['start'].timestamp())}" for ev in events_actifs}
+                # 🔥 FIX : On compare maintenant avec l'ID (plus avec la date de début)
+                ids_en_cache = {ev.get("id") for ev in events_actifs}
 
                 for nev in nouveaux_events:
-                    uid_nev = f"{nev['key']}_{int(nev['start'].timestamp())}"
-                    if uid_nev not in ids_existants:
+                    nev_id = nev.get("id")
+
+                    # 1. Vérification Liste Noire (L'event a été supprimé via !cal_del)
+                    if nev_id in deleted_events:
+                        logger.info(f"🚫 [Calendrier] L'événement {nev['key']} ({nev_id}) a été ignoré (Liste Noire).")
+                        continue
+
+                    # 2. Ajout si nouveau (Si l'event est modifié, son ID est en cache, donc ignoré ici)
+                    if nev_id not in ids_en_cache:
                         events_actifs.append(nev)
-                        ids_existants.add(uid_nev)
+                        ids_en_cache.add(nev_id)
 
             self.cached_events = events_actifs
             self.last_scrape_time = maintenant
@@ -568,6 +580,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
         if not events:
             return
 
+        # ... Le reste du code de _run_calendar_check (Notifications de début/fin) reste strictement identique !
         data = await load_calendrier_async()
         notified = data.get("notified", [])
         modifie = False
@@ -580,7 +593,6 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
 
             # 🟢 DÉBUT D'ÉVÉNEMENT
             if maintenant >= ev["start"] and uid_start not in notified:
-                # On limite l'envoi Discord ET les logs aux événements d'aujourd'hui !
                 if ev["start"].date() == maintenant.date():
                     logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT DÉBUT de {meta['name_default']}")
                     ts_fin = int(ev["end"].timestamp())
@@ -625,13 +637,11 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                 except:
                                     pass
 
-                # L'ajout à la mémoire se fait dans tous les cas pour ignorer les vieux événements
                 notified.append(uid_start)
                 modifie = True
 
             # 🔴 FIN D'ÉVÉNEMENT
             if maintenant >= ev["end"] and uid_end not in notified:
-                # On limite l'envoi Discord ET les logs aux événements d'aujourd'hui !
                 if ev["end"].date() == maintenant.date():
                     logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT FIN de {meta['name_default']}")
 

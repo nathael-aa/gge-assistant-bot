@@ -141,6 +141,7 @@
     "contact_success": "{e_players} **Merci !** Ton message a bien été enregistré et transmis au développeur.",
     "err_dm_only": "{e_error} Commande utilisable uniquement en message privé.",
     "err_guild_only": "{e_error} Commande utilisable uniquement sur un serveur.",
+    "err_spam": "{e_warning} Tu vas trop vite ! Patiente quelques secondes.",
     "err_unsupported_special": "{e_warning} La commande n'est actuellement pas supportée pour ton serveur de jeu GGE. Pour avoir plus d'informations, merci d'utiliser /support.",
     "error_player_not_found": "{e_error} Joueur **{joueur}** introuvable (API injoignable ou joueur inexistant).",
     "error_unsupported_server": "{e_error} **Erreur** : Le serveur `{serveur}` n'est pas pris en charge par l'API pour le moment. Veuillez choisir un serveur avec la pastille {e_greencirclebullet}.",

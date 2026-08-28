@@ -141,6 +141,7 @@
     "contact_success": "{e_players} **Thank you!** Your message has been saved and sent to the developer.",
     "err_dm_only": "{e_error} This command can only be used in a direct message.",
     "err_guild_only": "{e_error} This command can only be used on a server.",
+    "err_spam": "{e_warning} You are going too fast! Please wait a few seconds.",
     "err_unsupported_special": "{e_warning} This command is currently not supported for your GGE game server. For more information, please use /support.",
     "error_player_not_found": "{e_error} Player **{joueur}** not found (API unreachable or player doesn't exist).",
     "error_unsupported_server": "{e_error} **Error**: The server `{serveur}` is not currently supported by the API. Please choose a server with a {e_greencirclebullet} badge.",
