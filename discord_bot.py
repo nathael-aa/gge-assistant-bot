@@ -32,9 +32,9 @@ from utils import (
     t,
 )
 
-# ==========================================
+# =========================================
 # ⚙️ INITIALISATION DU BOT ET DES LOGS
-# ==========================================
+# =========================================
 os.makedirs("/app/logs/general", exist_ok=True)
 os.makedirs("/app/data", exist_ok=True)
 
