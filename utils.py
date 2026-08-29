@@ -271,7 +271,7 @@ def t(langue: str, cle: str, defaut: str = None, **kwargs) -> str:
 # =========================================
 # ⚙️ VARIABLES GLOBALES & CACHE
 # =========================================
-MON_ID_DISCORD = 1166375576685265040
+MON_ID_DISCORD = int(os.getenv("MON_ID_DISCORD", 0))
 TOKEN = os.getenv("DISCORD_TOKEN")
 TOPGG_TOKEN = os.getenv("TOPGG_TOKEN")
 
@@ -308,7 +308,7 @@ def get_file_lock(filepath):
 # ==========================================
 # 🔧 Footer global
 # ==========================================
-BOT_VERSION = "GGE Assistant • Version 1.2.4"
+BOT_VERSION = "GGE Assistant • Version 1.2.5"
 
 
 async def setup_embed_footer(

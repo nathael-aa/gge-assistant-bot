@@ -5,6 +5,8 @@ import json
 import logging
 import os
 import socket
+import sys
+import traceback
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from logging.handlers import TimedRotatingFileHandler
@@ -141,6 +143,9 @@ class GGEAssistantBot(commands.Bot):
 
         self.status_index = 0
         self.custom_status = None
+
+        # 🔗 Raccordement du gestionnaire global d'erreurs de commandes Slash
+        self.tree.on_error = self.on_tree_error
 
     def export_commands_json(self):
         """Exporte le 'Slash Command Payload' incluant les groupes et sous-commandes."""
@@ -285,8 +290,8 @@ class GGEAssistantBot(commands.Bot):
         logger.info(f"✅ Bot connecté en tant que {self.user} (ID: {self.user.id})")
 
         # 📢 WEBHOOK ADMIN : Bot en ligne
-        webhook_systeme = "https://discord.com/api/webhooks/1542928722561077389/v47MYXZKS-XIh9_vpqiEczY9p5KbHGcbM732SS3rrTRnMnRllAGQHLD4xTCFrZs1C-Bd"
-        if webhook_systeme.startswith("http"):
+        webhook_systeme = os.getenv("WEBHOOK_START")
+        if webhook_systeme and webhook_systeme.startswith("http"):
             payload = {
                 "username": "GGE Console 🟢",
                 "embeds": [
@@ -322,8 +327,8 @@ class GGEAssistantBot(commands.Bot):
         )
 
         # 📢 WEBHOOK ADMIN : Nouveau serveur
-        webhook_servers = "https://discord.com/api/webhooks/1542928212152156320/MPhCbqCEuhoRZggK-DNzNb3uJVO_3oZUvphiyAT9JVeSgbK4OlhOx6yI-4GqiP5nhQZs"
-        if webhook_servers.startswith("http"):
+        webhook_servers = os.getenv("WEBHOOK_JOIN")
+        if webhook_servers and webhook_servers.startswith("http"):
             proprio = guild.owner.name if guild.owner else "Inconnu"
             payload = {
                 "username": "GGE Serveurs 📈",
@@ -353,15 +358,29 @@ class GGEAssistantBot(commands.Bot):
             embed_initial = view.get_welcome_embed("en")
             try:
                 await channel_to_send.send(embed=embed_initial, view=view)
+            except discord.Forbidden as e:
+                logger.error(f"❌ Impossible d'envoyer le message de bienvenue sur {guild.name} (Forbidden) : {e}")
+                self.loop.create_task(
+                    self._send_background_error(
+                        "🔇 Erreur Permissions (Bienvenue)",
+                        f"Le bot n'a pas les droits pour envoyer le message de bienvenue sur le serveur **{guild.name}**.\nErreur : `{e}`",
+                    )
+                )
             except Exception as e:
-                logger.error(f"❌ Impossible d'envoyer le message de bienvenue sur {guild.name} : {e}")
+                logger.error(f"❌ Erreur inattendue du message de bienvenue sur {guild.name} : {e}")
+                self.loop.create_task(
+                    self._send_background_error(
+                        "🐛 Crash Inattendu (Bienvenue)",
+                        f"Crash lors du message de bienvenue sur **{guild.name}**.\nErreur : `{e}`",
+                    )
+                )
 
     async def on_guild_remove(self, guild: discord.Guild):
         logger.warning(f"👋 [DÉPART SERVEUR] Le bot a été retiré de '{guild.name}' (ID: {guild.id})")
 
         # 📢 WEBHOOK ADMIN : Départ d'un serveur
-        webhook_servers = "https://discord.com/api/webhooks/1542928339369725974/eT8HDAcwyv0R6du94i7MMqvXFPClJyKYeZaryLLw488oARtjWurO_Pa4YN9RzsoTNrCI"
-        if webhook_servers.startswith("http"):
+        webhook_servers = os.getenv("WEBHOOK_LEAVE")
+        if webhook_servers and webhook_servers.startswith("http"):
             payload = {
                 "username": "GGE Serveurs 📉",
                 "embeds": [
@@ -451,7 +470,7 @@ class GGEAssistantBot(commands.Bot):
     # 🌐 WEBHOOK TOP.GG (HYBRIDE v0 & v1 SÉCURISÉ)
     # ==========================================
     async def vote_handler(self, request):
-        secret = "whs_c7babaae2778a44fca787c43be391732e3924c5790907857e61b15b397e3fc32"
+        secret = os.getenv("TOPGG_WEBHOOK_SECRET", "faux_secret")
 
         signature_header = request.headers.get("x-topgg-signature")
         auth_header = request.headers.get("Authorization")
@@ -502,7 +521,7 @@ class GGEAssistantBot(commands.Bot):
             return web.Response(status=400, text="Missing user ID")
 
         # --- 3. GESTION DU TYPE (TEST ou VOTE) ---
-        webhook_votes = "https://discord.com/api/webhooks/1542929105757143120/gLCxqAh8kvTaUMIF_1lKaZgPa9sVywRs72CmZieJPtI0uYiYm_hhIcEkCorJKk7zlM2n"
+        webhook_votes = os.getenv("WEBHOOK_VOTES")
 
         if event_type in ["test", "webhook.test"]:
             logger.info(f"✅ [Webhook] TEST RÉUSSI ! La liaison avec Top.gg est parfaite (Test par {user_id}).")
@@ -510,7 +529,7 @@ class GGEAssistantBot(commands.Bot):
             logger.info(f"✅ [Webhook] Vrai vote reçu ! Application du bouclier pour {user_id}.")
 
             # 📢 WEBHOOK ADMIN : Alerte de Vote !
-            if webhook_votes.startswith("http"):
+            if webhook_votes and webhook_votes.startswith("http"):
                 payload = {
                     "username": "GGE Top.gg 🏆",
                     "embeds": [
@@ -665,7 +684,7 @@ class GGEAssistantBot(commands.Bot):
     async def update_servers_task(self):
 
         url = "https://ggetracker.github.io/i18n/servers.xml"
-        webhook_url = "https://discord.com/api/webhooks/1542925605920833576/jn9OjaioUAzMyaq9VmlLlKOk0XcXowajz1pgRTR5QBy-_Zvp2uT-YcJP31Sj-ski_FcL"
+        webhook_url = os.getenv("WEBHOOK_SYNC")
 
         try:
             async with self.session.get(url, timeout=10) as r:
@@ -784,11 +803,12 @@ class GGEAssistantBot(commands.Bot):
                                     }
                                 ]
                             }
-                            try:
-                                async with self.session.post(webhook_url, json=payload) as resp:
-                                    pass
-                            except Exception as webhook_err:
-                                logger.error(f"❌ Erreur envoi webhook admin synchro : {webhook_err}")
+                            if webhook_url and webhook_url.startswith("http"):
+                                try:
+                                    async with self.session.post(webhook_url, json=payload) as resp:
+                                        pass
+                                except Exception as webhook_err:
+                                    logger.error(f"❌ Erreur envoi webhook admin synchro : {webhook_err}")
                 else:
                     logger.warning(f"⚠️ [XML Sync] Impossible d'accéder au XML (Erreur {r.status})")
         except Exception as e:
@@ -820,15 +840,14 @@ class GGEAssistantBot(commands.Bot):
         await self.wait_until_ready()
 
     # ==========================================
-    # 🛑 LE VIDEUR UNIQUE ET UNIVERSEL
+    # 🛑 SYSTÈMES D'ALERTES ET DE GESTION D'ERREURS GLOBAUX
     # ==========================================
-    WEBHOOK_SYSTEME = "https://discord.com/api/webhooks/1542926665498230815/ejtJY-55vCS0w6zKq0u-BRrsO_NByJV7NvGCx9NHwRib_Hlp8QUHivbieexu_i5aAlQ-"
 
     async def _send_system_alert(
         self, interaction: discord.Interaction, titre: str, description: str, couleur: int = 0xFF0000
     ):
-        """Fonction interne pour envoyer des alertes système en arrière-plan."""
-        webhook_url = getattr(self, "WEBHOOK_SYSTEME", None)
+        """Alerte système attachée à une interaction utilisateur (ex: Spam, Logs de commandes)."""
+        webhook_url = os.getenv("WEBHOOK_SYSTEM")
         if not webhook_url or webhook_url.startswith("https://discord.com/api/webhooks/TON/"):
             return
 
@@ -840,6 +859,92 @@ class GGEAssistantBot(commands.Bot):
             await webhook.send(embed=embed, username="GGE Système 🚨")
         except Exception as e:
             logger.error(f"❌ Erreur Webhook Système : {e}")
+
+    async def _send_background_error(self, titre: str, description: str):
+        """Alerte système indépendante (Crash Global, Erreur de tâche de fond, Permissions)."""
+        webhook_url = os.getenv("WEBHOOK_SYSTEM")
+        if not webhook_url or webhook_url.startswith("https://discord.com/api/webhooks/TON/"):
+            return
+
+        embed = discord.Embed(title=titre, description=description, color=0x8B0000)  # Rouge Sombre
+        embed.set_footer(text="GGE Assistant - Rapport de Crash Automatique")
+
+        try:
+            if not hasattr(self, "session") or self.session.closed:
+                async with aiohttp.ClientSession() as session:
+                    webhook = discord.Webhook.from_url(webhook_url, session=session)
+                    await webhook.send(embed=embed, username="GGE Crash Report 🐛")
+            else:
+                webhook = discord.Webhook.from_url(webhook_url, session=self.session)
+                await webhook.send(embed=embed, username="GGE Crash Report 🐛")
+        except Exception as e:
+            logger.error(f"❌ Erreur critique du Webhook de Crash Background : {e}")
+
+    # --- LE FILET DE SÉCURITÉ #1 : ERREURS D'ÉVÉNEMENTS (on_message, on_guild_join, etc.) ---
+    async def on_error(self, event_method: str, *args, **kwargs):
+        """Capture et signale automatiquement toutes les erreurs survenant dans un événement du bot."""
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        tb_str = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+
+        logger.error(f"❌ Erreur globale dans l'événement '{event_method}':\n{tb_str}")
+
+        # Tronquer le traceback si trop long pour Discord (limite 4096 caractères pour la description)
+        tb_str_short = tb_str[-2000:] if len(tb_str) > 2000 else tb_str
+
+        self.loop.create_task(
+            self._send_background_error(
+                f"💥 Crash Événement : `{event_method}`",
+                f"Une erreur inattendue a fait planter un événement du bot.\n\n**Traceback :**\n```py\n{tb_str_short}\n```",
+            )
+        )
+
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+        """Le filet de sécurité #3 : Pour tes commandes d'administration classiques (!commande)."""
+        # On ignore les erreurs bêtes (commande inexistante)
+        if isinstance(error, commands.CommandNotFound):
+            return
+
+        tb_str = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+        tb_str_short = tb_str[-2000:] if len(tb_str) > 2000 else tb_str
+
+        logger.error(f"❌ Crash sur la commande admin '!{ctx.command}':\n{tb_str}")
+
+        self.loop.create_task(
+            self._send_background_error(
+                f"💥 Crash Commande Admin : `!{ctx.command}`",
+                f"**Exécuté par :** {ctx.author.mention}\n\n**Traceback :**\n```py\n{tb_str_short}\n```",
+            )
+        )
+
+    # --- LE FILET DE SÉCURITÉ #2 : ERREURS DE COMMANDES SLASH (/help, /player, etc.) ---
+    async def on_tree_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+        """Capture et signale automatiquement les plantages lors de l'exécution d'une commande Slash."""
+        tb_str = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+        tb_str_short = tb_str[-2000:] if len(tb_str) > 2000 else tb_str
+
+        cmd_name = interaction.command.name if interaction.command else "Inconnue"
+        serveur = interaction.guild.name if interaction.guild else "Message Privé"
+
+        logger.error(f"❌ Crash sur la commande '/{cmd_name}':\n{tb_str}")
+
+        self.loop.create_task(
+            self._send_background_error(
+                f"💥 Crash Commande : `/{cmd_name}`",
+                f"**Exécuté par :** {interaction.user.mention} (`{interaction.user.id}`)\n"
+                f"**Serveur :** {serveur}\n\n"
+                f"**Traceback :**\n```py\n{tb_str_short}\n```",
+            )
+        )
+
+        # Informer poliment l'utilisateur que ça a cassé, si possible
+        try:
+            msg = "⚠️ Aïe ! Une erreur interne a fait planter cette commande. Mon créateur vient de recevoir le rapport de crash et va corriger ça au plus vite."
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
+        except Exception:
+            pass
 
     async def global_interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.type == discord.InteractionType.autocomplete:
@@ -901,7 +1006,6 @@ class GGEAssistantBot(commands.Bot):
                 logger.info(f"📝 [COMMANDE] {interaction.user.name} a lancé `/{cmd_name}` sur [{lieu}]{options_txt}")
         except Exception as e:
             logger.error(f"⚠️ Erreur lors de l'écriture du log : {e}")
-            # 🚨 ALERTE WEBHOOK : Crash Console (Logs)
             self.bot.loop.create_task(
                 self._send_system_alert(
                     interaction,
@@ -1018,7 +1122,6 @@ class GGEAssistantBot(commands.Bot):
                         return False
         except Exception as e:
             logger.error(f"❌ Erreur lors de la vérification des serveurs spéciaux : {e}")
-            # 🚨 ALERTE WEBHOOK : Crash Console (Lecture Config)
             self.bot.loop.create_task(
                 self._send_system_alert(
                     interaction,
@@ -1028,7 +1131,7 @@ class GGEAssistantBot(commands.Bot):
             )
 
         # --- 3. BYPASS : Le créateur a toujours accès au reste ---
-        if interaction.user.id == MON_ID_DISCORD:
+        if interaction.user.id == MON_ID_DISCORD and getattr(self, "bypass_createur", True):
             return True
 
         # --- 4. MAINTENANCE GLOBALE ---

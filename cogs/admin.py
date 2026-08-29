@@ -57,7 +57,8 @@ class AdminCog(commands.Cog):
             "`!restart` ➔ Redémarre le bot (via Docker).\n"
             "`!m` ➔ Active/Désactive le mode maintenance.\n"
             "`!setstatus [msg]` ➔ Ajoute/retire un statut personnalisé.\n"
-            "`!log [date]` ➔ Télécharge les logs système.",
+            "`!log [date]` ➔ Télécharge les logs système.\n"
+            "`!bypass` ➔ Active/Désactive ton immunité.\n",
             inline=False,
         )
 
@@ -275,6 +276,28 @@ class AdminCog(commands.Cog):
                 self.admin_lang, "admin_log_error", error=str(e), defaut=f"❌ Erreur lors de la lecture des logs : {e}"
             )
             await ctx.send(msg)
+
+    @commands.command(name="bypass", hidden=True)
+    async def toggle_bypass(self, ctx):
+        """[CACHÉE] !bypass : Active/Désactive ton passe-partout de créateur."""
+        if ctx.author.id != MON_ID_DISCORD:
+            return
+
+        # On lit l'état actuel (True par défaut si la variable n'existe pas encore)
+        etat_actuel = getattr(self.bot, "bypass_createur", True)
+        nouvel_etat = not etat_actuel
+
+        # On sauvegarde le nouvel état dans le bot
+        self.bot.bypass_createur = nouvel_etat
+
+        if nouvel_etat:
+            await ctx.send(
+                "🔓 **Passe-partout ACTIVÉ.** Tu es de nouveau immunisé contre la maintenance, l'anti-spam et le videur."
+            )
+        else:
+            await ctx.send(
+                "🔒 **Passe-partout DÉSACTIVÉ.** Tu es maintenant un simple mortel ! Tes commandes Slash subiront les mêmes contrôles que les autres joueurs.\n*(Tape `!bypass` pour annuler).*"
+            )
 
     # ==========================================
     # 🌍 2. SERVEURS DISCORD & GGE
@@ -1359,7 +1382,6 @@ class AdminCog(commands.Cog):
     # ==========================================
     # 🕵️ 7. SYSTÈME DE VIGILANCE (ANTI-CONTOURNEMENT)
     # ==========================================
-    WEBHOOK_URL = "https://discord.com/api/webhooks/1542923608832221276/R-BoQNvevIW7U3dIxvi-b7BCm5O-oxh0_TxiCEiLjhNyKhHVrHgi-qhO4Nj4LZUoNvA8"
 
     @commands.command(name="vigi_add", hidden=True)
     async def vigi_add(self, ctx, *, cible: str):
@@ -1446,9 +1468,8 @@ class AdminCog(commands.Cog):
 
         from utils import ADMINS_DIR  # 💡 CORRECTION : Import de ADMINS_DIR
 
-        # 1. On vérifie si le webhook est configuré
-        webhook_url = self.WEBHOOK_URL if hasattr(self, "WEBHOOK_URL") else AdminCog.WEBHOOK_URL
-        if not webhook_url or webhook_url.startswith("https://discord.com/api/webhooks/TON/"):
+        webhook_url = os.getenv("WEBHOOK_VIGILANCE")
+        if not webhook_url or not webhook_url.startswith("http"):
             return
 
         # 2. On charge la liste des cibles

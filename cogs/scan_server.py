@@ -24,7 +24,7 @@ class ScanCog(commands.Cog):
             "Accept": "application/json",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) GGE-Assistant/3.0 (Async)",
         }
-        self.webhook_url = "https://discord.com/api/webhooks/1525853187280474222/Y4fycCy0IW019tZCMhGOdJzS1vqg7wSYn1ZEhtVO2o9Atuwr8ek-zieIsN9kG86Ndlcq"
+        self.webhook_url = os.getenv("WEBHOOK_SCAN")
 
         # Démarrage de la tâche planifiée (ex: tous les jours à 00:30 UTC)
         self.daily_scan.start()
@@ -34,7 +34,7 @@ class ScanCog(commands.Cog):
 
     async def send_discord_alert(self, title, description, color=16711680):
         """Envoie une notification sur Discord de manière asynchrone"""
-        if not self.webhook_url:
+        if not self.webhook_url or not self.webhook_url.startswith("http"):
             return
 
         payload = {
