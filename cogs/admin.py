@@ -34,14 +34,18 @@ class AdminCog(commands.Cog):
         self.bot = bot
         self.admin_lang = "fr"
 
+    # 🟢 FILTRE GLOBAL ADMIN : Seul le créateur peut utiliser ce module
+    def cog_check(self, ctx):
+        if ctx.author.id != MON_ID_DISCORD:
+            return False
+        return True
+
     # ==========================================
     # 🆘 MENU D'AIDE ADMINISTRATEUR
     # ==========================================
     @commands.command(name="ahelp", aliases=["admin_help", "adminhelp"], hidden=True)
     async def admin_help(self, ctx):
         """[CACHÉE] !ahelp : Affiche le récapitulatif des commandes admin."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         embed = discord.Embed(
             title="🛠️ Panneau de Contrôle Administrateur",
@@ -130,8 +134,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="sync", hidden=True)
     async def sync_tree(self, ctx):
         """[CACHÉE] !sync : Synchronise l'arbre des commandes Slash."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         msg_start = t(
             self.admin_lang, "admin_sync_start", defaut="⏳ Synchronisation de l'arbre des commandes en cours..."
@@ -157,8 +159,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="reload", hidden=True)
     async def reload_cog(self, ctx, extension: str):
         """[CACHÉE] !reload [cogs.nom] : Recharge un module à chaud."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         try:
             await self.bot.reload_extension(extension)
@@ -169,8 +169,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="restart", aliases=["reboot"], hidden=True)
     async def restart_bot(self, ctx):
         """[CACHÉE] !restart : Redémarre le bot (Nécessite Docker 'restart: always')."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         msg = t(
             self.admin_lang,
@@ -184,8 +182,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="m", hidden=True)
     async def toggle_maintenance(self, ctx):
         """[CACHÉE] !m : Bascule le bot en mode maintenance."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         self.bot.maintenance_mode = not self.bot.maintenance_mode
         await save_maintenance_async(self.bot.maintenance_mode)
@@ -215,8 +211,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="setstatus")
     async def setstatus(self, ctx, *, message: str = None):
         """[Admin] Ajoute ou retire un message de statut personnalisé."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         self.bot.custom_status = message
         if message:
@@ -227,8 +221,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="log", hidden=True)
     async def get_log(self, ctx, requested_date: str = "today"):
         """[CACHÉE] !log [date] : Récupère les logs système pour une date spécifique."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         requested_date = requested_date.lower()
         aujourd_hui = datetime.now().strftime("%Y-%m-%d")
@@ -280,8 +272,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="bypass", hidden=True)
     async def toggle_bypass(self, ctx):
         """[CACHÉE] !bypass : Active/Désactive ton passe-partout de créateur."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         # On lit l'état actuel (True par défaut si la variable n'existe pas encore)
         etat_actuel = getattr(self.bot, "bypass_createur", True)
@@ -305,8 +295,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="bot_servers", hidden=True)
     async def admin_serveurs(self, ctx):
         """[CACHÉE] !bot_servers : Liste les serveurs Discord sur lesquels le bot est présent."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         serveurs = self.bot.guilds
         nb_serveurs = len(serveurs)
@@ -344,8 +332,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="bot_leave", hidden=True)
     async def admin_quitter(self, ctx, server_id: str):
         """[CACHÉE] !bot_leave [server_id] : Force le bot à quitter un serveur Discord."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         try:
             guild = self.bot.get_guild(int(server_id))
@@ -376,8 +362,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="sync_servers", hidden=True)
     async def sync_servers(self, ctx):
         """[CACHÉE] !sync_servers : Force la synchronisation de la liste des serveurs via XML."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         import json
         import xml.etree.ElementTree as ET
@@ -468,8 +452,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="scan_manuel", hidden=True)
     async def scan_manuel(self, ctx, cible: str = "ALL"):
         """[CACHÉE] !scan_manuel [ALL/Serveur] : Lance manuellement le scanner (Tous ou un seul)."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         cible = cible.upper()
         scan_server = self.bot.get_cog("ScanCog")
@@ -523,8 +505,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="cal_keys", hidden=True)
     async def cal_keys(self, ctx):
         """[CACHÉE] Liste toutes les clés valides pour ajouter/modifier un événement."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         import json
 
@@ -554,8 +534,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="cal_list", hidden=True)
     async def cal_list(self, ctx):
         """[CACHÉE] Liste tous les événements actifs avec leurs IDs."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         cal_file = SERVEURS_DIR / "calendrier.json"
         if not cal_file.exists():
@@ -587,8 +565,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="cal_add", hidden=True)
     async def cal_add(self, ctx, event_key: str, start: str, end: str):
         """[CACHÉE] Ajoute un event. Ex: !cal_add "rift raid" "15/09/2026 11:00" "22/09/2026 09:00" """
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         try:
             dt_start = datetime.strptime(start, "%d/%m/%Y %H:%M")
@@ -626,8 +602,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="cal_edit", hidden=True)
     async def cal_edit(self, ctx, event_id: str, start: str, end: str):
         """[CACHÉE] Modifie les dates. Ex: !cal_edit 1a2b3 "15/09/2026 11:00" "22/09/2026 09:00" """
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         try:
             dt_start = datetime.strptime(start, "%d/%m/%Y %H:%M")
@@ -661,8 +635,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="cal_del", hidden=True)
     async def cal_del(self, ctx, event_id: str):
         """[CACHÉE] Supprime un événement du calendrier. Ex: !cal_del 1a2b3"""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         cal_file = SERVEURS_DIR / "calendrier.json"
         import json
@@ -694,8 +666,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="cal_mapping", hidden=True)
     async def cal_mapping(self, ctx, event_key: str, cible: str, heure: str):
         """[CACHÉE] Modifie l'heure par défaut. Ex: !cal_mapping "berimond" start "10:30" """
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         if cible.lower() not in ["start", "end"]:
             return await ctx.send("❌ La cible doit être `start` ou `end`.")
@@ -728,8 +698,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="ban_cmd", hidden=True)
     async def ban_cmd(self, ctx, command: str, *, reason: str = "Maintenance."):
         """[CACHÉE] !ban_cmd [command] [reason] : Bloque une commande globalement."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         data = await load_blocks_async()
         cmd_clean = command.replace("/", "").strip()
@@ -751,8 +719,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="unban_cmd", hidden=True)
     async def unban_cmd(self, ctx, command: str):
         """[CACHÉE] !unban_cmd [command] : Débloque une commande globalement."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         data = await load_blocks_async()
         cmd_clean = command.replace("/", "").strip()
@@ -873,8 +839,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="ban_user", hidden=True)
     async def ban_user(self, ctx, user: discord.User, command: str, *, reason: str = "Abus."):
         """[CACHÉE] !ban_user [user] [command] [reason] : Restreint un utilisateur."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         data = await load_blocks_async()
         uid = str(user.id)
@@ -916,8 +880,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="unban_user", hidden=True)
     async def unban_user(self, ctx, user: discord.User, command: str):
         """[CACHÉE] !unban_user [user] [command] : Lève la restriction d'un utilisateur."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         data = await load_blocks_async()
         uid = str(user.id)
@@ -957,11 +919,10 @@ class AdminCog(commands.Cog):
             self.ctx = ctx
             self.delete = False
             self.responded = False
+            self.message = None
 
         @discord.ui.button(label="🗑️ Supprimer les clés", style=discord.ButtonStyle.danger)
         async def btn_delete(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.ctx.author.id:
-                return
             self.delete = True
             self.responded = True
             for item in self.children:
@@ -971,8 +932,6 @@ class AdminCog(commands.Cog):
 
         @discord.ui.button(label="💾 Conserver (Trier & Ajouter)", style=discord.ButtonStyle.success)
         async def btn_keep(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.ctx.author.id:
-                return
             self.delete = False
             self.responded = True
             for item in self.children:
@@ -980,8 +939,16 @@ class AdminCog(commands.Cog):
             await interaction.response.edit_message(view=self)
             self.stop()
 
+        async def on_timeout(self):
+            for item in self.children:
+                item.disabled = True
+            if self.message:
+                try:
+                    await self.message.edit(view=self)
+                except discord.HTTPException:
+                    pass
+
     @commands.command(name="i18n_sync", aliases=["sortlang", "sort_locales"], hidden=True)
-    @commands.is_owner()
     async def i18n_sync(self, ctx):
         """[CACHÉE] !i18n_sync : Scanne, Trie et Synchronise les fichiers JSON avec sécurité."""
         import json
@@ -1049,6 +1016,7 @@ class AdminCog(commands.Cog):
             )
             view = self.I18nConfirmView(ctx)
             msg = await ctx.send(embed=embed_warn, view=view, file=discord_file)
+            view.message = msg
             await view.wait()
 
             if not view.responded:
@@ -1106,7 +1074,6 @@ class AdminCog(commands.Cog):
             await ctx.send(embed=embed_success)
 
     @commands.command(name="i18n_export", hidden=True)
-    @commands.is_owner()
     async def i18n_export(self, ctx, langue_cible: str = "en"):
         """[CACHÉE] !i18n_export [langue] : Génère un CSV pour les traducteurs communautaires."""
         import csv
@@ -1158,8 +1125,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="emojis_list", hidden=True)
     async def emojis_list(self, ctx):
         """[CACHÉE] !emojis_list : Scan le code pour trouver tous les émojis utilisés."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         msg_wait = await ctx.send("⏳ **Scan du code en cours...**")
         emojis_found = {}
@@ -1205,8 +1170,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="replace_raw", hidden=True)
     async def replace_raw(self, ctx, old_text: str, new_text: str):
         """[CACHÉE] !replace_raw [ancien] [nouveau] : Remplacement strict de texte."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         old_text = old_text.strip('`"').replace("[", "<").replace("]", ">")
         new_text = new_text.strip('`"').replace("[", "<").replace("]", ">")
@@ -1257,8 +1220,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="check_emojis", hidden=True)
     async def check_emojis(self, ctx):
         """[CACHÉE] Vérifie si le bot a accès à tous les émojis du code."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         msg_wait = await ctx.send("⏳ **Scanner d'émojis en cours d'analyse...**")
         bot_emoji_ids = {str(e.id) for e in self.bot.emojis}
@@ -1334,8 +1295,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="check_bad_emojis", hidden=True)
     async def check_bad_emojis(self, ctx):
         """[CACHÉE] Traque les erreurs de syntaxe comme <<: ou >ID>."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         msg_wait = await ctx.send("🔍 **Recherche des émojis malformés en cours...**")
         regexes = [re.compile(p) for p in [r"<<a?:[a-zA-Z0-9_]+:\d+>", r">\d+>", r"<a?:[a-zA-Z0-9_]+:\d+>>"]]
@@ -1386,8 +1345,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="vigi_add", hidden=True)
     async def vigi_add(self, ctx, *, cible: str):
         """[CACHÉE] Ajoute un pseudo ou ID à surveiller."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         # 💡 CORRECTION : ADMINS_DIR au lieu de ADMINS_DIR_DIR
         vigi_file = ADMINS_DIR / "vigilance.json"
@@ -1415,8 +1372,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="vigi_del", hidden=True)
     async def vigi_del(self, ctx, *, cible: str):
         """[CACHÉE] Retire un pseudo ou ID de la surveillance."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         vigi_file = ADMINS_DIR / "vigilance.json"
         if not vigi_file.exists():
@@ -1437,8 +1392,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="vigi_list", hidden=True)
     async def vigi_list(self, ctx):
         """[CACHÉE] Liste les cibles surveillées."""
-        if ctx.author.id != MON_ID_DISCORD:
-            return
 
         vigi_file = ADMINS_DIR / "vigilance.json"
         if not vigi_file.exists():

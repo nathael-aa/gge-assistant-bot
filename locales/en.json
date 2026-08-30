@@ -32,6 +32,8 @@
     "bot_err_maintenance": "{e_working} **Under maintenance!**\nMy goblins are working to restore all features as quickly as possible.",
     "bot_err_user_blocked_all": "{e_tomatobulletpoint} **Access denied**:\n> {reason}",
     "bot_err_user_blocked_cmd": "{e_tomatobulletpoint} **Restricted access**:\n> {reason}",
+    "bot_restart_notify_desc": "{e_working} A system update or maintenance has just taken place.\n\n{e_icon_search} Your fortress radar has automatically resumed in the background.\n\n{e_warning} Please note that the interactive buttons (*Restart / Check*) on your previous alerts are no longer functional.\n\n{e_check} *(System back to normal)*",
+    "bot_restart_notify_title": "{e_refresh} System Restart",
     "btn_api": "API",
     "btn_discord": "Discord",
     "btn_refresh": "Refresh",

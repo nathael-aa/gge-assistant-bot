@@ -180,6 +180,7 @@ class TargetWizard(discord.ui.View):
     def __init__(self, user_id, langue="en", current_config=None):
         super().__init__(timeout=600)
         self.user_id = user_id
+        self.message = None
         self.langue = langue
         self.config = current_config or {
             "lvl_min": -1,
@@ -203,6 +204,15 @@ class TargetWizard(discord.ui.View):
 
     async def start(self, interaction: discord.Interaction, content=None):
         await self.update_view(interaction, initial=True, content=content)
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if hasattr(self, "message") and self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
     async def update_view(self, interaction: discord.Interaction, initial=False, content=None):
         self.clear_items()
@@ -435,8 +445,10 @@ class TargetWizard(discord.ui.View):
 
         if initial:
             await interaction.response.send_message(content=content, embed=embed, view=self, ephemeral=True)
+            self.message = await interaction.original_response()
         else:
             await interaction.response.edit_message(content=None, embed=embed, view=self)
+            self.message = interaction.message
 
     def save_config(self):
         path_users = CONFIG_DIR / "target.json"
@@ -511,9 +523,6 @@ class TargetWizard(discord.ui.View):
         return embed
 
 
-# ========================================================
-# 🎛️ UI COMPONENT : PAGINATION + LIVE RERUN
-# ========================================================
 class CiblePaginationView(discord.ui.View):
     def __init__(self, cog, attacker, sort_by, target_alliance, embeds, langue="en", owner_id=None):
         super().__init__(timeout=1800)
@@ -525,6 +534,7 @@ class CiblePaginationView(discord.ui.View):
         self.current_page = 0
         self.langue = langue
         self.owner_id = owner_id
+        self.message = None
 
         self.btn_prev.label = t(langue, "target_btn_prev", defaut="Previous Page")
         self.btn_prev.emoji = DICT_EMOJIS.get("e_last", "⏮️")
@@ -536,6 +546,15 @@ class CiblePaginationView(discord.ui.View):
         self.btn_rerun.emoji = DICT_EMOJIS.get("e_refresh", "🔄")
 
         self.update_buttons()
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if hasattr(self, "message") and self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if self.owner_id is not None and interaction.user.id != self.owner_id:
@@ -1095,9 +1114,10 @@ class TargetCog(commands.Cog):
         )
 
         if message_to_edit:
-            await message_to_edit.edit(content=None, embed=embeds[0], view=view)
+            view.message = await message_to_edit.edit(content=None, embed=embeds[0], view=view)
         else:
-            await interaction.edit_original_response(content=None, embed=embeds[0], view=view)
+            view.message = await interaction.edit_original_response(content=None, embed=embeds[0], view=view)
+
         await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
 
 

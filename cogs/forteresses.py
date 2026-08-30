@@ -37,6 +37,7 @@ class FortressActionView(discord.ui.View):
         super().__init__(timeout=7200)
         self.cog = cog
         self.user_id = user_id
+        self.message = None
         self.cibles = cibles
         self.joueur = joueur
         self.serveur = serveur
@@ -70,6 +71,15 @@ class FortressActionView(discord.ui.View):
         logger.info(f"🔄 [FORTERESSES] {interaction.user.name} a cliqué sur 'Relancer' pour {self.joueur}.")
         await interaction.response.defer(thinking=True, ephemeral=False)
         await self.cog.relaunch_scan(interaction, self.user_id, self.langue)
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if hasattr(self, "message") and self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
 
 # ==========================================
@@ -231,7 +241,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         if cibles_list:
             view = FortressActionView(self, user_id, cibles_list, joueur, serveur, langue)
             await setup_embed_footer(embed_cibles, interaction, langue)
-            await interaction.followup.send(embed=embed_cibles, view=view, ephemeral=False)
+            view.message = await interaction.followup.send(embed=embed_cibles, view=view, ephemeral=False, wait=True)
         else:
             embed_attente = discord.Embed(
                 title=t(langue, "fort_wait_title", defaut="📭 Calme plat sur les frontières..."),
@@ -642,7 +652,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         if cibles_list:
             view = FortressActionView(self, user_id, cibles_list, nom_joueur, serveur, langue)
             await setup_embed_footer(embed_cibles, interaction, langue)
-            await interaction.followup.send(embed=embed_cibles, view=view, ephemeral=False)
+            view.message = await interaction.followup.send(embed=embed_cibles, view=view, ephemeral=False, wait=True)
         else:
             embed_attente = discord.Embed(
                 title=t(langue, "fort_wait_title", defaut="📭 Calme plat sur les frontières..."),

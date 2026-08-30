@@ -135,7 +135,7 @@ class AquamarineSelectView(discord.ui.View):
         gt_cargo,
         gt_am,
     ):
-        super().__init__(timeout=180)
+        super().__init__(timeout=300)
         self.interaction = interaction
         self.player = player
         self.alliance_name = alliance_name
@@ -170,6 +170,15 @@ class AquamarineSelectView(discord.ui.View):
 
         embed = await self.generate_embed(self.current_month)
         await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if hasattr(self, "message") and self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
     async def generate_embed(self, month_key):
         annee, mois_num = month_key.split("-")
@@ -564,7 +573,7 @@ class EventsCog(commands.Cog):
                 )
 
                 embed = await view.generate_embed(sorted_months[0])
-                await interaction.followup.send(embed=embed, view=view)
+                view.message = await interaction.followup.send(embed=embed, view=view, wait=True)
                 await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
                 return
 

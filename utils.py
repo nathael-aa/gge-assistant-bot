@@ -486,11 +486,21 @@ async def save_surveillance_async(data):
 # 🛠️ OUTILS UNIVERSELS & UI
 # ==========================================
 class PaginationView(discord.ui.View):
-    def __init__(self, embeds):
-        super().__init__(timeout=7200)
+    def __init__(self, embeds, timeout=7200):
+        super().__init__(timeout=timeout)
         self.embeds = embeds
         self.current_page = 0
+        self.message = None
         self.update_buttons()
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
     def update_buttons(self):
         self.btn_prev.disabled = self.current_page == 0

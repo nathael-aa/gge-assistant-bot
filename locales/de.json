@@ -32,6 +32,8 @@
     "bot_err_maintenance": "{e_working} **Wartungsarbeiten laufen!**\nMeine Kobolde arbeiten daran, alle Funktionen so schnell wie möglich wiederherzustellen.",
     "bot_err_user_blocked_all": "{e_tomatobulletpoint} **Zugriff verweigert**:\n> {reason}",
     "bot_err_user_blocked_cmd": "{e_tomatobulletpoint} **Eingeschränkter Zugriff**:\n> {reason}",
+    "bot_restart_notify_desc": "{e_working} Ein Systemupdate oder eine Wartung wurde gerade durchgeführt.\n\n{e_icon_search} Ihr Festungsradar wurde im Hintergrund automatisch fortgesetzt.\n\n{e_warning} Bitte beachten Sie, dass die interaktiven Schaltflächen (*Neustart / Überprüfen*) Ihrer vorherigen Benachrichtigungen nicht mehr funktionieren.\n\n{e_check} *(System wieder normal)*",
+    "bot_restart_notify_title": "{e_refresh} System-Neustart",
     "btn_api": "API",
     "btn_discord": "Discord",
     "btn_refresh": "Aktualisieren",

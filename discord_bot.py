@@ -289,23 +289,51 @@ class GGEAssistantBot(commands.Bot):
         charger_langues()
         logger.info(f"✅ Bot connecté en tant que {self.user} (ID: {self.user.id})")
 
-        # 📢 WEBHOOK ADMIN : Bot en ligne
-        webhook_systeme = os.getenv("WEBHOOK_START")
-        if webhook_systeme and webhook_systeme.startswith("http"):
-            payload = {
-                "username": "GGE Console 🟢",
-                "embeds": [
-                    {
-                        "title": "🚀 Démarrage Réussi",
-                        "description": f"Le bot est connecté et opérationnel.\n**Serveurs actuels :** `{len(self.guilds)}`",
-                        "color": 0x3498DB,  # Bleu
-                    }
-                ],
-            }
-            try:
-                await self.session.post(webhook_systeme, json=payload)
-            except:
-                pass
+        # 🔄 PRÉAVIS DE REDÉMARRAGE AUX UTILISATEURS
+        try:
+            path_fort = JOUEURS_DIR / "forteresses_sessions.json"
+            path_users = CONFIG_DIR / "users.json"
+
+            if path_fort.exists():
+                with open(path_fort, encoding="utf-8") as f:
+                    data_fort = json.load(f)
+                    sessions = data_fort.get("sessions", {})
+
+                if sessions:
+                    users_data = {}
+                    if path_users.exists():
+                        try:
+                            with open(path_users, encoding="utf-8") as f_u:
+                                users_data = json.load(f_u)
+                        except Exception:
+                            pass
+
+                    logger.info(f"🛑 [Redémarrage] Envoi du préavis de reprise à {len(sessions)} joueurs...")
+
+                    for uid in sessions.keys():
+                        try:
+                            user = self.get_user(int(uid)) or await self.fetch_user(int(uid))
+                            langue = users_data.get(uid, {}).get("langue", "fr")
+
+                            titre = t(langue, "bot_restart_notify_title", defaut="🔄 Redémarrage système")
+                            desc = t(
+                                langue,
+                                "bot_restart_notify_desc",
+                                defaut=(
+                                    "Une mise à jour ou une maintenance du système vient d'avoir lieu.\n\n"
+                                    "Votre radar de forteresses a repris automatiquement en arrière-plan. "
+                                    "Veuillez noter que les boutons interactifs (*Relancer / Vérifier*) de vos anciennes alertes ne sont désormais plus fonctionnels.\n\n"
+                                    "*(Retour à la normale effectif)*"
+                                ),
+                            )
+
+                            embed = discord.Embed(title=titre, description=desc, color=discord.Color.orange())
+                            await user.send(embed=embed)
+                        except Exception:
+                            pass
+
+        except Exception as e:
+            logger.error(f"❌ Erreur lors de l'envoi du préavis au démarrage : {e}")
 
         if self.maintenance_mode:
             statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
@@ -950,6 +978,10 @@ class GGEAssistantBot(commands.Bot):
         if interaction.type == discord.InteractionType.autocomplete:
             return True
 
+        # --- BYPASS : Le créateur a toujours accès au reste ---
+        if interaction.user.id == MON_ID_DISCORD and getattr(self, "bypass_createur", True):
+            return True
+
         cmd_name = (
             interaction.command.qualified_name if interaction.command else interaction.data.get("name", "inconnue")
         )
@@ -978,7 +1010,7 @@ class GGEAssistantBot(commands.Bot):
                     await interaction.response.send_message(msg, ephemeral=True)
 
                     # 🚨 ALERTE WEBHOOK : Détection de spam
-                    self.bot.loop.create_task(
+                    self.loop.create_task(
                         self._send_system_alert(
                             interaction,
                             "⚠️ Alerte Spam",
@@ -1006,7 +1038,7 @@ class GGEAssistantBot(commands.Bot):
                 logger.info(f"📝 [COMMANDE] {interaction.user.name} a lancé `/{cmd_name}` sur [{lieu}]{options_txt}")
         except Exception as e:
             logger.error(f"⚠️ Erreur lors de l'écriture du log : {e}")
-            self.bot.loop.create_task(
+            self.loop.create_task(
                 self._send_system_alert(
                     interaction,
                     "🐛 Erreur Console (Logs)",
@@ -1090,7 +1122,7 @@ class GGEAssistantBot(commands.Bot):
                 await interaction.response.send_message(msg, ephemeral=True)
             return False
 
-        # --- 2.7. VÉRIFICATION DES SERVEURS SPÉCIAUX (COMPTE ESPION REQUIS) ---
+        # --- 3. VÉRIFICATION DES SERVEURS SPÉCIAUX (COMPTE ESPION REQUIS) ---
         try:
             import json
 
@@ -1122,17 +1154,13 @@ class GGEAssistantBot(commands.Bot):
                         return False
         except Exception as e:
             logger.error(f"❌ Erreur lors de la vérification des serveurs spéciaux : {e}")
-            self.bot.loop.create_task(
+            self.loop.create_task(
                 self._send_system_alert(
                     interaction,
                     "🐛 Erreur Console (Vérification Serveur)",
                     f"Impossible de valider le serveur de l'utilisateur.\n```py\n{e}\n```",
                 )
             )
-
-        # --- 3. BYPASS : Le créateur a toujours accès au reste ---
-        if interaction.user.id == MON_ID_DISCORD and getattr(self, "bypass_createur", True):
-            return True
 
         # --- 4. MAINTENANCE GLOBALE ---
         if self.maintenance_mode:
@@ -1174,7 +1202,7 @@ class GGEAssistantBot(commands.Bot):
                     await interaction.response.send_message(msg, ephemeral=True)
 
                     # 🚨 ALERTE WEBHOOK : Tentative de contournement ou forcing
-                    self.bot.loop.create_task(
+                    self.loop.create_task(
                         self._send_system_alert(
                             interaction,
                             "🛑 Intrusion bloquée (Ban ALL)",
@@ -1196,7 +1224,7 @@ class GGEAssistantBot(commands.Bot):
                     await interaction.response.send_message(msg, ephemeral=True)
 
                     # 🚨 ALERTE WEBHOOK : Utilisateur banni d'une commande
-                    self.bot.loop.create_task(
+                    self.loop.create_task(
                         self._send_system_alert(
                             interaction,
                             "🛑 Intrusion bloquée (Ban Commande)",
@@ -1209,6 +1237,7 @@ class GGEAssistantBot(commands.Bot):
         return True
 
     async def close(self):
+
         if hasattr(self, "flag_watcher_task"):
             self.flag_watcher_task.cancel()
         if hasattr(self, "status_task"):
@@ -1222,6 +1251,7 @@ class GGEAssistantBot(commands.Bot):
         if hasattr(self, "web_site"):
             await self.web_site.stop()
             await self.web_runner.cleanup()
+
         session = getattr(self, "session", None)
         if session:
             await session.close()

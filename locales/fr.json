@@ -32,6 +32,8 @@
     "bot_err_maintenance": "{e_working} **En cours de maintenance !**\nMes gobelins travaillent pour réactiver l'ensemble des fonctionnalités au plus vite.",
     "bot_err_user_blocked_all": "{e_warning} **Accès refusé** :\n> {reason}",
     "bot_err_user_blocked_cmd": "{e_warning} **Accès restreint** :\n> {reason}",
+    "bot_restart_notify_desc": "{e_working} Une mise à jour ou une maintenance du système vient d'avoir lieu.\n\n{e_icon_search} Votre radar de forteresses a repris automatiquement en arrière-plan.\n\n{e_warning} Veuillez noter que les boutons interactifs (*Relancer / Vérifier*) de vos anciennes alertes ne sont désormais plus fonctionnels.\n\n{e_check} *(Retour à la normale effectif)*",
+    "bot_restart_notify_title": "{e_refresh} Redémarrage système",
     "btn_api": "API",
     "btn_discord": "Discord",
     "btn_refresh": "Actualiser",

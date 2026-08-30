@@ -270,8 +270,18 @@ class HelpSelect(discord.ui.Select):
 
 class HelpView(discord.ui.View):
     def __init__(self, langue: str):
-        super().__init__(timeout=1200)
+        super().__init__(timeout=3600)
+        self.message = None
         self.add_item(HelpSelect(langue))
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if hasattr(self, "message") and self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
 
 # ==========================================
@@ -316,7 +326,7 @@ class AideCog(commands.Cog):
         await setup_embed_footer(embed, interaction, langue)
 
         view = HelpView(langue)
-        await interaction.followup.send(embed=embed, view=view)
+        view.message = await interaction.followup.send(embed=embed, view=view, wait=True)
 
     # ==========================================
     # 📡 COMMANDE : STATUS

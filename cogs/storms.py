@@ -72,6 +72,32 @@ def get_isle_name(isle_id, langue):
     return f"{name} ({res_data['qty']})"
 
 
+# ==========================================
+# 🎛️ COMPOSANT UI : VUE AVEC RAFRAÎCHISSEMENT UNIQUE
+# ==========================================
+class RefreshOnlyView(discord.ui.View):
+    def __init__(self, callback_func, langue="fr", timeout=1800):
+        super().__init__(timeout=timeout)
+        self.message = None
+
+        self.refresh_btn = discord.ui.Button(
+            style=discord.ButtonStyle.primary,
+            emoji="<:refresh:1533433306610274425>",
+            label=t(langue, "btn_refresh", defaut="Refresh"),
+        )
+        self.refresh_btn.callback = callback_func
+        self.add_item(self.refresh_btn)
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
+
+
 class StormsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -239,28 +265,27 @@ class StormsCog(commands.Cog):
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
 
-            if len(embeds) > 1:
-                view = PaginationView(embeds)
-            else:
-                view = discord.ui.View(timeout=72000)
-
-            refresh_btn = discord.ui.Button(
-                style=discord.ButtonStyle.primary,
-                emoji="<:refresh:1533433306610274425>",
-                label=t(langue, "btn_refresh", defaut="Refresh"),
-            )
-
             async def refresh_callback(btn_inter: discord.Interaction):
                 await btn_inter.response.defer()
                 await fetch_and_build_view(btn_inter, is_refresh=True)
 
-            refresh_btn.callback = refresh_callback
-            view.add_item(refresh_btn)
+            if len(embeds) > 1:
+                view = PaginationView(embeds)
+                # Ajout du bouton refresh manuel dans la vue de pagination si c'est multi-page
+                refresh_btn = discord.ui.Button(
+                    style=discord.ButtonStyle.primary,
+                    emoji="<:refresh:1533433306610274425>",
+                    label=t(langue, "btn_refresh", defaut="Refresh"),
+                )
+                refresh_btn.callback = refresh_callback
+                view.add_item(refresh_btn)
+            else:
+                view = RefreshOnlyView(refresh_callback, langue)
 
             if is_refresh:
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
             else:
-                await current_inter.followup.send(embed=embeds[0], view=view)
+                view.message = await current_inter.followup.send(embed=embeds[0], view=view, wait=True)
                 await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
 
         await fetch_and_build_view(interaction, is_refresh=False)
@@ -402,28 +427,26 @@ class StormsCog(commands.Cog):
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
 
-            if len(embeds) > 1:
-                view = PaginationView(embeds)
-            else:
-                view = discord.ui.View(timeout=1800)
-
-            refresh_btn = discord.ui.Button(
-                style=discord.ButtonStyle.primary,
-                emoji="<:refresh:1533433306610274425>",
-                label=t(langue, "btn_refresh", defaut="Refresh"),
-            )
-
             async def refresh_callback(btn_inter: discord.Interaction):
                 await btn_inter.response.defer()
                 await fetch_and_build_view(btn_inter, is_refresh=True)
 
-            refresh_btn.callback = refresh_callback
-            view.add_item(refresh_btn)
+            if len(embeds) > 1:
+                view = PaginationView(embeds)
+                refresh_btn = discord.ui.Button(
+                    style=discord.ButtonStyle.primary,
+                    emoji="<:refresh:1533433306610274425>",
+                    label=t(langue, "btn_refresh", defaut="Refresh"),
+                )
+                refresh_btn.callback = refresh_callback
+                view.add_item(refresh_btn)
+            else:
+                view = RefreshOnlyView(refresh_callback, langue)
 
             if is_refresh:
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
             else:
-                await current_inter.followup.send(embed=embeds[0], view=view)
+                view.message = await current_inter.followup.send(embed=embeds[0], view=view, wait=True)
                 await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
 
         await fetch_and_build_view(interaction, is_refresh=False)

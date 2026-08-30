@@ -31,9 +31,10 @@ logger = logging.getLogger("GGE_Bot")
 
 class HistoriqueView(discord.ui.View):
     def __init__(self, embeds_dict, interaction: discord.Interaction, langue: str = "fr"):
-        super().__init__(timeout=300)
+        super().__init__(timeout=900)
         self.embeds_dict = embeds_dict
         self.interaction = interaction
+        self.message = None
         self.langue = langue
 
         self.btn_pseudo.label = t(langue, "prof_hist_btn_pseudos", defaut="Pseudos")
@@ -70,6 +71,15 @@ class HistoriqueView(discord.ui.View):
         self.current_page = 0
         self._update_navigation()
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][0], view=self)
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if hasattr(self, "message") and self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
     @discord.ui.button(emoji="<:listitem:1512573892596858960>", row=0)
     async def btn_pseudo(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -933,7 +943,7 @@ class ProfilsCog(commands.Cog):
             return
 
         view = HistoriqueView(embeds_dict, interaction, langue=langue)
-        await interaction.followup.send(embed=embeds_dict[view.current_cat][0], view=view)
+        view.message = await interaction.followup.send(embed=embeds_dict[view.current_cat][0], view=view, wait=True)
         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     # ========================================================
