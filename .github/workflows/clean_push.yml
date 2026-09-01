@@ -27,16 +27,16 @@ jobs:
         run: python strip_comments.py
 
       - - name: Push clean code to main
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          mv production /tmp/production_temp
-          
-          git checkout main
-          
-          cp -r /tmp/production_temp/* ./
-          
-          git add .
-          git commit -m "${{ github.event.head_commit.message }}" || echo "Rien à commit"
-          git push origin main
+          run: |
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            
+            mv production /tmp/production_temp
+            
+            git checkout main
+            
+            cp -r /tmp/production_temp/* ./
+            
+            git add .
+            git commit -m "${{ github.event.head_commit.message }}" || echo "Rien à commit"
+            git push origin main
