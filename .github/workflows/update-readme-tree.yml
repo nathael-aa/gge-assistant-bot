@@ -1,0 +1,39 @@
+name: Update README Tree
+
+on:
+  push:
+    branches:
+      - main # Remplace par 'master' si c'est le nom de ta branche principale
+
+jobs:
+  update-tree:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Generate tree and update README
+        run: |
+          # Installation de l'outil tree
+          sudo apt-get install -y tree
+          
+          # Génération de l'arbre en ignorant les dossiers lourds ou sensibles
+          echo '```bash' > tree_tmp.txt
+          tree -L 3 -I '.git|node_modules|dist|__pycache__|.env|tmp|logs' >> tree_tmp.txt
+          echo '```' >> tree_tmp.txt
+          
+          # Remplacement dans le README.md entre les balises
+          sed -i '/<!-- TREE-START -->/,/<!-- TREE-END -->/!b;//!d;/<!-- TREE-START -->/r tree_tmp.txt' README.md
+          
+          rm tree_tmp.txt
+
+      - name: Commit and Push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md
+          # Ne commit que s'il y a un changement
+          git diff --quiet && git diff --staged --quiet || git commit -m "docs: auto-update README tree"
+          git push
