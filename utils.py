@@ -12,7 +12,7 @@ import discord
 from discord import app_commands
 
 logger = logging.getLogger("GGE_Bot")
-
+#commit
 # ==========================================
 # ⚙️ GESTION DES CHEMINS & DOSSIER
 # ==========================================
