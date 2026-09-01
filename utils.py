@@ -163,16 +163,12 @@ class PaginationView(discord.ui.View):
 
         # Création des boutons dynamiquement pour éviter le crash d'émojis
         self.btn_prev = discord.ui.Button(
-            emoji=DICT_EMOJIS.get("e_last", "⏮️"),
-            style=discord.ButtonStyle.secondary,
-            custom_id="page_prev"
+            emoji=DICT_EMOJIS.get("e_last", "⏮️"), style=discord.ButtonStyle.secondary, custom_id="page_prev"
         )
         self.btn_prev.callback = self.cb_prev
 
         self.btn_next = discord.ui.Button(
-            emoji=DICT_EMOJIS.get("e_next", "⏭️"),
-            style=discord.ButtonStyle.secondary,
-            custom_id="page_next"
+            emoji=DICT_EMOJIS.get("e_next", "⏭️"), style=discord.ButtonStyle.secondary, custom_id="page_next"
         )
         self.btn_next.callback = self.cb_next
 
@@ -214,6 +210,7 @@ class PaginationView(discord.ui.View):
 
 class RefreshOnlyView(discord.ui.View):
     """Une vue avec uniquement un bouton Refresh qui se désactive aussi après un timeout."""
+
     def __init__(self, callback_func, langue="fr", timeout=3600):
         super().__init__(timeout=timeout)
         self.message = None
@@ -247,6 +244,7 @@ class RefreshOnlyView(discord.ui.View):
 # 🎲 MESSAGE SOUTIENS ALEATOIRE
 # ==========================================
 VOTES_FILE = JOUEURS_DIR / "votes.json"
+
 
 async def prompt_vote_if_lucky(interaction: discord.Interaction, probability_percent: int, langue: str = "fr"):
     """Vérifie si le joueur est protégé par les 7 jours. Sinon, lance le dé."""
@@ -682,6 +680,7 @@ async def generer_rapport_alliance_embed(
 
     return embed, lignes_classement, stats_text, global_latest_str
 
+
 # =========================================
 # ⚙️ VARIABLES GLOBALES & CACHE
 # =========================================
@@ -711,6 +710,7 @@ TRACKER_EVENTS = {
 # ==========================================
 FILE_LOCKS = {}
 
+
 def get_file_lock(filepath):
     path_key = str(Path(filepath).resolve())
     if path_key not in FILE_LOCKS:
@@ -722,6 +722,7 @@ def get_file_lock(filepath):
 # 🔧 Footer global
 # ==========================================
 BOT_VERSION = "GGE Assistant • Version 1.2.5"
+
 
 async def setup_embed_footer(
     embed: discord.Embed, interaction: discord.Interaction = None, langue: str = "fr", custom_server: str = None
