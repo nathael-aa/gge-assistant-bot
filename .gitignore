@@ -27,6 +27,7 @@ logs/
 # ----------------------------------
 # Ignore tous les dossiers __pycache__ (cogs, locales, racine...)
 __pycache__/
+production/
 *.py[cod]
 *$py.class
 .DS_Store
