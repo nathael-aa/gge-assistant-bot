@@ -27,6 +27,44 @@ A comprehensive Discord bot designed to assist "Goodgame Empire" (GGE) and "Empi
 ## 📂 Project Structure
 
 <!-- TREE-START -->
+```bash
+.
+├── Dockerfile
+├── README.md
+├── assets
+│   └── logo.webp
+├── cogs
+│   ├── admin.py
+│   ├── aide.py
+│   ├── calendrier.py
+│   ├── classement.py
+│   ├── config.py
+│   ├── events.py
+│   ├── forteresses.py
+│   ├── profils.py
+│   ├── radar.py
+│   ├── scan_server.py
+│   ├── storms.py
+│   └── target.py
+├── data
+│   └── configs
+│       ├── configuration.json
+│       └── event_mapping.json
+├── discord_bot.py
+├── docker-compose.yaml
+├── emojis.py
+├── locales
+│   ├── de.json
+│   ├── en.json
+│   └── fr.json
+├── requirements.txt
+├── ruff.toml
+├── strip_comments.py
+├── tree_tmp.txt
+└── utils.py
+
+6 directories, 28 files
+```
 <!-- TREE-END -->
 *(This section can be auto-updated via GitHub Actions)*
 
