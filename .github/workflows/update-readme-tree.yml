@@ -6,6 +6,9 @@ on:
       - main
       - dev
 
+permissions:
+  contents: write
+
 jobs:
   update-tree:
     runs-on: ubuntu-latest
