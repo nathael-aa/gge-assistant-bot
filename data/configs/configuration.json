@@ -342,7 +342,7 @@
         },
         "E4K_GB1": {
             "enabled": true,
-            "featured": true,
+            "featured": false,
             "scan_minutes": 45,
             "api_name": "EmpirefourkingdomsExGG_5"
         },
