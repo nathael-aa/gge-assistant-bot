@@ -107,7 +107,7 @@ async def get_api_headers(interaction: discord.Interaction = None, custom_server
 # 🌍 MOTEUR DE TRADUCTION (i18n)
 # ==========================================
 try:
-    from locales.emojis import DICT_EMOJIS
+    from emojis import DICT_EMOJIS
 except ImportError as e:
     logger.error(f"❌ Impossible de charger les émojis : {e}")
     DICT_EMOJIS = {}
