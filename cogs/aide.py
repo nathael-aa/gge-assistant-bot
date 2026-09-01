@@ -27,9 +27,9 @@ logger = logging.getLogger("GGE_Bot")
 
 CONTACTS_FILE = ADMINS_DIR / "contacts.json"
 
-# ==========================================
+# ===========================================
 # ⚙️ CONFIGURATION CENTRALISÉE DE L'AIDE
-# ==========================================
+# ===========================================
 HELP_CONFIG = {
     "home": {
         "emoji": "🏠",

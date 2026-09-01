@@ -10,9 +10,9 @@ from discord.ext import commands
 from utils import CONFIG_DIR, clear_config_cache, get_server_config, load_configuration_async, t
 
 
-# ==========================================
+# ===========================================
 # 💾 SAUVEGARDE CONFIG UTILISATEURS (DMs)
-# ==========================================
+# ===========================================
 async def load_users_config():
     path = CONFIG_DIR / "users.json"
     if os.path.exists(path):

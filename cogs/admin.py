@@ -41,9 +41,9 @@ class AdminCog(commands.Cog):
             return False
         return True
 
-    # ==========================================
+    # ===========================================
     # 🆘 MENU D'AIDE ADMINISTRATEUR
-    # ==========================================
+    # ===========================================
     @commands.command(name="ahelp", aliases=["admin_help", "adminhelp"], hidden=True)
     async def admin_help(self, ctx):
         """[CACHÉE] !ahelp : Affiche le récapitulatif des commandes admin."""

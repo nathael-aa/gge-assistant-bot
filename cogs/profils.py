@@ -44,7 +44,7 @@ class HistoriqueView(discord.ui.View):
         self.btn_alliance.emoji = DICT_EMOJIS.get("e_alliance_icon", "🛡️")
 
         self.btn_position.label = t(langue, "prof_hist_btn_mouvements", defaut="Mouvements")
-        # Fallback sur e_compass s'il te manque e_moove dans ton DICT_EMOJIS
+        # Fallbacks sur e_compass s'il te manque e_moove dans ton DICT_EMOJIS
         self.btn_position.emoji = DICT_EMOJIS.get("e_moove", DICT_EMOJIS.get("e_compass", "📍"))
 
         self.btn_prev.emoji = DICT_EMOJIS.get("e_last", "⏮️")

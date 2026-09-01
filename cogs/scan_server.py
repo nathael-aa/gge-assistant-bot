@@ -26,7 +26,7 @@ class ScanCog(commands.Cog):
         }
         self.webhook_url = os.getenv("WEBHOOK_SCAN")
 
-        # Démarrage de la tâche planifiée (ex: tous les jours à 00:30 UTC)
+        # Démarrage de la tâche planifiée ex: tous les jours à 00:30 UTC
         self.daily_scan.start()
 
     def cog_unload(self):

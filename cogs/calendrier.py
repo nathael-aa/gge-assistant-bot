@@ -28,9 +28,9 @@ CALENDRIER_FILE = SERVEURS_DIR / "calendrier.json"
 MAPPING_FILE = CONFIG_DIR / "event_mapping.json"
 
 
-# ==========================================
+# ===========================================
 # 🛠️ CLASSE DE NAVIGATION UI (AVEC TIMEOUT)
-# ==========================================
+# ===========================================
 class CalendarNavView(discord.ui.View):
     def __init__(self, embeds_dict, current_page, langue="fr", timeout=3600):
         super().__init__(timeout=timeout)

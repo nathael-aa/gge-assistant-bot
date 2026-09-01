@@ -51,7 +51,7 @@ def extract_p_rank(p):
     return int(p[0]) if len(p) > 0 else 999999
 
 
-# --- VUE PERSONNALISÉE AVEC BOUTON REFRESH ET TIMEOUT ---
+# -- VUE PERSONNALISÉE AVEC BOUTON REFRESH ET TIMEOUT --
 class RankingPaginationView(PaginationView):
     def __init__(self, embeds, refresh_callback, user_id, timeout=3600):
         super().__init__(embeds)

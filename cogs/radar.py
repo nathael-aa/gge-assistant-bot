@@ -66,9 +66,9 @@ def get_discord_time(iso_str, langue="fr"):
         return t(langue, "rad_time_recent", defaut="Récemment")
 
 
-# ==========================================
+# ===========================================
 # 🎛️ MENU INTERACTIF DES FILTRES JOUEURS
-# ==========================================
+# ===========================================
 class RadarSettingsView(discord.ui.View):
     def __init__(self, p_id: str, user_id: str, player_name: str, initial_prefs: dict, langue: str = "fr"):
         super().__init__(timeout=900)

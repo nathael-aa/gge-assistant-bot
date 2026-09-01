@@ -169,7 +169,7 @@ class AquamarineSelectView(discord.ui.View):
         for opt in self.select.options:
             opt.default = opt.value == self.current_month
 
-        # Sécurité pour le timeout du message
+        # Sécurités pour le timeout du message
         if not self.message:
             self.message = interaction.message
 

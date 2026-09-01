@@ -13,9 +13,9 @@ from discord import app_commands
 
 logger = logging.getLogger("GGE_Bot")
 
-# ==========================================
+# =========================================
 # ⚙️ GESTION DES CHEMINS & DOSSIER
-# ==========================================
+# =========================================
 BASE_DIR = Path(__file__).parent
 
 LOCALES_DIR = BASE_DIR / "locales"
