@@ -103,9 +103,9 @@ async def get_api_headers(interaction: discord.Interaction = None, custom_server
     return {"accept": "application/json", "gge-server": server, "User-Agent": "Mozilla/5.0 GGE-Assistant/2.0"}
 
 
-# ==========================================
+# ===========================================
 # 🌍 MOTEUR DE TRADUCTION (i18n)
-# ==========================================
+# ===========================================
 try:
     from emojis import DICT_EMOJIS
 except ImportError as e:
