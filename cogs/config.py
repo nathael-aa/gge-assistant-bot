@@ -40,7 +40,8 @@ class ConfigCog(commands.Cog):
     async def server_autocomplete(self, interaction: discord.Interaction, current: str):
         langue, _ = await get_server_config(interaction)
 
-        # 💡 Les 3 niveaux de prise en charge
+        # 💡 ATTENTION : L'autocomplétion Discord ne supporte PAS les émojis customisés (<:nom:id>).
+        # On doit impérativement utiliser des émojis Unicode standards ici.
         lbl_featured = t(langue, "config_featured", defaut="🌟 Fonctions Avancées")
         lbl_ok = t(langue, "config_supported", defaut="🟢 Standard")
         lbl_ko = t(langue, "config_unsupported", defaut="🔴 Non pris en charge")
@@ -144,7 +145,7 @@ class ConfigCog(commands.Cog):
                 language.value,
                 "error_unsupported_server",
                 serveur=serveur_upper,
-                defaut=f"❌ **Erreur** : Le serveur `{serveur_upper}` n'est pas pris en charge par l'API pour le moment. Veuillez choisir un serveur avec la pastille 🌟 ou 🟢.",
+                defaut="{e_error} **Erreur** : Le serveur `{serveur}` n'est pas pris en charge par l'API pour le moment. Veuillez choisir un serveur avec la pastille 🌟 ou 🟢.",
             )
             return await interaction.followup.send(msg_erreur)
 
@@ -154,7 +155,8 @@ class ConfigCog(commands.Cog):
         data[user_id] = {"nom_discord": interaction.user.name, "langue": language.value, "gge_server": serveur_upper}
         await save_users_config(data)
         clear_config_cache()
-        titre = t(language.value, "config_dm_setup_title", defaut="✅ Profil Configuré")
+
+        titre = t(language.value, "config_dm_setup_title", defaut="{e_check} Profil Configuré")
         desc = t(
             language.value,
             "config_dm_setup_desc",
@@ -166,7 +168,7 @@ class ConfigCog(commands.Cog):
                 language.value,
                 "config_scan_init",
                 srv=serveur_upper,
-                defaut=f"\n\n⏳ *Un scan d'initialisation pour {serveur_upper} vient d'être lancé en arrière-plan. Le radar sera disponible d'ici 1 à 2 minutes.*",
+                defaut="\n\n{e_hourglass} *Un scan d'initialisation pour {srv} vient d'être lancé en arrière-plan. Le radar sera disponible d'ici 1 à 2 minutes.*",
             )
 
         embed = discord.Embed(title=titre, description=desc, color=discord.Color.blue())

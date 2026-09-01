@@ -525,7 +525,7 @@ class TargetWizard(discord.ui.View):
 
 class CiblePaginationView(discord.ui.View):
     def __init__(self, cog, attacker, sort_by, target_alliance, embeds, langue="en", owner_id=None):
-        super().__init__(timeout=1800)
+        super().__init__(timeout=3600)
         self.cog = cog
         self.attacker = attacker
         self.sort_by = sort_by
@@ -558,6 +558,8 @@ class CiblePaginationView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if self.owner_id is not None and interaction.user.id != self.owner_id:
+            msg_err = t(self.langue, "target_err_not_yours", defaut="❌ This radar scan is not yours.")
+            await interaction.response.send_message(msg_err, ephemeral=True)
             return False
         return True
 
@@ -569,12 +571,16 @@ class CiblePaginationView(discord.ui.View):
     async def btn_prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page -= 1
         self.update_buttons()
+        if not self.message:
+            self.message = interaction.message
         await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
 
     @discord.ui.button(style=discord.ButtonStyle.secondary, custom_id="cible_next")
     async def btn_next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page += 1
         self.update_buttons()
+        if not self.message:
+            self.message = interaction.message
         await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
 
     @discord.ui.button(style=discord.ButtonStyle.primary, custom_id="cible_rerun")

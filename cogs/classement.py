@@ -9,6 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import (
+    DICT_EMOJIS,
     PaginationView,
     alliance_autocomplete,
     get_api_headers,
@@ -52,14 +53,20 @@ def extract_p_rank(p):
 
 # --- VUE PERSONNALISÉE AVEC BOUTON REFRESH ET TIMEOUT ---
 class RankingPaginationView(PaginationView):
-    def __init__(self, embeds, refresh_callback, user_id, timeout=1800):  # 1800s = 30 minutes
+    def __init__(self, embeds, refresh_callback, user_id, timeout=3600):
         super().__init__(embeds)
         self.timeout = timeout
         self.refresh_callback = refresh_callback
         self.user_id = user_id
         self.message = None
 
-        btn = discord.ui.Button(label="🔄 Actualiser", style=discord.ButtonStyle.secondary, row=1)
+        btn = discord.ui.Button(
+            label="Actualiser",
+            style=discord.ButtonStyle.secondary,
+            row=1,
+            emoji=DICT_EMOJIS.get("e_refresh", "🔄"),
+            custom_id="btn_rank_refresh",
+        )
         btn.callback = self.refresh_action
         self.add_item(btn)
 
@@ -80,6 +87,9 @@ class RankingPaginationView(PaginationView):
                 self.index = new_page
             if hasattr(self, "update_buttons"):
                 self.update_buttons()
+
+            if not self.message:
+                self.message = interaction.message
             await interaction.edit_original_response(embed=self.embeds[new_page], view=self)
 
     async def on_timeout(self):
@@ -206,9 +216,6 @@ class ClassementCog(commands.Cog):
     classement = app_commands.Group(name="rank", description="Live event analysis and rankings")
 
     def get_league_title_and_level(self, rank):
-        """
-        Déduit le blason et les étoiles directement depuis le KLRID de l'API (Rang de 1 à 21).
-        """
         if rank > 21:
             rank = 21
 
@@ -287,13 +294,11 @@ class ClassementCog(commands.Cog):
                     name = info.get("N", "Inconnu")
                     alliance = info.get("AN", "Aucune")
 
-            # --- GESTION SPÉCIFIQUE DE LA LIGUE (CALCUL DES POINTS) ---
             league_str = ""
             if event_name == "league" and not is_alliance:
                 klmo = info.get("KLMO", [])
-                klrid = info.get("KLRID", 1)  # 💡 L'API nous donne le rang exact (1 à 21) !
+                klrid = info.get("KLRID", 1)
 
-                # 1. On calcule le VRAI score grâce au multiplicateur de médailles
                 MEDAL_VALUES = {1: 1000, 2: 950, 3: 850, 4: 700, 5: 500, 6: 300, 7: 100}
                 real_score = 0
                 if klmo:
@@ -313,13 +318,11 @@ class ClassementCog(commands.Cog):
                 display_name = f"**{name}**"
 
             if event_name == "league" and not is_alliance:
-                # 2. Calcul du Titre (Directement via le KLRID de l'API)
                 title_raw, level_raw = self.get_league_title_and_level(klrid)
                 title_emo = get_emo(langue, title_raw) if title_raw else ""
                 level_emo = get_emo(langue, level_raw) if level_raw else ""
                 titre_str = f"{title_emo}{level_emo}".strip()
 
-                # 3. Formatage des 3 Médailles basiques
                 medailles_str = ""
                 if klmo:
                     m_list = []
@@ -335,7 +338,6 @@ class ClassementCog(commands.Cog):
                 if combo:
                     league_str = f" | {combo}"
 
-            # --- ASSEMBLAGE DE LA LIGNE FINALE ---
             if is_alliance:
                 if event_name == "league":
                     description += f"{medal} {display_name}{league_str}\n"
@@ -417,7 +419,6 @@ class ClassementCog(commands.Cog):
             search_mode = bool(loc_player)
             p_info = None
 
-            # --- PRÉ-RECHERCHE ANTI-CRASH ---
             if search_mode:
                 headers = await get_api_headers(ctx_int)
                 url_precheck = (
@@ -447,7 +448,6 @@ class ClassementCog(commands.Cog):
                 lvl = 70
                 leg = 999
 
-            # --- DÉTERMINATION MULTI-TRANCHES ---
             if statistic in ["plunder", "legendary"]:
                 possible_lids = [1]
             else:
@@ -550,7 +550,7 @@ class ClassementCog(commands.Cog):
                         "ev_rank_empty",
                         tranche="Tranche requise",
                         ev=stat_info["name"],
-                        defaut="📭 Aucun classement.",
+                        defaut="{e_error} Aucun classement.",
                     )
                 )
                 return None, None
@@ -558,7 +558,6 @@ class ClassementCog(commands.Cog):
             found_lid = found_lid or possible_lids[-1]
             all_players_raw = accumulated_data[found_lid]
 
-            # --- DÉTERMINATION DU TITRE (POST-SCAN) ---
             bracket_icon = (
                 get_emo(langue, "{e_icon_points}")
                 if statistic in ["plunder", "legendary"]
@@ -637,7 +636,6 @@ class ClassementCog(commands.Cog):
 
             return embeds, page_cible
 
-        # Lancement initial de la commande
         embeds, page_cible = await fetch_and_build(interaction)
         if not embeds:
             return
@@ -714,7 +712,6 @@ class ClassementCog(commands.Cog):
             search_mode = bool(loc_player)
             p_info = None
 
-            # --- PRÉ-RECHERCHE ANTI-CRASH ---
             if search_mode:
                 headers = await get_api_headers(ctx_int)
                 url_precheck = (
@@ -744,7 +741,6 @@ class ClassementCog(commands.Cog):
                 lvl = 70
                 leg = 999
 
-            # --- DÉTERMINATION MULTI-TRANCHES ---
             if loc_tranche is not None:
                 possible_lids = [loc_tranche]
             else:
@@ -848,7 +844,7 @@ class ClassementCog(commands.Cog):
                         "ev_rank_empty",
                         tranche="Tranche requise",
                         ev=ev_info["name"],
-                        defaut="📭 Aucun classement.",
+                        defaut="{e_error} Aucun classement.",
                     )
                 )
                 return None, None
@@ -862,7 +858,6 @@ class ClassementCog(commands.Cog):
             else:
                 all_players_raw = accumulated_data[found_lid]
 
-            # --- DÉTERMINATION DU TITRE (POST-SCAN) ---
             mot_classement = t(langue, "ev_word_rank", defaut="Classement")
             if evenement == "berimond":
                 BERIMOND_DETAILS = {
@@ -985,37 +980,36 @@ class ClassementCog(commands.Cog):
             EVENT_MAP = {
                 "flora": {
                     "name": t(langue, "cal_ev_flora", defaut="Piège de la Flore Fatale"),
-                    "emoji": "<:FloraToken:1532427755671650465>",
+                    "emoji": DICT_EMOJIS.get("e_FloraToken", "<:FloraToken:1532427755671650465>"),
                 },
                 "snowglobe": {
                     "name": t(langue, "cal_ev_snowglobe", defaut="La Boule à Neige Enchantée"),
-                    "emoji": "<:FrozenCarrot:1532428873768374382>",
+                    "emoji": DICT_EMOJIS.get("e_FrozenCarrot", "<:FrozenCarrot:1532428873768374382>"),
                 },
                 "hollowmoon": {
                     "name": t(langue, "cal_ev_hollowmoon", defaut="Invocation de Lune"),
-                    "emoji": "<:Moonegg:1532428876876091573>",
+                    "emoji": DICT_EMOJIS.get("e_Moonegg", "<:Moonegg:1532428876876091573>"),
                 },
                 "sandfortune": {
                     "name": t(langue, "cal_ev_sandfortune", defaut="Sables de Fortune"),
-                    "emoji": "<:Orange:1532428875424989246>",
+                    "emoji": DICT_EMOJIS.get("e_Orange", "<:Orange:1532428875424989246>"),
                 },
                 "banquet": {
                     "name": t(langue, "cal_ev_banquet", defaut="Banquet du Roi"),
-                    "emoji": "<:Cake:1532428872639971380>",
+                    "emoji": DICT_EMOJIS.get("e_Cake", "<:Cake:1532428872639971380>"),
                 },
                 "midnight": {
                     "name": t(langue, "cal_ev_midnight", defaut="Marché de Minuit"),
-                    "emoji": "<:Midnight_key:1532429792413089835>",
+                    "emoji": DICT_EMOJIS.get("e_Midnight_key", "<:Midnight_key:1532429792413089835>"),
                 },
             }
             ev_info = EVENT_MAP.get(
-                evenement, {"name": evenement.capitalize(), "emoji": "<:gacha_currency:1532431673830932612>"}
+                evenement, {"name": evenement.capitalize(), "emoji": DICT_EMOJIS.get("e_gacha_currency", "🪙")}
             )
 
             search_mode = bool(loc_player)
             p_info = None
 
-            # --- PRÉ-RECHERCHE ANTI-CRASH ---
             if search_mode:
                 headers = await get_api_headers(ctx_int)
                 url_precheck = (
@@ -1106,13 +1100,18 @@ class ClassementCog(commands.Cog):
             has_any_data = any(len(data) > 0 for data in accumulated_data.values())
             if not has_any_data:
                 await ctx_int.followup.send(
-                    t(langue, "ev_rank_empty", tranche="Global", ev=ev_info["name"], defaut="📭 Aucun classement.")
+                    t(
+                        langue,
+                        "ev_rank_empty",
+                        tranche="Global",
+                        ev=ev_info["name"],
+                        defaut="{e_error} Aucun classement.",
+                    )
                 )
                 return None, None
 
             all_players_raw = accumulated_data[1]
 
-            # --- DÉTERMINATION DU TITRE (POST-SCAN) ---
             nom_tranche = t(langue, "ev_bracket_all", defaut="Classement Global")
             mot_classement = t(langue, "ev_word_rank", defaut="Classement")
             bracket_icon = get_emo(langue, "{e_icon_points}")
@@ -1239,7 +1238,7 @@ class ClassementCog(commands.Cog):
                 },
             }
             ev_info = EVENT_MAP.get(
-                evenement, {"name": evenement.capitalize(), "emoji": "<:events4:1532431480398286878>"}
+                evenement, {"name": evenement.capitalize(), "emoji": DICT_EMOJIS.get("e_events4", "🛡️")}
             )
 
             search_mode = bool(loc_player)
@@ -1247,7 +1246,6 @@ class ClassementCog(commands.Cog):
             target_name_exact = f"{loc_player}_{suffixe}".lower() if search_mode else ""
             p_info = None
 
-            # --- PRÉ-RECHERCHE ANTI-CRASH ---
             if search_mode:
                 headers = await get_api_headers(ctx_int)
                 url_precheck = (
@@ -1348,14 +1346,13 @@ class ClassementCog(commands.Cog):
                         "ev_rank_empty",
                         tranche="Inter-Serveurs",
                         ev=ev_info["name"],
-                        defaut="📭 Aucun classement.",
+                        defaut="{e_error} Aucun classement.",
                     )
                 )
                 return None, None
 
             all_players_raw = accumulated_data[1]
 
-            # --- DÉTERMINATION DU TITRE (POST-SCAN) ---
             nom_tranche = t(langue, "ev_bracket_cross_server", defaut="Classement Inter-Serveurs")
             mot_classement = t(langue, "ev_word_rank", defaut="Classement")
             bracket_icon = get_emo(langue, "{e_icon_points}")
@@ -1473,13 +1470,12 @@ class ClassementCog(commands.Cog):
                 },
             }
             ev_info = EVENT_MAP.get(
-                evenement, {"name": evenement.capitalize(), "emoji": "<:leagueicon:1532432050231972030>"}
+                evenement, {"name": evenement.capitalize(), "emoji": DICT_EMOJIS.get("e_leagueicon", "🛡️")}
             )
 
             search_mode = bool(loc_player)
             p_info = None
 
-            # --- PRÉ-RECHERCHE ANTI-CRASH ---
             if search_mode:
                 headers = await get_api_headers(ctx_int)
                 url_precheck = (
@@ -1509,7 +1505,6 @@ class ClassementCog(commands.Cog):
                 lvl = 70
                 leg = 999
 
-            # --- DÉTERMINATION MULTI-TRANCHES ---
             api_command = "hgh"
             pagination_param = "SV"
             is_string_val = True
@@ -1526,7 +1521,7 @@ class ClassementCog(commands.Cog):
                         t(
                             langue,
                             "ev_err_season_level",
-                            defaut="❌ Classement de saison indisponible avant le niveau 70.",
+                            defaut="{e_error} Classement de saison indisponible avant le niveau 70.",
                         )
                     )
                     return None, None
@@ -1630,7 +1625,7 @@ class ClassementCog(commands.Cog):
                         "ev_rank_empty",
                         tranche="Tranche requise",
                         ev=ev_info["name"],
-                        defaut="📭 Aucun classement.",
+                        defaut="{e_error} Aucun classement.",
                     )
                 )
                 return None, None
@@ -1638,7 +1633,6 @@ class ClassementCog(commands.Cog):
             found_lid = found_lid or possible_lids[-1]
             all_players_raw = accumulated_data[found_lid]
 
-            # --- DÉTERMINATION DU TITRE (POST-SCAN) ---
             if evenement == "league":
                 nom_tranche = t(langue, "ev_bracket_all", defaut="Classement Global")
             elif evenement == "season":
@@ -1727,6 +1721,9 @@ class ClassementCog(commands.Cog):
 
         view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
 
+    # ==========================================
+    # LA FAMEUSE COMMANDE CONTESTS OUBLIÉE
+    # ==========================================
     @classement.command(name="contests", description="Displays a ranking for specific contests")
     @app_commands.describe(
         evenement="Événement", player="Pseudo (Optionnel)", rank="Rang (Optionnel)", tranche="Tranche (Optionnel)"
@@ -1760,7 +1757,10 @@ class ClassementCog(commands.Cog):
             event_id = self.event_ids.get(evenement, 60)
 
             EVENT_MAP = {
-                "shapeshifters": {"name": t(langue, "cal_ev_shape", defaut="Les Métamorphes"), "emoji": "👹"},
+                "shapeshifters": {
+                    "name": t(langue, "cal_ev_shape", defaut="Les Métamorphes"),
+                    "emoji": DICT_EMOJIS.get("e_shapeshifter", "👹"),
+                },
                 "nobility": {
                     "name": t(langue, "cal_ev_nobility", defaut="Concours de Noblesse"),
                     "emoji": get_emo(langue, "{e_std_crown}"),
@@ -1769,14 +1769,18 @@ class ClassementCog(commands.Cog):
                     "name": t(langue, "cal_ev_woa", defaut="Guerre des Alliances"),
                     "emoji": get_emo(langue, "{e_woa_points}"),
                 },
-                "patronage": {"name": t(langue, "cal_ev_patronage", defaut="Patronage"), "emoji": "🪙"},
+                "patronage": {
+                    "name": t(langue, "cal_ev_patronage", defaut="Patronage"),
+                    "emoji": DICT_EMOJIS.get("e_patronage", "🪙"),
+                },
             }
-            ev_info = EVENT_MAP.get(evenement, {"name": evenement.capitalize(), "emoji": "🏆"})
+            ev_info = EVENT_MAP.get(
+                evenement, {"name": evenement.capitalize(), "emoji": DICT_EMOJIS.get("e_events4", "🏆")}
+            )
 
             search_mode = bool(loc_player)
             p_info = None
 
-            # --- PRÉ-RECHERCHE ANTI-CRASH ---
             if search_mode:
                 headers = await get_api_headers(ctx_int)
                 url_precheck = (
@@ -1806,7 +1810,6 @@ class ClassementCog(commands.Cog):
                 lvl = 70
                 leg = 999
 
-            # --- DÉTERMINATION MULTI-TRANCHES ---
             if evenement in ["woa", "patronage"]:
                 possible_lids = [1]
             elif evenement == "shapeshifters":
@@ -1927,7 +1930,7 @@ class ClassementCog(commands.Cog):
                         "ev_rank_empty",
                         tranche="Tranche requise",
                         ev=ev_info["name"],
-                        defaut="📭 Aucun classement.",
+                        defaut="{e_error} Aucun classement.",
                     )
                 )
                 return None, None
@@ -1935,7 +1938,6 @@ class ClassementCog(commands.Cog):
             found_lid = found_lid or possible_lids[-1]
             all_players_raw = accumulated_data[found_lid]
 
-            # --- DÉTERMINATION DU TITRE (POST-SCAN) ---
             bracket_icon = get_emo(langue, "{e_icon_points}")
             if evenement in ["woa", "patronage"]:
                 nom_tranche = t(langue, "ev_bracket_all", defaut="Classement Global")
@@ -1974,6 +1976,7 @@ class ClassementCog(commands.Cog):
                         page_cible = i
                         break
 
+            warning_msg = ""
             if search_mode and not player_found:
                 if loc_rank:
                     warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé. Voici le rang {loc_rank} à la place.*"
@@ -1981,12 +1984,16 @@ class ClassementCog(commands.Cog):
                     warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé dans le Top {max_sv_limit}. Voici la première page par défaut.*"
                     page_cible = 0
 
-            if evenement == "shapeshifters":
-                embed_color = discord.Color(0x2B211C)
-            elif evenement == "nobility":
-                embed_color = discord.Color(0xFFBF5B)
-            elif evenement == "woa":
-                embed_color = discord.Color(0x512DA8)
+            if evenement == "flora":
+                embed_color = discord.Color(0x81C24A)
+            elif evenement == "snowglobe":
+                embed_color = discord.Color(0xFFFFFF)
+            elif evenement == "hollowmoon":
+                embed_color = discord.Color(0xFF8D00)
+            elif evenement == "sandfortune":
+                embed_color = discord.Color(0xFFE29C)
+            elif evenement == "midnight":
+                embed_color = discord.Color(0x282442)
             else:
                 embed_color = discord.Color.gold()
 
@@ -2068,7 +2075,7 @@ class ClassementCog(commands.Cog):
                 },
                 "alliance_command": {
                     "name": t(langue, "cal_stat_command", defaut="Points de Commandement"),
-                    "emoji": "🛡️",
+                    "emoji": DICT_EMOJIS.get("e_alliance_icon", "🛡️"),
                     "color": discord.Color(0xAFAFAF),
                 },
                 "alliance_cargo": {

@@ -31,15 +31,24 @@ logger = logging.getLogger("GGE_Bot")
 
 class HistoriqueView(discord.ui.View):
     def __init__(self, embeds_dict, interaction: discord.Interaction, langue: str = "fr"):
-        super().__init__(timeout=900)
+        super().__init__(timeout=3600)
         self.embeds_dict = embeds_dict
         self.interaction = interaction
         self.message = None
         self.langue = langue
 
         self.btn_pseudo.label = t(langue, "prof_hist_btn_pseudos", defaut="Pseudos")
+        self.btn_pseudo.emoji = DICT_EMOJIS.get("e_listitem", "📝")
+
         self.btn_alliance.label = t(langue, "prof_hist_btn_alliances", defaut="Alliances")
+        self.btn_alliance.emoji = DICT_EMOJIS.get("e_alliance_icon", "🛡️")
+
         self.btn_position.label = t(langue, "prof_hist_btn_mouvements", defaut="Mouvements")
+        # Fallback sur e_compass s'il te manque e_moove dans ton DICT_EMOJIS
+        self.btn_position.emoji = DICT_EMOJIS.get("e_moove", DICT_EMOJIS.get("e_compass", "📍"))
+
+        self.btn_prev.emoji = DICT_EMOJIS.get("e_last", "⏮️")
+        self.btn_next.emoji = DICT_EMOJIS.get("e_next", "⏭️")
 
         self.current_cat = "pseudo"
         self.current_page = 0
@@ -70,6 +79,8 @@ class HistoriqueView(discord.ui.View):
         self.current_cat = cat
         self.current_page = 0
         self._update_navigation()
+        if not self.message:
+            self.message = interaction.message
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][0], view=self)
 
     async def on_timeout(self):
@@ -81,26 +92,30 @@ class HistoriqueView(discord.ui.View):
             except discord.HTTPException:
                 pass
 
-    @discord.ui.button(emoji="<:listitem:1512573892596858960>", row=0)
+    @discord.ui.button(row=0)
     async def btn_pseudo(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "pseudo")
 
-    @discord.ui.button(emoji="<:icon_alliance:1512573872774451210>", row=0)
+    @discord.ui.button(row=0)
     async def btn_alliance(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "alliance")
 
-    @discord.ui.button(emoji="<:moove:1512574624112578580>", row=0)
+    @discord.ui.button(row=0)
     async def btn_position(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._switch_category(interaction, "position")
 
-    @discord.ui.button(emoji="<:lastpage:1533554126984581283>", style=discord.ButtonStyle.blurple, row=1)
+    @discord.ui.button(style=discord.ButtonStyle.blurple, row=1)
     async def btn_prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = max(0, self.current_page - 1)
+        if not self.message:
+            self.message = interaction.message
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][self.current_page], view=self)
 
-    @discord.ui.button(emoji="<:nextpage:1533554128230420590>", style=discord.ButtonStyle.blurple, row=1)
+    @discord.ui.button(style=discord.ButtonStyle.blurple, row=1)
     async def btn_next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = min(len(self.embeds_dict[self.current_cat]) - 1, self.current_page + 1)
+        if not self.message:
+            self.message = interaction.message
         await interaction.response.edit_message(embed=self.embeds_dict[self.current_cat][self.current_page], view=self)
 
 
@@ -118,7 +133,7 @@ class ProfilsCog(commands.Cog):
         self.clr_historique = discord.Color.from_rgb(200, 183, 216)
         self.clr_colombe = discord.Color.from_rgb(160, 146, 172)
         self.clr_compare_j = discord.Color.from_rgb(112, 102, 120)
-        # Green for lliance group
+        # Green for alliance group
         self.clr_alliance = discord.Color.from_rgb(129, 186, 39)
         self.clr_alliance_pp = discord.Color.from_rgb(116, 167, 35)
         self.clr_alliance_property = discord.Color.from_rgb(92, 133, 28)
@@ -136,9 +151,6 @@ class ProfilsCog(commands.Cog):
         headers = await get_api_headers(custom_server=serveur)
         session = self.bot.session
 
-        # ----------------------------------------------------
-        # 1. RÉCUPÉRATION DES DONNÉES LOCALES & API
-        # ----------------------------------------------------
         local_data = {}
         try:
             scan_dir = BASE_DATA_PATH / "server_scans" / serveur
@@ -159,9 +171,9 @@ class ProfilsCog(commands.Cog):
                 if r.status == 200:
                     data = await r.json()
                     if isinstance(data, list) and len(data) > 0:
-                        api_current = data[-1]  # Le VRAI plus récent (à la fin de la liste)
+                        api_current = data[-1]
                         if len(data) > 1:
-                            api_previous = data[-2]  # L'avant-dernier pour la comparaison
+                            api_previous = data[-2]
                     elif isinstance(data, dict):
                         api_current = data
         except Exception as e:
@@ -175,9 +187,6 @@ class ProfilsCog(commands.Cog):
             )
             return await interaction.followup.send(err_msg)
 
-        # ----------------------------------------------------
-        # 2. EXTRACTION ET COMPARAISON
-        # ----------------------------------------------------
         def fmt(n):
             if n is None:
                 return "0"
@@ -191,7 +200,6 @@ class ProfilsCog(commands.Cog):
                 return float(api_current[key]) - float(api_previous[key])
             return 0
 
-        # 👉 Utilisation du dictionnaire d'émojis en direct
         e_up = DICT_EMOJIS.get("e_std_chart_increasing", "📈")
         e_down = DICT_EMOJIS.get("e_std_chart_decreasing", "📉")
 
@@ -203,7 +211,6 @@ class ProfilsCog(commands.Cog):
             else:
                 return f" {e_down} (`{fmt(val)}`)"
 
-        # Démographie
         p_count = get_val("players_count")
         a_count = get_val("alliance_count") or get_val("total_alliances")
         p_peace = get_val("players_in_peace")
@@ -214,7 +221,6 @@ class ProfilsCog(commands.Cog):
         a_count_var = format_var(get_diff("alliance_count"))
         p_peace_var = format_var(get_diff("players_in_peace"))
 
-        # Niveau Moyen (Logique Légendaire 70/X)
         avg_lvl_raw = get_val("avg_level")
         avg_lvl = f"70/{int(avg_lvl_raw) - 70}" if avg_lvl_raw > 70 else str(int(avg_lvl_raw))
 
@@ -227,26 +233,22 @@ class ProfilsCog(commands.Cog):
             else ""
         )
 
-        # Puissance
         t_might = get_val("total_might")
         a_might = get_val("avg_might")
         m_might = get_val("max_might")
         v_might_str = format_var(get_diff("total_might"))
 
-        # Butin
         t_loot = get_val("total_loot")
         a_loot = get_val("avg_loot")
         m_loot = get_val("max_loot")
         v_loot_str = format_var(get_diff("total_loot"))
 
-        # Honneur
         t_honor = get_val("total_honor")
         a_honor = get_val("avg_honor")
         v_honor_str = format_var(get_diff("total_honor"))
 
-        # Date de mise à jour (Priorité absolue à l'API)
         created_at_raw = api_current.get("created_at") or local_data.get("scan_date")
-        timestamp_str = "Récemment"
+        timestamp_str = t(langue, "rad_time_recent", defaut="Récemment")
         if created_at_raw:
             try:
                 dt = datetime.fromisoformat(str(created_at_raw).replace("Z", "+00:00"))
@@ -254,9 +256,6 @@ class ProfilsCog(commands.Cog):
             except:
                 pass
 
-        # ----------------------------------------------------
-        # 3. CONSTRUCTION DE L'EMBED
-        # ----------------------------------------------------
         titre = t(
             langue, "server_title", serv=serveur.upper(), defaut="{e_icon_world} Statistiques Globales - Serveur {serv}"
         )
@@ -264,7 +263,6 @@ class ProfilsCog(commands.Cog):
 
         embed = discord.Embed(title=titre, description=desc, color=self.clr_server)
 
-        # RANGÉE 1 : Démographie
         lbl_demo_title = t(langue, "server_demo_title", defaut="{e_players} Démographie")
         lbl_demo_val = t(
             langue,
@@ -290,7 +288,6 @@ class ProfilsCog(commands.Cog):
         )
         embed.add_field(name=lbl_demo_title, value=lbl_demo_val, inline=False)
 
-        # RANGÉE 2 : Puissance, Honneur, Butin
         lbl_might_title = t(langue, "server_might_title", defaut="{e_pp1} Puissance")
         lbl_might_val = t(
             langue,
@@ -351,16 +348,14 @@ class ProfilsCog(commands.Cog):
                     langue,
                     "error_player_not_found",
                     joueur=player,
-                    defaut=f"<:error:1512505075220611172> Joueur **{player}** introuvable.",
+                    defaut="{e_error} Joueur **{joueur}** introuvable.",
                 )
                 await interaction.followup.send(msg)
                 return
 
             data = full_json.get("parsed_data", {})
             if not data:
-                await interaction.followup.send(
-                    t(langue, "prof_err_empty_data", defaut="<:error:1512505075220611172> Données vides.")
-                )
+                await interaction.followup.send(t(langue, "prof_err_empty_data", defaut="{e_error} Données vides."))
                 return
 
             main_pts = int(data.get("main_points", 0))
@@ -376,7 +371,9 @@ class ProfilsCog(commands.Cog):
                 try:
                     dt_peace = datetime.fromisoformat(peace.replace("Z", "+00:00"))
                     if dt_peace > discord.utils.utcnow():
-                        txt_colombe = f"\n<:peace:1512503935892586566> **Colombe** : <t:{int(dt_peace.timestamp())}:R>"
+                        txt_colombe = (
+                            f"\n{DICT_EMOJIS.get('e_peace', '🕊️')} **Colombe** : <t:{int(dt_peace.timestamp())}:R>"
+                        )
                 except:
                     pass
 
@@ -409,15 +406,15 @@ class ProfilsCog(commands.Cog):
 
             outposts = data.get("outposts", [])
             type_emojis = {
-                1: "<:castle1:1512573817892110647>",
-                3: "<:castle3:1512573819313979544>",
-                4: "<:castle4:1512573820752498839>",
-                10: "<:date:1512573832375042340>",
-                12: "<:castle12:1521949211850182686>",
-                22: "<:castle22:1512573821520183347>",
-                23: "<:castle23:1512573823118086174>",
-                24: "<:aquamarine_16:1512573724786950346>",
-                26: "<:castle26:1512573824086835280>",
+                1: DICT_EMOJIS.get("e_castle1", "<:castle1:1512573817892110647>"),
+                3: DICT_EMOJIS.get("e_castle3", "<:castle3:1512573819313979544>"),
+                4: DICT_EMOJIS.get("e_castle4", "<:castle4:1512573820752498839>"),
+                10: DICT_EMOJIS.get("e_date", "<:date:1512573832375042340>"),
+                12: DICT_EMOJIS.get("e_castle12", "<:castle12:1521949211850182686>"),
+                22: DICT_EMOJIS.get("e_castle22", "<:castle22:1512573821520183347>"),
+                23: DICT_EMOJIS.get("e_castle23", "<:castle23:1512573823118086174>"),
+                24: DICT_EMOJIS.get("e_aquamarine_16", "<:aquamarine_16:1512573724786950346>"),
+                26: DICT_EMOJIS.get("e_castle26", "<:castle26:1512573824086835280>"),
             }
             sort_priority = {1: 0, 4: 1, 12: 2, 3: 3, 22: 4, 23: 5, 24: 7, 26: 6}
 
@@ -433,18 +430,15 @@ class ProfilsCog(commands.Cog):
                 langue,
                 "prof_joueur_title",
                 n=data.get("name", player),
-                defaut=f"<:players:1512504277392953426> Profil de {data.get('name', player)}",
+                defaut="{e_players} Profil de {n}",
             )
             embed = discord.Embed(title=embed_title, color=self.clr_joueur)
-
             embed.description = f"{lbl_date} <t:{ts}:F> (<t:{ts}:R>)"
 
-            info_title = t(
-                langue, "prof_info_title", defaut="<:Information:1533430015264555099> Informations Générales"
-            )
+            info_title = t(langue, "prof_info_title", defaut="{e_information} Informations Générales")
             unk_id = t(langue, "prof_unknown", defaut="Inconnu")
 
-            status_txt = t(langue, "prof_status_combat", defaut="⚔️ **Statut :** Attaque possible")
+            status_txt = t(langue, "prof_status_combat", defaut="{e_std_crossed_swords} **Statut :** Attaque possible")
             if peace and peace != "null":
                 try:
                     dt_peace = datetime.fromisoformat(peace.replace("Z", "+00:00"))
@@ -454,7 +448,7 @@ class ProfilsCog(commands.Cog):
                             langue,
                             "prof_status_peace",
                             tp=ts_peace,
-                            defaut=f"<:peace:1512503935892586566> **Colombe :** Jusqu'au <t:{ts_peace}:R> (<t:{ts_peace}:t>)",
+                            defaut="{e_peace} **Colombe :** Jusqu'au <t:{tp}:R> (<t:{tp}:t>)",
                         )
                 except:
                     pass
@@ -466,15 +460,11 @@ class ProfilsCog(commands.Cog):
                 leg=data.get("legendary_level", 0),
                 pid=data.get("player_id", unk_id),
                 status=status_txt,
-                defaut=(
-                    f"<:lvl:1512571152524906596> **Niveau :** {data.get('level', 0)} (Lég. {data.get('legendary_level', 0)})\n"
-                    f"<:listitem:1512573892596858960> **ID Joueur :** `{data.get('player_id', unk_id)}`\n"
-                    f"{status_txt}"
-                ),
+                defaut=("{e_lvl} **Niveau :** {lvl} (Lég. {leg})\n{e_listitem} **ID Joueur :** `{pid}`\n{status}"),
             )
             embed.add_field(name=info_title, value=info_val, inline=True)
 
-            rank_title = t(langue, "prof_rank_title", defaut="<:empirerankings:1512574698301423847> Statistiques")
+            rank_title = t(langue, "prof_rank_title", defaut="{e_empirerankings} Statistiques")
 
             m_curr = f"{main_pts:,}".replace(",", " ")
             m_max = f"{might_all_time:,}".replace(",", " ")
@@ -493,15 +483,15 @@ class ProfilsCog(commands.Cog):
                 l_curr=l_curr,
                 l_max=l_max,
                 defaut=(
-                    f"<:might:1512574615422107818> **Puissance :** {m_curr} (Max: `{m_max}`)\n"
-                    f"<:honor2:1512573861521260544> **Honneur :** {h_curr} (Max: `{h_max}`)\n"
-                    f"<:loot:1512439015570276553> **Pillage :** {l_curr} (Max: `{l_max}`)"
+                    "{e_pp1} **Puissance :** {m_curr} (Max: `{m_max}`)\n"
+                    "{e_honor} **Honneur :** {h_curr} (Max: `{h_max}`)\n"
+                    "{e_loot} **Pillage :** {l_curr} (Max: `{l_max}`)"
                 ),
             )
 
             embed.add_field(name=rank_title, value=rank_desc, inline=True)
 
-            alli_title = t(langue, "prof_alli_title", defaut="<:alliance_icon:1512574688415580242> Alliance")
+            alli_title = t(langue, "prof_alli_title", defaut="{e_alliance_icon} Alliance")
             embed.add_field(name=alli_title, value=f"{alliance_display}", inline=False)
 
             if outposts:
@@ -521,7 +511,7 @@ class ProfilsCog(commands.Cog):
                             langue,
                             "prof_pos_others",
                             count=(len(outposts) - 10),
-                            defaut=f"*... et {len(outposts) - 10} autres positions.*\n",
+                            defaut="*... et {count} autres positions.*\n",
                         )
                         + "\n"
                     )
@@ -530,7 +520,7 @@ class ProfilsCog(commands.Cog):
                     langue,
                     "prof_pos_title",
                     count=len(outposts),
-                    defaut=f"<:compass:1512504625364729987> Positions ({len(outposts)})",
+                    defaut="{e_compass} Positions ({count})",
                 )
                 embed.add_field(name=pos_title, value=coords_txt[:1024], inline=False)
 
@@ -550,11 +540,11 @@ class ProfilsCog(commands.Cog):
                     vp=v_pic,
                     ve=v_emp,
                     vo=v_orage,
-                    defaut=f"<:dungeon2:1512573843267518546> Glace: **{v_glace}** | <:dungeon1:1512573842277794062> Sables: **{v_sable}** | <:dungeon3:1512573844538396692> Pics: **{v_pic}**",
+                    defaut="{e_dungeon2} Glace: **{vg}** | {e_dungeon1} Sables: **{vs}** | {e_dungeon3} Pics: **{vp}**",
                 )
                 v_coords = "\n".join(
                     [
-                        f"<:date:1512573832375042340> VR ({v['world_label']}) ➔ `{v['coords_x']}:{v['coords_y']}`"
+                        f"{DICT_EMOJIS.get('e_date', '📅')} VR ({v['world_label']}) ➔ `{v['coords_x']}:{v['coords_y']}`"
                         for v in current_vassals[:5]
                     ]
                 )
@@ -563,7 +553,7 @@ class ProfilsCog(commands.Cog):
                     langue,
                     "prof_vr_title",
                     count=len(current_vassals),
-                    defaut=f"<:date:1512573832375042340> Villages à Ressources ({len(current_vassals)})",
+                    defaut="{e_date} Villages à Ressources ({count})",
                 )
                 embed.add_field(name=vr_title, value=f"{v_txt}\n\n{v_coords}"[:1024], inline=False)
 
@@ -572,12 +562,10 @@ class ProfilsCog(commands.Cog):
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
         except Exception as e:
-            import traceback
-
             logger.error(f"❌ [Profils - Joueur] Erreur fatale : {traceback.format_exc()}")
             try:
                 await interaction.followup.send(
-                    t(langue, "prof_err_internal", defaut="<:error:1512505075220611172> Erreur système interne.")
+                    t(langue, "prof_err_internal", defaut="{e_error} Erreur système interne.")
                 )
             except:
                 pass
@@ -590,7 +578,6 @@ class ProfilsCog(commands.Cog):
     ):
         headers = await get_api_headers(interaction)
         serveur = headers.get("gge-server", "E4K_FR1")
-
         api_url = "https://api.gge-tracker.com/api/v1"
 
         castle_types = {
@@ -614,17 +601,15 @@ class ProfilsCog(commands.Cog):
         }
 
         world_emojis = {
-            0: "<:dungeon0:1512573840704671775>",
-            1: "<:dungeon1:1512573842277794062>",
-            2: "<:dungeon2:1512573843267518546>",
-            3: "<:dungeon3:1512573844538396692>",
-            4: "<:dungeon4:1512573845737963722>",
+            0: DICT_EMOJIS.get("e_dungeon0", "<:dungeon0:1512573840704671775>"),
+            1: DICT_EMOJIS.get("e_dungeon1", "<:dungeon1:1512573842277794062>"),
+            2: DICT_EMOJIS.get("e_dungeon2", "<:dungeon2:1512573843267518546>"),
+            3: DICT_EMOJIS.get("e_dungeon3", "<:dungeon3:1512573844538396692>"),
+            4: DICT_EMOJIS.get("e_dungeon4", "<:dungeon4:1512573845737963722>"),
         }
 
         txt_unk_world = t(langue, "prof_world_unknown", defaut="Monde inconnu")
         txt_unk_castle = t(langue, "prof_castle_unknown", defaut="Type inconnu")
-
-        from urllib.parse import quote
 
         safe_name = quote(str(player_name))
         search_url = f"{api_url}/players/{safe_name}"
@@ -677,7 +662,7 @@ class ProfilsCog(commands.Cog):
 
                                             if c_name:
                                                 return (int(cx), int(cy)), c_name
-                                except Exception as e:
+                                except Exception:
                                     pass
                                 return None, None
 
@@ -816,9 +801,7 @@ class ProfilsCog(commands.Cog):
             pass
 
         if not p_id:
-            await interaction.followup.send(
-                t(langue, "prof_hist_err_id", j=player, defaut="<:error:1512505075220611172> ID introuvable.")
-            )
+            await interaction.followup.send(t(langue, "prof_hist_err_id", j=player, defaut="{e_error} ID introuvable."))
             return
 
         headers = await get_api_headers(interaction)
@@ -856,19 +839,19 @@ class ProfilsCog(commands.Cog):
             {
                 "key": "pseudo",
                 "title": t(langue, "prof_hist_cat_pseudo", defaut="Historique des Pseudos"),
-                "emoji": "<:listitem:1512573892596858960>",
+                "emoji": DICT_EMOJIS.get("e_listitem", "📝"),
                 "json_key": "updates",
             },
             {
                 "key": "alliance",
                 "title": t(langue, "prof_hist_cat_alliance", defaut="Historique des Alliances"),
-                "emoji": "<:alliance_icon:1512574688415580242>",
+                "emoji": DICT_EMOJIS.get("e_alliance_icon", "🛡️"),
                 "json_key": "updates",
             },
             {
                 "key": "position",
                 "title": t(langue, "prof_hist_cat_position", defaut="Historique des Positions"),
-                "emoji": "<:compass:1512504625364729987>",
+                "emoji": DICT_EMOJIS.get("e_moove", DICT_EMOJIS.get("e_compass", "📍")),
                 "json_key": "movements",
             },
         ]
@@ -887,6 +870,10 @@ class ProfilsCog(commands.Cog):
         lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
         str_date_header = f"{lbl_date} <t:{ts_act}:F> (<t:{ts_act}:R>)\n\n"
 
+        e_members_ic = DICT_EMOJIS.get("e_members", "👥")
+        e_alli_ic = DICT_EMOJIS.get("e_icon_alliance", "🛡️")
+        e_moove_ic = DICT_EMOJIS.get("e_moove", "🚚")
+
         for cat in categories:
             lines = []
             raw_data = results.get(cat["key"], {}).get(cat["json_key"], [])
@@ -896,15 +883,15 @@ class ProfilsCog(commands.Cog):
                 if cat["key"] == "pseudo":
                     old = item.get("old_player_name") or unk_val
                     new = item.get("new_player_name") or unk_val
-                    lines.append(f"<:members:1512573912305766652> {d} : ~~{old}~~ ➔ **{new}**")
+                    lines.append(f"{e_members_ic} {d} : ~~{old}~~ ➔ **{new}**")
                 elif cat["key"] == "alliance":
                     old = item.get("old_alliance_name") or no_alli_val
                     new = item.get("new_alliance_name") or no_alli_val
-                    lines.append(f"<:icon_alliance:1512573872774451210> {d} : *{old}* ➔ **{new}**")
+                    lines.append(f"{e_alli_ic} {d} : *{old}* ➔ **{new}**")
                 elif cat["key"] == "position":
                     x_old, y_old = item.get("position_x_old"), item.get("position_y_old")
                     x_new, y_new = item.get("position_x_new"), item.get("position_y_new")
-                    lines.append(f"<:moove:1512574624112578580> {d} : `{x_old}:{y_old}` ➔ `{x_new}:{y_new}`")
+                    lines.append(f"{e_moove_ic} {d} : `{x_old}:{y_old}` ➔ `{x_new}:{y_new}`")
 
             if lines:
                 has_any_data = True
@@ -961,7 +948,7 @@ class ProfilsCog(commands.Cog):
 
         session = self.bot.session
         if not session:
-            return await interaction.followup.send(t(langue, "prof_pp_err_http", defaut="Erreur."))
+            return await interaction.followup.send(t(langue, "prof_pp_err_http", defaut="{e_error} Erreur."))
 
         try:
             async with session.get(url, headers=headers, timeout=5) as r:
@@ -970,13 +957,13 @@ class ProfilsCog(commands.Cog):
                     p_data = data[0] if isinstance(data, list) and data else data
                     if not p_data:
                         return await interaction.followup.send(
-                            t(langue, "prof_col_not_found", j=player, defaut="Joueur introuvable.")
+                            t(langue, "prof_col_not_found", j=player, defaut="{e_error} Joueur introuvable.")
                         )
 
                     peace_str = p_data.get("peace_disabled_at")
                     if not peace_str or peace_str == "null":
                         return await interaction.followup.send(
-                            t(langue, "prof_col_none", j=player, defaut="Aucune colombe.")
+                            t(langue, "prof_col_none", j=player, defaut="{e_information} Aucune colombe.")
                         )
 
                     dt_peace = datetime.fromisoformat(peace_str.replace("Z", "+00:00"))
@@ -985,7 +972,7 @@ class ProfilsCog(commands.Cog):
 
                     if dt_peace > maintenant:
                         embed = discord.Embed(
-                            title=t(langue, "prof_col_embed_title", defaut="Statut de la Colombe"),
+                            title=t(langue, "prof_col_embed_title", defaut="{e_peace} Statut de la Colombe"),
                             color=self.clr_colombe,
                         )
 
@@ -1007,15 +994,21 @@ class ProfilsCog(commands.Cog):
                         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
                     else:
                         await interaction.followup.send(
-                            t(langue, "prof_col_expired", j=player, ts=ts, defaut="La colombe a expiré.")
+                            t(
+                                langue,
+                                "prof_col_expired",
+                                j=player,
+                                ts=ts,
+                                defaut="{e_information} La colombe a expiré.",
+                            )
                         )
                         await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
                 else:
                     await interaction.followup.send(
-                        t(langue, "prof_col_err_api", j=player, s=r.status, defaut="Erreur API.")
+                        t(langue, "prof_col_err_api", j=player, s=r.status, defaut="{e_error} Erreur API.")
                     )
         except Exception:
-            await interaction.followup.send(t(langue, "prof_col_err_conn", defaut="Erreur."))
+            await interaction.followup.send(t(langue, "prof_col_err_conn", defaut="{e_error} Erreur de connexion."))
 
     # ========================================================
     # 🥊 COMMANDE : COMPARE (PLAYER)
@@ -1220,7 +1213,7 @@ class ProfilsCog(commands.Cog):
                 t(
                     langue,
                     "guerre_comp_err_load",
-                    defaut="<:error:1512505075220611172> Impossible de charger l'un des profils.",
+                    defaut="{e_error} Impossible de charger l'un des profils.",
                 )
             )
 
@@ -1271,7 +1264,7 @@ class ProfilsCog(commands.Cog):
                 f"• Métriques Militaires/Solo : `+1.0 pt` par supériorité brute.\n"
                 f"• Piliers Événementiels : `+0.25 pt` par moyenne glissante (3 éd.) supérieure.\n"
                 f"• États de Robustesse : `-1.0 pt` fixe par handicap actif (Feux ou Colombe).\n\n"
-                f"<:ranking:1512438311132729525> **Résultat :**\n"
+                f"{{e_empirerankings}} **Résultat :**\n"
                 f"🔵 **{p1['nom']}** (`{score1}🏆`) 🆚 🔴 **{p2['nom']}** (`{score2}🏆`)"
             ),
         )
@@ -1280,7 +1273,7 @@ class ProfilsCog(commands.Cog):
             title=t(
                 langue,
                 "guerre_comp_title",
-                defaut="<:icon_analyze:1512573874150314005> Analyse : Grille de Confrontation",
+                defaut="{e_icon_analyze} Analyse : Grille de Confrontation",
             ),
             color=self.clr_compare_j,
         )
@@ -1313,7 +1306,7 @@ class ProfilsCog(commands.Cog):
         lbl_pill_s = t(langue, "ev_short_pillage", defaut="Pillage/J")
         lbl_col_s = t(langue, "ev_short_colombe", defaut="Colombe")
 
-        lbl_f1 = t(langue, "guerre_comp_f1", defaut="<:players:1512504277392953426> Fiche d'Identité Générale")
+        lbl_f1 = t(langue, "guerre_comp_f1", defaut="{e_players} Fiche d'Identité Générale")
 
         embed.add_field(
             name=lbl_f1,
@@ -1321,21 +1314,21 @@ class ProfilsCog(commands.Cog):
             inline=False,
         )
 
-        lbl_f2 = t(langue, "guerre_comp_f2", defaut="<:2_:1512574740915818527> Axe Militaire & Robustesse")
+        lbl_f2 = t(langue, "guerre_comp_f2", defaut="{e_2_} Axe Militaire & Robustesse")
         embed.add_field(
             name=lbl_f2,
             value=f"```\n{build_row(lbl_puiss_s, format_num(p1['pp']), pp_1, format_num(p2['pp']), pp_2)}\n{build_row(lbl_inc_s, p1['feux_txt'], '', p2['feux_txt'], '')}\n```",
             inline=False,
         )
 
-        lbl_f3 = t(langue, "guerre_comp_f3", defaut="<:events4:1532431480398286878> Suivi des Événements (Moy. 3 éd.)")
+        lbl_f3 = t(langue, "guerre_comp_f3", defaut="{e_events4} Suivi des Événements (Moy. 3 éd.)")
         embed.add_field(
             name=lbl_f3,
             value=f"```\n{build_row(lbl_nomad_s, format_num(p1['event_averages']['nomades']), nom_1, format_num(p2['event_averages']['nomades']), nom_2)}\n{build_row(lbl_samou_s, format_num(p1['event_averages']['samourais']), sam_1, format_num(p2['event_averages']['samourais']), sam_2)}\n{build_row(lbl_corb_s, format_num(p1['event_averages']['corbeaux']), cor_1, format_num(p2['event_averages']['corbeaux']), cor_2)}\n{build_row(lbl_etr_s, format_num(p1['event_averages']['etrangers']), et_1, format_num(p2['event_averages']['etrangers']), et_2)}\n```",
             inline=False,
         )
 
-        lbl_f4 = t(langue, "guerre_comp_f4", defaut="<:icon_points:1512502439339888820> Activité & Vigilance")
+        lbl_f4 = t(langue, "guerre_comp_f4", defaut="{e_icon_points} Activité & Vigilance")
         embed.add_field(
             name=lbl_f4,
             value=f"```\n{build_row(lbl_gloire_s, format_num(p1['gloire']), glr_1, format_num(p2['gloire']), glr_2)}\n{build_row(lbl_pill_s, format_num(p1['butin']), btn_1, format_num(p2['butin']), btn_2)}\n{build_row(lbl_col_s, p1['colombe_txt'], '', p2['colombe_txt'], '')}\n```",
@@ -1429,7 +1422,7 @@ class ProfilsCog(commands.Cog):
                             langue,
                             "prof_alli_not_found",
                             nom=alliance_name,
-                            defaut=f"<:error:1512505075220611172> Alliance **{alliance_name}** introuvable.",
+                            defaut="{e_error} Alliance **{nom}** introuvable.",
                         )
                     )
 
@@ -1473,7 +1466,7 @@ class ProfilsCog(commands.Cog):
                         langue,
                         "prof_alli_ghost",
                         alli=alliance_name,
-                        defaut=f"<:error:1512505075220611172> L'alliance **{alliance_name}** semble vide.",
+                        defaut="{e_error} L'alliance **{alli}** semble vide.",
                     )
                 )
 
@@ -1491,16 +1484,16 @@ class ProfilsCog(commands.Cog):
 
             embeds = []
             rank_emojis = {
-                0: "<:0_:1512574737677684818>",
-                1: "<:1_:1512574739208470640>",
-                2: "<:2_:1512574740915818527>",
-                3: "<:3_:1512574742245412874>",
-                4: "<:4_:1512574743369224303>",
-                5: "<:5_:1512574744501817515>",
-                6: "<:6_:1512574745617498172>",
-                7: "<:7_:1512574746989039839>",
-                8: "<:8_:1512574748356251691>",
-                9: "<:9_:1512574749430120519>",
+                0: DICT_EMOJIS.get("e_title_0", "<:0_:1512574737677684818>"),
+                1: DICT_EMOJIS.get("e_title_1", "<:1_:1512574739208470640>"),
+                2: DICT_EMOJIS.get("e_title_2", "<:2_:1512574740915818527>"),
+                3: DICT_EMOJIS.get("e_title_3", "<:3_:1512574742245412874>"),
+                4: DICT_EMOJIS.get("e_title_4", "<:4_:1512574743369224303>"),
+                5: DICT_EMOJIS.get("e_title_5", "<:5_:1512574744501817515>"),
+                6: DICT_EMOJIS.get("e_title_6", "<:6_:1512574745617498172>"),
+                7: DICT_EMOJIS.get("e_title_7", "<:7_:1512574746989039839>"),
+                8: DICT_EMOJIS.get("e_title_8", "<:8_:1512574748356251691>"),
+                9: DICT_EMOJIS.get("e_title_9", "<:9_:1512574749430120519>"),
             }
             chunk_size = 15
             nb_pages = max(1, (len(members) - 1) // chunk_size + 1)
@@ -1513,12 +1506,12 @@ class ProfilsCog(commands.Cog):
                     langue,
                     "prof_alli_embed_title",
                     a=alliance_name,
-                    defaut=f"<:alliance_icon:1512574688415580242> Alliance : {alliance_name}",
+                    defaut="{e_alliance_icon} Alliance : {a}",
                 )
                 embed = discord.Embed(title=embed_title, color=self.clr_alliance)
                 embed.description = str_date_header.strip()
 
-                info_title = t(langue, "prof_info_title", defaut="<:Information:1533430015264555099> Informations")
+                info_title = t(langue, "prof_info_title", defaut="{e_information} Informations")
                 info_desc = t(
                     langue,
                     "prof_alli_info_desc",
@@ -1529,9 +1522,7 @@ class ProfilsCog(commands.Cog):
                 )
                 embed.add_field(name=info_title, value=info_desc, inline=True)
 
-                stats_title = t(
-                    langue, "prof_alli_stats_title", defaut="<:stats:1512517930490003726> Statistiques Globales"
-                )
+                stats_title = t(langue, "prof_alli_stats_title", defaut="{e_stats} Statistiques Globales")
                 stats_desc = t(
                     langue,
                     "prof_alli_stats_desc",
@@ -1546,7 +1537,7 @@ class ProfilsCog(commands.Cog):
                 for m in chunk:
                     lvl = m.get("level", 0)
                     leg = m.get("leg_level", m.get("leg", 0))
-                    emoji = rank_emojis.get(int(m.get("rank", 9)), "<:players:1512504277392953426>")
+                    emoji = rank_emojis.get(int(m.get("rank", 9)), DICT_EMOJIS.get("e_players", "👤"))
                     memb_txt += f"{emoji} **{m.get('name', txt_unknown)}** ({lvl}/{leg}) ➔ {format_num(m.get('might', 0))} | {format_num(m.get('fame', 0))}\n"
 
                 memb_title = t(
@@ -1572,7 +1563,7 @@ class ProfilsCog(commands.Cog):
             logger.error(f"❌ [Profils - Alliance] Erreur fatale : {traceback.format_exc()}")
             try:
                 await interaction.followup.send(
-                    t(langue, "prof_alli_err_internal", defaut="<:error:1512505075220611172> Erreur système interne.")
+                    t(langue, "prof_alli_err_internal", defaut="{e_error} Erreur système interne.")
                 )
             except:
                 pass
@@ -1722,24 +1713,24 @@ class ProfilsCog(commands.Cog):
 
         session = self.bot.session
         if not session:
-            return await interaction.followup.send(t(langue, "prof_pp_err_http", defaut="Erreur connexion."))
+            return await interaction.followup.send(t(langue, "prof_pp_err_http", defaut="{e_error} Erreur connexion."))
 
         try:
             search_url = f"https://api.gge-tracker.com/api/v1/alliances/name/{safe_alliance}"
             async with session.get(search_url, headers=headers, timeout=10) as resp:
                 if resp.status != 200:
                     return await interaction.followup.send(
-                        t(langue, "prof_pp_err_not_found", defaut="Alliance introuvable.")
+                        t(langue, "prof_pp_err_not_found", defaut="{e_error} Alliance introuvable.")
                     )
                 data1 = await resp.json()
                 target = data1[0] if isinstance(data1, list) and data1 else data1
                 alliance_id = target.get("alliance_id") or target.get("id")
         except Exception:
-            return await interaction.followup.send(t(langue, "prof_pp_err_api", defaut="Erreur API."))
+            return await interaction.followup.send(t(langue, "prof_pp_err_api", defaut="{e_error} Erreur API."))
 
         if not alliance_id:
             return await interaction.followup.send(
-                t(langue, "prof_pp_err_alli_nf", a=alliance_name, defaut="Alliance introuvable.")
+                t(langue, "prof_pp_err_alli_nf", a=alliance_name, defaut="{e_error} Alliance introuvable.")
             )
 
         try:
@@ -1757,20 +1748,22 @@ class ProfilsCog(commands.Cog):
 
             res_stats, res_detail = await asyncio.gather(fetch_json(stats_url), fetch_json(detail_url))
             if not res_stats:
-                return await interaction.followup.send(t(langue, "prof_pp_err_dl", defaut="Téléchargement impossible."))
+                return await interaction.followup.send(
+                    t(langue, "prof_pp_err_dl", defaut="{e_error} Téléchargement impossible.")
+                )
 
             stats_data = res_stats
             detail_data = res_detail or {}
 
         except Exception:
             return await interaction.followup.send(
-                t(langue, "prof_pp_err_dl_stats", defaut="Téléchargement impossible.")
+                t(langue, "prof_pp_err_dl_stats", defaut="{e_error} Téléchargement impossible.")
             )
 
         might_history = stats_data.get("points", {}).get("player_might_history", [])
         if not might_history:
             return await interaction.followup.send(
-                t(langue, "prof_pp_no_hist", a=alliance_name, defaut="Aucun historique.")
+                t(langue, "prof_pp_no_hist", a=alliance_name, defaut="{e_information} Aucun historique.")
             )
 
         daily_data = {}
@@ -1794,7 +1787,7 @@ class ProfilsCog(commands.Cog):
 
         if not daily_data:
             return await interaction.followup.send(
-                t(langue, "prof_pp_no_data_days", a=alliance_name, j=days, defaut="Aucune donnée.")
+                t(langue, "prof_pp_no_data_days", a=alliance_name, j=days, defaut="{e_information} Aucune donnée.")
             )
 
         alliance_daily_might = {}
@@ -1912,7 +1905,7 @@ class ProfilsCog(commands.Cog):
                         langue,
                         "cmd_prop_not_found",
                         alliance_name=alliance_name,
-                        defaut=f"❌ Alliance **{alliance_name}** introuvable sur l'API.",
+                        defaut=f"{{e_error}} Alliance **{alliance_name}** introuvable sur l'API.",
                     )
                 )
             data = await r.json()
@@ -1922,7 +1915,7 @@ class ProfilsCog(commands.Cog):
                         langue,
                         "cmd_prop_not_found",
                         alliance_name=alliance_name,
-                        defaut=f"❌ Alliance **{alliance_name}** introuvable sur l'API.",
+                        defaut=f"{{e_error}} Alliance **{alliance_name}** introuvable sur l'API.",
                     )
                 )
 
@@ -1936,7 +1929,7 @@ class ProfilsCog(commands.Cog):
                     langue,
                     "cmd_prop_not_found",
                     alliance_name=alliance_name,
-                    defaut=f"❌ ID de l'alliance **{alliance_name}** introuvable.",
+                    defaut=f"{{e_error}} ID de l'alliance **{alliance_name}** introuvable.",
                 )
             )
 
@@ -1948,7 +1941,7 @@ class ProfilsCog(commands.Cog):
                     t(
                         langue,
                         "cmd_prop_api_err",
-                        defaut="❌ Erreur lors de la récupération des données cartographiques.",
+                        defaut="{e_error} Erreur lors de la récupération des données cartographiques.",
                     )
                 )
             carto_data = await r.json()
@@ -1964,19 +1957,34 @@ class ProfilsCog(commands.Cog):
 
         # --- 3. CONFIGURATION DES DONNÉES ---
         PROP_TYPES = {
-            3: {"name": t(langue, "prop_capital", defaut="Capitale"), "emoji": "<:castle3:1512573819313979544>"},
-            22: {"name": t(langue, "prop_city", defaut="Cité Marchande"), "emoji": "<:castle22:1512573821520183347>"},
-            23: {"name": t(langue, "prop_tower", defaut="Tour Royale"), "emoji": "<:castle23:1512573823118086174>"},
-            26: {"name": t(langue, "prop_monument", defaut="Monument"), "emoji": "<:castle26:1512573824086835280>"},
-            28: {"name": t(langue, "prop_lab", defaut="Laboratoire"), "emoji": "<:castle28:1512573825299251351>"},
+            3: {
+                "name": t(langue, "prop_capital", defaut="Capitale"),
+                "emoji": DICT_EMOJIS.get("e_castle3", "<:castle3:1512573819313979544>"),
+            },
+            22: {
+                "name": t(langue, "prop_city", defaut="Cité Marchande"),
+                "emoji": DICT_EMOJIS.get("e_castle22", "<:castle22:1512573821520183347>"),
+            },
+            23: {
+                "name": t(langue, "prop_tower", defaut="Tour Royale"),
+                "emoji": DICT_EMOJIS.get("e_castle23", "<:castle23:1512573823118086174>"),
+            },
+            26: {
+                "name": t(langue, "prop_monument", defaut="Monument"),
+                "emoji": DICT_EMOJIS.get("e_castle26", "<:castle26:1512573824086835280>"),
+            },
+            28: {
+                "name": t(langue, "prop_lab", defaut="Laboratoire"),
+                "emoji": DICT_EMOJIS.get("e_castle28", "<:castle28:1512573825299251351>"),
+            },
         }
 
         REALM_EMOJIS = {
-            0: "<:dungeon0:1512573840704671775>",
-            1: "<:dungeon1:1512573842277794062>",
-            2: "<:dungeon2:1512573843267518546>",
-            3: "<:dungeon3:1512573844538396692>",
-            4: "<:dungeon4:1512573845737963722>",
+            0: DICT_EMOJIS.get("e_dungeon0", "<:dungeon0:1512573840704671775>"),
+            1: DICT_EMOJIS.get("e_dungeon1", "<:dungeon1:1512573842277794062>"),
+            2: DICT_EMOJIS.get("e_dungeon2", "<:dungeon2:1512573843267518546>"),
+            3: DICT_EMOJIS.get("e_dungeon3", "<:dungeon3:1512573844538396692>"),
+            4: DICT_EMOJIS.get("e_dungeon4", "<:dungeon4:1512573845737963722>"),
         }
 
         all_props = []
@@ -1985,12 +1993,10 @@ class ProfilsCog(commands.Cog):
         for player in carto_data:
             p_name = player.get("name", "Inconnu")
 
-            # Traitement des châteaux dans le Grand Empire (index 0)
             for c in player.get("castles", []):
                 if len(c) >= 3 and int(c[2]) in PROP_TYPES:
                     all_props.append({"type": int(c[2]), "x": c[0], "y": c[1], "player": p_name, "world_id": 0})
 
-            # Traitement des châteaux dans les autres mondes
             for cr in player.get("castles_realm", []):
                 if len(cr) >= 4 and int(cr[3]) in PROP_TYPES:
                     all_props.append(
@@ -2005,7 +2011,6 @@ class ProfilsCog(commands.Cog):
             )
             return await interaction.followup.send(msg_empty)
 
-        # Tri de la liste : Par type (Capitales d'abord), puis par royaume, puis par joueur
         all_props.sort(key=lambda p: (p["type"], p["world_id"], p["player"].lower()))
 
         # --- 5. CONSTRUCTION DE L'EMBED APLATI ---
@@ -2015,7 +2020,7 @@ class ProfilsCog(commands.Cog):
         header_desc = t(
             langue,
             "cmd_prop_header",
-            defaut="**<:Information:1533430015264555099> Monde | Type | Joueur ➔ Coordonnées**\n\n",
+            defaut="{e_information} **Monde | Type | Joueur ➔ Coordonnées**\n\n",
         )
 
         current_embed = discord.Embed(title=titre_base, color=self.clr_alliance_property)
@@ -2040,7 +2045,6 @@ class ProfilsCog(commands.Cog):
             current_embed.description = current_desc
             embeds.append(current_embed)
 
-        # Ajout du footer et envoi
         for emb in embeds:
             await setup_embed_footer(emb, interaction, langue)
 
@@ -2068,7 +2072,7 @@ class ProfilsCog(commands.Cog):
         session = self.bot.session
         if not session:
             return await interaction.followup.send(
-                t(langue, "prof_desc_err_tech", defaut="❌ Erreur système (Session fermée).")
+                t(langue, "prof_desc_err_tech", defaut="{e_error} Erreur système (Session fermée).")
             )
 
         from urllib.parse import quote
@@ -2091,7 +2095,7 @@ class ProfilsCog(commands.Cog):
         # --- 2. RECHERCHE DE L'ID (PLAN B : SCAN LOCAL) ---
         if not alliance_id:
             try:
-                from utils import BASE_DATA_PATH  # Assure-toi que c'est bien importé en haut de ton fichier
+                from utils import BASE_DATA_PATH
 
                 player_files = list((BASE_DATA_PATH / "server_scans" / serveur).rglob("server_*.json"))
                 if player_files:
@@ -2123,7 +2127,7 @@ class ProfilsCog(commands.Cog):
                 langue,
                 "prof_desc_not_found",
                 a=alliance_name,
-                defaut=f"❌ Impossible de trouver l'ID de l'alliance **{alliance_name}**.",
+                defaut=f"{{e_error}} Impossible de trouver l'ID de l'alliance **{alliance_name}**.",
             )
             return await interaction.followup.send(msg)
 
@@ -2138,7 +2142,7 @@ class ProfilsCog(commands.Cog):
                             langue,
                             "prof_desc_not_found",
                             a=alliance_name,
-                            defaut="❌ Impossible de trouver les données de cette alliance dans le Tracker.",
+                            defaut="{e_error} Impossible de trouver les données de cette alliance dans le Tracker.",
                         )
                     )
                 data = await response.json()
@@ -2147,7 +2151,7 @@ class ProfilsCog(commands.Cog):
         except Exception as e:
             self.logger.error(f"❌ Erreur API GGE Tracker (Murs) : {e}")
             return await interaction.followup.send(
-                t(langue, "prof_desc_err_tech", defaut="❌ Erreur technique lors de la connexion à l'API.")
+                t(langue, "prof_desc_err_tech", defaut="{e_error} Erreur technique lors de la connexion à l'API.")
             )
 
         # --- 4. TRAITEMENT DES DONNÉES ---
@@ -2160,7 +2164,7 @@ class ProfilsCog(commands.Cog):
                 langue,
                 "prof_desc_unsupported",
                 srv=serveur,
-                defaut=f"⚠️ Cette commande ne fonctionne pas encore sur le serveur demandé (**{serveur}**), ou le mur est totalement vide.",
+                defaut=f"{{e_warning}} Cette commande ne fonctionne pas encore sur le serveur demandé (**{serveur}**), ou le mur est totalement vide.",
             )
             return await interaction.followup.send(msg_unsupported)
 
@@ -2169,7 +2173,6 @@ class ProfilsCog(commands.Cog):
                 return "*(Mur vide ou non renseigné)*"
             return text.replace("<br />", "\n").replace("<br/>", "\n").replace("<br>", "\n").strip()
 
-        # Récupération de la date
         dates_trouvees = []
         if data.get("updated_at"):
             dates_trouvees.append(data.get("updated_at"))
@@ -2195,10 +2198,8 @@ class ProfilsCog(commands.Cog):
         ts_act = int(actualisation_dt.timestamp())
 
         # --- 5. PRÉPARATION DES BLOCS DE TEXTE ---
-        # On va créer une liste avec tous les murs (Actuel + 14 historiques)
         murs_blocks = []
 
-        # Ajout du mur actuel
         murs_blocks.append(
             {
                 "name": t(langue, "prof_desc_current", defaut="📝 Description Actuelle"),
@@ -2206,7 +2207,6 @@ class ProfilsCog(commands.Cog):
             }
         )
 
-        # Ajout de l'historique (limité à 14 pour éviter de faire trop de pages, mais tu peux augmenter)
         if historique:
             historique_trie = sorted(historique, key=lambda x: x.get("created_at", ""), reverse=True)
             for entry in historique_trie[:14]:
@@ -2252,14 +2252,11 @@ class ProfilsCog(commands.Cog):
             embed = discord.Embed(
                 title=embed_title,
                 description=str_date_header + desc_i18n,
-                color=getattr(
-                    self, "clr_descalli", discord.Color.blue()
-                ),  # Fallback couleur si clr_descalli n'est pas def
+                color=getattr(self, "clr_descalli", discord.Color.blue()),
             )
 
             for block in chunk:
                 valeur_champ = f">>> {block['value']}"
-                # Sécurité Discord : 1024 caractères max par champ
                 if len(valeur_champ) > 1020:
                     valeur_champ = valeur_champ[:1017] + "..."
 
@@ -2269,7 +2266,6 @@ class ProfilsCog(commands.Cog):
             await setup_embed_footer(embed, interaction, langue)
             embeds.append(embed)
 
-        # Envoi avec ou sans boutons de pagination
         if len(embeds) == 1:
             await interaction.followup.send(embed=embeds[0])
         else:
@@ -2313,7 +2309,7 @@ class ProfilsCog(commands.Cog):
                     langue,
                     "guerre_err_alli_cache",
                     a=alliance_name,
-                    defaut=f"<:error:1512505075220611172> Alliance **{alliance_name}** introuvable dans le cache local.",
+                    defaut=f"{{e_error}} Alliance **{alliance_name}** introuvable dans le cache local.",
                 )
             )
 
@@ -2327,7 +2323,7 @@ class ProfilsCog(commands.Cog):
                         t(
                             langue,
                             "guerre_err_api",
-                            defaut="<:error:1512505075220611172> Erreur de l'API GGE-Tracker (Impossible d'obtenir les données live).",
+                            defaut="{e_error} Erreur de l'API GGE-Tracker (Impossible d'obtenir les données live).",
                         )
                     )
                 data = await r.json()
@@ -2339,7 +2335,7 @@ class ProfilsCog(commands.Cog):
                     langue,
                     "guerre_err_api_join",
                     e=str(e),
-                    defaut=f"<:error:1512505075220611172> Impossible de joindre l'API : {e}",
+                    defaut=f"{{e_error}} Impossible de joindre l'API : {e}",
                 )
             )
 
@@ -2349,7 +2345,7 @@ class ProfilsCog(commands.Cog):
                 t(
                     langue,
                     "guerre_err_alli_empty",
-                    defaut="<:error:1512505075220611172> L'alliance semble vide ou l'API ne renvoie pas les membres.",
+                    defaut="{e_error} L'alliance semble vide ou l'API ne renvoie pas les membres.",
                 )
             )
 
@@ -2382,13 +2378,13 @@ class ProfilsCog(commands.Cog):
         embeds = []
         chunk_size = 10
 
+        e_peace_ic = DICT_EMOJIS.get("e_peace", "🕊️")
+        e_atk_ic = DICT_EMOJIS.get("e_attaque", "⚔️")
+
         lignes_colombes = [
-            f"<:peace:1512503935892586566> **{c['name']}** ({format_num(c['pp'])} PP) ➔ Fin: <t:{c['fin']}:R>"
-            for c in colombes
+            f"{e_peace_ic} **{c['name']}** ({format_num(c['pp'])} PP) ➔ Fin: <t:{c['fin']}:R>" for c in colombes
         ]
-        lignes_cibles = [
-            f"<:attaque:1512570903886692474> **{c['name']}** ➔ **{format_num(c['pp'])} PP**" for c in cibles_libres
-        ]
+        lignes_cibles = [f"{e_atk_ic} **{c['name']}** ➔ **{format_num(c['pp'])} PP**" for c in cibles_libres]
 
         async def creer_base_embed(titre_page):
             embed = discord.Embed(
@@ -2396,7 +2392,7 @@ class ProfilsCog(commands.Cog):
                     langue,
                     "guerre_scan_title",
                     a=alliance_name,
-                    defaut=f"<:icon_search:1512505406474293438> Scanner de Guerre : {alliance_name}",
+                    defaut=f"{{e_icon_search}} Scanner de Guerre : {alliance_name}",
                 ),
                 color=self.clr_scanner,
             )
@@ -2408,7 +2404,7 @@ class ProfilsCog(commands.Cog):
                 pro=len(colombes),
                 vul=len(cibles_libres),
                 tp=titre_page,
-                defaut=f"<:players:1512504277392953426> **Membres Actifs :** {len(members)}\n<:peace:1512503935892586566> **Sous protection :** {len(colombes)}\n<:attaque:1512570903886692474> **Cibles vulnérables :** {len(cibles_libres)}\n\n**{titre_page}**",
+                defaut=f"{{e_players}} **Membres Actifs :** {len(members)}\n{{e_peace}} **Sous protection :** {len(colombes)}\n{{e_attaque}} **Cibles vulnérables :** {len(cibles_libres)}\n\n**{titre_page}**",
             )
 
             lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
@@ -2428,7 +2424,7 @@ class ProfilsCog(commands.Cog):
                         "guerre_scan_page_col",
                         cur=num_page,
                         tot=nb_pages_col,
-                        defaut=f"<:icon_peace:1512573882010435624> Colombes (Page {num_page}/{nb_pages_col})",
+                        defaut=f"{{e_icon_peace}} Colombes (Page {num_page}/{nb_pages_col})",
                     )
                 )
                 embed.add_field(
@@ -2449,7 +2445,7 @@ class ProfilsCog(commands.Cog):
                         "guerre_scan_page_cib",
                         cur=num_page,
                         tot=nb_pages_cib,
-                        defaut=f"<:castle1:1512573817892110647> Cibles Libres (Page {num_page}/{nb_pages_cib})",
+                        defaut=f"{{e_castle1}} Cibles Libres (Page {num_page}/{nb_pages_cib})",
                     )
                 )
                 embed.add_field(
@@ -2464,7 +2460,7 @@ class ProfilsCog(commands.Cog):
                 t(
                     langue,
                     "guerre_err_no_exploit",
-                    defaut="<:error:1512505075220611172> L'alliance ne contient aucun membre exploitable.",
+                    defaut="{e_error} L'alliance ne contient aucun membre exploitable.",
                 )
             )
 

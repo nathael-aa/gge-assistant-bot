@@ -1,0 +1,40 @@
+name: Strip Comments and Push to Main
+
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Run comment stripper
+        run: python strip_comments.py
+
+      - name: Push clean code to main
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git checkout main
+          
+          cp -r production/cogs/* cogs/
+          
+          git add cogs/
+          git commit -m "Automated commit: Stripped comments 🧹" || echo "Rien à commit"
+          git push origin main

@@ -13,6 +13,7 @@ from utils import (
     ADMINS_DIR,
     BASE_DIR,
     CONFIG_DIR,
+    DICT_EMOJIS,
     JOUEURS_DIR,
     LOCALES_DIR,
     MON_ID_DISCORD,
@@ -183,7 +184,7 @@ class AdminCog(commands.Cog):
     async def toggle_maintenance(self, ctx):
         """[CACHÉE] !m : Bascule le bot en mode maintenance."""
 
-        self.bot.maintenance_mode = not self.bot.maintenance_mode
+        self.bot.maintenance_mode = not getattr(self.bot, "maintenance_mode", False)
         await save_maintenance_async(self.bot.maintenance_mode)
 
         langue = getattr(self, "admin_lang", "fr")
@@ -273,11 +274,9 @@ class AdminCog(commands.Cog):
     async def toggle_bypass(self, ctx):
         """[CACHÉE] !bypass : Active/Désactive ton passe-partout de créateur."""
 
-        # On lit l'état actuel (True par défaut si la variable n'existe pas encore)
         etat_actuel = getattr(self.bot, "bypass_createur", True)
         nouvel_etat = not etat_actuel
 
-        # On sauvegarde le nouvel état dans le bot
         self.bot.bypass_createur = nouvel_etat
 
         if nouvel_etat:
@@ -372,14 +371,16 @@ class AdminCog(commands.Cog):
         try:
             async with self.bot.session.get(url, timeout=10) as r:
                 if r.status != 200:
-                    return await msg_wait.edit(content=f"❌ Erreur {r.status} lors de l'accès au XML de GGE-Tracker.")
+                    await msg_wait.edit(content=f"❌ Erreur {r.status} lors de l'accès au XML de GGE-Tracker.")
+                    return  # Sécurité : on return direct pour ne pas planter la suite
 
                 xml_text = await r.text()
                 root = ET.fromstring(xml_text)
 
                 config_file = CONFIG_DIR / "configuration.json"
                 if not config_file.exists():
-                    return await msg_wait.edit(content="❌ Fichier `configuration.json` introuvable.")
+                    await msg_wait.edit(content="❌ Fichier `configuration.json` introuvable.")
+                    return
 
                 with open(config_file, encoding="utf-8") as f:
                     config_data = json.load(f)
@@ -424,9 +425,10 @@ class AdminCog(commands.Cog):
                         }
 
                 if not nouveau_servers_info:
-                    return await msg_wait.edit(
+                    await msg_wait.edit(
                         content="❌ **Erreur de lecture XML** : 0 serveurs trouvés. Le format du fichier a peut-être changé."
                     )
+                    return
 
                 if nouveau_servers_info != anciennes_infos:
                     config_data["servers_info"] = nouveau_servers_info
@@ -921,7 +923,9 @@ class AdminCog(commands.Cog):
             self.responded = False
             self.message = None
 
-        @discord.ui.button(label="🗑️ Supprimer les clés", style=discord.ButtonStyle.danger)
+        @discord.ui.button(
+            label="Supprimer les clés", style=discord.ButtonStyle.danger, emoji=DICT_EMOJIS.get("e_trash", "🗑️")
+        )
         async def btn_delete(self, interaction: discord.Interaction, button: discord.ui.Button):
             self.delete = True
             self.responded = True
@@ -930,7 +934,11 @@ class AdminCog(commands.Cog):
             await interaction.response.edit_message(view=self)
             self.stop()
 
-        @discord.ui.button(label="💾 Conserver (Trier & Ajouter)", style=discord.ButtonStyle.success)
+        @discord.ui.button(
+            label="Conserver (Trier & Ajouter)",
+            style=discord.ButtonStyle.success,
+            emoji=DICT_EMOJIS.get("e_save", "💾"),
+        )
         async def btn_keep(self, interaction: discord.Interaction, button: discord.ui.Button):
             self.delete = False
             self.responded = True
@@ -1149,7 +1157,9 @@ class AdminCog(commands.Cog):
                         pass
 
         if not emojis_found:
-            return await msg_wait.edit(content="❌ Aucun émoji trouvé dans le code source.")
+            return await msg_wait.edit(
+                content="ℹ️ Aucun émoji `<:name:id>` détecté dans le code (Ce qui est normal si tout a été centralisé !)."
+            )
 
         report_lines = ["=== RAPPORT DES EMOJIS UTILISÉS DANS LE CODE ===\n"]
         for emoji, paths in sorted(emojis_found.items()):
@@ -1253,7 +1263,7 @@ class AdminCog(commands.Cog):
 
         if not missing_emojis:
             return await msg_wait.edit(
-                content="✅ **Parfait !** Le bot a les droits sur **TOUS** les émojis présents dans le code."
+                content="✅ **Parfait !** Le bot a les droits sur **TOUS** les émojis restants dans le code."
             )
 
         embed = discord.Embed(
@@ -1346,7 +1356,6 @@ class AdminCog(commands.Cog):
     async def vigi_add(self, ctx, *, cible: str):
         """[CACHÉE] Ajoute un pseudo ou ID à surveiller."""
 
-        # 💡 CORRECTION : ADMINS_DIR au lieu de ADMINS_DIR_DIR
         vigi_file = ADMINS_DIR / "vigilance.json"
         cibles = []
         if vigi_file.exists():
@@ -1419,14 +1428,14 @@ class AdminCog(commands.Cog):
 
         import json
 
-        from utils import ADMINS_DIR  # 💡 CORRECTION : Import de ADMINS_DIR
+        from utils import ADMINS_DIR
 
         webhook_url = os.getenv("WEBHOOK_VIGILANCE")
         if not webhook_url or not webhook_url.startswith("http"):
             return
 
         # 2. On charge la liste des cibles
-        vigi_file = ADMINS_DIR / "vigilance.json"  # 💡 CORRECTION : ADMINS_DIR au lieu de CONFIG_DIR
+        vigi_file = ADMINS_DIR / "vigilance.json"
         if not vigi_file.exists():
             return
 

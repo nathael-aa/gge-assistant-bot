@@ -12,6 +12,7 @@ from discord.ext import commands, tasks
 from utils import (
     BASE_DATA_PATH,
     CONFIG_DIR,
+    DICT_EMOJIS,
     PaginationView,
     alliance_autocomplete,
     format_num,
@@ -70,7 +71,7 @@ def get_discord_time(iso_str, langue="fr"):
 # ==========================================
 class RadarSettingsView(discord.ui.View):
     def __init__(self, p_id: str, user_id: str, player_name: str, initial_prefs: dict, langue: str = "fr"):
-        super().__init__(timeout=None)
+        super().__init__(timeout=900)
         self.p_id = p_id
         self.user_id = str(user_id)
         self.player_name = player_name
@@ -83,6 +84,8 @@ class RadarSettingsView(discord.ui.View):
         self.btn_puissance.label = t(langue, "rad_btn_pp", defaut="Puissance")
         self.btn_colombe.label = t(langue, "rad_btn_dove", defaut="Colombe")
         self.btn_fermer.label = t(langue, "rad_btn_close", defaut="Terminer et Fermer")
+        self.btn_fermer.emoji = DICT_EMOJIS.get("e_check", "✅")
+
         self.update_buttons_state()
 
     async def toggle_pref(self, pref_key: str):
@@ -108,6 +111,12 @@ class RadarSettingsView(discord.ui.View):
         self.btn_colombe.style = (
             discord.ButtonStyle.success if self.prefs.get("colombe") else discord.ButtonStyle.danger
         )
+
+    async def on_timeout(self):
+        # Les messages éphémères sont gérés par Discord qui désactive l'interaction après 15 min,
+        # mais vider la mémoire côté bot proprement est important.
+        for child in self.children:
+            child.disabled = True
 
     @discord.ui.button(custom_id="pref_pseudo", row=0)
     async def btn_pseudo(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -139,12 +148,12 @@ class RadarSettingsView(discord.ui.View):
         self.update_buttons_state()
         await interaction.response.edit_message(view=self)
 
-    @discord.ui.button(emoji="<:greencirclebullet:1533440867598340186>", style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, row=2)
     async def btn_fermer(self, interaction: discord.Interaction, button: discord.ui.Button):
         msg = t(
             self.langue,
             "rad_saved_player",
-            defaut="✅ **Préférences enregistrées avec succès !** Le radar joueur est actif.",
+            defaut="{e_check} **Préférences enregistrées avec succès !** Le radar joueur est actif.",
         )
         await interaction.response.edit_message(content=msg, view=None)
 
@@ -154,7 +163,7 @@ class RadarSettingsView(discord.ui.View):
 # ==========================================
 class RadarAllianceSettingsView(discord.ui.View):
     def __init__(self, a_id: str, user_id: str, alliance_name: str, initial_prefs: dict, langue: str = "fr"):
-        super().__init__(timeout=None)
+        super().__init__(timeout=900)
         self.a_id = a_id
         self.user_id = str(user_id)
         self.alliance_name = alliance_name
@@ -165,6 +174,8 @@ class RadarAllianceSettingsView(discord.ui.View):
         self.btn_rangs.label = t(langue, "rad_alli_btn_rangs", defaut="Promotions/Rétrogradations")
         self.btn_infos.label = t(langue, "rad_alli_btn_infos", defaut="Changement Nom/Chef")
         self.btn_fermer.label = t(langue, "rad_btn_close", defaut="Terminer et Fermer")
+        self.btn_fermer.emoji = DICT_EMOJIS.get("e_check", "✅")
+
         self.update_buttons_state()
 
     async def toggle_pref(self, pref_key: str):
@@ -182,6 +193,10 @@ class RadarAllianceSettingsView(discord.ui.View):
         )
         self.btn_rangs.style = discord.ButtonStyle.success if self.prefs.get("rangs") else discord.ButtonStyle.danger
         self.btn_infos.style = discord.ButtonStyle.success if self.prefs.get("infos") else discord.ButtonStyle.danger
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
 
     @discord.ui.button(custom_id="pref_alli_mouv", row=0)
     async def btn_mouvements(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -201,12 +216,12 @@ class RadarAllianceSettingsView(discord.ui.View):
         self.update_buttons_state()
         await interaction.response.edit_message(view=self)
 
-    @discord.ui.button(emoji="<:greencirclebullet:1533440867598340186>", style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, row=2)
     async def btn_fermer(self, interaction: discord.Interaction, button: discord.ui.Button):
         msg = t(
             self.langue,
             "rad_alli_saved",
-            defaut="✅ **Préférences d'alliance enregistrées !** Le radar global est actif.",
+            defaut="{e_check} **Préférences d'alliance enregistrées !** Le radar global est actif.",
         )
         await interaction.response.edit_message(content=msg, view=None)
 
@@ -293,7 +308,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_err_not_found_cache",
                 p=player,
-                defaut=f"⚠️ Joueur **{player}** introuvable dans le cache local.",
+                defaut=f"{{e_warning}} Joueur **{player}** introuvable dans le cache local.",
             )
             return await interaction.followup.send(msg)
 
@@ -311,7 +326,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     langue,
                     "rad_err_limit_player",
                     cnt=count_tracked,
-                    defaut=f"❌ **Limite atteinte** : Suivi maximal `{count_tracked}/25` joueurs. Retire un profil avec `/radar remove` d'abord.",
+                    defaut=f"{{e_nocheck}} **Limite atteinte** : Suivi maximal `{count_tracked}/25` joueurs. Retire un profil avec `/radar remove` d'abord.",
                 )
                 return await interaction.followup.send(msg)
 
@@ -341,19 +356,24 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 "colombe": False,
             }
         else:
-            msg = t(langue, "rad_err_already_track", p=player, defaut=f"Tu surveilles DÉJÀ **{player}** ! 😉")
+            msg = t(
+                langue,
+                "rad_err_already_track",
+                p=player,
+                defaut=f"Tu surveilles DÉJÀ **{player}** ! {{e_std_winking_face}}",
+            )
             return await interaction.followup.send(msg)
 
         await save_surveillance_async(data)
 
         embed = discord.Embed(
-            title=t(langue, "rad_add_title", j=player, defaut=f"🎯 Cible verrouillée : {player}"),
+            title=t(langue, "rad_add_title", j=player, defaut=f"{{e_std_bullseye}} Cible verrouillée : {player}"),
             description=t(
                 langue,
                 "rad_add_desc",
                 j=player,
                 r=reason,
-                defaut=f"**{player}** a bien été ajouté à ton radar.\n*(Raison: {reason})*\n\n👇 **Configure tes alertes (Rouge = OFF, Vert = ON) :**",
+                defaut=f"**{player}** a bien été ajouté à ton radar.\n*(Raison: {reason})*\n\n{{e_std_backhand_index_pointing_down}} **Configure tes alertes (Rouge = OFF, Vert = ON) :**",
             ),
             color=self.clr_add_joueur,
         )
@@ -387,11 +407,14 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         if cible_trouvee:
             await save_surveillance_async(data)
             msg = t(
-                langue, "rad_rem_succ", j=player, defaut=f"✅ **{player}** a bien été retiré de ton radar personnel."
+                langue,
+                "rad_rem_succ",
+                j=player,
+                defaut=f"{{e_check}} **{player}** a bien été retiré de ton radar personnel.",
             )
             await interaction.followup.send(msg)
         else:
-            msg = t(langue, "rad_rem_fail", j=player, defaut=f"⚠️ **{player}** n'est pas dans ton radar.")
+            msg = t(langue, "rad_rem_fail", j=player, defaut=f"{{e_warning}} **{player}** n'est pas dans ton radar.")
             await interaction.followup.send(msg)
 
     # ==========================================
@@ -441,13 +464,18 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         except Exception as e:
             logger.error(f"❌ [Radar Alli Add] Erreur API : {e}")
             msg = t(
-                langue, "rad_err_api_join", defaut="❌ Impossible de joindre GGE-Tracker pour trouver cette alliance."
+                langue,
+                "rad_err_api_join",
+                defaut="{e_nocheck} Impossible de joindre GGE-Tracker pour trouver cette alliance.",
             )
             return await interaction.followup.send(msg)
 
         if not a_id:
             msg = t(
-                langue, "rad_err_alli_not_found", a=alliance_name, defaut=f"⚠️ Alliance **{alliance_name}** introuvable."
+                langue,
+                "rad_err_alli_not_found",
+                a=alliance_name,
+                defaut=f"{{e_warning}} Alliance **{alliance_name}** introuvable.",
             )
             return await interaction.followup.send(msg)
 
@@ -464,7 +492,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     langue,
                     "rad_err_limit_alli",
                     cnt=count_tracked,
-                    defaut=f"❌ **Limite atteinte** : Surveillance maximale `{count_tracked}/3` alliances.",
+                    defaut=f"{{e_nocheck}} **Limite atteinte** : Surveillance maximale `{count_tracked}/3` alliances.",
                 )
                 return await interaction.followup.send(msg)
 
@@ -486,21 +514,26 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_err_already_track_alli",
                 a=a_name_real,
-                defaut=f"Tu surveilles DÉJÀ l'alliance **{a_name_real}** ! 😉",
+                defaut=f"Tu surveilles DÉJÀ l'alliance **{a_name_real}** ! {{e_std_winking_face}}",
             )
             return await interaction.followup.send(msg)
 
         await save_surveillance_async(data)
 
         embed = discord.Embed(
-            title=t(langue, "rad_alli_add_title", a=a_name_real, defaut=f"🛡️ Alliance verrouillée : {a_name_real}"),
+            title=t(
+                langue,
+                "rad_alli_add_title",
+                a=a_name_real,
+                defaut=f"{{e_alliance_icon}} Alliance verrouillée : {a_name_real}",
+            ),
             description=t(
                 langue,
                 "rad_alli_add_desc",
                 a=a_name_real,
                 cnt=len(members_dict),
                 r=reason,
-                defaut=f"Le radar global est activé sur **{a_name_real}** ({len(members_dict)} membres).\n*(Raison: {reason})*\n\n👇 **Configure tes alertes d'alliance (Rouge = OFF, Vert = ON) :**",
+                defaut=f"Le radar global est activé sur **{a_name_real}** ({len(members_dict)} membres).\n*(Raison: {reason})*\n\n{{e_std_backhand_index_pointing_down}} **Configure tes alertes d'alliance (Rouge = OFF, Vert = ON) :**",
             ),
             color=self.clr_add_alliance,
         )
@@ -539,7 +572,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_alli_rem_succ",
                 a=alliance_name,
-                defaut=f"✅ L'alliance **{alliance_name}** a bien été retirée de ton radar.",
+                defaut=f"{{e_check}} L'alliance **{alliance_name}** a bien été retirée de ton radar.",
             )
             await interaction.followup.send(msg)
         else:
@@ -547,7 +580,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_alli_rem_fail",
                 a=alliance_name,
-                defaut=f"⚠️ L'alliance **{alliance_name}** n'est pas dans ton radar.",
+                defaut=f"{{e_warning}} L'alliance **{alliance_name}** n'est pas dans ton radar.",
             )
             await interaction.followup.send(msg)
 
@@ -592,12 +625,12 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                         langue,
                         "rad_list_filter_active",
                         f=", ".join(filtres_actifs),
-                        defaut=f"✅ {', '.join(filtres_actifs)}",
+                        defaut=f"{{e_check}} {', '.join(filtres_actifs)}",
                     )
                     if filtres_actifs
-                    else t(langue, "rad_list_no_filter", defaut="❌ Aucun filtre actif")
+                    else t(langue, "rad_list_no_filter", defaut="{e_nocheck} Aucun filtre actif")
                 )
-                mes_joueurs.append(f"🎯 **{nom}** ➔ *{raison}*\n└ {str_filtres}")
+                mes_joueurs.append(f"{{e_std_bullseye}} **{nom}** ➔ *{raison}*\n└ {str_filtres}")
 
         mes_alliances = []
         for aid, info in data.get("alliances", {}).items():
@@ -620,16 +653,18 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                         langue,
                         "rad_list_filter_active",
                         f=", ".join(filtres_actifs),
-                        defaut=f"✅ {', '.join(filtres_actifs)}",
+                        defaut=f"{{e_check}} {', '.join(filtres_actifs)}",
                     )
                     if filtres_actifs
-                    else t(langue, "rad_list_no_filter", defaut="❌ Aucun filtre actif")
+                    else t(langue, "rad_list_no_filter", defaut="{e_nocheck} Aucun filtre actif")
                 )
-                mes_alliances.append(f"🛡️ **{nom}** ➔ *{raison}*\n└ {str_filtres}")
+                mes_alliances.append(f"{{e_alliance_icon}} **{nom}** ➔ *{raison}*\n└ {str_filtres}")
 
         if not mes_joueurs and not mes_alliances:
             msg = t(
-                langue, "rad_list_empty", defaut="🕸️ Ton radar est vide ! Utilise `/radar add` ou `/radar alliance add`."
+                langue,
+                "rad_list_empty",
+                defaut="{e_information} Ton radar est vide ! Utilise `/radar add` ou `/radar alliance add`.",
             )
             return await interaction.followup.send(msg)
 
@@ -637,7 +672,8 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
 
         if mes_alliances:
             embed = discord.Embed(
-                title=t(langue, "rad_list_title_alli", defaut="🕵️‍♂️ Mon Radar - Alliances"), color=self.clr_list_alliances
+                title=t(langue, "rad_list_title_alli", defaut="{e_std_man_detective} Mon Radar - Alliances"),
+                color=self.clr_list_alliances,
             )
             embed.description = "\n\n".join(mes_alliances)
             await setup_embed_footer(embed, interaction, langue)
@@ -648,7 +684,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             for i in range(0, len(mes_joueurs), lignes_par_page):
                 chunk = mes_joueurs[i : i + lignes_par_page]
                 embed = discord.Embed(
-                    title=t(langue, "rad_list_title_player", defaut="🕵️‍♂️ Mon Radar - Joueurs"),
+                    title=t(langue, "rad_list_title_player", defaut="{e_std_man_detective} Mon Radar - Joueurs"),
                     color=self.clr_list_joueurs,
                 )
                 embed.description = "\n\n".join(chunk)
@@ -772,7 +808,9 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                     for lg in ["fr", "de", "en"]:
                                         embed = discord.Embed(
                                             title=t(
-                                                lg, "rad_spy_alli_name_title", defaut="🛡️ ALERTE ALLIANCE : NOUVEAU NOM"
+                                                lg,
+                                                "rad_spy_alli_name_title",
+                                                defaut="{e_alliance_icon} ALERTE ALLIANCE : NOUVEAU NOM",
                                             ),
                                             color=discord.Color.purple(),
                                         )
@@ -818,7 +856,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                             title=t(
                                                 lg,
                                                 "rad_spy_alli_lead_title",
-                                                defaut="👑 ALERTE ALLIANCE : NOUVEAU CHEF",
+                                                defaut="{e_std_crown} ALERTE ALLIANCE : NOUVEAU CHEF",
                                             ),
                                             description=t(
                                                 lg,
@@ -852,7 +890,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                     lg,
                                                     "rad_spy_alli_join",
                                                     p=m["name"],
-                                                    defaut=f"🟢 **{m['name']}** a rejoint l'alliance.",
+                                                    defaut=f"{{e_std_green_circle}} **{m['name']}** a rejoint l'alliance.",
                                                 )
                                             )
                                         for m in sorties:
@@ -861,13 +899,15 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                     lg,
                                                     "rad_spy_alli_leave",
                                                     p=m["name"],
-                                                    defaut=f"🔴 **{m['name']}** a quitté l'alliance.",
+                                                    defaut=f"{{e_std_red_circle}} **{m['name']}** a quitté l'alliance.",
                                                 )
                                             )
 
                                         embed = discord.Embed(
                                             title=t(
-                                                lg, "rad_spy_alli_mouv_title", defaut="🚪 ALERTE ALLIANCE : MOUVEMENTS"
+                                                lg,
+                                                "rad_spy_alli_mouv_title",
+                                                defaut="{e_std_door} ALERTE ALLIANCE : MOUVEMENTS",
                                             ),
                                             description=t(
                                                 lg,
@@ -909,7 +949,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                         p=r["info"]["name"],
                                                         r1=old_l,
                                                         r2=new_l,
-                                                        defaut=f"📈 **{r['info']['name']}** a été promu ({old_l} ➔ {new_l})",
+                                                        defaut=f"{{e_std_chart_increasing}} **{r['info']['name']}** a été promu ({old_l} ➔ {new_l})",
                                                     )
                                                 )
                                             else:
@@ -920,11 +960,15 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                         p=r["info"]["name"],
                                                         r1=old_l,
                                                         r2=new_l,
-                                                        defaut=f"📉 **{r['info']['name']}** a été rétrogradé ({old_l} ➔ {new_l})",
+                                                        defaut=f"{{e_std_chart_decreasing}} **{r['info']['name']}** a été rétrogradé ({old_l} ➔ {new_l})",
                                                     )
                                                 )
                                         embed = discord.Embed(
-                                            title=t(lg, "rad_spy_alli_rank_title", defaut="🎖️ ALERTE ALLIANCE : GRADES"),
+                                            title=t(
+                                                lg,
+                                                "rad_spy_alli_rank_title",
+                                                defaut="{e_honor} ALERTE ALLIANCE : GRADES",
+                                            ),
                                             description=t(
                                                 lg,
                                                 "rad_spy_alli_rank_desc",
@@ -1017,7 +1061,11 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                         else new_name
                                                     )
                                                     embed = discord.Embed(
-                                                        title=t(lg, "rad_spy_p_name_title", defaut="🚨 ALERTE PSEUDO"),
+                                                        title=t(
+                                                            lg,
+                                                            "rad_spy_p_name_title",
+                                                            defaut="{e_warning} ALERTE PSEUDO",
+                                                        ),
                                                         color=discord.Color.orange(),
                                                     )
                                                     embed.add_field(
@@ -1028,7 +1076,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                             old=old_t,
                                                             new=new_t,
                                                             time=get_discord_time(maintenant.isoformat(), lg),
-                                                            defaut=f"~~{old_t}~~ ➔ **{new_t}**\n🕒 *Fait {get_discord_time(maintenant.isoformat(), lg)}*",
+                                                            defaut=f"~~{old_t}~~ ➔ **{new_t}**\n{{e_time}} *Fait {get_discord_time(maintenant.isoformat(), lg)}*",
                                                         ),
                                                     )
                                                     embeds_locales[lg] = embed
@@ -1064,7 +1112,9 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                     )
                                                     embed = discord.Embed(
                                                         title=t(
-                                                            lg, "rad_spy_p_alli_title", defaut="🚨 ALERTE ALLIANCE"
+                                                            lg,
+                                                            "rad_spy_p_alli_title",
+                                                            defaut="{e_warning} ALERTE ALLIANCE",
                                                         ),
                                                         color=discord.Color.brand_red(),
                                                     )
@@ -1077,7 +1127,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                             old=old_t,
                                                             new=new_t,
                                                             time=get_discord_time(maintenant.isoformat(), lg),
-                                                            defaut=f"**{player}**\n*{old_t}* ➔ **{new_t}**\n🕒 *Fait {get_discord_time(maintenant.isoformat(), lg)}*",
+                                                            defaut=f"**{player}**\n*{old_t}* ➔ **{new_t}**\n{{e_time}} *Fait {get_discord_time(maintenant.isoformat(), lg)}*",
                                                         ),
                                                     )
                                                     embeds_locales[lg] = embed
@@ -1094,10 +1144,10 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                             current_might = int(p_data.get("might_current", 0))
                                             diff = current_might - info.get("last_might", current_might)
                                             if abs(diff) >= 500_000:
-                                                emoji, color = (
-                                                    ("📈", discord.Color.green())
+                                                emoji_str, color = (
+                                                    ("{e_std_chart_increasing}", discord.Color.green())
                                                     if diff > 0
-                                                    else ("📉", discord.Color.brand_red())
+                                                    else ("{e_std_chart_decreasing}", discord.Color.brand_red())
                                                 )
                                                 sign = "+" if diff > 0 else ""
                                                 embeds_locales = {}
@@ -1106,8 +1156,8 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                         title=t(
                                                             lg,
                                                             "rad_spy_p_pp_title",
-                                                            emoji=emoji,
-                                                            defaut=f"🚨 ALERTE PUISSANCE {emoji}",
+                                                            emoji=emoji_str,
+                                                            defaut=f"{{e_warning}} ALERTE PUISSANCE {emoji_str}",
                                                         ),
                                                         color=color,
                                                     )
@@ -1189,14 +1239,14 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                                 title=t(
                                                                     lg,
                                                                     "rad_spy_p_dove_on_title",
-                                                                    defaut="🕊️ ALERTE COLOMBE : ACTIVÉE",
+                                                                    defaut="{e_std_dove} ALERTE COLOMBE : ACTIVÉE",
                                                                 ),
                                                                 description=t(
                                                                     lg,
                                                                     "rad_spy_p_dove_on_desc",
                                                                     j=player,
                                                                     ts=ts,
-                                                                    defaut=f"**{player}** est sous protection !\n🕒 Fin : <t:{ts}:f> (<t:{ts}:R>)",
+                                                                    defaut=f"**{player}** est sous protection !\n{{e_time}} Fin : <t:{ts}:f> (<t:{ts}:R>)",
                                                                 ),
                                                                 color=discord.Color.light_grey(),
                                                             )
@@ -1205,14 +1255,14 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                                 title=t(
                                                                     lg,
                                                                     "rad_spy_p_dove_mod_title",
-                                                                    defaut="🔄 ALERTE COLOMBE : MODIFIÉE",
+                                                                    defaut="{e_refresh} ALERTE COLOMBE : MODIFIÉE",
                                                                 ),
                                                                 description=t(
                                                                     lg,
                                                                     "rad_spy_p_dove_mod_desc",
                                                                     j=player,
                                                                     ts=ts,
-                                                                    defaut=f"**{player}** a modifié sa protection !\n🕒 Fin : <t:{ts}:f> (<t:{ts}:R>)",
+                                                                    defaut=f"**{player}** a modifié sa protection !\n{{e_time}} Fin : <t:{ts}:f> (<t:{ts}:R>)",
                                                                 ),
                                                                 color=discord.Color.blue(),
                                                             )
@@ -1221,7 +1271,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                                 title=t(
                                                                     lg,
                                                                     "rad_spy_p_dove_off_title",
-                                                                    defaut="⚔️ CONFIRMATION : SANS COLOMBE",
+                                                                    defaut="{e_std_crossed_swords} CONFIRMATION : SANS COLOMBE",
                                                                 ),
                                                                 description=t(
                                                                     lg,
@@ -1236,7 +1286,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                                 title=t(
                                                                     lg,
                                                                     "rad_spy_p_dove_end_title",
-                                                                    defaut="⚔️ ALERTE COLOMBE : TERMINÉE",
+                                                                    defaut="{e_std_crossed_swords} ALERTE COLOMBE : TERMINÉE",
                                                                 ),
                                                                 description=t(
                                                                     lg,
@@ -1311,7 +1361,11 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                             embeds_locales = {}
                                             for lg in ["fr", "de", "en"]:
                                                 embed = discord.Embed(
-                                                    title=t(lg, "rad_spy_p_pos_title", defaut="🚨 ALERTE DÉMÉNAGEMENT"),
+                                                    title=t(
+                                                        lg,
+                                                        "rad_spy_p_pos_title",
+                                                        defaut="{e_warning} ALERTE DÉMÉNAGEMENT",
+                                                    ),
                                                     color=discord.Color.dark_purple(),
                                                 )
                                                 embed.add_field(
@@ -1325,7 +1379,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                         xn=x_new,
                                                         yn=y_new,
                                                         time=get_discord_time(m["created_at"], lg),
-                                                        defaut=f"**{m_name}**\n`{x_old}:{y_old}` ➔ `{x_new}:{y_new}`\n🕒 *Fait {get_discord_time(m['created_at'], lg)}*",
+                                                        defaut=f"**{m_name}**\n`{x_old}:{y_old}` ➔ `{x_new}:{y_new}`\n{{e_time}} *Fait {get_discord_time(m['created_at'], lg)}*",
                                                     ),
                                                 )
                                                 embeds_locales[lg] = embed

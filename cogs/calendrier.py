@@ -12,6 +12,7 @@ from discord.ext import commands, tasks
 
 from utils import (
     CONFIG_DIR,
+    DICT_EMOJIS,
     SERVEURS_DIR,
     TRACKER_EVENTS,
     alliance_autocomplete,
@@ -31,7 +32,7 @@ MAPPING_FILE = CONFIG_DIR / "event_mapping.json"
 # 🛠️ CLASSE DE NAVIGATION UI (AVEC TIMEOUT)
 # ==========================================
 class CalendarNavView(discord.ui.View):
-    def __init__(self, embeds_dict, current_page, langue="fr", timeout=900):  # 900s = 15 minutes
+    def __init__(self, embeds_dict, current_page, langue="fr", timeout=3600):
         super().__init__(timeout=timeout)
         self.embeds = embeds_dict
         self.current_page = current_page
@@ -40,21 +41,21 @@ class CalendarNavView(discord.ui.View):
 
         self.btn_main = discord.ui.Button(
             label=t(langue, "cal_btn_main", defaut="Résumé Complet"),
-            emoji="<:book:1535657877799444500>",
+            emoji=DICT_EMOJIS.get("e_book", "📖"),
             custom_id="cal_main",
         )
         self.btn_main.callback = self.callback_main
 
         self.btn_future = discord.ui.Button(
             label=t(langue, "cal_btn_future", defaut="À venir (7j)"),
-            emoji="<:clock:1535651534308642916>",
+            emoji=DICT_EMOJIS.get("e_clock", "⏰"),
             custom_id="cal_future",
         )
         self.btn_future.callback = self.callback_future
 
         self.btn_alliance = discord.ui.Button(
             label=t(langue, "cal_btn_alliance", defaut="Événements d'Alliances"),
-            emoji="<:alliance_icon:1512574688415580242>",
+            emoji=DICT_EMOJIS.get("e_alliance_icon", "🛡️"),
             custom_id="cal_alliance",
         )
         self.btn_alliance.callback = self.callback_alliance
@@ -77,16 +78,22 @@ class CalendarNavView(discord.ui.View):
     async def callback_main(self, interaction: discord.Interaction):
         self.current_page = "main"
         self.update_buttons()
+        if not self.message:
+            self.message = interaction.message
         await interaction.response.edit_message(embed=self.embeds["main"], view=self)
 
     async def callback_future(self, interaction: discord.Interaction):
         self.current_page = "future"
         self.update_buttons()
+        if not self.message:
+            self.message = interaction.message
         await interaction.response.edit_message(embed=self.embeds["future"], view=self)
 
     async def callback_alliance(self, interaction: discord.Interaction):
         self.current_page = "alliance"
         self.update_buttons()
+        if not self.message:
+            self.message = interaction.message
         await interaction.response.edit_message(embed=self.embeds["alliance"], view=self)
 
     async def on_timeout(self):
@@ -222,7 +229,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             langue,
             "cal_setup_success",
             salon=channel.mention,
-            defaut=f"✅ Le salon des alertes a été défini sur {channel.mention} pour le serveur **{serveur}**.",
+            defaut=f"{{e_check}} Le salon des alertes a été défini sur {channel.mention} pour le serveur **{serveur}**.",
         )
         await interaction.followup.send(msg)
 
@@ -246,7 +253,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                 langue,
                 "cal_track_already",
                 alliance=alliance_name,
-                defaut=f"<:error:1512505075220611172> L'alliance **{alliance_name}** est déjà dans la liste de suivi de ce serveur.",
+                defaut=f"{{e_error}} L'alliance **{alliance_name}** est déjà dans la liste de suivi de ce serveur.",
             )
             return await interaction.followup.send(msg)
 
@@ -256,7 +263,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             langue,
             "cal_track_success",
             alliance=alliance_name,
-            defaut=f"✅ L'alliance **{alliance_name}** a été ajoutée ! Ses résultats seront envoyés à la fin des événements majeurs.",
+            defaut=f"{{e_check}} L'alliance **{alliance_name}** a été ajoutée ! Ses résultats seront envoyés à la fin des événements majeurs.",
         )
         await interaction.followup.send(msg_success)
 
@@ -275,7 +282,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             msg_err = t(
                 langue,
                 "cal_untrack_no_config",
-                defaut="<:error:1512505075220611172> Aucune configuration trouvée pour ce serveur.",
+                defaut="{e_error} Aucune configuration trouvée pour ce serveur.",
             )
             return await interaction.followup.send(msg_err)
 
@@ -285,7 +292,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                 langue,
                 "cal_untrack_not_found",
                 alliance=alliance_name,
-                defaut=f"<:error:1512505075220611172> L'alliance **{alliance_name}** n'est pas dans la liste de suivi.",
+                defaut=f"{{e_error}} L'alliance **{alliance_name}** n'est pas dans la liste de suivi.",
             )
             return await interaction.followup.send(msg_not_found)
 
@@ -296,7 +303,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             langue,
             "cal_untrack_success",
             alliance=alliance_name,
-            defaut=f"❌ L'alliance **{alliance_name}** a été retirée de la liste de suivi.",
+            defaut=f"{{e_nocheck}} L'alliance **{alliance_name}** a été retirée de la liste de suivi.",
         )
         await interaction.followup.send(msg_success)
 
@@ -323,7 +330,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             )
             await interaction.followup.send(msg)
         else:
-            msg_fail = t(langue, "cal_stop_fail", defaut="⚠️ Le calendrier n'était pas activé sur ce serveur.")
+            msg_fail = t(langue, "cal_stop_fail", defaut="{e_warning} Le calendrier n'était pas activé sur ce serveur.")
             await interaction.followup.send(msg_fail)
 
     # ==========================================
@@ -340,7 +347,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             msg_err = t(
                 langue,
                 "cal_actuelle_error",
-                defaut="<:error:1512505075220611172> Le calendrier est en cours de synchronisation ou vide. Réessayez dans une minute.",
+                defaut="{e_error} Le calendrier est en cours de synchronisation ou vide. Réessayez dans une minute.",
             )
             return await interaction.followup.send(msg_err)
 
@@ -387,7 +394,11 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             ts_end = int(ev["end"].timestamp())
 
             nom_event_traduit = t(langue, meta["name_key"], defaut=meta["name_default"])
-            titre_carte = f"{meta['emoji']} **{nom_event_traduit}**"
+
+            # Application de la traduction si l'émoji est une balise dynamique
+            emoji_clean = t(langue, f"emo_{ev['key']}", defaut=meta["emoji"]) if "{" in meta["emoji"] else meta["emoji"]
+
+            titre_carte = f"{emoji_clean} **{nom_event_traduit}**"
 
             ligne_date = f"• <t:{ts_start}:d> ➔ <t:{ts_end}:d>"
 
@@ -414,7 +425,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             langue,
             "cal_last_update",
             ts_last_scan=ts_last_scan,
-            defaut=f"<:Information:1533430015264555099> Dernière mise à jour : <t:{ts_last_scan}:R>",
+            defaut=f"{{e_information}} Dernière mise à jour : <t:{ts_last_scan}:R>",
         )
         empty_txt = t(langue, "cal_empty_cat", defaut="*Aucun événement dans cette catégorie pour le moment.*")
 
@@ -580,13 +591,14 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
         if not events:
             return
 
-        # ... Le reste du code de _run_calendar_check (Notifications de début/fin) reste strictement identique !
         data = await load_calendrier_async()
         notified = data.get("notified", [])
         modifie = False
 
         for ev in events:
-            meta = self.event_mapping[ev["key"]]
+            meta = self.event_mapping.get(ev["key"])
+            if not meta:
+                continue
 
             uid_start = f"{ev['key']}_{ev['start'].strftime('%Y-%m-%d')}_start"
             uid_end = f"{ev['key']}_{ev['end'].strftime('%Y-%m-%d')}_end"
@@ -612,13 +624,18 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                 serveur_cible = g_info.get("gge_server", "E4K_FR1")
 
                                 nom_traduit = t(langue, meta["name_key"], defaut=meta["name_default"])
+                                emoji_clean = (
+                                    t(langue, f"emo_{ev['key']}", defaut=meta["emoji"])
+                                    if "{" in meta["emoji"]
+                                    else meta["emoji"]
+                                )
 
                                 titre_start = t(
                                     langue,
                                     "cal_event_start_title",
-                                    emoji=meta["emoji"],
+                                    emoji=emoji_clean,
                                     name=nom_traduit,
-                                    defaut=f"{meta['emoji']} DÉBUT D'ÉVÉNEMENT : {nom_traduit}",
+                                    defaut=f"{emoji_clean} DÉBUT D'ÉVÉNEMENT : {nom_traduit}",
                                 )
                                 desc_start = t(
                                     langue,
@@ -681,7 +698,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                     pass
 
                                 tracked = g_info.get("tracked_alliances", [])
-                                if tracked and meta["tracker_name"]:
+                                if tracked and meta.get("tracker_name"):
                                     event_keys = TRACKER_EVENTS.get(meta["tracker_name"])
                                     if event_keys:
                                         for alliance_nom in tracked:

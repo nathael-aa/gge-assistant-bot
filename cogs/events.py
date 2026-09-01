@@ -135,7 +135,7 @@ class AquamarineSelectView(discord.ui.View):
         gt_cargo,
         gt_am,
     ):
-        super().__init__(timeout=300)
+        super().__init__(timeout=3600)
         self.interaction = interaction
         self.player = player
         self.alliance_name = alliance_name
@@ -146,13 +146,14 @@ class AquamarineSelectView(discord.ui.View):
         self.monthly_finals = monthly_finals
         self.gt_cargo = gt_cargo
         self.gt_am = gt_am
+        self.message = None
 
         # --- Création des options du menu déroulant ---
         options = []
         for i, m_key in enumerate(sorted_months[:25]):
             annee, mois_num = m_key.split("-")
             nom_mois = f"{get_month_name(mois_num, langue)} {annee}"
-
+            # Emoji calendrier natif pour la sécurité du select
             options.append(discord.SelectOption(label=nom_mois, value=m_key, default=(i == 0), emoji="📅"))
 
         placeholder_txt = t(langue, "ev_aqua_select_placeholder", defaut="Sélectionnez un mois...")
@@ -167,6 +168,10 @@ class AquamarineSelectView(discord.ui.View):
 
         for opt in self.select.options:
             opt.default = opt.value == self.current_month
+
+        # Sécurité pour le timeout du message
+        if not self.message:
+            self.message = interaction.message
 
         embed = await self.generate_embed(self.current_month)
         await interaction.response.edit_message(embed=embed, view=self)
@@ -212,7 +217,7 @@ class AquamarineSelectView(discord.ui.View):
                 self.langue,
                 "ev_aqua_cumul_title",
                 player=self.player,
-                defaut=f"<:stats:1512517930490003726> Historique Îles Orageuses de {self.player}",
+                defaut=f"{{e_stats}} Historique Îles Orageuses de {self.player}",
             ),
             description=f"{lbl_date} <t:{int(self.actualisation_dt.timestamp())}:F> (<t:{int(self.actualisation_dt.timestamp())}:R>)\n\n{profil_desc}\n",
             color=self.clr,
@@ -225,8 +230,8 @@ class AquamarineSelectView(discord.ui.View):
             gta=gt_a,
             pf=p_f,
             defaut=(
-                f"🏆 **Total Historique Cargo :** `{gt_c}` <:aquamarinedepenser:1512162297425039423>\n"
-                f"📈 **Total Historique Aigue-Marine :** `{gt_a}` <:aquamarinetotalcollectee:1512162700518752410>"
+                f"🏆 **Total Historique Cargo :** `{gt_c}` {{e_aquamarinedepenser}}\n"
+                f"📈 **Total Historique Aigue-Marine :** `{gt_a}` {{e_aquamarinetotalcollectee}}"
             ),
         )
 
@@ -237,7 +242,7 @@ class AquamarineSelectView(discord.ui.View):
             name=t(
                 self.langue,
                 "ev_aqua_cumul_overview",
-                defaut="**<:icon_world:1512517516012814537> Vue d'ensemble historique**",
+                defaut="{e_icon_world} **Vue d'ensemble historique**",
             ),
             value=stats_globales,
             inline=False,
@@ -253,12 +258,12 @@ class AquamarineSelectView(discord.ui.View):
             wf=w_f,
             df=d_f,
             defaut=(
-                f"**Score Final Cargo :** `{p_f}` <:pointscargo:1512161268411273429>\n\n"
-                f"<:aquamarinetotalcollectee:1512162700518752410> **Aigue-marine collectées :** `{a_f}`\n"
-                f" ↳ <:aquamarineiles:1512162072249765908> *Dans les îles à ressources :* `{i_f}`\n"
-                f" ↳ <:aquamarineforts:1512162154890133506> *Dans les forts orageux :* `{f_f}`\n"
-                f" ↳ <:aquamarinegagnerjcj:1512162488504811590> *Gagné en JcJ :* `{w_f}`\n\n"
-                f"<:aquamarinedepenser:1512162297425039423> **Dépensé en points cargo :** `{d_f}`"
+                f"**Score Final Cargo :** `{p_f}` {{e_pointscargo}}\n\n"
+                f"{{e_aquamarinetotalcollectee}} **Aigue-marine collectées :** `{a_f}`\n"
+                f" ↳ {{e_aquamarineiles}} *Dans les îles à ressources :* `{i_f}`\n"
+                f" ↳ {{e_aquamarineforts}} *Dans les forts orageux :* `{f_f}`\n"
+                f" ↳ {{e_aquamarinegagnerjcj}} *Gagné en JcJ :* `{w_f}`\n\n"
+                f"{{e_aquamarinedepenser}} **Dépensé en points cargo :** `{d_f}`"
             ),
         )
 
@@ -343,7 +348,7 @@ class EventsCog(commands.Cog):
                     langue,
                     "ev_err_player_local",
                     player=player,
-                    defaut=f"<:error:1512505075220611172> Joueur **{player}** introuvable dans le cache local.",
+                    defaut=f"{{e_error}} Joueur **{player}** introuvable dans le cache local.",
                 )
             )
 
@@ -365,7 +370,7 @@ class EventsCog(commands.Cog):
                                 langue,
                                 "ev_err_aqua_hist",
                                 player=player,
-                                defaut=f"<:error:1512505075220611172> Aucun historique Aquamarine trouvé pour **{player}**.",
+                                defaut=f"{{e_error}} Aucun historique Aquamarine trouvé pour **{player}**.",
                             )
                         )
                     snapshots = (await resp.json()).get("snapshots", [])
@@ -376,7 +381,7 @@ class EventsCog(commands.Cog):
                         langue,
                         "ev_err_aqua_tech",
                         type=type(e).__name__,
-                        defaut=f"<:error:1512505075220611172> Erreur technique Aquamarine : {type(e).__name__}",
+                        defaut=f"{{e_error}} Erreur technique Aquamarine : {type(e).__name__}",
                     )
                 )
 
@@ -386,7 +391,7 @@ class EventsCog(commands.Cog):
                         langue,
                         "ev_err_aqua_no_snap",
                         player=player,
-                        defaut=f"<:error:1512505075220611172> **{player}** ne possède aucun snapshot enregistré pour l'Aquamarine.",
+                        defaut=f"{{e_error}} **{player}** ne possède aucun snapshot enregistré pour l'Aquamarine.",
                     )
                 )
 
@@ -428,13 +433,13 @@ class EventsCog(commands.Cog):
                     loss=cargo_pvp_loss_str,
                     dep=cargo_depense_str,
                     defaut=(
-                        f"<:pointscargo:1512161268411273429> **Points cargo (Classement) :** {pts_cargo_str} pts\n\n"
-                        f"<:aquamarinetotalcollectee:1512162700518752410> **Total aigue-marine collectées :** {total_am_str}\n"
-                        f" ↳ <:aquamarineiles:1512162072249765908> *Dans les îles à ressources :* {cargo_iles_str}\n"
-                        f" ↳ <:aquamarineforts:1512162154890133506> *Dans les forts orageux :* {cargo_forts_str}\n"
-                        f" ↳ <:aquamarinegagnerjcj:1512162488504811590> *Gagné en JcJ :* {cargo_pvp_win_str}\n"
-                        f" ↳ <:aquamarineperdujcj:1512162424365646067> *Perdu en JcJ :* {cargo_pvp_loss_str}\n\n"
-                        f"<:aquamarinedepenser:1512162297425039423> **Dépensé en points cargo :** {cargo_depense_str}"
+                        f"{{e_pointscargo}} **Points cargo (Classement) :** {pts_cargo_str} pts\n\n"
+                        f"{{e_aquamarinetotalcollectee}} **Total aigue-marine collectées :** {total_am_str}\n"
+                        f" ↳ {{e_aquamarineiles}} *Dans les îles à ressources :* {cargo_iles_str}\n"
+                        f" ↳ {{e_aquamarineforts}} *Dans les forts orageux :* {cargo_forts_str}\n"
+                        f" ↳ {{e_aquamarinegagnerjcj}} *Gagné en JcJ :* {cargo_pvp_win_str}\n"
+                        f" ↳ {{e_aquamarineperdujcj}} *Perdu en JcJ :* {cargo_pvp_loss_str}\n\n"
+                        f"{{e_aquamarinedepenser}} **Dépensé en points cargo :** {cargo_depense_str}"
                     ),
                 )
 
@@ -446,7 +451,7 @@ class EventsCog(commands.Cog):
                     "ev_aqua_title_live",
                     player=player,
                     event=event_trad,
-                    defaut=f"🎯 Score en direct de {player} pour : {event_trad}",
+                    defaut=f"{{e_podium}} Score en direct de {player} pour : {event_trad}",
                 )
                 warning_desc = ""
                 couleur_embed = self.clr_aqua
@@ -465,7 +470,7 @@ class EventsCog(commands.Cog):
                             langue,
                             "ev_aqua_warning_archive",
                             mois=nom_mois_s,
-                            defaut=f"<:error:1512505075220611172> **Attention :** Ce joueur n'a pas encore lancé l'édition actuelle. Affichage des archives de l'édition de **{nom_mois_s}**.\n\n",
+                            defaut=f"{{e_error}} **Attention :** Ce joueur n'a pas encore lancé l'édition actuelle. Affichage des archives de l'édition de **{nom_mois_s}**.\n\n",
                         )
                         couleur_embed = discord.Color.orange()
                     except:
@@ -477,13 +482,13 @@ class EventsCog(commands.Cog):
                 )
 
                 embed.add_field(
-                    name=t(langue, "ev_prof_title", defaut="<:players:1512504277392953426> Profil"),
+                    name=t(langue, "ev_prof_title", defaut="{e_players} Profil"),
                     value=t(
                         langue,
                         "ev_prof_desc",
                         p=player,
                         a=alliance_name,
-                        defaut=f"**Joueur :** {player}\n**Alliance :** {alliance_name}",
+                        defaut=f"**Joueur :** {player}\n**Alliance :** [{alliance_name}]",
                     ),
                     inline=True,
                 )
@@ -491,7 +496,7 @@ class EventsCog(commands.Cog):
                     name=t(
                         langue,
                         "ev_aqua_reserves_title",
-                        defaut="<:stats:1512517930490003726> État des Réserves Live\n\n",
+                        defaut="{e_stats} État des Réserves Live\n\n",
                     ),
                     value=f"{warning_desc}{status_txt}",
                     inline=False,
@@ -542,7 +547,7 @@ class EventsCog(commands.Cog):
                         t(
                             langue,
                             "ev_err_monthly_hist",
-                            defaut="<:error:1512505075220611172> Impossible d'analyser l'historique mensuel.",
+                            defaut="{e_error} Impossible d'analyser l'historique mensuel.",
                         )
                     )
 
@@ -583,7 +588,7 @@ class EventsCog(commands.Cog):
                 t(
                     langue,
                     "ev_err_unsupported",
-                    defaut="<:error:1512505075220611172> Événement inconnu ou non géré par l'API.",
+                    defaut="{e_error} Événement inconnu ou non géré par l'API.",
                 )
             )
 
@@ -597,7 +602,7 @@ class EventsCog(commands.Cog):
                             langue,
                             "ev_err_api_player",
                             player=player,
-                            defaut=f"<:error:1512505075220611172> Erreur API GGE-Tracker pour {player}.",
+                            defaut=f"{{e_error}} Erreur API GGE-Tracker pour {player}.",
                         )
                     )
                 stats_data = await resp.json()
@@ -606,7 +611,7 @@ class EventsCog(commands.Cog):
                 t(
                     langue,
                     "utils_err_api_connection",
-                    defaut="<:error:1512505075220611172> Impossible de se connecter à l'API.",
+                    defaut="{e_error} Impossible de se connecter à l'API.",
                 )
             )
 
@@ -622,7 +627,7 @@ class EventsCog(commands.Cog):
                     "utils_err_no_points",
                     alliance=player,
                     nom_event=event_trad,
-                    defaut=f"<:error:1512505075220611172> Aucun point enregistré pour **{player}** sur **{event_trad}**.",
+                    defaut=f"{{e_error}} Aucun point enregistré pour **{player}** sur **{event_trad}**.",
                 )
             )
 
@@ -638,9 +643,6 @@ class EventsCog(commands.Cog):
                 continue
             try:
                 dt = datetime.fromisoformat(d_str.replace("Z", "+00:00"))
-
-                # La vérification CUTOFF_DATE a été supprimée ici
-
                 if not current_session:
                     current_session.append((dt, pt))
                 else:
@@ -666,7 +668,7 @@ class EventsCog(commands.Cog):
                     "ev_warn_missing_data",
                     nb=nb_events,
                     acts=events_joues,
-                    defaut=f"\n\n<:error:1512505075220611172> **Manque de données** : Cumul sur {nb_events} events, mais seulement **{events_joues}** ont été joués/enregistrés.",
+                    defaut=f"\n\n{{e_error}} **Manque de données** : Cumul sur {nb_events} events, mais seulement **{events_joues}** ont été joués/enregistrés.",
                 )
                 nb_events = events_joues
 
@@ -676,7 +678,7 @@ class EventsCog(commands.Cog):
                     t(
                         langue,
                         "ev_err_no_usable_hist",
-                        defaut="<:error:1512505075220611172> Aucun historique exploitable pour calculer un cumul.",
+                        defaut="{e_error} Aucun historique exploitable pour calculer un cumul.",
                     )
                 )
 
@@ -715,8 +717,8 @@ class EventsCog(commands.Cog):
                 b=format_num(meilleur_score),
                 w=format_num(pire_score),
                 defaut=(
-                    f"> <:podium:1512523218299392131> **TOTAL CUMULÉ : {format_num(total_score)} pts**\n"
-                    f"> <:ranking:1512438311132729525> **Moyenne/Event** : {format_num(moyenne)} pts\n"
+                    f"> {{e_podium}} **TOTAL CUMULÉ : {format_num(total_score)} pts**\n"
+                    f"> {{e_ranking}} **Moyenne/Event** : {format_num(moyenne)} pts\n"
                     f"> ⚖️ **Médiane** : {format_num(mediane)} pts\n"
                     f"> 🚀 **Meilleur Score** : {format_num(meilleur_score)} pts\n"
                     f"> 📉 **Pire Score** : {format_num(pire_score)} pts"
@@ -724,7 +726,6 @@ class EventsCog(commands.Cog):
             )
 
             embeds = []
-            # 🟢 RÉDUCTION de 15 à 10 pour éviter le crash des limites Discord
             chunk_size = 10
             nb_pages = max(1, (len(lignes_details) - 1) // chunk_size + 1)
 
@@ -738,7 +739,7 @@ class EventsCog(commands.Cog):
                         "ev_cumul_title",
                         player=player,
                         event=event_trad,
-                        defaut=f"<:stats:1512517930490003726> Analyse & Historique de {player} pour : {event_trad}",
+                        defaut=f"{{e_stats}} Analyse & Historique de {player} pour : {event_trad}",
                     ),
                     color=self.clr_joueur_cumul,
                 )
@@ -747,7 +748,7 @@ class EventsCog(commands.Cog):
                     "ev_cumul_desc",
                     a=alliance_name,
                     w=avertissement,
-                    defaut=f"<:alliance:1512503083861540914> **Alliance actuelle :** [{alliance_name}]{avertissement}",
+                    defaut=f"{{e_alliance_icon}} **Alliance actuelle :** [{alliance_name}]{avertissement}",
                 )
                 embed.description = f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{desc_i18n}"
 
@@ -757,7 +758,7 @@ class EventsCog(commands.Cog):
                     n=len(recent_sessions),
                     start=start_date_global,
                     end=end_date_global,
-                    defaut=f"<:stats:1512517930490003726> Bilan sur les {len(recent_sessions)} derniers events\n*(Période du {start_date_global} au {end_date_global})*",
+                    defaut=f"{{e_stats}} Bilan sur les {len(recent_sessions)} derniers events\n*(Période du {start_date_global} au {end_date_global})*",
                 )
                 embed.add_field(name=f_title1, value=stats_txt, inline=False)
 
@@ -783,7 +784,7 @@ class EventsCog(commands.Cog):
                 await interaction.followup.send(embed=embeds[0])
             else:
                 view = PaginationView(embeds)
-                await interaction.followup.send(embed=embeds[0], view=view)
+                view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
         else:
@@ -802,7 +803,7 @@ class EventsCog(commands.Cog):
                         "ev_err_zero_pt",
                         player=player,
                         ev=event_trad,
-                        defaut=f"<:error:1512505075220611172> **{player}** est actuellement à 0 pt sur **{event_trad}**.",
+                        defaut=f"{{e_error}} **{player}** est actuellement à 0 pt sur **{event_trad}**.",
                     )
                 )
 
@@ -812,7 +813,7 @@ class EventsCog(commands.Cog):
                     "ev_live_title",
                     player=player,
                     ev=event_trad,
-                    defaut=f"<:podium:1512523218299392131> Score en direct de {player} pour : {event_trad}",
+                    defaut=f"{{e_podium}} Score en direct de {player} pour : {event_trad}",
                 ),
                 color=self.clr_joueur_dernier,
             )
@@ -821,7 +822,7 @@ class EventsCog(commands.Cog):
             )
 
             embed.add_field(
-                name=t(langue, "ev_prof_title", defaut="<:players:1512504277392953426> Profil"),
+                name=t(langue, "ev_prof_title", defaut="{e_players} Profil"),
                 value=t(
                     langue,
                     "ev_prof_desc",
@@ -832,7 +833,7 @@ class EventsCog(commands.Cog):
                 inline=True,
             )
             embed.add_field(
-                name=t(langue, "ev_live_score_title", defaut="<:icon_points:1512502439339888820> Score Actuel"),
+                name=t(langue, "ev_live_score_title", defaut="{e_icon_points} Score Actuel"),
                 value=f"**{format_num(latest_point)} pts**",
                 inline=True,
             )
@@ -877,9 +878,7 @@ class EventsCog(commands.Cog):
 
         event_keys = TRACKER_EVENTS.get(event_name)
         if not event_keys:
-            return await interaction.followup.send(
-                t(langue, "ev_err_unknown", defaut="<:error:1512505075220611172> Événement inconnu.")
-            )
+            return await interaction.followup.send(t(langue, "ev_err_unknown", defaut="{e_error} Événement inconnu."))
 
         embed, error_or_lignes, stats_text, global_latest_str = await generer_rapport_alliance_embed(
             self.bot,
@@ -892,7 +891,7 @@ class EventsCog(commands.Cog):
         )
 
         if not embed:
-            return await interaction.followup.send(f"<:error:1512505075220611172> {error_or_lignes}")
+            return await interaction.followup.send(f"{{e_error}} {error_or_lignes}")
 
         if display_mode == "list":
             await setup_embed_footer(embed, interaction, langue)
@@ -917,7 +916,7 @@ class EventsCog(commands.Cog):
                         "ev_alli_title",
                         a=alliance_name,
                         ev=event_trad,
-                        defaut=f"<:alliance:1512503083861540914> {alliance_name} - {event_trad}",
+                        defaut=f"{{e_alliance_icon}} {alliance_name} - {event_trad}",
                     ),
                     color=self.clr_alliance,
                 )
@@ -927,7 +926,7 @@ class EventsCog(commands.Cog):
                 )
 
                 emb.add_field(
-                    name=t(langue, "utils_embed_stats_title", defaut="<:stats:1512517930490003726> Statistiques"),
+                    name=t(langue, "utils_embed_stats_title", defaut="{e_stats} Statistiques"),
                     value=stats_text,
                     inline=False,
                 )
@@ -937,15 +936,14 @@ class EventsCog(commands.Cog):
                     "ev_alli_page_title",
                     i=(i // chunk_size) + 1,
                     n=nb_pages,
-                    defaut=f"<:ranking:1512438311132729525> Classement (Page {i // chunk_size + 1}/{nb_pages})",
+                    defaut=f"{{e_ranking}} Classement (Page {i // chunk_size + 1}/{nb_pages})",
                 )
                 emb.add_field(name=f_title, value="\n".join(chunk), inline=False)
 
                 await setup_embed_footer(emb, interaction, langue)
                 embeds.append(emb)
-
             view = PaginationView(embeds)
-            await interaction.followup.send(embed=embeds[0], view=view)
+            view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     # ==========================================
@@ -962,7 +960,7 @@ class EventsCog(commands.Cog):
             langue,
             "ev_pseudo_linked",
             pseudo=player,
-            defaut=f"<:players:1512504277392953426> Compte lié à **{player}** !",
+            defaut=f"{{e_players}} Compte lié à **{player}** !",
         )
         await interaction.response.send_message(msg, ephemeral=True)
 
@@ -981,13 +979,13 @@ class EventsCog(commands.Cog):
         langue, serveur = await get_server_config(interaction)
         if interaction.guild:
             return await interaction.response.send_message(
-                t(langue, "ev_err_dm_only", defaut="<:error:1512505075220611172> À faire en **Message Privé**."),
+                t(langue, "ev_err_dm_only", defaut="{e_error} À faire en **Message Privé**."),
                 ephemeral=True,
             )
         pseudos = await load_pseudos_async()
         if str(interaction.user.id) not in pseudos:
             return await interaction.response.send_message(
-                t(langue, "ev_err_need_pseudo", defaut="<:error:1512505075220611172> Fais `/link_account` d'abord.")
+                t(langue, "ev_err_need_pseudo", defaut="{e_error} Fais `/link_account` d'abord.")
             )
 
         data = await load_rivals_async()
@@ -1007,7 +1005,7 @@ class EventsCog(commands.Cog):
                 langue,
                 "ev_rival_started",
                 event=event_trad,
-                defaut=f"<:icon_analyze:1512573874150314005> Radar activé pour **{event_trad}** !",
+                defaut=f"{{e_icon_analyze}} Radar activé pour **{event_trad}** !",
             )
         )
         await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
@@ -1025,20 +1023,20 @@ class EventsCog(commands.Cog):
         langue, _ = await get_server_config(interaction)
         if interaction.guild:
             return await interaction.response.send_message(
-                t(langue, "ev_err_dm_only", defaut="<:error:1512505075220611172> En privé uniquement."), ephemeral=True
+                t(langue, "ev_err_dm_only", defaut="{e_error} En privé uniquement."), ephemeral=True
             )
         data = await load_rivals_async()
         uid = str(interaction.user.id)
         if uid not in data:
             return await interaction.response.send_message(
-                t(langue, "ev_err_need_rival_start", defaut="<:error:1512505075220611172> Fais `/rival start` d'abord.")
+                t(langue, "ev_err_need_rival_start", defaut="{e_error} Fais `/rival start` d'abord.")
             )
         for j in [player1, player2, player3, player4, player5]:
             if j and j not in data[uid]["rivaux"] and len(data[uid]["rivaux"]) < 10:
                 data[uid]["rivaux"].append(j)
         await save_rivals_async(data)
         await interaction.response.send_message(
-            t(langue, "ev_rival_added", defaut="<:icon_search:1512505406474293438> Rivaux mis à jour !")
+            t(langue, "ev_rival_added", defaut="{e_icon_search} Rivaux mis à jour !")
         )
 
     @rival_group.command(name="list", description="Show your rivals")
@@ -1046,7 +1044,7 @@ class EventsCog(commands.Cog):
         langue, _ = await get_server_config(interaction)
         if interaction.guild:
             return await interaction.response.send_message(
-                t(langue, "ev_err_dm_only", defaut="<:error:1512505075220611172> En privé uniquement."), ephemeral=True
+                t(langue, "ev_err_dm_only", defaut="{e_error} En privé uniquement."), ephemeral=True
             )
         data = await load_rivals_async()
         if str(interaction.user.id) not in data:
@@ -1058,7 +1056,7 @@ class EventsCog(commands.Cog):
             langue,
             "ev_rival_list_title",
             event=event_trad,
-            defaut=f"<:icon_name:1512505444172697611> Radar Actif : {event_trad}",
+            defaut=f"{{e_icon_name}} Radar Actif : {event_trad}",
         )
         desc = t(
             langue, "ev_rival_list_desc", s=config["seuil"], defaut=f"**Seuil :** {config['seuil']}%\n"
@@ -1086,9 +1084,7 @@ class EventsCog(commands.Cog):
         try:
             maintenant = discord.utils.utcnow()
 
-            # 🔄 1. Lecture ultra-propre avec ta nouvelle fonction
             config_data = await load_configuration_async()
-            # 💡 MODIFICATION : On lit le nouveau dictionnaire unifié
             servers_info = config_data.get("servers_info", {})
 
             data = await load_rivals_async()
@@ -1113,15 +1109,12 @@ class EventsCog(commands.Cog):
             for user_id, config in list(data.items()):
                 serveur = config.get("serveur", "E4K_FR1").upper()
 
-                # 💡 MODIFICATION : Récupération propre de la minute depuis servers_info
                 srv_data = servers_info.get(serveur, {})
                 minute_cible = srv_data.get("scan_minutes")
 
-                # Fallback sécurisé
                 if minute_cible is None:
                     minute_cible = 46
 
-                # 🔄 Fenêtre de tir élargie (heure pile + 3 essais)
                 minutes_valides = [
                     minute_cible,
                     (minute_cible + 5) % 60,
@@ -1202,7 +1195,7 @@ class EventsCog(commands.Cog):
                                         diff=format_num(diff),
                                         s=format_num(score_rival),
                                         ms=format_num(mon_score),
-                                        defaut=f"🚨 **DANGER !**\n**{rival}** vient de te dépasser avec **{format_num(diff)}** points d'avance !\n\nLui : {format_num(score_rival)} pts\nToi : {format_num(mon_score)} pts",
+                                        defaut=f"{{e_warning}} **DANGER !**\n**{rival}** vient de te dépasser avec **{format_num(diff)}** points d'avance !\n\nLui : {format_num(score_rival)} pts\nToi : {format_num(mon_score)} pts",
                                     )
                                 else:
                                     desc = t(
@@ -1212,7 +1205,7 @@ class EventsCog(commands.Cog):
                                         pct=f"{pourcentage:.1f}",
                                         s=format_num(score_rival),
                                         ms=format_num(mon_score),
-                                        defaut=f"⚠️ **ATTENTION !**\n**{rival}** se rapproche dangereusement de ton score ({pourcentage:.1f}%).\n\nLui : {format_num(score_rival)} pts\nToi : {format_num(mon_score)} pts",
+                                        defaut=f"{{e_warning}} **ATTENTION !**\n**{rival}** se rapproche dangereusement de ton score ({pourcentage:.1f}%).\n\nLui : {format_num(score_rival)} pts\nToi : {format_num(mon_score)} pts",
                                     )
 
                                 emb = discord.Embed(
@@ -1271,7 +1264,7 @@ class EventsCog(commands.Cog):
                             langue,
                             "ev_woa_player_not_found",
                             p=player,
-                            defaut=f"<:error:1512505075220611172> Joueur **{player}** introuvable.",
+                            defaut=f"{{e_error}} Joueur **{player}** introuvable.",
                         )
                     )
                 res_base = await r.json()
@@ -1283,13 +1276,13 @@ class EventsCog(commands.Cog):
             async with session.get(f"{base_api}/woa/events/player/{player_id}", headers=headers, timeout=8) as r:
                 if r.status != 200:
                     return await interaction.followup.send(
-                        t(langue, "ev_woa_no_hist", defaut="<:error:1512505075220611172> Aucun historique WoA trouvé.")
+                        t(langue, "ev_woa_no_hist", defaut="{e_error} Aucun historique WoA trouvé.")
                     )
                 events = (await r.json()).get("events", [])
 
             if not events:
                 return await interaction.followup.send(
-                    t(langue, "ev_woa_no_part", defaut="<:error:1512505075220611172> Aucune participation enregistrée.")
+                    t(langue, "ev_woa_no_part", defaut="{e_error} Aucune participation enregistrée.")
                 )
 
             actualisation_dt = _get_api_timestamp(events)
@@ -1343,9 +1336,9 @@ class EventsCog(commands.Cog):
                     md=f_md,
                     max_date=f_md,
                     defaut=(
-                        f"🏆 **Total Historique :** {f_gt} <:woa_points:1512573716259668098>\n"
-                        f"<:stats:1512517930490003726> **Total {nom_m} {annee} :** {f_mt} <:woa_points:1512573716259668098>\n"
-                        f"🚀 **Jour max :** {f_mp} <:woa_points:1512573716259668098> *(le {f_md})*"
+                        f"🏆 **Total Historique :** {f_gt} {{e_woa_points}}\n"
+                        f"{{e_stats}} **Total {nom_m} {annee} :** {f_mt} {{e_woa_points}}\n"
+                        f"🚀 **Jour max :** {f_mp} {{e_woa_points}} *(le {f_md})*"
                     ),
                 )
 
@@ -1361,7 +1354,7 @@ class EventsCog(commands.Cog):
                             d=ev["date_str"],
                             m=medal,
                             p=pts_str,
-                            defaut=f"• **{ev['date_str']}** │ Rang {medal} ➔ **{pts_str} <:woa_points:1512573716259668098>**",
+                            defaut=f"• **{ev['date_str']}** │ Rang {medal} ➔ **{pts_str} {{e_woa_points}}**",
                         )
                     )
 
@@ -1369,9 +1362,9 @@ class EventsCog(commands.Cog):
                     langue,
                     "ev_woa_hist_title",
                     nom=vrai_nom,
-                    defaut=f"<:woaicon:1512165794740572292> Historique Roue de la Fortune : {vrai_nom}",
+                    defaut=f"{{e_woaicon}} Historique Roue de la Fortune : {vrai_nom}",
                 )
-                overv = t(langue, "ev_woa_hist_overview", defaut="**<:stats:1512517930490003726> Vue d'ensemble**")
+                overv = t(langue, "ev_woa_hist_overview", defaut="**{e_stats} Vue d'ensemble**")
                 det_title = t(langue, "ev_woa_hist_details", mois=nom_m, defaut=f"**📜 Détails ({nom_m})**")
 
                 embed = discord.Embed(
@@ -1382,13 +1375,12 @@ class EventsCog(commands.Cog):
                 )
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
-
             view = PaginationView(embeds)
-            await interaction.followup.send(embed=embeds[0], view=view)
+            view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
         except Exception as e:
             await interaction.followup.send(
-                t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur technique : {e}")
+                t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur technique : {e}")
             )
 
     @woa.command(name="summary", description="Displays the ticket consumption summary")
@@ -1437,10 +1429,10 @@ class EventsCog(commands.Cog):
                 mt=f"{moy_tickets:,}".replace(",", " "),
                 mp=f"{moy_parts:,}".replace(",", " "),
                 defaut=(
-                    f"<:stats:1512517930490003726> **Éditions :** {t_editions}\n"
-                    f"<:woa_points:1512573716259668098> **Tickets :** {t_tickets:,}\n"
-                    f"<:Le_Hraut_Lumbricus_2:1512573890298380388> **Participants :** {t_parts:,}\n"
-                    f"⚖️ **Moyenne :** {moy_tickets:,} <:woa_points:1512573716259668098> / {moy_parts:,} <:Le_Hraut_Lumbricus_2:1512573890298380388>"
+                    f"{{e_stats}} **Éditions :** {t_editions}\n"
+                    f"{{e_woa_points}} **Tickets :** {t_tickets:,}\n"
+                    f"{{e_members}} **Participants :** {t_parts:,}\n"
+                    f"⚖️ **Moyenne :** {moy_tickets:,} {{e_woa_points}} / {moy_parts:,} {{e_members}}"
                 ).replace(",", " "),
             )
 
@@ -1455,18 +1447,14 @@ class EventsCog(commands.Cog):
                 j_vus.add(d_str)
                 parts = f"{int(ev.get('participants', 0)):,}".replace(",", " ")
                 tix = f"{int(ev.get('total_tickets', 0)):,}".replace(",", " ")
-                lignes.append(
-                    f"📅 **{d_str}** │ <:players:1512504277392953426> {parts} │ <:woa_points:1512573716259668098> **{tix}**"
-                )
+                lignes.append(f"📅 **{d_str}** │ {{e_players}} {parts} │ {{e_woa_points}} **{tix}**")
 
             title = t(
                 langue,
                 "ev_woa_bilan_title",
-                defaut="<:woaicon:1512165794740572292> Bilan Économique : Roue d'Abondance",
+                defaut="{e_woaicon} Bilan Économique : Roue d'Abondance",
             )
-            glob = t(
-                langue, "ev_woa_bilan_global", defaut="**<:icon_world:1512517516012814537> Statistiques Globales**"
-            )
+            glob = t(langue, "ev_woa_bilan_global", defaut="**{e_icon_world} Statistiques Globales**")
             det = t(langue, "ev_woa_bilan_detail", defaut="**📜 Détail des 31 dernières éditions**")
 
             embeds = []
@@ -1480,12 +1468,10 @@ class EventsCog(commands.Cog):
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
             view = PaginationView(embeds)
-            await interaction.followup.send(embed=embeds[0], view=view)
+            view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
         except Exception as e:
-            await interaction.followup.send(
-                t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur : {e}")
-            )
+            await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur : {e}"))
 
     # ========================================================
     # 🏆 GROUPE DE COMMANDES RACINE : LEADERBOARD
@@ -1508,7 +1494,7 @@ class EventsCog(commands.Cog):
             async with session.get(f"{base_api}/woa/events", headers=headers, timeout=8) as r:
                 if r.status != 200:
                     return await interaction.followup.send(
-                        t(langue, "ev_err_api_unavail", defaut="<:error:1512505075220611172> API indisponible.")
+                        t(langue, "ev_err_api_unavail", defaut="{e_error} API indisponible.")
                     )
 
                 woa_base_data = await r.json()
@@ -1535,7 +1521,7 @@ class EventsCog(commands.Cog):
 
             if not all_players:
                 return await interaction.followup.send(
-                    t(langue, "ev_err_no_players", defaut="<:error:1512505075220611172> Aucun joueur trouvé.")
+                    t(langue, "ev_err_no_players", defaut="{e_error} Aucun joueur trouvé.")
                 )
 
             all_players = all_players[:100]
@@ -1547,7 +1533,7 @@ class EventsCog(commands.Cog):
                 pts = f"{int(p.get('point', 0)):,}".replace(",", " ")
                 alli = p.get("alliance_name") or "Sans alliance"
                 medal = "🥇" if rang == 1 else "🥈" if rang == 2 else "🥉" if rang == 3 else f"**{rang}.**"
-                lignes.append(f"{medal} **{nom}** [{alli}] ➔ **{pts} <:woa_points:1512573716259668098>**")
+                lignes.append(f"{medal} **{nom}** [{alli}] ➔ **{pts} {{e_woa_points}}**")
 
             actualisation_dt = _get_api_timestamp(data_rank, woa_base_data)
 
@@ -1567,14 +1553,11 @@ class EventsCog(commands.Cog):
                 )
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
-
             view = PaginationView(embeds)
-            await interaction.followup.send(embed=embeds[0], view=view)
+            view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=10, langue=langue)
         except Exception as e:
-            await interaction.followup.send(
-                t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur : {e}")
-            )
+            await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur : {e}"))
 
     @leaderboard.command(name="storm_islands", description="Displays the Top 100 looters of Aquamarine")
     async def classement_iles(self, interaction: discord.Interaction):
@@ -1594,7 +1577,7 @@ class EventsCog(commands.Cog):
             ) as r:
                 if r.status != 200:
                     return await interaction.followup.send(
-                        t(langue, "ev_err_api_unavail", defaut="<:error:1512505075220611172> API indisponible.")
+                        t(langue, "ev_err_api_unavail", defaut="{e_error} API indisponible.")
                     )
                 data_rank = await r.json()
                 players = data_rank.get("players", [])
@@ -1616,7 +1599,7 @@ class EventsCog(commands.Cog):
 
             if not players:
                 return await interaction.followup.send(
-                    t(langue, "ev_err_no_players", defaut="<:error:1512505075220611172> Aucun joueur trouvé.")
+                    t(langue, "ev_err_no_players", defaut="{e_error} Aucun joueur trouvé.")
                 )
 
             mois_actif = ""
@@ -1638,7 +1621,7 @@ class EventsCog(commands.Cog):
                     t(
                         langue,
                         "ev_err_aqua_not_started",
-                        defaut="<:error:1512505075220611172> Aucun joueur n'a encore débuté l'édition de ce mois-ci.",
+                        defaut="{e_error} Aucun joueur n'a encore débuté l'édition de ce mois-ci.",
                     )
                 )
 
@@ -1649,7 +1632,7 @@ class EventsCog(commands.Cog):
                 metrics = p.get("metrics", {})
                 pts = f"{int(metrics.get('100', 0)):,}".replace(",", " ")
                 medal = "🥇" if rang == 1 else "🥈" if rang == 2 else "🥉" if rang == 3 else f"**{rang}.**"
-                lignes.append(f"{medal} **{nom}** ➔ **{pts} <:pointscargo:1512161268411273429>**")
+                lignes.append(f"{medal} **{nom}** ➔ **{pts} {{e_pointscargo}}**")
 
             actualisation_dt = _get_api_timestamp(players)
 
@@ -1683,13 +1666,12 @@ class EventsCog(commands.Cog):
                 )
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
-
             view = PaginationView(embeds)
-            await interaction.followup.send(embed=embeds[0], view=view)
+            view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
         except Exception as e:
             await interaction.followup.send(
-                t(langue, "ev_err_tech", e=str(e), defaut=f"<:error:1512505075220611172> Erreur technique : {e}")
+                t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur technique : {e}")
             )
 
 

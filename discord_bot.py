@@ -315,15 +315,15 @@ class GGEAssistantBot(commands.Bot):
                             user = self.get_user(int(uid)) or await self.fetch_user(int(uid))
                             langue = users_data.get(uid, {}).get("langue", "fr")
 
-                            titre = t(langue, "bot_restart_notify_title", defaut="🔄 Redémarrage système")
+                            titre = t(langue, "bot_restart_notify_title", defaut="{e_refresh} Redémarrage système")
                             desc = t(
                                 langue,
                                 "bot_restart_notify_desc",
                                 defaut=(
-                                    "Une mise à jour ou une maintenance du système vient d'avoir lieu.\n\n"
-                                    "Votre radar de forteresses a repris automatiquement en arrière-plan. "
-                                    "Veuillez noter que les boutons interactifs (*Relancer / Vérifier*) de vos anciennes alertes ne sont désormais plus fonctionnels.\n\n"
-                                    "*(Retour à la normale effectif)*"
+                                    "{e_working} Une mise à jour ou une maintenance du système vient d'avoir lieu.\n\n"
+                                    "{e_icon_search} Votre radar de forteresses a repris automatiquement en arrière-plan.\n"
+                                    "{e_nocheck} Veuillez noter que les boutons interactifs (*Relancer / Vérifier*) de vos anciennes alertes ne sont désormais plus fonctionnels.\n\n"
+                                    "{e_check} *(Retour à la normale effectif)*"
                                 ),
                             )
 
@@ -373,11 +373,19 @@ class GGEAssistantBot(commands.Bot):
             except:
                 pass
 
-        # Message de bienvenue standard (ton code existant)
+        # Message de bienvenue standard avec vérification stricte des permissions
         channel_to_send = guild.system_channel
-        if not channel_to_send or not channel_to_send.permissions_for(guild.me).send_messages:
+
+        def can_send_welcome(channel):
+            if not channel:
+                return False
+            perms = channel.permissions_for(guild.me)
+            return perms.view_channel and perms.send_messages and perms.embed_links
+
+        if not can_send_welcome(channel_to_send):
+            channel_to_send = None
             for channel in guild.text_channels:
-                if channel.permissions_for(guild.me).send_messages:
+                if can_send_welcome(channel):
                     channel_to_send = channel
                     break
 
@@ -386,12 +394,14 @@ class GGEAssistantBot(commands.Bot):
             embed_initial = view.get_welcome_embed("en")
             try:
                 await channel_to_send.send(embed=embed_initial, view=view)
-            except discord.Forbidden as e:
-                logger.error(f"❌ Impossible d'envoyer le message de bienvenue sur {guild.name} (Forbidden) : {e}")
+            except discord.Forbidden:
+                logger.warning(f"🔇 Message de bienvenue bloqué par les paramètres du serveur '{guild.name}'.")
+            except Exception as e:
+                logger.error(f"❌ Erreur inattendue du message de bienvenue sur {guild.name} : {e}")
                 self.loop.create_task(
                     self._send_background_error(
-                        "🔇 Erreur Permissions (Bienvenue)",
-                        f"Le bot n'a pas les droits pour envoyer le message de bienvenue sur le serveur **{guild.name}**.\nErreur : `{e}`",
+                        "🐛 Crash Inattendu (Bienvenue)",
+                        f"Crash lors du message de bienvenue sur **{guild.name}**.\nErreur : `{e}`",
                     )
                 )
             except Exception as e:

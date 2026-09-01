@@ -13,6 +13,7 @@ from discord.ext import commands
 from utils import (
     ADMINS_DIR,
     BOT_VERSION,
+    DICT_EMOJIS,
     MON_ID_DISCORD,
     PaginationView,
     get_api_headers,
@@ -133,19 +134,19 @@ PROJECTS_LIST = [
                 "label_key": "btn_website",
                 "label_defaut": "Site Web",
                 "url": "https://gge-tracker.com/",
-                "emoji": "<:website:1542172920468602910>",
+                "emoji": DICT_EMOJIS.get("e_website", "🌐"),
             },
             {
                 "label_key": "btn_discord",
                 "label_defaut": "Discord",
                 "url": "https://discord.gg/eb6WSHQqYh",
-                "emoji": "<:discordlogo:1542171293074587729>",
+                "emoji": DICT_EMOJIS.get("e_discordlogo", "💬"),
             },
             {
                 "label_key": "btn_api",
                 "label_defaut": "API",
                 "url": "https://docs.gge-tracker.com/",
-                "emoji": "<:developer:1542207399476330497>",
+                "emoji": DICT_EMOJIS.get("e_developer", "💻"),
             },
         ],
     },
@@ -159,7 +160,7 @@ PROJECTS_LIST = [
                 "label_key": "btn_website",
                 "label_defaut": "Site Web",
                 "url": "https://danadum.github.io/empire-rankings/",
-                "emoji": "<:website:1542172920468602910>",
+                "emoji": DICT_EMOJIS.get("e_website", "🌐"),
             }
         ],
     },
@@ -173,7 +174,7 @@ PROJECTS_LIST = [
                 "label_key": "btn_website",
                 "label_defaut": "Site Web",
                 "url": "https://generalsforum.com/",
-                "emoji": "<:website:1542172920468602910>",
+                "emoji": DICT_EMOJIS.get("e_website", "🌐"),
             }
         ],
     },
@@ -265,6 +266,8 @@ class HelpSelect(discord.ui.Select):
                 embed.add_field(name=f"{emoji_statut} **`{cmd['name']}`**", value=f"{cmd_desc}", inline=False)
 
         await setup_embed_footer(embed, interaction, self.langue)
+        if not self.view.message:
+            self.view.message = interaction.message
         await interaction.response.edit_message(embed=embed, view=self.view)
 
 
@@ -277,7 +280,7 @@ class HelpView(discord.ui.View):
     async def on_timeout(self):
         for child in self.children:
             child.disabled = True
-        if hasattr(self, "message") and self.message:
+        if self.message:
             try:
                 await self.message.edit(view=self)
             except discord.HTTPException:
@@ -297,7 +300,6 @@ class AideCog(commands.Cog):
         self.clr_vote = discord.Color.from_rgb(232, 198, 112)  # Gold3
         self.clr_support = discord.Color.from_rgb(241, 213, 143)  # Gold4
         self.clr_contact = discord.Color.from_rgb(247, 226, 173)  # Gold5
-        self.clr_discover = discord.Color.from_rgb(0, 153, 255)  # Bleu
 
     # ==========================================
     # 📖 COMMANDE : HELP
@@ -352,8 +354,8 @@ class AideCog(commands.Cog):
         # 🤖 1. DIAGNOSTIC BOT DISCORD
         ping = round(self.bot.latency * 1000)
 
-        val_oui = t(langue, "statut_yes", defaut="<:parameters:1512573735390154986> Oui")
-        val_non = t(langue, "statut_no", defaut="<:icon_friends2:1512573878801797271> Non")
+        val_oui = t(langue, "statut_yes", defaut="{e_parameters} Oui")
+        val_non = t(langue, "statut_no", defaut="{e_icon_friends2} Non")
         maintenance_txt = val_oui if getattr(self.bot, "maintenance_mode", False) else val_non
 
         bot_txt = t(
@@ -381,9 +383,7 @@ class AideCog(commands.Cog):
 
             # --- 🔍 Scan Serveur ---
             scans_dir = Path(f"/app/data/server_scans/{serveur}")
-            last_scan_txt = t(
-                langue, "statut_storage_no_file", defaut="<:error:1512505075220611172> Aucun fichier trouvé"
-            )
+            last_scan_txt = t(langue, "statut_storage_no_file", defaut="{e_error} Aucun fichier trouvé")
 
             if scans_dir.exists():
                 server_files = list(scans_dir.rglob("*.json"))
@@ -411,7 +411,7 @@ class AideCog(commands.Cog):
                 langue,
                 "statut_storage_err",
                 error=str(e),
-                defaut=f"<:error:1512505075220611172> Erreur de lecture de l'espace de stockage : {e}",
+                defaut=f"{{e_error}} Erreur de lecture de l'espace de stockage : {e}",
             )
 
         embed.add_field(
@@ -440,7 +440,7 @@ class AideCog(commands.Cog):
                     api_data = await r.json()
                     v_api = api_data.get("version", "Inconnue")
 
-                    val_prog = t(langue, "statut_api_prog", defaut="<:error:1512505075220611172> En cours...")
+                    val_prog = t(langue, "statut_api_prog", defaut="{e_error} En cours...")
                     val_done = t(langue, "statut_api_done", defaut="🟢 Terminé / À jour")
                     in_progress = val_prog if api_data.get("update_in_progress", False) else val_done
 
@@ -470,13 +470,13 @@ class AideCog(commands.Cog):
                         e=to_discord_ts(updates.get("war_realms")),
                         b=to_discord_ts(updates.get("berimond_kingdom")),
                         defaut=(
-                            f"<:pp1:1512438903821570160> **Puissances** : {to_discord_ts(updates.get('might'))}\n"
-                            f"<:loot:1512439015570276553> **Pillages** : {to_discord_ts(updates.get('loot'))}\n"
-                            f"<:nomads:1512431070719774750> **Nomades** : {to_discord_ts(updates.get('nomad'))}\n"
-                            f"<:samurai:1512430844935929868> **Samouraïs** : {to_discord_ts(updates.get('samurai'))}\n"
-                            f"<:bloodcrow:1512430942990368928> **Corbeaux** : {to_discord_ts(updates.get('bloodcrow'))}\n"
-                            f"<:war_realms:1512573773658980504> **Etrangers** : {to_discord_ts(updates.get('war_realms'))}\n"
-                            f"<:berimond:1512430901756428390> **Bérimond** : {to_discord_ts(updates.get('berimond_kingdom'))}"
+                            f"{{e_pp1}} **Puissances** : {to_discord_ts(updates.get('might'))}\n"
+                            f"{{e_loot}} **Pillages** : {to_discord_ts(updates.get('loot'))}\n"
+                            f"{{e_nomads}} **Nomades** : {to_discord_ts(updates.get('nomad'))}\n"
+                            f"{{e_samurai}} **Samouraïs** : {to_discord_ts(updates.get('samurai'))}\n"
+                            f"{{e_bloodcrow}} **Corbeaux** : {to_discord_ts(updates.get('bloodcrow'))}\n"
+                            f"{{e_war_realms}} **Etrangers** : {to_discord_ts(updates.get('war_realms'))}\n"
+                            f"{{e_berimond}} **Bérimond** : {to_discord_ts(updates.get('berimond_kingdom'))}"
                         ),
                     )
                     embed.add_field(
@@ -491,7 +491,7 @@ class AideCog(commands.Cog):
                             langue,
                             "statut_api_err_instable",
                             code=r.status,
-                            defaut=f"<:error:1512505075220611172> L'API répond mais rencontre une instabilité (Code : {r.status}).",
+                            defaut=f"{{e_error}} L'API répond mais rencontre une instabilité (Code : {r.status}).",
                         ),
                         inline=False,
                     )
@@ -502,7 +502,7 @@ class AideCog(commands.Cog):
                     langue,
                     "statut_api_err_offline",
                     error=str(e),
-                    defaut=f"<:error:1512505075220611172> **Hors ligne** : Impossible de joindre l'API de suivi du jeu ({e}).",
+                    defaut=f"{{e_error}} **Hors ligne** : Impossible de joindre l'API de suivi du jeu ({e}).",
                 ),
                 inline=False,
             )
@@ -535,24 +535,16 @@ class AideCog(commands.Cog):
             )
 
             for project in chunk:
-                # La fonction t() traduira toute seule les {e_...}
                 titre_traduit = t(langue, project["title_key"], defaut=project["default_title"])
                 desc_traduit = t(langue, project["desc_key"], defaut=project["default_desc"])
 
-                # Création des liens cliquables en texte (Markdown)
                 links_text = []
                 for link in project.get("links", []):
                     label = t(langue, link["label_key"], defaut=link["label_defaut"])
                     links_text.append(f"{link['emoji']} **[{label}]({link['url']})**")
 
-                # MISE EN FORME AMÉLIORÉE 🎨
-                # 1. On met la description en citation (> )
                 desc_formatee = f"> *{desc_traduit}*"
-
-                # 2. On utilise un point (•) pour séparer les liens
                 barre_liens = "  •  ".join(links_text)
-
-                # 3. On ajoute \u200b à la fin pour forcer un espace vide entre les projets
                 final_value = f"{desc_formatee}\n\n{barre_liens}\n\u200b"
 
                 embed.add_field(name=titre_traduit, value=final_value, inline=False)
@@ -560,13 +552,12 @@ class AideCog(commands.Cog):
             await setup_embed_footer(embed, interaction, langue)
             embeds.append(embed)
 
-        # S'il n'y a qu'une seule page, on l'envoie direct
         if len(embeds) == 1:
             await interaction.response.send_message(embed=embeds[0])
-        # Sinon, on utilise ta vue de pagination
         else:
             view = PaginationView(embeds)
             await interaction.response.send_message(embed=embeds[0], view=view)
+            view.message = await interaction.original_response()
 
     # ========================================================
     # 🆘 COMMANDE : SUPPORT
@@ -576,7 +567,7 @@ class AideCog(commands.Cog):
         langue, _ = await get_server_config(interaction)
 
         embed = discord.Embed(
-            title=t(langue, "cmd_support_title", defaut="<:Information:1533430015264555099> Support & Communauté"),
+            title=t(langue, "cmd_support_title", defaut="{e_information} Support & Communauté"),
             description=t(
                 langue,
                 "cmd_support_desc",
@@ -586,7 +577,6 @@ class AideCog(commands.Cog):
         )
 
         view = discord.ui.View()
-        # 🔗 Remplace par ton vrai lien d'invitation Discord :
         invite_url = "https://discord.gg/zrrhxp6wDj"
         btn = discord.ui.Button(
             label=t(langue, "cmd_support_btn", defaut="Rejoindre le serveur"), url=invite_url, emoji="💬"
@@ -613,7 +603,6 @@ class AideCog(commands.Cog):
         )
 
         view = discord.ui.View()
-        # 🔗 Remplace par l'ID de ton bot pour le lien de vote :
         bot_id = "1472309793065533493"
         vote_url = f"https://top.gg/bot/{bot_id}/vote"
         btn = discord.ui.Button(label=t(langue, "cmd_vote_btn", defaut="Voter sur Top.gg"), url=vote_url, emoji="⭐")
@@ -639,11 +628,8 @@ class AideCog(commands.Cog):
         )
 
         view = discord.ui.View()
-        # 🔗 Remplace par l'ID de ton bot pour le lien de la page :
         bot_id = "1472309793065533493"
-        news_url = (
-            f"https://top.gg/bot/{bot_id}/announcements"  # Le #articles descend la page directement au bon endroit
-        )
+        news_url = f"https://top.gg/bot/{bot_id}/announcements"
         btn = discord.ui.Button(label=t(langue, "cmd_news_btn", defaut="Voir les annonces"), url=news_url, emoji="🗞️")
         view.add_item(btn)
 
@@ -705,16 +691,20 @@ class AideCog(commands.Cog):
                 title="📩 Nouveau Ticket Reçu !", color=self.clr_contact, timestamp=discord.utils.utcnow()
             )
             embed_mp.add_field(
-                name="<:players:1512504277392953426> Expéditeur",
+                name="{e_players} Expéditeur",
                 value=f"**{interaction.user.name}** (`{interaction.user.id}`)",
                 inline=True,
             )
-            embed_mp.add_field(
-                name="<:castles:1512574693859786822> Provenance", value=f"*{nouveau_ticket['serveur']}*", inline=True
+            embed_mp.add_field(name="{e_castles} Provenance", value=f"*{nouveau_ticket['serveur']}*", inline=True)
+            embed_mp.add_field(name="{e_memberlist} Message", value=f"```text\n{message}\n```", inline=False)
+
+            # On remplace les emojis dynamiques manuellement pour le MP admin car setup_embed_footer ne lit que le footer
+            embed_mp.fields[0].name = embed_mp.fields[0].name.replace("{e_players}", DICT_EMOJIS.get("e_players", "👤"))
+            embed_mp.fields[1].name = embed_mp.fields[1].name.replace("{e_castles}", DICT_EMOJIS.get("e_castles", "🏰"))
+            embed_mp.fields[2].name = embed_mp.fields[2].name.replace(
+                "{e_memberlist}", DICT_EMOJIS.get("e_memberlist", "📋")
             )
-            embed_mp.add_field(
-                name="<:memberlist:1512572899360378971> Message", value=f"```text\n{message}\n```", inline=False
-            )
+
             await setup_embed_footer(embed_mp, interaction, "fr")
 
             await developpeur.send(embed=embed_mp)
@@ -727,19 +717,16 @@ class AideCog(commands.Cog):
         succ_msg = t(
             langue,
             "contact_success",
-            defaut="<:players:1512504277392953426> **Merci !** Ton message a bien été enregistré et transmis au développeur.",
+            defaut="{e_players} **Merci !** Ton message a bien été enregistré et transmis au développeur.",
         )
         await interaction.followup.send(succ_msg)
 
     # ==========================================
     # 🛡️ PROTECTEUR DE CLÉS POUR LE SCRIPT DE SYNCHRO
-    # Ces appels ne sont jamais exécutés, ils servent
-    # juste à empêcher !i18l_sync de supprimer ces clés dynamiques.
     # ==========================================
     def _dummy_i18n():
         langue = "fr"
 
-        # --- Titres & Catégories ---
         t(langue, "help_home_title")
         t(langue, "help_legend")
         t(langue, "aide_p0_desc")
@@ -749,18 +736,15 @@ class AideCog(commands.Cog):
         t(langue, "help_cat_guerre")
         t(langue, "help_cat_events")
         t(langue, "help_cat_radars")
-        # --- Commandes : Config ---
         t(langue, "help_cmd_setup")
         t(langue, "help_cmd_link_account")
         t(langue, "help_cmd_status")
         t(langue, "help_cmd_help")
-        # --- Commandes : Communauté ---
         t(langue, "help_cmd_news")
         t(langue, "help_cmd_support")
         t(langue, "help_cmd_contact")
         t(langue, "help_cmd_vote")
         t(langue, "help_cmd_discover")
-        # --- Commandes : Profils ---
         t(langue, "help_cmd_server")
         t(langue, "help_cmd_player_profile")
         t(langue, "help_cmd_player_history")
@@ -770,23 +754,19 @@ class AideCog(commands.Cog):
         t(langue, "help_cmd_alliance_might")
         t(langue, "help_cmd_alliance_property")
         t(langue, "help_cmd_alliance_desc")
-        # --- Commandes : Guerre ---
         t(langue, "help_cmd_alliance_scanner")
         t(langue, "help_cmd_target_group")
-        # --- Commandes : Events ---
         t(langue, "help_cmd_event_player")
         t(langue, "help_cmd_event_alliance")
         t(langue, "help_cmd_calendar_group")
         t(langue, "help_cmd_rank_group")
         t(langue, "help_cmd_leaderboard_group")
         t(langue, "help_cmd_woa_group")
-        # --- Commandes : Radars ---
         t(langue, "help_cmd_radar_group")
         t(langue, "help_cmd_radar_alliance_group")
         t(langue, "help_cmd_rival_group")
         t(langue, "help_cmd_fortress_group")
         t(langue, "help_cmd_storm_group")
-        # --- Éléments du Select Menu ---
         t(langue, "help_placeholder")
         t(langue, "help_menu_home")
         t(langue, "help_menu_home_desc")
@@ -796,7 +776,6 @@ class AideCog(commands.Cog):
         t(langue, "help_menu_guerre")
         t(langue, "help_menu_events")
         t(langue, "help_menu_radars")
-        # --- Projets Discover ---
         t(langue, "cmd_discover_title")
         t(langue, "cmd_discover_desc")
         t(langue, "cmd_disc_gge_tracker_title")
