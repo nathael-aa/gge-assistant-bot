@@ -298,7 +298,7 @@ class StormsCog(commands.Cog):
                         f"**Lvl. {desc}** | {{e_compass}} `({x}:{y})` | {{e_attaque}} {attaques} {lbl_att_left}{time_str}"
                     )
 
-                embed.description = "\n".join(lignes_description) + "\n" + last_update
+                embed.description = ("\n".join(lignes_description) + "\n" + last_update).format(**DICT_EMOJIS)
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
 
@@ -450,7 +450,7 @@ class StormsCog(commands.Cog):
 
                     lignes_description.append(ligne)
 
-                embed.description = "\n".join(lignes_description) + "\n" + last_update
+                embed.description = ("\n".join(lignes_description) + "\n" + last_update).format(**DICT_EMOJIS)
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
 
