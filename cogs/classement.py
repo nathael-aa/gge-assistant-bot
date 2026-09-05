@@ -109,7 +109,6 @@ class ClassementCog(commands.Cog):
         self.logger = logging.getLogger("GGEAssistant")
         self.ranking_api_url = "https://empire-api.fly.dev"
 
-        # 🌟 UTILISATION DU CHEMIN ABSOLU DE UTILS
         self.config_path = CONFIG_DIR / "configuration.json"
 
         self.servers_map = {}
@@ -120,7 +119,6 @@ class ClassementCog(commands.Cog):
     def load_rankings_config(self):
         try:
             self.logger.info(f"📝 [Classement] Tentative de chargement du JSON à : {self.config_path}")
-            # 🌟 UTILISATION DE .exists() PROPRE À PATHLIB
             if self.config_path.exists():
                 with open(self.config_path, encoding="utf-8") as f:
                     config_data = json.load(f)
@@ -139,7 +137,7 @@ class ClassementCog(commands.Cog):
                 )
             else:
                 self.logger.warning(
-                    f"⚠️ [Classement] Fichier introuvable à {self.config_path} ! Vérifie ton arborescence."
+                    f"⚠️ [Classement] Fichier introuvable à {self.config_path} ! Les dictionnaires de secours prendront le relais."
                 )
         except Exception as e:
             self.logger.error(f"❌ [Classement] Erreur critique lors de l'initialisation du JSON : {e}")
