@@ -67,7 +67,7 @@
     "cal_ev_snowglobe": "Verzauberte Schneekugel",
     "cal_ev_storm": "Sturminseln",
     "cal_ev_tournament": "Das Große Turnier",
-    "cal_ev_woa": "Krieg der Allianzen",
+    "cal_ev_woa": "Rad des unvorstellbaren Reichtums",
     "cal_event_end_desc": "Ruhe kehrt auf dem Server ein. Das Event ist offiziell beendet!",
     "cal_event_end_title": "{e_tomatobulletpoint} EVENT-ENDE: {name}",
     "cal_event_start_desc": "Die Stunde hat geschlagen! Ein neues Event hat soeben seine Tore in unserem Land geöffnet.\n\n{e_std_hourglass_not_done} **Geplantes Ende**: <t:{ts_fin}:f> (<t:{ts_fin}:R>)",

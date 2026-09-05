@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 import urllib.parse
 
 import discord
@@ -10,6 +9,7 @@ from discord.ext import commands
 
 import observability as obs
 from utils import (
+    CONFIG_DIR,
     DICT_EMOJIS,
     PaginationView,
     alliance_autocomplete,
@@ -108,7 +108,9 @@ class ClassementCog(commands.Cog):
         self.bot = bot
         self.logger = logging.getLogger("GGEAssistant")
         self.ranking_api_url = "https://empire-api.fly.dev"
-        self.config_path = "data/configs/configuration.json"
+
+        # 🌟 UTILISATION DU CHEMIN ABSOLU DE UTILS
+        self.config_path = CONFIG_DIR / "configuration.json"
 
         self.servers_map = {}
         self.event_ids = {}
@@ -118,7 +120,8 @@ class ClassementCog(commands.Cog):
     def load_rankings_config(self):
         try:
             self.logger.info(f"📝 [Classement] Tentative de chargement du JSON à : {self.config_path}")
-            if os.path.exists(self.config_path):
+            # 🌟 UTILISATION DE .exists() PROPRE À PATHLIB
+            if self.config_path.exists():
                 with open(self.config_path, encoding="utf-8") as f:
                     config_data = json.load(f)
 
@@ -1964,6 +1967,7 @@ class ClassementCog(commands.Cog):
 
             if evenement in ["woa", "patronage"]:
                 nom_tranche = t(langue, "ev_bracket_all", defaut="Classement Global")
+                bracket_icon = get_emo(langue, "{e_events4}")
             elif evenement == "shapeshifters":
                 nom_tranche_defaut = self.brackets_map.get(str(found_lid), f"Tranche {found_lid}")
                 nom_tranche = t(langue, f"ev_bracket_{found_lid}", defaut=nom_tranche_defaut)

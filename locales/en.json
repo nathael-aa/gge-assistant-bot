@@ -67,7 +67,7 @@
     "cal_ev_snowglobe": "The Enchanted Snowglobe",
     "cal_ev_storm": "Storm Islands",
     "cal_ev_tournament": "The Grand Tournament",
-    "cal_ev_woa": "War of the Alliances",
+    "cal_ev_woa": "Wheel of Unimaginable Affluence",
     "cal_event_end_desc": "Calm returns to the server. The event is officially over!",
     "cal_event_end_title": "{e_tomatobulletpoint} EVENT END: {name}",
     "cal_event_start_desc": "The time has come! A new event has just opened its gates on our lands.\n\n{e_std_hourglass_not_done} **Scheduled closing**: <t:{ts_fin}:f> (<t:{ts_fin}:R>)",

@@ -67,7 +67,7 @@
     "cal_ev_snowglobe": "La Boule à Neige Enchantée",
     "cal_ev_storm": "Îles Orageuses",
     "cal_ev_tournament": "Grand Tournoi",
-    "cal_ev_woa": "Guerre des Alliances",
+    "cal_ev_woa": "Roue de l'Abondance Inimaginable",
     "cal_event_end_desc": "Le calme revient sur le serveur. L'événement est officiellement terminé !",
     "cal_event_end_title": "{e_tomatobulletpoint} FIN D'ÉVÉNEMENT : {name}",
     "cal_event_start_desc": "L'heure a sonné ! Un nouvel événement vient d'ouvrir ses portes sur nos terres.\n\n{e_time} **Fermeture prévue** : <t:{ts_fin}:f> (<t:{ts_fin}:R>)",
