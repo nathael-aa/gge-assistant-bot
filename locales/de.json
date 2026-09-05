@@ -375,7 +375,7 @@
     "hub_stop_fail": "{e_warning} Neuigkeiten vom Typ `{categorie}` waren auf diesem Server nicht konfiguriert.",
     "hub_stop_success": "{e_check} Neuigkeiten vom Typ `{categorie}` wurden für diesen Server deaktiviert.",
     "hub_thread_hint": "{e_std_backhand_index_pointing_down} *Die vollständigen Details des Updates findest du im Thread unten!*",
-    "hub_thread_name": "{e_std_scroll} Details: {titre}",
+    "hub_thread_name": "Details: {titre}",
     "month_01": "Januar",
     "month_02": "Februar",
     "month_03": "März",

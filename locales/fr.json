@@ -375,7 +375,7 @@
     "hub_stop_fail": "{e_warning} Les actualités de type `{categorie}` n'étaient pas configurées sur ce serveur.",
     "hub_stop_success": "{e_check} Les actualités de type `{categorie}` ont été désactivées pour ce serveur.",
     "hub_thread_hint": "{e_std_backhand_index_pointing_down} *Le détail complet de la mise à jour est disponible dans le fil de discussion ci-dessous !*",
-    "hub_thread_name": "{e_std_scroll} Détails : {titre}",
+    "hub_thread_name": "Détails : {titre}",
     "month_01": "Janvier",
     "month_02": "Février",
     "month_03": "Mars",

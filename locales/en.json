@@ -375,7 +375,7 @@
     "hub_stop_fail": "{e_warning} News of type `{categorie}` were not configured on this server.",
     "hub_stop_success": "{e_check} News of type `{categorie}` have been disabled for this server.",
     "hub_thread_hint": "{e_std_backhand_index_pointing_down} *The full details of the update are available in the thread below!*",
-    "hub_thread_name": "{e_std_scroll} Details: {titre}",
+    "hub_thread_name": "Details: {titre}",
     "month_01": "January",
     "month_02": "February",
     "month_03": "March",
