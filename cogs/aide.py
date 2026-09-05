@@ -54,6 +54,7 @@ HELP_CONFIG = {
         "color": discord.Color.from_rgb(230, 230, 250),
         "title_key": "help_cat_communaute",
         "commands": [
+            {"name": "/hub (setup / stop)", "desc_key": "help_cmd_hub_group"},
             {"name": "/news", "desc_key": "help_cmd_news"},
             {"name": "/support", "desc_key": "help_cmd_support"},
             {"name": "/contact", "desc_key": "help_cmd_contact"},
@@ -710,6 +711,7 @@ class AideCog(commands.Cog):
         t(langue, "help_cat_radars")
         t(langue, "help_cmd_setup")
         t(langue, "help_cmd_link_account")
+        t(langue, "help_cmd_hub_group")
         t(langue, "help_cmd_status")
         t(langue, "help_cmd_help")
         t(langue, "help_cmd_news")

@@ -231,6 +231,7 @@ class GGEAssistantBot(commands.Bot):
             "cogs.config",
             "cogs.events",
             "cogs.forteresses",
+            "cogs.gge_hub_community",
             "cogs.profils",
             "cogs.radar",
             "cogs.scan_server",
