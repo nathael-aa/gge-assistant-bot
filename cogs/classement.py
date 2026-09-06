@@ -472,8 +472,10 @@ class ClassementCog(commands.Cog):
 
             warning_msg = ""
             if loc_rank and not loc_tranche and not search_mode:
-                warning_msg += (
-                    "\n*💡 Info : Tranche maximale affichée par défaut. Utilisez l'option `tranche` pour changer.*"
+                warning_msg += "\n" + t(
+                    langue,
+                    "info_max_bracket",
+                    defaut="*💡 Info : Tranche maximale affichée par défaut. Utilisez l'option `tranche` pour changer.*",
                 )
 
             accumulated_data = {lid: [] for lid in possible_lids}
@@ -493,18 +495,26 @@ class ClassementCog(commands.Cog):
 
             current_sv = start_sv
             PLAYERS_PER_PAGE = 5
-            BATCH_SIZE = 10
+            BATCH_SIZE = 3
 
             async def fetch_chunk(sv_val, lid):
                 url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22LID%22:{lid},%22SV%22:%22{sv_val}%22"
-                for _ in range(3):
+                for attempt in range(3):
                     try:
-                        async with self.bot.session.get(url, timeout=5) as r:
+                        async with self.bot.session.get(url, timeout=10) as r:
                             if r.status == 200:
                                 return await r.json()
-                    except:
-                        pass
-                    await asyncio.sleep(0.3)
+                            else:
+                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
+                                # Ajout des codes 500 (crash API) pour forcer le bot à faire une pause
+                                if r.status in [429, 500, 502, 503, 504]:
+                                    await asyncio.sleep(2)
+                    except TimeoutError:
+                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
+                    except Exception as e:
+                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
+
+                    await asyncio.sleep(0.5)
                 return None
 
             try:
@@ -522,6 +532,14 @@ class ClassementCog(commands.Cog):
                     if not task_coros:
                         break
                     responses = await asyncio.gather(*task_coros)
+                    if all(resp is None for resp in responses):
+                        msg_err = t(
+                            langue,
+                            "api_unavailable_error",
+                            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                        )
+                        await ctx_int.followup.send(msg_err)
+                        return None, None
                     batch_empty = True
 
                     for i, jsonData in enumerate(responses):
@@ -771,10 +789,11 @@ class ClassementCog(commands.Cog):
 
             warning_msg = ""
             if loc_rank and not loc_tranche and not search_mode:
-                warning_msg += (
-                    "\n*💡 Info : Tranche maximale affichée par défaut. Utilisez l'option `tranche` pour changer.*"
+                warning_msg += "\n" + t(
+                    langue,
+                    "info_max_bracket",
+                    defaut="*💡 Info : Tranche maximale affichée par défaut. Utilisez l'option `tranche` pour changer.*",
                 )
-
             accumulated_data = {lid: [] for lid in possible_lids}
             player_found = False
 
@@ -792,18 +811,26 @@ class ClassementCog(commands.Cog):
 
             current_sv = start_sv
             PLAYERS_PER_PAGE = 5
-            BATCH_SIZE = 10
+            BATCH_SIZE = 3
 
             async def fetch_chunk(sv_val, lid):
                 url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22LID%22:{lid},%22SV%22:%22{sv_val}%22"
-                for _ in range(3):
+                for attempt in range(3):
                     try:
-                        async with self.bot.session.get(url, timeout=5) as r:
+                        async with self.bot.session.get(url, timeout=10) as r:
                             if r.status == 200:
                                 return await r.json()
-                    except:
-                        pass
-                    await asyncio.sleep(0.3)
+                            else:
+                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
+                                # Ajout des codes 500 (crash API) pour forcer le bot à faire une pause
+                                if r.status in [429, 500, 502, 503, 504]:
+                                    await asyncio.sleep(2)
+                    except TimeoutError:
+                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
+                    except Exception as e:
+                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
+
+                    await asyncio.sleep(0.5)
                 return None
 
             try:
@@ -821,6 +848,14 @@ class ClassementCog(commands.Cog):
                     if not task_coros:
                         break
                     responses = await asyncio.gather(*task_coros)
+                    if all(resp is None for resp in responses):
+                        msg_err = t(
+                            langue,
+                            "api_unavailable_error",
+                            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                        )
+                        await ctx_int.followup.send(msg_err)
+                        return None, None
                     batch_empty = True
 
                     for i, jsonData in enumerate(responses):
@@ -1058,18 +1093,26 @@ class ClassementCog(commands.Cog):
 
             current_sv = start_sv
             PLAYERS_PER_PAGE = 5
-            BATCH_SIZE = 10
+            BATCH_SIZE = 3
 
             async def fetch_chunk(sv_val, lid):
                 url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22LID%22:{lid},%22SV%22:%22{sv_val}%22"
-                for _ in range(3):
+                for attempt in range(3):
                     try:
-                        async with self.bot.session.get(url, timeout=5) as r:
+                        async with self.bot.session.get(url, timeout=10) as r:
                             if r.status == 200:
                                 return await r.json()
-                    except:
-                        pass
-                    await asyncio.sleep(0.3)
+                            else:
+                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
+                                # Ajout des codes 500 (crash API) pour forcer le bot à faire une pause
+                                if r.status in [429, 500, 502, 503, 504]:
+                                    await asyncio.sleep(2)
+                    except TimeoutError:
+                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
+                    except Exception as e:
+                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
+
+                    await asyncio.sleep(0.5)
                 return None
 
             try:
@@ -1087,6 +1130,14 @@ class ClassementCog(commands.Cog):
                     if not task_coros:
                         break
                     responses = await asyncio.gather(*task_coros)
+                    if all(resp is None for resp in responses):
+                        msg_err = t(
+                            langue,
+                            "api_unavailable_error",
+                            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                        )
+                        await ctx_int.followup.send(msg_err)
+                        return None, None
                     batch_empty = True
 
                     for i, jsonData in enumerate(responses):
@@ -1156,9 +1207,19 @@ class ClassementCog(commands.Cog):
             warning_msg = ""
             if search_mode and not player_found:
                 if loc_rank:
-                    warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé. Voici le rang {loc_rank} à la place.*"
+                    msg = t(
+                        langue,
+                        "info_player_not_found_rank",
+                        defaut="*💡 Info : Le joueur **{joueur}** n'a pas été trouvé. Voici le rang {rang} à la place.*",
+                    ).format(joueur=loc_player, rang=loc_rank)
+                    warning_msg += f"\n\n{msg}"
                 else:
-                    warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé dans le Top {max_sv_limit}. Voici la première page par défaut.*"
+                    msg = t(
+                        langue,
+                        "info_player_not_found_top",
+                        defaut="*💡 Info : Le joueur **{joueur}** n'a pas été trouvé dans le Top {top}. Voici la première page par défaut.*",
+                    ).format(joueur=loc_player, top=max_sv_limit)
+                    warning_msg += f"\n\n{msg}"
                     page_cible = 0
 
             if evenement == "flora":
@@ -1303,14 +1364,22 @@ class ClassementCog(commands.Cog):
 
             async def fetch_chunk(sv_val, lid):
                 url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22LID%22:{lid},%22SV%22:%22{sv_val}%22"
-                for _ in range(3):
+                for attempt in range(3):
                     try:
-                        async with self.bot.session.get(url, timeout=5) as r:
+                        async with self.bot.session.get(url, timeout=10) as r:
                             if r.status == 200:
                                 return await r.json()
-                    except:
-                        pass
-                    await asyncio.sleep(0.3)
+                            else:
+                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
+                                # Ajout des codes 500 (crash API) pour forcer le bot à faire une pause
+                                if r.status in [429, 500, 502, 503, 504]:
+                                    await asyncio.sleep(2)
+                    except TimeoutError:
+                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
+                    except Exception as e:
+                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
+
+                    await asyncio.sleep(0.5)
                 return None
 
             try:
@@ -1328,6 +1397,14 @@ class ClassementCog(commands.Cog):
                     if not task_coros:
                         break
                     responses = await asyncio.gather(*task_coros)
+                    if all(resp is None for resp in responses):
+                        msg_err = t(
+                            langue,
+                            "api_unavailable_error",
+                            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                        )
+                        await ctx_int.followup.send(msg_err)
+                        return None, None
                     batch_empty = True
 
                     for i, jsonData in enumerate(responses):
@@ -1407,9 +1484,19 @@ class ClassementCog(commands.Cog):
             warning_msg = ""
             if search_mode and not player_found:
                 if loc_rank:
-                    warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé. Voici le rang {loc_rank} à la place.*"
+                    msg = t(
+                        langue,
+                        "info_player_not_found_rank",
+                        defaut="*💡 Info : Le joueur **{joueur}** n'a pas été trouvé. Voici le rang {rang} à la place.*",
+                    ).format(joueur=loc_player, rang=loc_rank)
+                    warning_msg += f"\n\n{msg}"
                 else:
-                    warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé dans le Top {max_sv_limit}. Voici la première page par défaut.*"
+                    msg = t(
+                        langue,
+                        "info_player_not_found_top",
+                        defaut="*💡 Info : Le joueur **{joueur}** n'a pas été trouvé dans le Top {top}. Voici la première page par défaut.*",
+                    ).format(joueur=loc_player, top=max_sv_limit)
+                    warning_msg += f"\n\n{msg}"
                     page_cible = 0
 
             embed_color = discord.Color(0x4A7160) if evenement == "horizon" else discord.Color(0xF25500)
@@ -1562,9 +1649,11 @@ class ClassementCog(commands.Cog):
             found_lid = None
 
             warning_msg = ""
-            if loc_rank and not loc_tranche and not search_mode and evenement == "season":
-                warning_msg += (
-                    "\n*💡 Info : Tranche maximale affichée par défaut. Utilisez l'option `tranche` pour changer.*"
+            if loc_rank and not loc_tranche and not search_mode:
+                warning_msg += "\n" + t(
+                    langue,
+                    "info_max_bracket",
+                    defaut="*💡 Info : Tranche maximale affichée par défaut. Utilisez l'option `tranche` pour changer.*",
                 )
 
             accumulated_data = {lid: [] for lid in possible_lids}
@@ -1584,7 +1673,7 @@ class ClassementCog(commands.Cog):
 
             current_sv = start_sv
             PLAYERS_PER_PAGE = 10
-            BATCH_SIZE = 10
+            BATCH_SIZE = 3
 
             async def fetch_chunk(sv_val, lid):
                 if is_string_val:
@@ -1592,14 +1681,22 @@ class ClassementCog(commands.Cog):
                 else:
                     url = f"{self.ranking_api_url}/{serveur_api}/{api_command}/%22LT%22:{event_id},%22LID%22:{lid},%22{pagination_param}%22:{sv_val}"
 
-                for _ in range(3):
+                for attempt in range(3):
                     try:
-                        async with self.bot.session.get(url, timeout=5) as r:
+                        async with self.bot.session.get(url, timeout=10) as r:
                             if r.status == 200:
                                 return await r.json()
-                    except:
-                        pass
-                    await asyncio.sleep(0.3)
+                            else:
+                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
+                                # Ajout des codes 500 (crash API) pour forcer le bot à faire une pause
+                                if r.status in [429, 500, 502, 503, 504]:
+                                    await asyncio.sleep(2)
+                    except TimeoutError:
+                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
+                    except Exception as e:
+                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
+
+                    await asyncio.sleep(0.5)
                 return None
 
             try:
@@ -1617,6 +1714,14 @@ class ClassementCog(commands.Cog):
                     if not task_coros:
                         break
                     responses = await asyncio.gather(*task_coros)
+                    if all(resp is None for resp in responses):
+                        msg_err = t(
+                            langue,
+                            "api_unavailable_error",
+                            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                        )
+                        await ctx_int.followup.send(msg_err)
+                        return None, None
                     batch_empty = True
 
                     for i, jsonData in enumerate(responses):
@@ -1873,9 +1978,11 @@ class ClassementCog(commands.Cog):
             found_lid = None
 
             warning_msg = ""
-            if loc_rank and not loc_tranche and not search_mode and evenement in ["shapeshifters", "nobility"]:
-                warning_msg += (
-                    "\n*💡 Info : Tranche maximale affichée par défaut. Utilisez l'option `tranche` pour changer.*"
+            if loc_rank and not loc_tranche and not search_mode:
+                warning_msg += "\n" + t(
+                    langue,
+                    "info_max_bracket",
+                    defaut="*💡 Info : Tranche maximale affichée par défaut. Utilisez l'option `tranche` pour changer.*",
                 )
 
             accumulated_data = {lid: [] for lid in possible_lids}
@@ -1895,18 +2002,26 @@ class ClassementCog(commands.Cog):
 
             current_sv = start_sv
             PLAYERS_PER_PAGE = 5
-            BATCH_SIZE = 10
+            BATCH_SIZE = 3
 
             async def fetch_chunk(sv_val, lid):
                 url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22LID%22:{lid},%22SV%22:%22{sv_val}%22"
-                for _ in range(3):
+                for attempt in range(3):
                     try:
-                        async with self.bot.session.get(url, timeout=5) as r:
+                        async with self.bot.session.get(url, timeout=10) as r:
                             if r.status == 200:
                                 return await r.json()
-                    except:
-                        pass
-                    await asyncio.sleep(0.3)
+                            else:
+                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
+                                # Ajout des codes 500 (crash API) pour forcer le bot à faire une pause
+                                if r.status in [429, 500, 502, 503, 504]:
+                                    await asyncio.sleep(2)
+                    except TimeoutError:
+                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
+                    except Exception as e:
+                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
+
+                    await asyncio.sleep(0.5)
                 return None
 
             try:
@@ -1924,6 +2039,14 @@ class ClassementCog(commands.Cog):
                     if not task_coros:
                         break
                     responses = await asyncio.gather(*task_coros)
+                    if all(resp is None for resp in responses):
+                        msg_err = t(
+                            langue,
+                            "api_unavailable_error",
+                            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                        )
+                        await ctx_int.followup.send(msg_err)
+                        return None, None
                     batch_empty = True
 
                     for i, jsonData in enumerate(responses):
@@ -2159,18 +2282,26 @@ class ClassementCog(commands.Cog):
 
             current_sv = start_sv
             PLAYERS_PER_PAGE = 5
-            BATCH_SIZE = 10
+            BATCH_SIZE = 3
 
             async def fetch_chunk(sv_val):
                 url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22SV%22:%22{sv_val}%22"
-                for _ in range(3):
+                for attempt in range(3):
                     try:
-                        async with self.bot.session.get(url, timeout=5) as r:
+                        # Augmentation du timeout de 5 à 10 secondes pour laisser l'API répondre
+                        async with self.bot.session.get(url, timeout=10) as r:
                             if r.status == 200:
                                 return await r.json()
-                    except:
-                        pass
-                    await asyncio.sleep(0.3)
+                            else:
+                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
+                                if r.status == 429:  # L'API limite le rythme (Too Many Requests)
+                                    await asyncio.sleep(2)
+                    except TimeoutError:
+                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
+                    except Exception as e:
+                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
+
+                    await asyncio.sleep(0.5)
                 return None
 
             try:
@@ -2248,9 +2379,19 @@ class ClassementCog(commands.Cog):
             warning_msg = ""
             if search_mode and not alliance_found:
                 if loc_rank:
-                    warning_msg += f"\n\n*💡 Info : L'alliance **{loc_alliance}** n'a pas été trouvée. Voici le rang {loc_rank} à la place.*"
+                    msg = t(
+                        langue,
+                        "info_alliance_not_found_rank",
+                        defaut="*💡 Info : L'alliance **{alliance}** n'a pas été trouvée. Voici le rang {rang} à la place.*",
+                    ).format(alliance=loc_alliance, rang=loc_rank)
+                    warning_msg += f"\n\n{msg}"
                 else:
-                    warning_msg += f"\n\n*💡 Info : L'alliance **{loc_alliance}** n'a pas été trouvée dans le Top {max_sv_limit}. Voici la première page par défaut.*"
+                    msg = t(
+                        langue,
+                        "info_alliance_not_found_top",
+                        defaut="*💡 Info : L'alliance **{alliance}** n'a pas été trouvée dans le Top {top}. Voici la première page par défaut.*",
+                    ).format(alliance=loc_alliance, top=max_sv_limit)
+                    warning_msg += f"\n\n{msg}"
                     page_cible = 0
 
             titre = f"{cat_info['emoji']} Classement {cat_info['name']}\n🛡️ {nom_tranche}"

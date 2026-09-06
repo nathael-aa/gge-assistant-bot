@@ -1087,7 +1087,7 @@ class GGEAssistantBot(commands.Bot):
                     msg = t(
                         langue,
                         "bot_err_config_dm",
-                        defaut="⚠️ **Halte là !**\nTu n'as pas encore configuré ton profil personnel. Utilise la commande </setup:0> pour définir ton serveur et ta langue avant d'utiliser le bot.",
+                        defaut="{e_warning} **Hold on!**\nYou haven't set up your personal profile yet. Use the </setup:0> command to choose your server and language before using the bot.",
                     )
                     await interaction.response.send_message(msg, ephemeral=True)
                 obs.deny_command(obs_ctx, "no_user_config")
@@ -1203,20 +1203,28 @@ class GGEAssistantBot(commands.Bot):
         global_cmds = blocks_data.get("global_commands", {})
         blocked_users = blocks_data.get("blocked_users", {})
 
-        if cmd_name in global_cmds:
-            if interaction.type == discord.InteractionType.application_command:
-                reason = global_cmds[cmd_name]
-                msg = t(
-                    langue, "bot_err_cmd_blocked", reason=reason, defaut=f"⛔ **Commande désactivée** :\n> {reason}"
-                )
-                await interaction.response.send_message(msg, ephemeral=True)
-            obs.deny_command(obs_ctx, "command_blocked")
-            return False
+        # Découpage du nom de la commande pour vérifier la hiérarchie ("rank contests" -> ["rank", "rank contests"])
+        parts = cmd_name.split()
 
+        # 1. Vérification des bans globaux (en cascade)
+        for i in range(1, len(parts) + 1):
+            check_name = " ".join(parts[:i])
+            if check_name in global_cmds:
+                if interaction.type == discord.InteractionType.application_command:
+                    reason = global_cmds[check_name]
+                    msg = t(
+                        langue, "bot_err_cmd_blocked", reason=reason, defaut=f"⛔ **Commande désactivée** :\n> {reason}"
+                    )
+                    await interaction.response.send_message(msg, ephemeral=True)
+                obs.deny_command(obs_ctx, "command_blocked")
+                return False
+
+        # 2. Vérification des bans utilisateurs
         user_id_str = str(interaction.user.id)
         if user_id_str in blocked_users:
             user_blocks = blocked_users[user_id_str]
 
+            # Ban total
             if "ALL" in user_blocks:
                 if interaction.type == discord.InteractionType.application_command:
                     reason = user_blocks["ALL"]
@@ -1236,27 +1244,30 @@ class GGEAssistantBot(commands.Bot):
                 obs.deny_command(obs_ctx, "user_banned_all")
                 return False
 
-            if cmd_name in user_blocks:
-                if interaction.type == discord.InteractionType.application_command:
-                    reason = user_blocks[cmd_name]
-                    msg = t(
-                        langue,
-                        "bot_err_user_blocked_cmd",
-                        reason=reason,
-                        defaut=f"🛑 **Accès restreint** :\n> {reason}",
-                    )
-                    await interaction.response.send_message(msg, ephemeral=True)
-
-                    self.loop.create_task(
-                        self._send_system_alert(
-                            interaction,
-                            "🛑 Intrusion bloquée (Ban Commande)",
-                            f"Un utilisateur a tenté d'utiliser sa commande restreinte `/{cmd_name}`.\nRaison du ban : {reason}",
-                            0x8B0000,
+            # Ban de commande spécifique (en cascade)
+            for i in range(1, len(parts) + 1):
+                check_name = " ".join(parts[:i])
+                if check_name in user_blocks:
+                    if interaction.type == discord.InteractionType.application_command:
+                        reason = user_blocks[check_name]
+                        msg = t(
+                            langue,
+                            "bot_err_user_blocked_cmd",
+                            reason=reason,
+                            defaut=f"🛑 **Accès restreint** :\n> {reason}",
                         )
-                    )
-                obs.deny_command(obs_ctx, "user_banned_command")
-                return False
+                        await interaction.response.send_message(msg, ephemeral=True)
+
+                        self.loop.create_task(
+                            self._send_system_alert(
+                                interaction,
+                                "🛑 Intrusion bloquée (Ban Commande)",
+                                f"Un utilisateur a tenté d'utiliser la commande `/{cmd_name}` (bloquée par le parent `/{check_name}`).\nRaison du ban : {reason}",
+                                0x8B0000,
+                            )
+                        )
+                    obs.deny_command(obs_ctx, "user_banned_command")
+                    return False
 
         return True
 
@@ -1280,7 +1291,6 @@ class GGEAssistantBot(commands.Bot):
         if session:
             await session.close()
 
-        # Flush the telemetry buffer before shutdown
         await obs.stop()
 
         await super().close()

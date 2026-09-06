@@ -705,11 +705,30 @@ class AdminCog(commands.Cog):
     # ⛔ 4. VIDEUR & MODÉRATION
     # ==========================================
     @commands.command(name="ban_cmd", hidden=True)
-    async def ban_cmd(self, ctx, command: str, *, reason: str = "Maintenance."):
+    async def ban_cmd(self, ctx, command: str, *, reason: str = "🚧 Maintenance."):
         """[CACHÉE] !ban_cmd [command] [reason] : Bloque une commande globalement."""
 
-        data = await load_blocks_async()
+        # 1. Nettoyer le nom tapé par l'admin (enlève le / et les espaces)
         cmd_clean = command.replace("/", "").strip()
+
+        # 2. Récupérer TOUTES les commandes et groupes enregistrés dans le bot (ex: "rank", "rank contests")
+        valid_commands = set()
+        for cmd in self.bot.tree.walk_commands():
+            valid_commands.add(cmd.qualified_name)
+            if getattr(cmd, "parent", None):
+                valid_commands.add(cmd.parent.qualified_name)
+
+        # 3. Vérifier si la commande existe
+        if cmd_clean not in valid_commands:
+            msg = t(
+                self.admin_lang,
+                "admin_ban_cmd_not_found",
+                cmd=cmd_clean,
+                defaut=f"❌ **Erreur** : La commande ou le groupe `/{cmd_clean}` n'existe pas. Vérifiez l'orthographe.",
+            )
+            return await ctx.send(msg)
+
+        data = await load_blocks_async()
         if "global_commands" not in data:
             data["global_commands"] = {}
 
@@ -846,7 +865,7 @@ class AdminCog(commands.Cog):
         return fichiers_purges
 
     @commands.command(name="ban_user", hidden=True)
-    async def ban_user(self, ctx, user: discord.User, command: str, *, reason: str = "Abus."):
+    async def ban_user(self, ctx, user: discord.User, command: str, *, reason: str = "⚠️ Abuse."):
         """[CACHÉE] !ban_user [user] [command] [reason] : Restreint un utilisateur."""
 
         data = await load_blocks_async()
