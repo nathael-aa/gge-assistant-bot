@@ -233,6 +233,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.last_scan_hour = None
+        self.users_to_purge = set()
         super().__init__()
 
         self.clr_add_joueur = discord.Color.from_rgb(255, 246, 143)
@@ -287,10 +288,19 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     livres += 1
                 except discord.Forbidden:
                     bloques += 1
-                    logger.warning(f"⚠️ Impossible d'envoyer un MP à {user_id} (DMs bloqués).")
+                    logger.warning(f"⚠️ MP bloqués pour {user_id}. Ajout à la purge.")
+                    self.users_to_purge.add(user_id)
+                except discord.HTTPException as e:
+                    if e.code == 50007:
+                        bloques += 1
+                        logger.warning(f"⚠️ MP impossibles pour {user_id}. Ajout à la purge.")
+                        self.users_to_purge.add(user_id)
+                    else:
+                        echecs += 1
+                        logger.error(f"❌ Erreur HTTP MP à {user_id} : {e}")
                 except Exception as e:
                     echecs += 1
-                    logger.error(f"❌ Erreur MP à {user_id} : {e}")
+                    logger.error(f"❌ Erreur inattendue MP à {user_id} : {e}")
 
         if destinataires:
             est_alliance = type_filtre in self.FILTRES_ALLIANCE
@@ -1454,6 +1464,32 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 except Exception as e:
                     logger.error(f"❌ [Radar Spy] Erreur Global Movements : {e}")
 
+            # ==========================================
+            # --- ÉTAPE 4 : PURGE AUTOMATIQUE DES ABONNÉS MORTS ---
+            # ==========================================
+            if hasattr(self, "users_to_purge") and self.users_to_purge:
+                for uid in self.users_to_purge:
+                    # 1. Purge des joueurs
+                    for p_id in list(data.get("players", {}).keys()):
+                        if uid in data["players"][p_id].get("abonnes", {}):
+                            del data["players"][p_id]["abonnes"][uid]
+                            # Si le joueur n'a plus aucun abonné, on supprime le joueur du radar
+                            if not data["players"][p_id]["abonnes"]:
+                                del data["players"][p_id]
+
+                    # 2. Purge des alliances
+                    for a_id in list(data.get("alliances", {}).keys()):
+                        if uid in data["alliances"][a_id].get("abonnes", {}):
+                            del data["alliances"][a_id]["abonnes"][uid]
+                            # Si l'alliance n'a plus d'abonné, on supprime l'alliance
+                            if not data["alliances"][a_id]["abonnes"]:
+                                del data["alliances"][a_id]
+
+                logger.info(f"🧹 Purge automatique terminée pour {len(self.users_to_purge)} compte(s) injoignable(s).")
+                self.users_to_purge.clear()  # On vide la corbeille
+                changes_detected = True
+
+            # FIN DE LA TÂCHE : Sauvegarde si modification
             if changes_detected:
                 await save_surveillance_async(data)
 
