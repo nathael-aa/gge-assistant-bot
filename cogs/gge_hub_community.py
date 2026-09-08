@@ -217,50 +217,6 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
             ).format(**DICT_EMOJIS)
             await interaction.followup.send(msg_fail)
 
-    @app_commands.command(name="test", description="[Dev] Oublie le dernier article du site et force l'annonce")
-    @app_commands.choices(
-        type_article=[
-            app_commands.Choice(name="News (Actualités générales)", value="news"),
-            app_commands.Choice(name="Patchnotes (Mises à jour)", value="patchnotes"),
-        ]
-    )
-    @app_commands.describe(type_article="Quel type d'article veux-tu forcer pour le test ?")
-    @app_commands.guild_only()
-    @app_commands.default_permissions(manage_guild=True)
-    async def hub_test(self, interaction: discord.Interaction, type_article: str = None):
-        """Commande secrète pour tester sans toucher au JSON."""
-        await interaction.response.defer(ephemeral=True)
-
-        articles = await self.fetch_latest_news()
-        if not articles:
-            return await interaction.followup.send("⚠️ Impossible de lire les articles du site Web pour le test.")
-
-        if type_article:
-            articles_filtres = [art for art in articles if art["type"] == type_article]
-            if not articles_filtres:
-                return await interaction.followup.send(
-                    f"⚠️ Aucun article de type `{type_article}` n'a été trouvé sur le site."
-                )
-            dernier_article = articles_filtres[-1]
-        else:
-            dernier_article = articles[-1]
-
-        data = await load_hub_config()
-
-        if data.get("posted_news") and dernier_article["id"] in data["posted_news"]:
-            data["posted_news"].remove(dernier_article["id"])
-            await save_hub_config(data)
-
-            await self.check_hub_news_logic()
-
-            await interaction.followup.send(
-                f"✅ Mémoire effacée pour : **{dernier_article['title']}** (Type: `{dernier_article['type']}`). L'annonce a été envoyée !"
-            )
-        else:
-            await interaction.followup.send(
-                f"⚠️ L'article **{dernier_article['title']}** n'est pas en mémoire. Test impossible."
-            )
-
     async def fetch_latest_news(self):
         """Scrape le Hub, crée le résumé propre ET extrait la version Markdown complète pour le fil Discord."""
         articles = []
@@ -270,7 +226,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
             async with self.bot.session.get(self.hub_url, headers=self.headers, timeout=15) as r:
                 if r.status == 200:
                     html_content = await r.text()
-                    soup = BeautifulSoup(html_content, "html.parser")
+                    soup = await asyncio.to_thread(BeautifulSoup, html_content, "html.parser")
 
                     for post in soup.find_all("article", class_="elementor-post"):
                         title_elem = post.find("h2", class_="elementor-post__title")
@@ -324,7 +280,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
             async with self.bot.session.get(self.changelog_url, headers=self.headers, timeout=15) as r2:
                 if r2.status == 200:
                     html_changelog = await r2.text()
-                    soup_cl = BeautifulSoup(html_changelog, "html.parser")
+                    soup_cl = await asyncio.to_thread(BeautifulSoup, html_changelog, "html.parser")
 
                     for details in soup_cl.find_all("details", class_="e-n-accordion-item"):
                         title_elem = details.find("div", class_="e-n-accordion-item-title-text")
@@ -472,7 +428,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             async with self.bot.session.get(article["url"], headers=self.headers, timeout=10) as r:
                                 if r.status == 200:
                                     html_article = await r.text()
-                                    soup_art = BeautifulSoup(html_article, "html.parser")
+                                    soup_art = await asyncio.to_thread(BeautifulSoup, html_article, "html.parser")
                                     content_div = soup_art.find("div", class_="elementor-widget-theme-post-content")
                                     if content_div:
                                         for header in content_div.find_all(["h1", "h2", "h3"]):

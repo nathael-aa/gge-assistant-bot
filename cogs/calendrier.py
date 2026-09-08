@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import logging
@@ -498,7 +499,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                     return []
 
                 html_content = await r.text()
-                soup = BeautifulSoup(html_content, "html.parser")
+                soup = await asyncio.to_thread(BeautifulSoup, html_content, "html.parser")
 
                 found_events = []
                 seen_signatures = set()

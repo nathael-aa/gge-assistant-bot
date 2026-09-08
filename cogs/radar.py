@@ -739,7 +739,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     # ==========================================
-    # 🛰️ LE SATELLITE ESPION (Tâche ETag ultra-optimisée)
+    # 🛰️ LE SATELLITE ESPION (Tâche ETag centralisée)
     # ==========================================
     @tasks.loop(seconds=20)
     async def radar_spy_task(self):
@@ -788,48 +788,59 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 self._serveur_courant = serveur
                 headers = await get_api_headers(custom_server=serveur)
 
+                cache_key_server = f"server_base_{serveur}"
+
+                # 🛑 1. Le "Portier" : On vérifie si on doit attendre avant de re-toquer
+                if now_ts < self.next_scan.get(cache_key_server, 0):
+                    continue
+
+                # 🚪 2. On toque à la porte globale du serveur pour savoir si les données ont bougé
+                url_base = "https://api-beta.gge-tracker.com/api/v1/"
+                req_headers = headers.copy()
+                if cache_key_server in self.etags_cache:
+                    req_headers["If-None-Match"] = self.etags_cache[cache_key_server]
+
+                try:
+                    async with session.get(url_base, headers=req_headers, timeout=10) as r_base:
+                        if r_base.status == 304:
+                            # 💤 Rien n'a changé sur ce serveur depuis notre dernier passage, on passe au suivant
+                            continue
+
+                        if r_base.status == 200:
+                            base_data = await r_base.json()
+                            polling = base_data.get("polling", {})
+                            new_etag = polling.get("etag") or r_base.headers.get("ETag")
+                            interval = polling.get("recommended_interval_seconds", 60)
+
+                            if new_etag:
+                                self.etags_cache[cache_key_server] = str(new_etag)
+                            self.next_scan[cache_key_server] = now_ts + interval
+
+                            # 🚀 À partir d'ici, on sait que le serveur a été mis à jour.
+                            # On n'a plus besoin d'utiliser les ETags pour les requêtes suivantes !
+                except Exception as e:
+                    logger.error(f"❌ [Radar Spy] Erreur check global {serveur} : {e}")
+                    continue
+
                 # ==========================================
                 # --- ÉTAPE 1 : SURVEILLANCE ALLIANCES ---
                 # ==========================================
                 for a_id, a_info in targets["alliances"]:
-                    cache_key = f"alli_{serveur}_{a_id}"
-
-                    # On respecte le temps de pause imposé par l'API
-                    if now_ts < self.next_scan.get(cache_key, 0):
-                        continue
-
                     old_name = a_info.get("name", "Inconnu")
                     old_members = a_info.get("members", {})
                     abonnes_alliance = a_info.get("abonnes", {})
+
                     if not abonnes_alliance:
                         continue
 
                     try:
                         url_alli_live = f"https://api-beta.gge-tracker.com/api/v1/alliances/id/{a_id}"
-                        req_headers = headers.copy()
-
-                        # Ajout du header ETag si on l'a déjà
-                        if cache_key in self.etags_cache:
-                            req_headers["If-None-Match"] = self.etags_cache[cache_key]
-
-                        async with session.get(url_alli_live, headers=req_headers, timeout=10) as r_live:
-                            if r_live.status == 304:
-                                continue
-
+                        # Requête simple, sans If-None-Match car on sait que ça a bougé
+                        async with session.get(url_alli_live, headers=headers, timeout=10) as r_live:
                             if r_live.status == 200:
                                 max_data = await r_live.json()
                                 if isinstance(max_data, list) and max_data:
                                     max_data = max_data[0]
-
-                                # 🚀 Lecture du nouveau ETag et du temps de pause
-                                polling = max_data.get("polling", {})
-                                new_etag = polling.get("etag") or r_live.headers.get("ETag")
-
-                                if new_etag:
-                                    self.etags_cache[cache_key] = str(new_etag)
-
-                                interval = polling.get("recommended_interval_seconds", 60)
-                                self.next_scan[cache_key] = now_ts + interval
 
                                 new_name = max_data.get("alliance_name", old_name)
                                 new_members_raw = max_data.get(
@@ -1064,429 +1075,384 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 # ==========================================
                 tracked_players = targets["players"]
                 if tracked_players:
-                    cache_key_bulk = f"players_bulk_{serveur}"
+                    player_ids = [p_id for p_id, p_info in tracked_players]
+                    try:
+                        url_bulk = "https://api-beta.gge-tracker.com/api/v1/players"
+                        # Envoi direct sans ETag
+                        async with session.post(url_bulk, headers=headers, json=player_ids, timeout=10) as r:
+                            if r.status == 200:
+                                bulk_data_raw = await r.json()
+                                bulk_data = bulk_data_raw.get("players", [])
+                                api_players = {str(p["player_id"]): p for p in bulk_data}
 
-                    if now_ts >= self.next_scan.get(cache_key_bulk, 0):
-                        player_ids = [p_id for p_id, p_info in tracked_players]
+                                for p_id, info in tracked_players:
+                                    abonnes = info.get("abonnes", {})
+                                    if not abonnes:
+                                        continue
 
-                        try:
-                            url_bulk = "https://api-beta.gge-tracker.com/api/v1/players"
-                            req_headers = headers.copy()
+                                    p_data = api_players.get(p_id)
+                                    if not p_data:
+                                        continue
 
-                            # Caching pour le bulk POST
-                            if cache_key_bulk in self.etags_cache:
-                                req_headers["If-None-Match"] = self.etags_cache[cache_key_bulk]
+                                    player = info["name"]
 
-                            async with session.post(url_bulk, headers=req_headers, json=player_ids, timeout=10) as r:
-                                if r.status == 304:
-                                    pass
-                                if r.status == 200:
-                                    bulk_data_raw = await r.json()
-
-                                    # 🚀 Récupération ETag pour les joueurs
-                                    polling = bulk_data_raw.get("polling", {})
-                                    new_etag = str(polling.get("etag") or r.headers.get("ETag"))
-                                    old_etag = self.etags_cache.get(cache_key_bulk)
-
-                                    interval = polling.get("recommended_interval_seconds", 60)
-                                    self.next_scan[cache_key_bulk] = now_ts + interval
-
-                                    if new_etag != "None":
-                                        self.etags_cache[cache_key_bulk] = new_etag
-
-                                    # 🛑 BOUCLIER ANTI-POST : On vérifie l'ETag nous-mêmes !
-                                    if old_etag and new_etag == old_etag:
-                                        pass
-                                    else:
-                                        bulk_data = bulk_data_raw.get("players", [])
-                                        api_players = {str(p["player_id"]): p for p in bulk_data}
-
-                                        for p_id, info in tracked_players:
-                                            abonnes = info.get("abonnes", {})
-                                            if not abonnes:
-                                                continue
-
-                                            p_data = api_players.get(p_id)
-                                            if not p_data:
-                                                continue
-
-                                            player = info["name"]
-
-                                            new_name = p_data.get("player_name", player)
-                                            if new_name != player:
-                                                embeds_locales = {}
-                                                for lg in ["fr", "de", "en"]:
-                                                    old_t = (
-                                                        t(lg, "prof_unknown", defaut="Inconnu")
-                                                        if player == "Inconnu"
-                                                        else player
-                                                    )
-                                                    new_t = (
-                                                        t(lg, "prof_unknown", defaut="Inconnu")
-                                                        if new_name == "Inconnu"
-                                                        else new_name
-                                                    )
-                                                    embed = discord.Embed(
-                                                        title=t(
-                                                            lg,
-                                                            "rad_spy_p_name_title",
-                                                            defaut="{e_warning} ALERTE PSEUDO",
-                                                        ),
-                                                        color=discord.Color.orange(),
-                                                    )
-                                                    embed.add_field(
-                                                        name="Cible",
-                                                        value=t(
-                                                            lg,
-                                                            "rad_spy_p_name_f",
-                                                            old=old_t,
-                                                            new=new_t,
-                                                            time=get_discord_time(maintenant.isoformat(), lg),
-                                                            defaut=f"~~{old_t}~~ ➔ **{new_t}**\n{{e_time}} *Fait {get_discord_time(maintenant.isoformat(), lg)}*",
-                                                        ),
-                                                    )
-                                                    embeds_locales[lg] = embed
-
-                                                await self.envoyer_alerte_privee(
-                                                    abonnes,
-                                                    "pseudo",
-                                                    embeds_locales,
-                                                    users_lang,
-                                                    target_name=player,
-                                                    target_id=str(p_id),
-                                                    gge_server=serveur,
-                                                )
-                                                info["name"], info["last_name"] = (
-                                                    new_name,
-                                                    maintenant.isoformat().replace("+00:00", "Z"),
-                                                )
-                                                player = new_name
-                                                changes_detected = True
-
-                                            old_alli = info.get("last_alliance_name")
-                                            new_alli = p_data.get("alliance_name") or "Sans alliance"
-
-                                            if old_alli is None:
-                                                info["last_alliance_name"] = new_alli
-                                                changes_detected = True
-                                            elif new_alli != old_alli:
-                                                embeds_locales = {}
-                                                for lg in ["fr", "de", "en"]:
-                                                    old_t = (
-                                                        t(lg, "prof_no_alliance", defaut="Sans alliance")
-                                                        if old_alli == "Sans alliance"
-                                                        else old_alli
-                                                    )
-                                                    new_t = (
-                                                        t(lg, "prof_no_alliance", defaut="Sans alliance")
-                                                        if new_alli == "Sans alliance"
-                                                        else new_alli
-                                                    )
-                                                    embed = discord.Embed(
-                                                        title=t(
-                                                            lg,
-                                                            "rad_spy_p_alli_title",
-                                                            defaut="{e_warning} ALERTE ALLIANCE",
-                                                        ),
-                                                        color=discord.Color.brand_red(),
-                                                    )
-                                                    embed.add_field(
-                                                        name="Cible",
-                                                        value=t(
-                                                            lg,
-                                                            "rad_spy_p_alli_f",
-                                                            j=player,
-                                                            old=old_t,
-                                                            new=new_t,
-                                                            time=get_discord_time(maintenant.isoformat(), lg),
-                                                            defaut=f"**{player}**\n*{old_t}* ➔ **{new_t}**\n{{e_time}} *Fait {get_discord_time(maintenant.isoformat(), lg)}*",
-                                                        ),
-                                                    )
-                                                    embeds_locales[lg] = embed
-
-                                                await self.envoyer_alerte_privee(
-                                                    abonnes,
-                                                    "alliance",
-                                                    embeds_locales,
-                                                    users_lang,
-                                                    target_name=player,
-                                                    target_id=str(p_id),
-                                                    gge_server=serveur,
-                                                )
-                                                info["last_alliance_name"], info["last_alliance"] = (
-                                                    new_alli,
-                                                    maintenant.isoformat().replace("+00:00", "Z"),
-                                                )
-                                                changes_detected = True
-
-                                            current_might = int(p_data.get("might_current", 0))
-                                            diff = current_might - info.get("last_might", current_might)
-                                            if abs(diff) >= 500_000:
-                                                emoji_str, color = (
-                                                    ("{e_std_chart_increasing}", discord.Color.green())
-                                                    if diff > 0
-                                                    else ("{e_std_chart_decreasing}", discord.Color.brand_red())
-                                                )
-                                                sign = "+" if diff > 0 else ""
-                                                embeds_locales = {}
-                                                for lg in ["fr", "de", "en"]:
-                                                    embed = discord.Embed(
-                                                        title=t(
-                                                            lg,
-                                                            "rad_spy_p_pp_title",
-                                                            emoji=emoji_str,
-                                                            defaut=f"{{e_warning}} ALERTE PUISSANCE {emoji_str}",
-                                                        ),
-                                                        color=color,
-                                                    )
-                                                    embed.add_field(
-                                                        name="Cible",
-                                                        value=t(
-                                                            lg,
-                                                            "rad_spy_p_pp_f",
-                                                            j=player,
-                                                            old=format_num(info.get("last_might")),
-                                                            new=format_num(current_might),
-                                                            diff=f"{sign}{format_num(diff)}",
-                                                            defaut=f"**{player}**\nAncienne: {format_num(info.get('last_might'))}\nNouvelle: **{format_num(current_might)}**\nDiff: **{sign}{format_num(diff)} PP**",
-                                                        ),
-                                                    )
-                                                    embeds_locales[lg] = embed
-
-                                                await self.envoyer_alerte_privee(
-                                                    abonnes,
-                                                    "puissance",
-                                                    embeds_locales,
-                                                    users_lang,
-                                                    target_name=player,
-                                                    target_id=str(p_id),
-                                                    gge_server=serveur,
-                                                )
-                                                info["last_might"] = current_might
-                                                changes_detected = True
-
-                                            new_peace = p_data.get("peace_disabled_at")
-                                            if new_peace == "null":
-                                                new_peace = None
-                                            old_peace, was_protected = (
-                                                info.get("peace_disabled_at"),
-                                                info.get("is_protected", False),
+                                    new_name = p_data.get("player_name", player)
+                                    if new_name != player:
+                                        embeds_locales = {}
+                                        for lg in ["fr", "de", "en"]:
+                                            old_t = (
+                                                t(lg, "prof_unknown", defaut="Inconnu")
+                                                if player == "Inconnu"
+                                                else player
                                             )
-                                            is_protected, new_dt = False, None
+                                            new_t = (
+                                                t(lg, "prof_unknown", defaut="Inconnu")
+                                                if new_name == "Inconnu"
+                                                else new_name
+                                            )
+                                            embed = discord.Embed(
+                                                title=t(
+                                                    lg,
+                                                    "rad_spy_p_name_title",
+                                                    defaut="{e_warning} ALERTE PSEUDO",
+                                                ),
+                                                color=discord.Color.orange(),
+                                            )
+                                            embed.add_field(
+                                                name="Cible",
+                                                value=t(
+                                                    lg,
+                                                    "rad_spy_p_name_f",
+                                                    old=old_t,
+                                                    new=new_t,
+                                                    time=get_discord_time(maintenant.isoformat(), lg),
+                                                    defaut=f"~~{old_t}~~ ➔ **{new_t}**\n{{e_time}} *Fait {get_discord_time(maintenant.isoformat(), lg)}*",
+                                                ),
+                                            )
+                                            embeds_locales[lg] = embed
 
-                                            if new_peace:
+                                        await self.envoyer_alerte_privee(
+                                            abonnes,
+                                            "pseudo",
+                                            embeds_locales,
+                                            users_lang,
+                                            target_name=player,
+                                            target_id=str(p_id),
+                                            gge_server=serveur,
+                                        )
+                                        info["name"], info["last_name"] = (
+                                            new_name,
+                                            maintenant.isoformat().replace("+00:00", "Z"),
+                                        )
+                                        player = new_name
+                                        changes_detected = True
+
+                                    old_alli = info.get("last_alliance_name")
+                                    new_alli = p_data.get("alliance_name") or "Sans alliance"
+
+                                    if old_alli is None:
+                                        info["last_alliance_name"] = new_alli
+                                        changes_detected = True
+                                    elif new_alli != old_alli:
+                                        embeds_locales = {}
+                                        for lg in ["fr", "de", "en"]:
+                                            old_t = (
+                                                t(lg, "prof_no_alliance", defaut="Sans alliance")
+                                                if old_alli == "Sans alliance"
+                                                else old_alli
+                                            )
+                                            new_t = (
+                                                t(lg, "prof_no_alliance", defaut="Sans alliance")
+                                                if new_alli == "Sans alliance"
+                                                else new_alli
+                                            )
+                                            embed = discord.Embed(
+                                                title=t(
+                                                    lg,
+                                                    "rad_spy_p_alli_title",
+                                                    defaut="{e_warning} ALERTE ALLIANCE",
+                                                ),
+                                                color=discord.Color.brand_red(),
+                                            )
+                                            embed.add_field(
+                                                name="Cible",
+                                                value=t(
+                                                    lg,
+                                                    "rad_spy_p_alli_f",
+                                                    j=player,
+                                                    old=old_t,
+                                                    new=new_t,
+                                                    time=get_discord_time(maintenant.isoformat(), lg),
+                                                    defaut=f"**{player}**\n*{old_t}* ➔ **{new_t}**\n{{e_time}} *Fait {get_discord_time(maintenant.isoformat(), lg)}*",
+                                                ),
+                                            )
+                                            embeds_locales[lg] = embed
+
+                                        await self.envoyer_alerte_privee(
+                                            abonnes,
+                                            "alliance",
+                                            embeds_locales,
+                                            users_lang,
+                                            target_name=player,
+                                            target_id=str(p_id),
+                                            gge_server=serveur,
+                                        )
+                                        info["last_alliance_name"], info["last_alliance"] = (
+                                            new_alli,
+                                            maintenant.isoformat().replace("+00:00", "Z"),
+                                        )
+                                        changes_detected = True
+
+                                    current_might = int(p_data.get("might_current", 0))
+                                    diff = current_might - info.get("last_might", current_might)
+                                    if abs(diff) >= 500_000:
+                                        emoji_str, color = (
+                                            ("{e_std_chart_increasing}", discord.Color.green())
+                                            if diff > 0
+                                            else ("{e_std_chart_decreasing}", discord.Color.brand_red())
+                                        )
+                                        sign = "+" if diff > 0 else ""
+                                        embeds_locales = {}
+                                        for lg in ["fr", "de", "en"]:
+                                            embed = discord.Embed(
+                                                title=t(
+                                                    lg,
+                                                    "rad_spy_p_pp_title",
+                                                    emoji=emoji_str,
+                                                    defaut=f"{{e_warning}} ALERTE PUISSANCE {emoji_str}",
+                                                ),
+                                                color=color,
+                                            )
+                                            embed.add_field(
+                                                name="Cible",
+                                                value=t(
+                                                    lg,
+                                                    "rad_spy_p_pp_f",
+                                                    j=player,
+                                                    old=format_num(info.get("last_might")),
+                                                    new=format_num(current_might),
+                                                    diff=f"{sign}{format_num(diff)}",
+                                                    defaut=f"**{player}**\nAncienne: {format_num(info.get('last_might'))}\nNouvelle: **{format_num(current_might)}**\nDiff: **{sign}{format_num(diff)} PP**",
+                                                ),
+                                            )
+                                            embeds_locales[lg] = embed
+
+                                        await self.envoyer_alerte_privee(
+                                            abonnes,
+                                            "puissance",
+                                            embeds_locales,
+                                            users_lang,
+                                            target_name=player,
+                                            target_id=str(p_id),
+                                            gge_server=serveur,
+                                        )
+                                        info["last_might"] = current_might
+                                        changes_detected = True
+
+                                    new_peace = p_data.get("peace_disabled_at")
+                                    if new_peace == "null":
+                                        new_peace = None
+                                    old_peace, was_protected = (
+                                        info.get("peace_disabled_at"),
+                                        info.get("is_protected", False),
+                                    )
+                                    is_protected, new_dt = False, None
+
+                                    if new_peace:
+                                        try:
+                                            new_dt = datetime.fromisoformat(new_peace.replace("Z", "+00:00"))
+                                            if new_dt > discord.utils.utcnow():
+                                                is_protected = True
+                                        except:
+                                            pass
+
+                                    msgs_trigger = []
+                                    if new_peace != old_peace and is_protected:
+                                        if not was_protected:
+                                            msgs_trigger.append("on")
+                                        else:
+                                            send_update = True
+                                            if old_peace:
                                                 try:
-                                                    new_dt = datetime.fromisoformat(new_peace.replace("Z", "+00:00"))
-                                                    if new_dt > discord.utils.utcnow():
-                                                        is_protected = True
+                                                    if (
+                                                        abs(
+                                                            (
+                                                                new_dt
+                                                                - datetime.fromisoformat(
+                                                                    old_peace.replace("Z", "+00:00")
+                                                                )
+                                                            ).total_seconds()
+                                                        )
+                                                        < 60
+                                                    ):
+                                                        send_update = False
                                                 except:
                                                     pass
+                                            if send_update:
+                                                msgs_trigger.append("mod")
 
-                                            msgs_trigger = []
-                                            if new_peace != old_peace and is_protected:
-                                                if not was_protected:
-                                                    msgs_trigger.append("on")
-                                                else:
-                                                    send_update = True
-                                                    if old_peace:
-                                                        try:
-                                                            if (
-                                                                abs(
-                                                                    (
-                                                                        new_dt
-                                                                        - datetime.fromisoformat(
-                                                                            old_peace.replace("Z", "+00:00")
-                                                                        )
-                                                                    ).total_seconds()
-                                                                )
-                                                                < 60
-                                                            ):
-                                                                send_update = False
-                                                        except:
-                                                            pass
-                                                    if send_update:
-                                                        msgs_trigger.append("mod")
+                                    if was_protected and not is_protected:
+                                        if not new_peace:
+                                            msgs_trigger.append("off")
+                                        else:
+                                            msgs_trigger.append("end")
 
-                                            if was_protected and not is_protected:
-                                                if not new_peace:
-                                                    msgs_trigger.append("off")
-                                                else:
-                                                    msgs_trigger.append("end")
-
-                                            if msgs_trigger:
-                                                ts = int(new_dt.timestamp()) if new_dt else 0
-                                                for trigger in msgs_trigger:
-                                                    embeds_locales = {}
-                                                    for lg in ["fr", "de", "en"]:
-                                                        if trigger == "on":
-                                                            embed = discord.Embed(
-                                                                title=t(
-                                                                    lg,
-                                                                    "rad_spy_p_dove_on_title",
-                                                                    defaut="{e_std_dove} ALERTE COLOMBE : ACTIVÉE",
-                                                                ),
-                                                                description=t(
-                                                                    lg,
-                                                                    "rad_spy_p_dove_on_desc",
-                                                                    j=player,
-                                                                    ts=ts,
-                                                                    defaut=f"**{player}** est sous protection !\n{{e_time}} Fin : <t:{ts}:f> (<t:{ts}:R>)",
-                                                                ),
-                                                                color=discord.Color.light_grey(),
-                                                            )
-                                                        elif trigger == "mod":
-                                                            embed = discord.Embed(
-                                                                title=t(
-                                                                    lg,
-                                                                    "rad_spy_p_dove_mod_title",
-                                                                    defaut="{e_refresh} ALERTE COLOMBE : MODIFIÉE",
-                                                                ),
-                                                                description=t(
-                                                                    lg,
-                                                                    "rad_spy_p_dove_mod_desc",
-                                                                    j=player,
-                                                                    ts=ts,
-                                                                    defaut=f"**{player}** a modifié sa protection !\n{{e_time}} Fin : <t:{ts}:f> (<t:{ts}:R>)",
-                                                                ),
-                                                                color=discord.Color.blue(),
-                                                            )
-                                                        elif trigger == "off":
-                                                            embed = discord.Embed(
-                                                                title=t(
-                                                                    lg,
-                                                                    "rad_spy_p_dove_off_title",
-                                                                    defaut="{e_std_crossed_swords} CONFIRMATION : SANS COLOMBE",
-                                                                ),
-                                                                description=t(
-                                                                    lg,
-                                                                    "rad_spy_p_dove_off_desc",
-                                                                    j=player,
-                                                                    defaut=f"La protection de **{player}** a expiré ou a été annulée. Il est vulnérable !",
-                                                                ),
-                                                                color=discord.Color.brand_green(),
-                                                            )
-                                                        elif trigger == "end":
-                                                            embed = discord.Embed(
-                                                                title=t(
-                                                                    lg,
-                                                                    "rad_spy_p_dove_end_title",
-                                                                    defaut="{e_std_crossed_swords} ALERTE COLOMBE : TERMINÉE",
-                                                                ),
-                                                                description=t(
-                                                                    lg,
-                                                                    "rad_spy_p_dove_off_desc",
-                                                                    j=player,
-                                                                    defaut=f"La protection de **{player}** a expiré ou a été annulée. Il est vulnérable !",
-                                                                ),
-                                                                color=discord.Color.brand_green(),
-                                                            )
-                                                        embeds_locales[lg] = embed
-
-                                                    await self.envoyer_alerte_privee(
-                                                        abonnes,
-                                                        "colombe",
-                                                        embeds_locales,
-                                                        users_lang,
-                                                        target_name=player,
-                                                        target_id=str(p_id),
-                                                        gge_server=serveur,
-                                                    )
-
-                                            if (new_peace != old_peace) or (was_protected != is_protected):
-                                                info["peace_disabled_at"], info["is_protected"] = (
-                                                    new_peace,
-                                                    is_protected,
-                                                )
-                                                changes_detected = True
-                        except Exception as e:
-                            logger.error(f"❌ [Radar Spy] Erreur Bulk Players : {e}")
-
-                # ==========================================
-                # --- ÉTAPE 3 : MOUVEMENTS GLOBAUX ---
-                # ==========================================
-                cache_key_mouv = f"mouv_{serveur}"
-                if now_ts >= self.next_scan.get(cache_key_mouv, 0):
-                    try:
-                        url_movements = "https://api-beta.gge-tracker.com/api/v1/server/movements?page=1&castleType=1&movementType=3"
-                        req_headers = headers.copy()
-
-                        # Caching pour les mouvements
-                        if cache_key_mouv in self.etags_cache:
-                            req_headers["If-None-Match"] = self.etags_cache[cache_key_mouv]
-
-                        async with session.get(url_movements, headers=req_headers, timeout=5) as r:
-                            if r.status == 304:
-                                pass
-                            if r.status == 200:
-                                data_mouv = await r.json()
-
-                                # 🚀 Récupération ETag pour les mouvements
-                                polling = data_mouv.get("polling", {})
-                                new_etag = polling.get("etag") or r.headers.get("ETag")
-
-                                if new_etag:
-                                    self.etags_cache[cache_key_mouv] = str(new_etag)
-
-                                interval = polling.get("recommended_interval_seconds", 60)
-                                self.next_scan[cache_key_mouv] = now_ts + interval
-
-                                movements = data_mouv.get("movements", [])
-
-                                for m in movements:
-                                    m_name = m.get("player_name")
-
-                                    for p_id, info in tracked_players:
-                                        if info["name"] == m_name and m["created_at"] > info["last_pos"]:
-                                            abonnes = info.get("abonnes", {})
-                                            if not abonnes:
-                                                continue
-
-                                            x_old, y_old, x_new, y_new = (
-                                                m.get("position_x_old"),
-                                                m.get("position_y_old"),
-                                                m.get("position_x_new"),
-                                                m.get("position_y_new"),
-                                            )
-
+                                    if msgs_trigger:
+                                        ts = int(new_dt.timestamp()) if new_dt else 0
+                                        for trigger in msgs_trigger:
                                             embeds_locales = {}
                                             for lg in ["fr", "de", "en"]:
-                                                embed = discord.Embed(
-                                                    title=t(
-                                                        lg,
-                                                        "rad_spy_p_pos_title",
-                                                        defaut="{e_warning} ALERTE DÉMÉNAGEMENT",
-                                                    ),
-                                                    color=discord.Color.dark_purple(),
-                                                )
-                                                embed.add_field(
-                                                    name="Cible",
-                                                    value=t(
-                                                        lg,
-                                                        "rad_spy_p_pos_f",
-                                                        j=m_name,
-                                                        xo=x_old,
-                                                        yo=y_old,
-                                                        xn=x_new,
-                                                        yn=y_new,
-                                                        time=get_discord_time(m["created_at"], lg),
-                                                        defaut=f"**{m_name}**\n`{x_old}:{y_old}` ➔ `{x_new}:{y_new}`\n{{e_time}} *Fait {get_discord_time(m['created_at'], lg)}*",
-                                                    ),
-                                                )
+                                                if trigger == "on":
+                                                    embed = discord.Embed(
+                                                        title=t(
+                                                            lg,
+                                                            "rad_spy_p_dove_on_title",
+                                                            defaut="{e_std_dove} ALERTE COLOMBE : ACTIVÉE",
+                                                        ),
+                                                        description=t(
+                                                            lg,
+                                                            "rad_spy_p_dove_on_desc",
+                                                            j=player,
+                                                            ts=ts,
+                                                            defaut=f"**{player}** est sous protection !\n{{e_time}} Fin : <t:{ts}:f> (<t:{ts}:R>)",
+                                                        ),
+                                                        color=discord.Color.light_grey(),
+                                                    )
+                                                elif trigger == "mod":
+                                                    embed = discord.Embed(
+                                                        title=t(
+                                                            lg,
+                                                            "rad_spy_p_dove_mod_title",
+                                                            defaut="{e_refresh} ALERTE COLOMBE : MODIFIÉE",
+                                                        ),
+                                                        description=t(
+                                                            lg,
+                                                            "rad_spy_p_dove_mod_desc",
+                                                            j=player,
+                                                            ts=ts,
+                                                            defaut=f"**{player}** a modifié sa protection !\n{{e_time}} Fin : <t:{ts}:f> (<t:{ts}:R>)",
+                                                        ),
+                                                        color=discord.Color.blue(),
+                                                    )
+                                                elif trigger == "off":
+                                                    embed = discord.Embed(
+                                                        title=t(
+                                                            lg,
+                                                            "rad_spy_p_dove_off_title",
+                                                            defaut="{e_std_crossed_swords} CONFIRMATION : SANS COLOMBE",
+                                                        ),
+                                                        description=t(
+                                                            lg,
+                                                            "rad_spy_p_dove_off_desc",
+                                                            j=player,
+                                                            defaut=f"La protection de **{player}** a expiré ou a été annulée. Il est vulnérable !",
+                                                        ),
+                                                        color=discord.Color.brand_green(),
+                                                    )
+                                                elif trigger == "end":
+                                                    embed = discord.Embed(
+                                                        title=t(
+                                                            lg,
+                                                            "rad_spy_p_dove_end_title",
+                                                            defaut="{e_std_crossed_swords} ALERTE COLOMBE : TERMINÉE",
+                                                        ),
+                                                        description=t(
+                                                            lg,
+                                                            "rad_spy_p_dove_off_desc",
+                                                            j=player,
+                                                            defaut=f"La protection de **{player}** a expiré ou a été annulée. Il est vulnérable !",
+                                                        ),
+                                                        color=discord.Color.brand_green(),
+                                                    )
                                                 embeds_locales[lg] = embed
 
                                             await self.envoyer_alerte_privee(
                                                 abonnes,
-                                                "position",
+                                                "colombe",
                                                 embeds_locales,
                                                 users_lang,
-                                                target_name=info.get("name", ""),
+                                                target_name=player,
                                                 target_id=str(p_id),
                                                 gge_server=serveur,
                                             )
-                                            info["last_pos"] = m["created_at"]
-                                            changes_detected = True
+
+                                    if (new_peace != old_peace) or (was_protected != is_protected):
+                                        info["peace_disabled_at"], info["is_protected"] = (
+                                            new_peace,
+                                            is_protected,
+                                        )
+                                        changes_detected = True
                     except Exception as e:
-                        logger.error(f"❌ [Radar Spy] Erreur Global Movements : {e}")
+                        logger.error(f"❌ [Radar Spy] Erreur Bulk Players : {e}")
+
+                # ==========================================
+                # --- ÉTAPE 3 : MOUVEMENTS GLOBAUX ---
+                # ==========================================
+                try:
+                    url_movements = (
+                        "https://api-beta.gge-tracker.com/api/v1/server/movements?page=1&castleType=1&movementType=3"
+                    )
+                    # Pas d'ETag ici non plus, on prend directement les données fraîches
+                    async with session.get(url_movements, headers=headers, timeout=5) as r:
+                        if r.status == 200:
+                            data_mouv = await r.json()
+                            movements = data_mouv.get("movements", [])
+
+                            for m in movements:
+                                m_name = m.get("player_name")
+
+                                for p_id, info in tracked_players:
+                                    if info["name"] == m_name and m["created_at"] > info["last_pos"]:
+                                        abonnes = info.get("abonnes", {})
+                                        if not abonnes:
+                                            continue
+
+                                        x_old, y_old, x_new, y_new = (
+                                            m.get("position_x_old"),
+                                            m.get("position_y_old"),
+                                            m.get("position_x_new"),
+                                            m.get("position_y_new"),
+                                        )
+
+                                        embeds_locales = {}
+                                        for lg in ["fr", "de", "en"]:
+                                            embed = discord.Embed(
+                                                title=t(
+                                                    lg,
+                                                    "rad_spy_p_pos_title",
+                                                    defaut="{e_warning} ALERTE DÉMÉNAGEMENT",
+                                                ),
+                                                color=discord.Color.dark_purple(),
+                                            )
+                                            embed.add_field(
+                                                name="Cible",
+                                                value=t(
+                                                    lg,
+                                                    "rad_spy_p_pos_f",
+                                                    j=m_name,
+                                                    xo=x_old,
+                                                    yo=y_old,
+                                                    xn=x_new,
+                                                    yn=y_new,
+                                                    time=get_discord_time(m["created_at"], lg),
+                                                    defaut=f"**{m_name}**\n`{x_old}:{y_old}` ➔ `{x_new}:{y_new}`\n{{e_time}} *Fait {get_discord_time(m['created_at'], lg)}*",
+                                                ),
+                                            )
+                                            embeds_locales[lg] = embed
+
+                                        await self.envoyer_alerte_privee(
+                                            abonnes,
+                                            "position",
+                                            embeds_locales,
+                                            users_lang,
+                                            target_name=info.get("name", ""),
+                                            target_id=str(p_id),
+                                            gge_server=serveur,
+                                        )
+                                        info["last_pos"] = m["created_at"]
+                                        changes_detected = True
+                except Exception as e:
+                    logger.error(f"❌ [Radar Spy] Erreur Global Movements : {e}")
 
             if changes_detected:
                 await save_surveillance_async(data)
