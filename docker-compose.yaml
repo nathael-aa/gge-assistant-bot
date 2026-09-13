@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   discord-bot:
-    build: .
+    build:
+      context: .
+      no_cache: true
     container_name: gge-assistant
     restart: unless-stopped
     dns:
