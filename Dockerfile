@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 # CORRIGER LES FAILLES DE SÉCURITÉ DE L'OS :
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* # Force Update 13-09-2026
 
 # Définir le fuseau horaire pour que les logs soient à l'heure française
 ENV TZ=Europe/Paris
