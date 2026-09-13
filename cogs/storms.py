@@ -1005,6 +1005,10 @@ class StormsCog(commands.Cog):
         await interaction.response.defer(thinking=True)
         langue, serveur = await get_server_config(interaction)
 
+        if not interaction.guild:
+            msg = t(langue, "cmd_guild_only", defaut="❌ This command can only be used in a server.")
+            return await interaction.followup.send(msg)
+
         data = await load_storm_config()
         guild_id_str = str(interaction.guild.id)
 

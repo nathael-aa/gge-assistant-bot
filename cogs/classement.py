@@ -533,13 +533,16 @@ class ClassementCog(commands.Cog):
                         break
                     responses = await asyncio.gather(*task_coros)
                     if all(resp is None for resp in responses):
-                        msg_err = t(
-                            langue,
-                            "api_unavailable_error",
-                            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                        )
-                        await ctx_int.followup.send(msg_err)
-                        return None, None
+                        if any(len(data) > 0 for data in accumulated_data.values()):
+                            break
+                        else:
+                            msg_err = t(
+                                langue,
+                                "api_unavailable_error",
+                                defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                            )
+                            await ctx_int.followup.send(msg_err)
+                            return None, None
                     batch_empty = True
 
                     for i, jsonData in enumerate(responses):
@@ -848,14 +851,18 @@ class ClassementCog(commands.Cog):
                     if not task_coros:
                         break
                     responses = await asyncio.gather(*task_coros)
+
                     if all(resp is None for resp in responses):
-                        msg_err = t(
-                            langue,
-                            "api_unavailable_error",
-                            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                        )
-                        await ctx_int.followup.send(msg_err)
-                        return None, None
+                        if any(len(data) > 0 for data in accumulated_data.values()):
+                            break
+                        else:
+                            msg_err = t(
+                                langue,
+                                "api_unavailable_error",
+                                defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                            )
+                            await ctx_int.followup.send(msg_err)
+                            return None, None
                     batch_empty = True
 
                     for i, jsonData in enumerate(responses):
@@ -1131,13 +1138,16 @@ class ClassementCog(commands.Cog):
                         break
                     responses = await asyncio.gather(*task_coros)
                     if all(resp is None for resp in responses):
-                        msg_err = t(
-                            langue,
-                            "api_unavailable_error",
-                            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                        )
-                        await ctx_int.followup.send(msg_err)
-                        return None, None
+                        if any(len(data) > 0 for data in accumulated_data.values()):
+                            break
+                        else:
+                            msg_err = t(
+                                langue,
+                                "api_unavailable_error",
+                                defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                            )
+                            await ctx_int.followup.send(msg_err)
+                            return None, None
                     batch_empty = True
 
                     for i, jsonData in enumerate(responses):
@@ -1398,13 +1408,16 @@ class ClassementCog(commands.Cog):
                         break
                     responses = await asyncio.gather(*task_coros)
                     if all(resp is None for resp in responses):
-                        msg_err = t(
-                            langue,
-                            "api_unavailable_error",
-                            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                        )
-                        await ctx_int.followup.send(msg_err)
-                        return None, None
+                        if any(len(data) > 0 for data in accumulated_data.values()):
+                            break
+                        else:
+                            msg_err = t(
+                                langue,
+                                "api_unavailable_error",
+                                defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                            )
+                            await ctx_int.followup.send(msg_err)
+                            return None, None
                     batch_empty = True
 
                     for i, jsonData in enumerate(responses):
@@ -1715,13 +1728,16 @@ class ClassementCog(commands.Cog):
                         break
                     responses = await asyncio.gather(*task_coros)
                     if all(resp is None for resp in responses):
-                        msg_err = t(
-                            langue,
-                            "api_unavailable_error",
-                            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                        )
-                        await ctx_int.followup.send(msg_err)
-                        return None, None
+                        if any(len(data) > 0 for data in accumulated_data.values()):
+                            break
+                        else:
+                            msg_err = t(
+                                langue,
+                                "api_unavailable_error",
+                                defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                            )
+                            await ctx_int.followup.send(msg_err)
+                            return None, None
                     batch_empty = True
 
                     for i, jsonData in enumerate(responses):
@@ -2040,13 +2056,16 @@ class ClassementCog(commands.Cog):
                         break
                     responses = await asyncio.gather(*task_coros)
                     if all(resp is None for resp in responses):
-                        msg_err = t(
-                            langue,
-                            "api_unavailable_error",
-                            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                        )
-                        await ctx_int.followup.send(msg_err)
-                        return None, None
+                        if any(len(data) > 0 for data in accumulated_data.values()):
+                            break
+                        else:
+                            msg_err = t(
+                                langue,
+                                "api_unavailable_error",
+                                defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                            )
+                            await ctx_int.followup.send(msg_err)
+                            return None, None
                     batch_empty = True
 
                     for i, jsonData in enumerate(responses):

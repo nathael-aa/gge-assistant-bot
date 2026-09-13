@@ -713,7 +713,8 @@ class GGEAssistantBot(commands.Bot):
     @tasks.loop(hours=3)
     async def update_servers_task(self):
         obs.set_task_name("update_servers_task")
-        url = "https://ggetracker.github.io/i18n/servers.xml"
+
+        url = "https://api-beta.gge-tracker.com/api/v1/servers/catalog"
         webhook_url = os.getenv("WEBHOOK_SYNC")
 
         try:
@@ -804,7 +805,7 @@ class GGEAssistantBot(commands.Bot):
                         )
 
                         if nouveaux_serveurs or changements_featured:
-                            desc_parts = ["Le XML de GGE-Tracker a évolué :"]
+                            desc_parts = ["Le catalogue GGE-Tracker a évolué :"]
 
                             if nouveaux_serveurs:
                                 desc_parts.append(
