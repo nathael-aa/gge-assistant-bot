@@ -52,131 +52,11 @@
         "6": "Niveau 70"
     },
     "servers_info": {
-        "ASIA": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": null,
-            "api_name": "EmpireEx_36"
-        },
-        "GB1": {
+        "AE1": {
             "enabled": true,
             "featured": false,
-            "scan_minutes": 40,
-            "api_name": "EmpireEx_19"
-        },
-        "EG1": {
-            "enabled": true,
-            "featured": false,
-            "scan_minutes": 40,
-            "api_name": "EmpireEx_34"
-        },
-        "SKN1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 42,
-            "api_name": "EmpireEx_13"
-        },
-        "SK1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 22,
-            "api_name": "EmpireEx_18"
-        },
-        "FR1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 10,
-            "api_name": "EmpireEx_3"
-        },
-        "DE1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 41,
-            "api_name": "EmpireEx_2"
-        },
-        "RO1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 6,
-            "api_name": "EmpireEx_15"
-        },
-        "CZ1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 4,
-            "api_name": "EmpireEx_4"
-        },
-        "NL1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 4,
-            "api_name": "EmpireEx_11"
-        },
-        "WORLD1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 6,
-            "api_name": "EmpireEx_46"
-        },
-        "WORLD2": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 6,
-            "api_name": "EmpireEx_49"
-        },
-        "INT3": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 1,
-            "api_name": "EmpireEx_43"
-        },
-        "US1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 10,
-            "api_name": "EmpireEx_21"
-        },
-        "TR1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 10,
-            "api_name": "EmpireEx_10"
-        },
-        "PT1": {
-            "enabled": true,
-            "featured": false,
-            "scan_minutes": 10,
-            "api_name": "EmpireEx_6"
-        },
-        "BR1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 14,
-            "api_name": "EmpireEx_20"
-        },
-        "IN1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 30,
-            "api_name": "EmpireEx_26"
-        },
-        "IT1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 14,
-            "api_name": "EmpireEx_9"
-        },
-        "PL1": {
-            "enabled": true,
-            "featured": false,
-            "scan_minutes": 16,
-            "api_name": "EmpireEx_5"
-        },
-        "AU1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 20,
-            "api_name": "EmpireEx_22"
+            "scan_minutes": 23,
+            "api_name": "EmpireEx_33"
         },
         "ARAB1": {
             "enabled": true,
@@ -184,23 +64,53 @@
             "scan_minutes": 16,
             "api_name": "EmpireEx_35"
         },
-        "HANT1": {
-            "enabled": true,
-            "featured": false,
-            "scan_minutes": 23,
-            "api_name": "EmpireEx_37"
-        },
-        "HU1": {
+        "ASIA": {
             "enabled": true,
             "featured": true,
-            "scan_minutes": 1,
-            "api_name": "EmpireEx_12"
+            "scan_minutes": null,
+            "api_name": "EmpireEx_36"
         },
-        "HU2": {
+        "AU1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 20,
+            "api_name": "EmpireEx_22"
+        },
+        "BG1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 7,
+            "api_name": "EmpireEx_16"
+        },
+        "BR1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 14,
+            "api_name": "EmpireEx_20"
+        },
+        "CN1": {
             "enabled": true,
             "featured": false,
-            "scan_minutes": 21,
-            "api_name": "EmpireEx_17"
+            "scan_minutes": 36,
+            "api_name": "EmpireEx_27"
+        },
+        "CZ1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 4,
+            "api_name": "EmpireEx_4"
+        },
+        "DE1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 41,
+            "api_name": "EmpireEx_2"
+        },
+        "EG1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 40,
+            "api_name": "EmpireEx_34"
         },
         "ES1": {
             "enabled": true,
@@ -214,17 +124,53 @@
             "scan_minutes": 41,
             "api_name": "EmpireEx_38"
         },
-        "SA1": {
+        "FR1": {
             "enabled": true,
             "featured": true,
-            "scan_minutes": 32,
-            "api_name": "EmpireEx_32"
+            "scan_minutes": 10,
+            "api_name": "EmpireEx_3"
         },
-        "AE1": {
+        "GB1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 40,
+            "api_name": "EmpireEx_19"
+        },
+        "GR1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 36,
+            "api_name": "EmpireEx_28"
+        },
+        "HANT1": {
             "enabled": true,
             "featured": false,
             "scan_minutes": 23,
-            "api_name": "EmpireEx_33"
+            "api_name": "EmpireEx_37"
+        },
+        "HIS1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "HU1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 1,
+            "api_name": "EmpireEx_12"
+        },
+        "HU2": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 21,
+            "api_name": "EmpireEx_17"
+        },
+        "IN1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 30,
+            "api_name": "EmpireEx_26"
         },
         "INT1": {
             "enabled": true,
@@ -238,23 +184,17 @@
             "scan_minutes": 2,
             "api_name": "EmpireEx_7"
         },
-        "RU1": {
-            "enabled": true,
-            "featured": false,
-            "scan_minutes": 35,
-            "api_name": "EmpireEx_14"
-        },
-        "CN1": {
-            "enabled": true,
-            "featured": false,
-            "scan_minutes": 36,
-            "api_name": "EmpireEx_27"
-        },
-        "BG1": {
+        "INT3": {
             "enabled": true,
             "featured": true,
-            "scan_minutes": 7,
-            "api_name": "EmpireEx_16"
+            "scan_minutes": 1,
+            "api_name": "EmpireEx_43"
+        },
+        "IT1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 14,
+            "api_name": "EmpireEx_9"
         },
         "JP1": {
             "enabled": true,
@@ -262,11 +202,113 @@
             "scan_minutes": 7,
             "api_name": "EmpireEx_24"
         },
-        "GR1": {
+        "KR1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "LT1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "NL1": {
             "enabled": true,
             "featured": true,
-            "scan_minutes": 36,
-            "api_name": "EmpireEx_28"
+            "scan_minutes": 4,
+            "api_name": "EmpireEx_11"
+        },
+        "PL1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 16,
+            "api_name": "EmpireEx_5"
+        },
+        "PT1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 10,
+            "api_name": "EmpireEx_6"
+        },
+        "RO1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 6,
+            "api_name": "EmpireEx_15"
+        },
+        "RU1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 35,
+            "api_name": "EmpireEx_14"
+        },
+        "SA1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 32,
+            "api_name": "EmpireEx_32"
+        },
+        "SK1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 22,
+            "api_name": "EmpireEx_18"
+        },
+        "SKN1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 42,
+            "api_name": "EmpireEx_13"
+        },
+        "TR1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 10,
+            "api_name": "EmpireEx_10"
+        },
+        "US1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 10,
+            "api_name": "EmpireEx_21"
+        },
+        "WORLD1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 6,
+            "api_name": "EmpireEx_46"
+        },
+        "WORLD2": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 6,
+            "api_name": "EmpireEx_49"
+        },
+        "E4K_AR1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_ARAB1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_ASIA1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_AU1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
         },
         "E4K_BR1": {
             "enabled": true,
@@ -274,17 +316,11 @@
             "scan_minutes": 47,
             "api_name": "EmpirefourkingdomsExGG_13"
         },
-        "E4K_HANT1": {
+        "E4K_CN1": {
             "enabled": true,
             "featured": true,
-            "scan_minutes": 45,
-            "api_name": "EmpirefourkingdomsExGG_30"
-        },
-        "E4K_FR1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 43,
-            "api_name": "EmpirefourkingdomsExGG_2"
+            "scan_minutes": 22,
+            "api_name": "EmpirefourkingdomsExGG_16"
         },
         "E4K_DE1": {
             "enabled": true,
@@ -298,47 +334,17 @@
             "scan_minutes": 45,
             "api_name": "EmpirefourkingdomsExGG_28"
         },
-        "E4K_PT1": {
-            "enabled": true,
+        "E4K_ES1": {
+            "enabled": false,
             "featured": false,
-            "scan_minutes": 34,
-            "api_name": "EmpirefourkingdomsExGG_8"
+            "scan_minutes": null,
+            "api_name": null
         },
-        "E4K_SKN1": {
-            "enabled": true,
-            "featured": false,
-            "scan_minutes": 33,
-            "api_name": "EmpirefourkingdomsExGG_11"
-        },
-        "E4K_NL1": {
-            "enabled": true,
-            "featured": false,
-            "scan_minutes": 39,
-            "api_name": "EmpirefourkingdomsExGG_6"
-        },
-        "E4K_US1": {
-            "enabled": true,
-            "featured": false,
-            "scan_minutes": 49,
-            "api_name": "EmpirefourkingdomsExGG_4"
-        },
-        "E4K_INT2": {
+        "E4K_FR1": {
             "enabled": true,
             "featured": true,
-            "scan_minutes": 49,
-            "api_name": "EmpirefourkingdomsExGG_21"
-        },
-        "E4K_INT4": {
-            "enabled": true,
-            "featured": false,
-            "scan_minutes": 36,
-            "api_name": "EmpirefourkingdomsExGG_34"
-        },
-        "E4K_CN1": {
-            "enabled": true,
-            "featured": true,
-            "scan_minutes": 22,
-            "api_name": "EmpirefourkingdomsExGG_16"
+            "scan_minutes": 43,
+            "api_name": "EmpirefourkingdomsExGG_2"
         },
         "E4K_GB1": {
             "enabled": true,
@@ -346,11 +352,143 @@
             "scan_minutes": 45,
             "api_name": "EmpirefourkingdomsExGG_5"
         },
+        "E4K_GR1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_HANT1": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 45,
+            "api_name": "EmpirefourkingdomsExGG_30"
+        },
+        "E4K_HIS1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_ID1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_IN1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_INT2": {
+            "enabled": true,
+            "featured": true,
+            "scan_minutes": 49,
+            "api_name": "EmpirefourkingdomsExGG_21"
+        },
+        "E4K_INT3": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_INT4": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 36,
+            "api_name": "EmpirefourkingdomsExGG_34"
+        },
+        "E4K_IT1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_JP1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_KR1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_MX1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_NL1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 39,
+            "api_name": "EmpirefourkingdomsExGG_6"
+        },
+        "E4K_PH": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_PL1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_PT1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 34,
+            "api_name": "EmpirefourkingdomsExGG_8"
+        },
         "E4K_RU1": {
             "enabled": true,
             "featured": true,
             "scan_minutes": 48,
             "api_name": "EmpirefourkingdomsExGG_10"
+        },
+        "E4K_RU2": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_SKN1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 33,
+            "api_name": "EmpirefourkingdomsExGG_11"
+        },
+        "E4K_TR1": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_US1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": 49,
+            "api_name": "EmpirefourkingdomsExGG_4"
+        },
+        "E4K_US2": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "E4K_WORLD1": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
         },
         "E4K_WORLD2": {
             "enabled": true,
@@ -358,10 +496,34 @@
             "scan_minutes": 34,
             "api_name": "EmpirefourkingdomsExGG_37"
         },
+        "PARTNER_KA": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "PARTNER_SA": {
+            "enabled": true,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
+        "PARTNER_SA2": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
+            "api_name": null
+        },
         "PARTNER_SP3": {
             "enabled": true,
             "featured": true,
             "scan_minutes": 50,
+            "api_name": null
+        },
+        "PARTNER_VZ": {
+            "enabled": false,
+            "featured": false,
+            "scan_minutes": null,
             "api_name": null
         }
     }

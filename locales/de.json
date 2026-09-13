@@ -104,6 +104,7 @@
     "cmd_disc_ranking_title": "{e_ggelogo} GGE Ranking",
     "cmd_discover_desc": "Entdecke unglaubliche Tools, die von der Community entwickelt wurden, um dein Spielerlebnis in Goodgame Empire zu verbessern!",
     "cmd_discover_title": "{e_share} Entdeckungen & Community-Projekte",
+    "cmd_guild_only": "{e_nocheck} Dieser Befehl kann nur auf einem Server verwendet werden.",
     "cmd_news_btn": "Ankündigungen lesen",
     "cmd_news_desc": "Sieh dir die neuesten Ankündigungen, neu hinzugefügte Server und Funktionsupdates direkt auf unserer Top.gg-Seite an!",
     "cmd_news_title": "{e_std_newspaper} Aktuelle News",
