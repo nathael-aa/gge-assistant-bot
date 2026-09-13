@@ -71,10 +71,13 @@ def get_discord_time(iso_str, langue="fr"):
 # 🎛️ MENU INTERACTIF DES FILTRES JOUEURS
 # ==========================================
 class RadarSettingsView(discord.ui.View):
-    def __init__(self, p_id: str, user_id: str, player_name: str, initial_prefs: dict, langue: str = "fr"):
+    def __init__(
+        self, p_id: str, entity_id: str, entity_type: str, player_name: str, initial_prefs: dict, langue: str = "fr"
+    ):
         super().__init__(timeout=900)
         self.p_id = p_id
-        self.user_id = str(user_id)
+        self.entity_id = str(entity_id)
+        self.entity_type = entity_type  # "user" ou "guild"
         self.player_name = player_name
         self.prefs = initial_prefs
         self.langue = langue
@@ -91,10 +94,12 @@ class RadarSettingsView(discord.ui.View):
 
     async def toggle_pref(self, pref_key: str):
         data = await load_surveillance_async()
-        if self.p_id in data.get("players", {}) and self.user_id in data["players"][self.p_id]["abonnes"]:
-            current = data["players"][self.p_id]["abonnes"][self.user_id].get(pref_key, False)
+        dict_key = "abonnes" if self.entity_type == "user" else "guild_abonnes"
+
+        if self.p_id in data.get("players", {}) and self.entity_id in data["players"][self.p_id].get(dict_key, {}):
+            current = data["players"][self.p_id][dict_key][self.entity_id].get(pref_key, False)
             new_val = not current
-            data["players"][self.p_id]["abonnes"][self.user_id][pref_key] = new_val
+            data["players"][self.p_id][dict_key][self.entity_id][pref_key] = new_val
             self.prefs[pref_key] = new_val
             await save_surveillance_async(data)
 
@@ -149,10 +154,16 @@ class RadarSettingsView(discord.ui.View):
 
     @discord.ui.button(style=discord.ButtonStyle.secondary, row=2)
     async def btn_fermer(self, interaction: discord.Interaction, button: discord.ui.Button):
+        target = (
+            t(self.langue, "rad_target_guild", defaut="Le radar de serveur")
+            if self.entity_type == "guild"
+            else t(self.langue, "rad_target_user", defaut="Le radar personnel")
+        )
         msg = t(
             self.langue,
-            "rad_saved_player",
-            defaut="{e_check} **Préférences enregistrées avec succès !** Le radar joueur est actif.",
+            "rad_prefs_saved",
+            target=target,
+            defaut=f"{{e_check}} **Préférences enregistrées !** {target} est actif.",
         )
         await interaction.response.edit_message(content=msg, view=None)
 
@@ -161,10 +172,13 @@ class RadarSettingsView(discord.ui.View):
 # 🎛️ MENU INTERACTIF DES FILTRES ALLIANCES
 # ==========================================
 class RadarAllianceSettingsView(discord.ui.View):
-    def __init__(self, a_id: str, user_id: str, alliance_name: str, initial_prefs: dict, langue: str = "fr"):
+    def __init__(
+        self, a_id: str, entity_id: str, entity_type: str, alliance_name: str, initial_prefs: dict, langue: str = "fr"
+    ):
         super().__init__(timeout=900)
         self.a_id = a_id
-        self.user_id = str(user_id)
+        self.entity_id = str(entity_id)
+        self.entity_type = entity_type
         self.alliance_name = alliance_name
         self.prefs = initial_prefs
         self.langue = langue
@@ -179,10 +193,12 @@ class RadarAllianceSettingsView(discord.ui.View):
 
     async def toggle_pref(self, pref_key: str):
         data = await load_surveillance_async()
-        if self.a_id in data.get("alliances", {}) and self.user_id in data["alliances"][self.a_id]["abonnes"]:
-            current = data["alliances"][self.a_id]["abonnes"][self.user_id].get(pref_key, False)
+        dict_key = "abonnes" if self.entity_type == "user" else "guild_abonnes"
+
+        if self.a_id in data.get("alliances", {}) and self.entity_id in data["alliances"][self.a_id].get(dict_key, {}):
+            current = data["alliances"][self.a_id][dict_key][self.entity_id].get(pref_key, False)
             new_val = not current
-            data["alliances"][self.a_id]["abonnes"][self.user_id][pref_key] = new_val
+            data["alliances"][self.a_id][dict_key][self.entity_id][pref_key] = new_val
             self.prefs[pref_key] = new_val
             await save_surveillance_async(data)
 
@@ -217,10 +233,16 @@ class RadarAllianceSettingsView(discord.ui.View):
 
     @discord.ui.button(style=discord.ButtonStyle.secondary, row=2)
     async def btn_fermer(self, interaction: discord.Interaction, button: discord.ui.Button):
+        target = (
+            t(self.langue, "rad_target_guild", defaut="Le radar de serveur")
+            if self.entity_type == "guild"
+            else t(self.langue, "rad_target_global", defaut="Le radar global")
+        )
         msg = t(
             self.langue,
-            "rad_alli_saved",
-            defaut="{e_check} **Préférences d'alliance enregistrées !** Le radar global est actif.",
+            "rad_prefs_saved",
+            target=target,
+            defaut=f"{{e_check}} **Préférences enregistrées !** {target} est actif.",
         )
         await interaction.response.edit_message(content=msg, view=None)
 
@@ -228,12 +250,13 @@ class RadarAllianceSettingsView(discord.ui.View):
 # ==========================================
 # 📊 MODULE COG RADAR
 # ==========================================
-@app_commands.allowed_contexts(guilds=False, dms=True, private_channels=True)
-class RadarCog(commands.GroupCog, group_name="radar", group_description="Personal War Radar"):
+@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+class RadarCog(commands.GroupCog, group_name="radar", group_description="Personal and Server War Radar"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.last_scan_hour = None
         self.users_to_purge = set()
+        self.guilds_to_purge = set()
         super().__init__()
 
         self.clr_add_joueur = discord.Color.from_rgb(255, 246, 143)
@@ -269,7 +292,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         target_id: str = "",
         gge_server: str = "",
     ):
-        """Envoie l'alerte MP uniquement aux joueurs qui ont coché ce filtre"""
+        """Envoie l'alerte MP uniquement aux joueurs (users) qui ont coché ce filtre"""
         destinataires = livres = bloques = echecs = 0
 
         for user_id, prefs in abonnes.items():
@@ -291,16 +314,14 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     logger.warning(f"⚠️ MP bloqués pour {user_id}. Ajout à la purge.")
                     self.users_to_purge.add(user_id)
                 except discord.HTTPException as e:
-                    if e.code == 50007:
+                    if getattr(e, "code", 0) == 50007:
                         bloques += 1
                         logger.warning(f"⚠️ MP impossibles pour {user_id}. Ajout à la purge.")
                         self.users_to_purge.add(user_id)
                     else:
                         echecs += 1
-                        logger.error(f"❌ Erreur HTTP MP à {user_id} : {e}")
                 except Exception as e:
                     echecs += 1
-                    logger.error(f"❌ Erreur inattendue MP à {user_id} : {e}")
 
         if destinataires:
             est_alliance = type_filtre in self.FILTRES_ALLIANCE
@@ -318,14 +339,498 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 dm_blocked=bloques,
             )
 
+    async def envoyer_alerte_serveur(
+        self,
+        guild_abonnes: dict,
+        type_filtre: str,
+        embeds_locales: dict,
+    ):
+        """Distribue l'alerte dans les salons de serveurs Discord (guilds)"""
+        if not guild_abonnes:
+            return
+
+        data = await load_surveillance_async()
+        guild_configs = data.get("guild_configs", {})
+
+        for guild_id_str, prefs in guild_abonnes.items():
+            if not prefs.get(type_filtre, False):
+                continue
+
+            config = guild_configs.get(guild_id_str)
+            if not config or not config.get("channel_id"):
+                continue
+
+            langue = config.get("langue", "fr")
+            embed = embeds_locales.get(langue, embeds_locales.get("fr"))
+            if not embed:
+                continue
+
+            try:
+                channel = self.bot.get_channel(config["channel_id"]) or await self.bot.fetch_channel(
+                    config["channel_id"]
+                )
+
+                content = None
+                # Ping le rôle uniquement pour les événements critiques
+                if type_filtre in ["colombe", "infos", "mouvements"] and config.get("ping_role"):
+                    content = config["ping_role"]
+
+                await setup_embed_footer(embed, None, langue)
+                await channel.send(content=content, embed=embed)
+            except (discord.Forbidden, discord.NotFound):
+                logger.warning(f"⚠️ Accès bloqué ou salon supprimé pour le serveur {guild_id_str}. Ajout à la purge.")
+                self.guilds_to_purge.add(guild_id_str)
+            except Exception as e:
+                logger.error(f"❌ Impossible d'envoyer l'alerte radar au serveur {guild_id_str} : {e}")
+
     # ==========================================
-    # 🕵️‍♂️ COMMANDES : RADAR PLAYER
+    # 🏢 COMMANDES : RADAR SERVEUR (ADMINS)
     # ==========================================
-    @app_commands.command(name="add", description="Add a player to your personal radar (Limit: 25 followed)")
+    server_group = app_commands.Group(name="server", description="Configure the public server radar")
+
+    @server_group.command(name="setup", description="Define the room where the radar will send public alerts")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.describe(channel="Le salon cible", role="Role to mention (Optional)")
+    async def srv_setup(
+        self, interaction: discord.Interaction, channel: discord.TextChannel, role: discord.Role = None
+    ):
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except:
+            return
+        langue, serveur = await get_server_config(interaction)
+        # 🛡️ Anti-crash : Blocage des Messages Privés
+        if not interaction.guild:
+            msg = t(langue, "cmd_guild_only", defaut="❌ Cette commande ne peut être utilisée que sur un serveur.")
+            return await interaction.followup.send(msg)
+
+        data = await load_surveillance_async()
+        guild_id = str(interaction.guild.id)
+
+        if "guild_configs" not in data:
+            data["guild_configs"] = {}
+
+        data["guild_configs"][str(interaction.guild.id)] = {
+            "channel_id": channel.id,
+            "ping_role": role.mention if role else None,
+            "langue": langue,
+            "serveur": serveur,
+        }
+        await save_surveillance_async(data)
+        msg_success = t(
+            langue,
+            "rad_srv_setup_success",
+            channel=channel.mention,
+            defaut=f"{{e_check}} **Radar Serveur configuré !** Les alertes arriveront dans {channel.mention}.",
+        )
+        await interaction.followup.send(msg_success)
+
+    @server_group.command(name="add_player", description="Add a player to the server radar (Limit: 15 followed)")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.autocomplete(player=joueur_autocomplete)
+    async def srv_add_player(self, interaction: discord.Interaction, player: str, reason: str = "Player monitoring"):
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except:
+            return
+        langue, serveur = await get_server_config(interaction)
+        # 🛡️ Anti-crash : Blocage des Messages Privés
+        if not interaction.guild:
+            msg = t(langue, "cmd_guild_only", defaut="❌ Cette commande ne peut être utilisée que sur un serveur.")
+            return await interaction.followup.send(msg)
+
+        data = await load_surveillance_async()
+        guild_id = str(interaction.guild.id)
+
+        if guild_id not in data.get("guild_configs", {}):
+            msg_err = t(langue, "rad_err_srv_not_setup", defaut="❌ Utilisez d'abord `/radar server setup`.")
+            return await interaction.followup.send(msg_err)
+
+        p_id, p_might = None, 0
+        try:
+            player_files = list((BASE_DATA_PATH / "server_scans" / serveur).rglob("server_*.json"))
+            if player_files:
+                latest = max(player_files, key=lambda p: p.stat().st_mtime)
+                with open(latest, encoding="utf-8") as f:
+                    for p_name, p_info in json.load(f).get("players", {}).items():
+                        if p_name.lower() == player.lower():
+                            p_id = str(p_info.get("player_id", p_info.get("id", "")))
+                            p_might = int(p_info.get("main_points", 0))
+                            player = p_name
+                            break
+        except:
+            pass
+
+        if not p_id:
+            msg_not_found = t(
+                langue,
+                "rad_err_not_found_cache",
+                p=player,
+                defaut=f"{{e_warning}} Joueur **{player}** introuvable dans le cache local.",
+            )
+            return await interaction.followup.send(msg_not_found)
+
+        # --- VÉRIFICATION DE LA LIMITE JOUEURS SERVEUR ---
+        already_tracking = guild_id in data.get("players", {}).get(p_id, {}).get("guild_abonnes", {})
+        if not already_tracking:
+            count_tracked = sum(
+                1 for p_info in data.get("players", {}).values() if guild_id in p_info.get("guild_abonnes", {})
+            )
+            if count_tracked >= 15:
+                msg_limite = t(
+                    langue,
+                    "rad_err_srv_limit_player",
+                    cnt=count_tracked,
+                    defaut=f"{{e_nocheck}} **Limite atteinte** : Le serveur surveille déjà le maximum autorisé (`{count_tracked}/15` joueurs).",
+                )
+                return await interaction.followup.send(msg_limite)
+
+        if p_id not in data.get("players", {}):
+            if "players" not in data:
+                data["players"] = {}
+            now_str = discord.utils.utcnow().isoformat().replace("+00:00", "Z")
+            data["players"][p_id] = {
+                "name": player,
+                "last_alliance": now_str,
+                "last_name": now_str,
+                "last_pos": now_str,
+                "last_might": p_might,
+                "is_protected": False,
+                "abonnes": {},
+                "guild_abonnes": {},
+                "serveur": serveur,
+            }
+
+        if "guild_abonnes" not in data["players"][p_id]:
+            data["players"][p_id]["guild_abonnes"] = {}
+
+        if guild_id not in data["players"][p_id]["guild_abonnes"]:
+            data["players"][p_id]["guild_abonnes"][guild_id] = {
+                "raison": reason,
+                "pseudo": False,
+                "position": False,
+                "alliance": False,
+                "puissance": False,
+                "colombe": False,
+            }
+            await save_surveillance_async(data)
+
+            title_str = t(
+                langue, "rad_srv_add_p_title", p=player, defaut=f"{{e_std_bullseye}} Cible Serveur : {player}"
+            )
+            desc_str = t(
+                langue,
+                "rad_srv_add_p_desc",
+                defaut="Ajouté au radar public.\n\n**Configure les alertes pour le serveur :**",
+            )
+            embed = discord.Embed(title=title_str, description=desc_str, color=self.clr_add_joueur)
+            view = RadarSettingsView(
+                p_id, guild_id, "guild", player, data["players"][p_id]["guild_abonnes"][guild_id], langue
+            )
+            await setup_embed_footer(embed, interaction, langue)
+            await interaction.followup.send(embed=embed, view=view)
+        else:
+            msg_already = t(
+                langue, "rad_err_srv_already_track", p=player, defaut=f"Le serveur surveille DÉJÀ **{player}** !"
+            )
+            await interaction.followup.send(msg_already)
+
+    @server_group.command(name="add_alliance", description="Add an alliance to the server radar (Limit: 3 followed)")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.autocomplete(alliance_name=alliance_autocomplete)
+    async def srv_add_alliance(
+        self, interaction: discord.Interaction, alliance_name: str, reason: str = "Alliance monitoring"
+    ):
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except:
+            return
+        langue, serveur = await get_server_config(interaction)
+        # 🛡️ Anti-crash : Blocage des Messages Privés
+        if not interaction.guild:
+            msg = t(langue, "cmd_guild_only", defaut="❌ Cette commande ne peut être utilisée que sur un serveur.")
+            return await interaction.followup.send(msg)
+
+        data = await load_surveillance_async()
+        guild_id = str(interaction.guild.id)
+
+        if guild_id not in data.get("guild_configs", {}):
+            msg_err = t(langue, "rad_err_srv_not_setup", defaut="❌ Utilisez d'abord `/radar server setup`.")
+            return await interaction.followup.send(msg_err)
+
+        headers = await get_api_headers(interaction)
+        a_id, a_name_real, members_dict = None, alliance_name, {}
+
+        try:
+            url_search = f"https://api.gge-tracker.com/api/v1/alliances/name/{urllib.parse.quote(alliance_name)}"
+            async with self.bot.session.get(url_search, headers=headers, timeout=10) as r:
+                if r.status == 200:
+                    search_data = await r.json()
+                    cible = search_data[0] if isinstance(search_data, list) and search_data else search_data
+                    a_id = str(cible.get("alliance_id") or cible.get("id"))
+                    a_name_real = cible.get("alliance_name", alliance_name)
+
+            if a_id:
+                url_alli = f"https://api.gge-tracker.com/api/v1/alliances/id/{a_id}"
+                async with self.bot.session.get(url_alli, headers=headers, timeout=10) as r:
+                    if r.status == 200:
+                        alli_data = await r.json()
+                        if isinstance(alli_data, list) and alli_data:
+                            alli_data = alli_data[0]
+                        members = alli_data.get("players", alli_data.get("members", alli_data.get("playerList", [])))
+                        for m in members:
+                            p_id = str(m.get("player_id", m.get("playerId", "")))
+                            if p_id:
+                                members_dict[p_id] = {
+                                    "name": m.get("player_name", m.get("playerName", "Inconnu")),
+                                    "rank": int(m.get("alliance_rank", 8)),
+                                }
+        except Exception as e:
+            msg_api_err = t(
+                langue,
+                "rad_err_api_join",
+                defaut="{e_nocheck} Impossible de joindre GGE-Tracker pour trouver cette alliance.",
+            )
+            return await interaction.followup.send(msg_api_err)
+
+        if not a_id:
+            msg_not_found = t(
+                langue,
+                "rad_err_alli_not_found",
+                a=alliance_name,
+                defaut=f"{{e_warning}} Alliance **{alliance_name}** introuvable.",
+            )
+            return await interaction.followup.send(msg_not_found)
+
+        # --- VÉRIFICATION DE LA LIMITE ALLIANCES SERVEUR ---
+        already_tracking = guild_id in data.get("alliances", {}).get(a_id, {}).get("guild_abonnes", {})
+        if not already_tracking:
+            count_tracked = sum(
+                1 for a_info in data.get("alliances", {}).values() if guild_id in a_info.get("guild_abonnes", {})
+            )
+            if count_tracked >= 3:
+                msg_limite = t(
+                    langue,
+                    "rad_err_srv_limit_alli",
+                    cnt=count_tracked,
+                    defaut=f"{{e_nocheck}} **Limite atteinte** : Le serveur surveille déjà le maximum autorisé (`{count_tracked}/3` alliances).",
+                )
+                return await interaction.followup.send(msg_limite)
+
+        if a_id not in data.get("alliances", {}):
+            if "alliances" not in data:
+                data["alliances"] = {}
+            data["alliances"][a_id] = {
+                "name": a_name_real,
+                "members": members_dict,
+                "abonnes": {},
+                "guild_abonnes": {},
+                "serveur": serveur,
+            }
+
+        if "guild_abonnes" not in data["alliances"][a_id]:
+            data["alliances"][a_id]["guild_abonnes"] = {}
+
+        if guild_id not in data["alliances"][a_id]["guild_abonnes"]:
+            data["alliances"][a_id]["guild_abonnes"][guild_id] = {
+                "raison": reason,
+                "mouvements": False,
+                "rangs": False,
+                "infos": False,
+            }
+            await save_surveillance_async(data)
+
+            title_str = t(
+                langue,
+                "rad_srv_add_a_title",
+                a=a_name_real,
+                defaut=f"{{e_alliance_icon}} Cible Serveur : {a_name_real}",
+            )
+            desc_str = t(
+                langue,
+                "rad_srv_add_a_desc",
+                defaut="Ajoutée au radar public.\n\n**Configure les alertes pour le serveur :**",
+            )
+            embed = discord.Embed(title=title_str, description=desc_str, color=self.clr_add_alliance)
+            view = RadarAllianceSettingsView(
+                a_id, guild_id, "guild", a_name_real, data["alliances"][a_id]["guild_abonnes"][guild_id], langue
+            )
+            await setup_embed_footer(embed, interaction, langue)
+            await interaction.followup.send(embed=embed, view=view)
+        else:
+            msg_already = t(
+                langue,
+                "rad_err_srv_already_track_alli",
+                a=a_name_real,
+                defaut=f"Le serveur surveille DÉJÀ **{a_name_real}** !",
+            )
+            await interaction.followup.send(msg_already)
+
+    @server_group.command(name="remove_player", description="Remove a player from the server radar")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.autocomplete(player=joueur_autocomplete)
+    async def srv_remove_player(self, interaction: discord.Interaction, player: str):
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except:
+            return
+        langue, _ = await get_server_config(interaction)
+        # 🛡️ Anti-crash : Blocage des Messages Privés
+        if not interaction.guild:
+            msg = t(langue, "cmd_guild_only", defaut="❌ Cette commande ne peut être utilisée que sur un serveur.")
+            return await interaction.followup.send(msg)
+
+        data = await load_surveillance_async()
+        guild_id = str(interaction.guild.id)
+        cible_trouvee = False
+
+        for pid, info in list(data.get("players", {}).items()):
+            if info["name"].lower() == player.lower() and guild_id in info.get("guild_abonnes", {}):
+                cible_trouvee = True
+                del data["players"][pid]["guild_abonnes"][guild_id]
+                if not data["players"][pid].get("abonnes", {}) and not data["players"][pid].get("guild_abonnes", {}):
+                    del data["players"][pid]
+                break
+
+        if cible_trouvee:
+            await save_surveillance_async(data)
+            msg_succ = t(
+                langue, "rad_srv_rem_p_succ", p=player, defaut=f"{{e_check}} **{player}** retiré du radar du serveur."
+            )
+            await interaction.followup.send(msg_succ)
+        else:
+            msg_fail = t(
+                langue,
+                "rad_srv_rem_p_fail",
+                p=player,
+                defaut=f"{{e_warning}} **{player}** n'est pas surveillé par le serveur.",
+            )
+            await interaction.followup.send(msg_fail)
+
+    @server_group.command(name="remove_alliance", description="Remove an alliance from the server radar")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.autocomplete(alliance_name=alliance_autocomplete)
+    async def srv_remove_alliance(self, interaction: discord.Interaction, alliance_name: str):
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except:
+            return
+        langue, _ = await get_server_config(interaction)
+        # 🛡️ Anti-crash : Blocage des Messages Privés
+        if not interaction.guild:
+            msg = t(langue, "cmd_guild_only", defaut="❌ Cette commande ne peut être utilisée que sur un serveur.")
+            return await interaction.followup.send(msg)
+
+        data = await load_surveillance_async()
+        guild_id = str(interaction.guild.id)
+        cible_trouvee = False
+
+        for aid, info in list(data.get("alliances", {}).items()):
+            if info["name"].lower() == alliance_name.lower() and guild_id in info.get("guild_abonnes", {}):
+                cible_trouvee = True
+                del data["alliances"][aid]["guild_abonnes"][guild_id]
+                if not data["alliances"][aid].get("abonnes", {}) and not data["alliances"][aid].get(
+                    "guild_abonnes", {}
+                ):
+                    del data["alliances"][aid]
+                break
+
+        if cible_trouvee:
+            await save_surveillance_async(data)
+            msg_succ = t(
+                langue,
+                "rad_srv_rem_a_succ",
+                a=alliance_name,
+                defaut=f"{{e_check}} L'alliance **{alliance_name}** a été retirée du radar du serveur.",
+            )
+            await interaction.followup.send(msg_succ)
+        else:
+            msg_fail = t(
+                langue,
+                "rad_srv_rem_a_fail",
+                a=alliance_name,
+                defaut=f"{{e_warning}} **{alliance_name}** n'est pas surveillée par le serveur.",
+            )
+            await interaction.followup.send(msg_fail)
+
+    @server_group.command(name="list", description="Display the server's radar targets")
+    @app_commands.default_permissions(manage_guild=True)
+    async def srv_list(self, interaction: discord.Interaction):
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except:
+            return
+        langue, _ = await get_server_config(interaction)
+        # 🛡️ Anti-crash : Blocage des Messages Privés
+        if not interaction.guild:
+            msg = t(langue, "cmd_guild_only", defaut="❌ Cette commande ne peut être utilisée que sur un serveur.")
+            return await interaction.followup.send(msg)
+
+        data = await load_surveillance_async()
+        guild_id = str(interaction.guild.id)
+
+        if guild_id not in data.get("guild_configs", {}):
+            msg_err = t(langue, "rad_err_srv_not_setup", defaut="❌ Ce serveur n'a pas configuré de radar.")
+            return await interaction.followup.send(msg_err)
+
+        mes_joueurs, mes_alliances = [], []
+        lbl_sr = t(langue, "rad_list_no_reason", defaut="Sans raison")
+        e_check = DICT_EMOJIS.get("e_check", "✅")
+        e_nocheck = DICT_EMOJIS.get("e_nocheck", "❌")
+        e_bullseye = DICT_EMOJIS.get("e_std_bullseye", "🎯")
+        e_alli = DICT_EMOJIS.get("e_alliance_icon", "🛡️")
+
+        for pid, info in data.get("players", {}).items():
+            if guild_id in info.get("guild_abonnes", {}):
+                prefs = info["guild_abonnes"][guild_id]
+                filtres_actifs = [k.capitalize() for k, v in prefs.items() if v and k != "raison"]
+                str_f = f"{e_check} {', '.join(filtres_actifs)}" if filtres_actifs else f"{e_nocheck} Aucun filtre"
+                mes_joueurs.append(f"{e_bullseye} **{info['name']}** ➔ *{prefs.get('raison', lbl_sr)}*\n└ {str_f}")
+
+        for aid, info in data.get("alliances", {}).items():
+            if guild_id in info.get("guild_abonnes", {}):
+                prefs = info["guild_abonnes"][guild_id]
+                filtres_actifs = [k.capitalize() for k, v in prefs.items() if v and k != "raison"]
+                str_f = f"{e_check} {', '.join(filtres_actifs)}" if filtres_actifs else f"{e_nocheck} Aucun filtre"
+                mes_alliances.append(f"{e_alli} **{info['name']}** ➔ *{prefs.get('raison', lbl_sr)}*\n└ {str_f}")
+
+        if not mes_joueurs and not mes_alliances:
+            msg_empty = t(langue, "rad_srv_list_empty", defaut="{e_information} Le radar de ce serveur est vide !")
+            return await interaction.followup.send(msg_empty)
+
+        embeds = []
+        if mes_alliances:
+            title_alli = t(langue, "rad_srv_list_title_alli", defaut="📡 Radar Serveur - Alliances")
+            embed = discord.Embed(
+                title=title_alli, description="\n\n".join(mes_alliances), color=self.clr_list_alliances
+            )
+            await setup_embed_footer(embed, interaction, langue)
+            embeds.append(embed)
+
+        if mes_joueurs:
+            title_play = t(langue, "rad_srv_list_title_player", defaut="📡 Radar Serveur - Joueurs")
+            for i in range(0, len(mes_joueurs), 10):
+                embed = discord.Embed(
+                    title=title_play, description="\n\n".join(mes_joueurs[i : i + 10]), color=self.clr_list_joueurs
+                )
+                await setup_embed_footer(embed, interaction, langue)
+                embeds.append(embed)
+
+        if len(embeds) == 1:
+            await interaction.followup.send(embed=embeds[0])
+        else:
+            await interaction.followup.send(embed=embeds[0], view=PaginationView(embeds))
+
+    # ==========================================
+    # 🕵️‍♂️ COMMANDES : RADAR PERSONNEL (MP)
+    # ==========================================
+    private_group = app_commands.Group(name="private", description="Manage your personal war radar (DMs)")
+
+    @private_group.command(name="add_player", description="Add a player to your personal radar (Limit: 25 followed)")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(player=joueur_autocomplete)
     @app_commands.describe(reason="Reason for surveillance")
-    async def s_add(self, interaction: discord.Interaction, player: str, reason: str = "Surveillance générale"):
+    async def private_add_player(self, interaction: discord.Interaction, player: str, reason: str = "Monitoring"):
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)
         except:
@@ -372,11 +877,13 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     langue,
                     "rad_err_limit_player",
                     cnt=count_tracked,
-                    defaut=f"{{e_nocheck}} **Limite atteinte** : Suivi maximal `{count_tracked}/25` joueurs. Retire un profil avec `/radar remove` d'abord.",
+                    defaut=f"{{e_nocheck}} **Limite atteinte** : Suivi maximal `{count_tracked}/25` joueurs.",
                 )
                 return await interaction.followup.send(msg)
 
-        if p_id not in data["players"]:
+        if p_id not in data.get("players", {}):
+            if "players" not in data:
+                data["players"] = {}
             data["players"][p_id] = {
                 "name": player,
                 "last_alliance": now_str,
@@ -386,6 +893,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 "peace_disabled_at": None,
                 "is_protected": False,
                 "abonnes": {},
+                "guild_abonnes": {},
                 "serveur": serveur,
             }
 
@@ -419,61 +927,22 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 "rad_add_desc",
                 j=player,
                 r=reason,
-                defaut=f"**{player}** a bien été ajouté à ton radar.\n*(Raison: {reason})*\n\n{{e_std_backhand_index_pointing_down}} **Configure tes alertes (Rouge = OFF, Vert = ON) :**",
+                defaut=f"**{player}** a bien été ajouté à ton radar personnel.\n*(Raison: {reason})*\n\n{{e_std_backhand_index_pointing_down}} **Configure tes alertes (Rouge = OFF, Vert = ON) :**",
             ),
             color=self.clr_add_joueur,
         )
-        view = RadarSettingsView(p_id, user_id, player, data["players"][p_id]["abonnes"][user_id], langue)
+        view = RadarSettingsView(p_id, user_id, "user", player, data["players"][p_id]["abonnes"][user_id], langue)
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed, view=view)
         await prompt_vote_if_lucky(interaction, probability_percent=20, langue=langue)
 
-    @app_commands.command(name="remove", description="Remove a player from your personal radar")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
-    @app_commands.autocomplete(player=joueur_autocomplete)
-    async def s_remove(self, interaction: discord.Interaction, player: str):
-        try:
-            await interaction.response.defer(ephemeral=True, thinking=True)
-        except:
-            return
-
-        langue, _ = await get_server_config(interaction)
-        data = await load_surveillance_async()
-        user_id = str(interaction.user.id)
-        cible_trouvee = False
-
-        for pid, info in list(data["players"].items()):
-            if info["name"].lower() == player.lower():
-                if user_id in info.get("abonnes", {}):
-                    cible_trouvee = True
-                    del data["players"][pid]["abonnes"][user_id]
-                    if not data["players"][pid]["abonnes"]:
-                        del data["players"][pid]
-                    break
-
-        if cible_trouvee:
-            await save_surveillance_async(data)
-            msg = t(
-                langue,
-                "rad_rem_succ",
-                j=player,
-                defaut=f"{{e_check}} **{player}** a bien été retiré de ton radar personnel.",
-            )
-            await interaction.followup.send(msg)
-        else:
-            msg = t(langue, "rad_rem_fail", j=player, defaut=f"{{e_warning}} **{player}** n'est pas dans ton radar.")
-            await interaction.followup.send(msg)
-
-    # ==========================================
-    # 🛡️ COMMANDES : RADAR ALLIANCE (SOUS-GROUPE)
-    # ==========================================
-    alliance_group = app_commands.Group(name="alliance", description="Manage the radar of complete alliances")
-
-    @alliance_group.command(name="add", description="Add an entire alliance to your radar (Limit: 3 followed)")
+    @private_group.command(name="add_alliance", description="Add an entire alliance to your radar (Limit: 3 followed)")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     @app_commands.describe(reason="Why are you monitoring this alliance?")
-    async def a_add(self, interaction: discord.Interaction, alliance_name: str, reason: str = "Surveillance globale"):
+    async def private_add_alliance(
+        self, interaction: discord.Interaction, alliance_name: str, reason: str = "Monitoring"
+    ):
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)
         except:
@@ -544,8 +1013,16 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 )
                 return await interaction.followup.send(msg)
 
-        if a_id not in data["alliances"]:
-            data["alliances"][a_id] = {"name": a_name_real, "members": members_dict, "abonnes": {}, "serveur": serveur}
+        if a_id not in data.get("alliances", {}):
+            if "alliances" not in data:
+                data["alliances"] = {}
+            data["alliances"][a_id] = {
+                "name": a_name_real,
+                "members": members_dict,
+                "abonnes": {},
+                "guild_abonnes": {},
+                "serveur": serveur,
+            }
 
         if "abonnes" not in data["alliances"][a_id]:
             data["alliances"][a_id]["abonnes"] = {}
@@ -581,21 +1058,59 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 a=a_name_real,
                 cnt=len(members_dict),
                 r=reason,
-                defaut=f"Le radar global est activé sur **{a_name_real}** ({len(members_dict)} membres).\n*(Raison: {reason})*\n\n{{e_std_backhand_index_pointing_down}} **Configure tes alertes d'alliance (Rouge = OFF, Vert = ON) :**",
+                defaut=f"Le radar personnel est activé sur **{a_name_real}** ({len(members_dict)} membres).\n*(Raison: {reason})*\n\n{{e_std_backhand_index_pointing_down}} **Configure tes alertes d'alliance (Rouge = OFF, Vert = ON) :**",
             ),
             color=self.clr_add_alliance,
         )
         view = RadarAllianceSettingsView(
-            a_id, user_id, a_name_real, data["alliances"][a_id]["abonnes"][user_id], langue
+            a_id, user_id, "user", a_name_real, data["alliances"][a_id]["abonnes"][user_id], langue
         )
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed, view=view)
         await prompt_vote_if_lucky(interaction, probability_percent=20, langue=langue)
 
-    @alliance_group.command(name="remove", description="Remove an alliance from your personal radar")
+    @private_group.command(name="remove_player", description="Remove a player from your personal radar")
+    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.autocomplete(player=joueur_autocomplete)
+    async def private_remove_player(self, interaction: discord.Interaction, player: str):
+        try:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+        except:
+            return
+
+        langue, _ = await get_server_config(interaction)
+        data = await load_surveillance_async()
+        user_id = str(interaction.user.id)
+        cible_trouvee = False
+
+        for pid, info in list(data.get("players", {}).items()):
+            if info["name"].lower() == player.lower():
+                if user_id in info.get("abonnes", {}):
+                    cible_trouvee = True
+                    del data["players"][pid]["abonnes"][user_id]
+                    if not data["players"][pid].get("abonnes", {}) and not data["players"][pid].get(
+                        "guild_abonnes", {}
+                    ):
+                        del data["players"][pid]
+                    break
+
+        if cible_trouvee:
+            await save_surveillance_async(data)
+            msg = t(
+                langue,
+                "rad_rem_succ",
+                j=player,
+                defaut=f"{{e_check}} **{player}** a bien été retiré de ton radar personnel.",
+            )
+            await interaction.followup.send(msg)
+        else:
+            msg = t(langue, "rad_rem_fail", j=player, defaut=f"{{e_warning}} **{player}** n'est pas dans ton radar.")
+            await interaction.followup.send(msg)
+
+    @private_group.command(name="remove_alliance", description="Remove an alliance from your personal radar")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
-    async def a_remove(self, interaction: discord.Interaction, alliance_name: str):
+    async def private_remove_alliance(self, interaction: discord.Interaction, alliance_name: str):
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)
         except:
@@ -611,7 +1126,9 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 if user_id in info.get("abonnes", {}):
                     cible_trouvee = True
                     del data["alliances"][aid]["abonnes"][user_id]
-                    if not data["alliances"][aid]["abonnes"]:
+                    if not data["alliances"][aid].get("abonnes", {}) and not data["alliances"][aid].get(
+                        "guild_abonnes", {}
+                    ):
                         del data["alliances"][aid]
                     break
 
@@ -633,12 +1150,9 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             )
             await interaction.followup.send(msg)
 
-    # ==========================================
-    # 📋 COMMANDE : LIST GLOBAL
-    # ==========================================
-    @app_commands.command(name="list", description="Display your personal radar (Players & Alliances)")
+    @private_group.command(name="list", description="Display your personal radar (Players & Alliances)")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
-    async def s_list(self, interaction: discord.Interaction):
+    async def private_list(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)
         except:
@@ -714,12 +1228,11 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             msg = t(
                 langue,
                 "rad_list_empty",
-                defaut="{e_information} Ton radar est vide ! Utilise `/radar add` ou `/radar alliance add`.",
+                defaut="{e_information} Ton radar est vide ! Utilise `/radar private add_player` ou `/radar private add_alliance`.",
             )
             return await interaction.followup.send(msg)
 
         embeds = []
-
         if mes_alliances:
             embed = discord.Embed(
                 title=t(langue, "rad_list_title_alli", defaut="{e_std_man_detective} Mon Radar - Alliances"),
@@ -826,8 +1339,6 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                 self.etags_cache[cache_key_server] = str(new_etag)
                             self.next_scan[cache_key_server] = now_ts + interval
 
-                            # 🚀 À partir d'ici, on sait que le serveur a été mis à jour.
-                            # On n'a plus besoin d'utiliser les ETags pour les requêtes suivantes !
                 except Exception as e:
                     logger.error(f"❌ [Radar Spy] Erreur check global {serveur} : {e}")
                     continue
@@ -839,8 +1350,9 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     old_name = a_info.get("name", "Inconnu")
                     old_members = a_info.get("members", {})
                     abonnes_alliance = a_info.get("abonnes", {})
+                    guild_abonnes_alliance = a_info.get("guild_abonnes", {})
 
-                    if not abonnes_alliance:
+                    if not abonnes_alliance and not guild_abonnes_alliance:
                         continue
 
                     try:
@@ -891,6 +1403,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                         target_id=str(a_id),
                                         gge_server=serveur,
                                     )
+                                    await self.envoyer_alerte_serveur(guild_abonnes_alliance, "infos", embeds_locales)
                                     a_info["name"] = new_name
                                     changes_detected = True
 
@@ -954,6 +1467,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                         target_id=str(a_id),
                                         gge_server=serveur,
                                     )
+                                    await self.envoyer_alerte_serveur(guild_abonnes_alliance, "infos", embeds_locales)
 
                                 if entrees or sorties:
                                     embeds_locales = {}
@@ -1014,6 +1528,9 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                         target_id=str(a_id),
                                         gge_server=serveur,
                                     )
+                                    await self.envoyer_alerte_serveur(
+                                        guild_abonnes_alliance, "mouvements", embeds_locales
+                                    )
 
                                 if rangs_changes:
                                     embeds_locales = {}
@@ -1073,6 +1590,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                         target_id=str(a_id),
                                         gge_server=serveur,
                                     )
+                                    await self.envoyer_alerte_serveur(guild_abonnes_alliance, "rangs", embeds_locales)
 
                                 if new_name != old_name or entrees or sorties or rangs_changes:
                                     a_info["members"] = new_members_dict
@@ -1097,7 +1615,9 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
 
                                 for p_id, info in tracked_players:
                                     abonnes = info.get("abonnes", {})
-                                    if not abonnes:
+                                    guild_abonnes = info.get("guild_abonnes", {})
+
+                                    if not abonnes and not guild_abonnes:
                                         continue
 
                                     p_data = api_players.get(p_id)
@@ -1150,6 +1670,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                             target_id=str(p_id),
                                             gge_server=serveur,
                                         )
+                                        await self.envoyer_alerte_serveur(guild_abonnes, "pseudo", embeds_locales)
                                         info["name"], info["last_name"] = (
                                             new_name,
                                             maintenant.isoformat().replace("+00:00", "Z"),
@@ -1207,6 +1728,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                             target_id=str(p_id),
                                             gge_server=serveur,
                                         )
+                                        await self.envoyer_alerte_serveur(guild_abonnes, "alliance", embeds_locales)
                                         info["last_alliance_name"], info["last_alliance"] = (
                                             new_alli,
                                             maintenant.isoformat().replace("+00:00", "Z"),
@@ -1256,6 +1778,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                             target_id=str(p_id),
                                             gge_server=serveur,
                                         )
+                                        await self.envoyer_alerte_serveur(guild_abonnes, "puissance", embeds_locales)
                                         info["last_might"] = current_might
                                         changes_detected = True
 
@@ -1385,6 +1908,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                 target_id=str(p_id),
                                                 gge_server=serveur,
                                             )
+                                            await self.envoyer_alerte_serveur(guild_abonnes, "colombe", embeds_locales)
 
                                     if (new_peace != old_peace) or (was_protected != is_protected):
                                         info["peace_disabled_at"], info["is_protected"] = (
@@ -1414,7 +1938,9 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                 for p_id, info in tracked_players:
                                     if info["name"] == m_name and m["created_at"] > info["last_pos"]:
                                         abonnes = info.get("abonnes", {})
-                                        if not abonnes:
+                                        guild_abonnes = info.get("guild_abonnes", {})
+
+                                        if not abonnes and not guild_abonnes:
                                             continue
 
                                         x_old, y_old, x_new, y_new = (
@@ -1459,6 +1985,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                             target_id=str(p_id),
                                             gge_server=serveur,
                                         )
+                                        await self.envoyer_alerte_serveur(guild_abonnes, "position", embeds_locales)
                                         info["last_pos"] = m["created_at"]
                                         changes_detected = True
                 except Exception as e:
@@ -1467,29 +1994,53 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             # ==========================================
             # --- ÉTAPE 4 : PURGE AUTOMATIQUE DES ABONNÉS MORTS ---
             # ==========================================
-            if hasattr(self, "users_to_purge") and self.users_to_purge:
+            if self.users_to_purge:
                 for uid in self.users_to_purge:
-                    # 1. Purge des joueurs
                     for p_id in list(data.get("players", {}).keys()):
                         if uid in data["players"][p_id].get("abonnes", {}):
                             del data["players"][p_id]["abonnes"][uid]
-                            # Si le joueur n'a plus aucun abonné, on supprime le joueur du radar
-                            if not data["players"][p_id]["abonnes"]:
+                            if not data["players"][p_id].get("abonnes", {}) and not data["players"][p_id].get(
+                                "guild_abonnes", {}
+                            ):
                                 del data["players"][p_id]
 
-                    # 2. Purge des alliances
                     for a_id in list(data.get("alliances", {}).keys()):
                         if uid in data["alliances"][a_id].get("abonnes", {}):
                             del data["alliances"][a_id]["abonnes"][uid]
-                            # Si l'alliance n'a plus d'abonné, on supprime l'alliance
-                            if not data["alliances"][a_id]["abonnes"]:
+                            if not data["alliances"][a_id].get("abonnes", {}) and not data["alliances"][a_id].get(
+                                "guild_abonnes", {}
+                            ):
                                 del data["alliances"][a_id]
 
-                logger.info(f"🧹 Purge automatique terminée pour {len(self.users_to_purge)} compte(s) injoignable(s).")
-                self.users_to_purge.clear()  # On vide la corbeille
+                logger.info(f"🧹 Purge MP terminée pour {len(self.users_to_purge)} compte(s).")
+                self.users_to_purge.clear()
                 changes_detected = True
 
-            # FIN DE LA TÂCHE : Sauvegarde si modification
+            if self.guilds_to_purge:
+                for gid in self.guilds_to_purge:
+                    if gid in data.get("guild_configs", {}):
+                        del data["guild_configs"][gid]
+
+                    for p_id in list(data.get("players", {}).keys()):
+                        if gid in data["players"][p_id].get("guild_abonnes", {}):
+                            del data["players"][p_id]["guild_abonnes"][gid]
+                            if not data["players"][p_id].get("abonnes", {}) and not data["players"][p_id].get(
+                                "guild_abonnes", {}
+                            ):
+                                del data["players"][p_id]
+
+                    for a_id in list(data.get("alliances", {}).keys()):
+                        if gid in data["alliances"][a_id].get("guild_abonnes", {}):
+                            del data["alliances"][a_id]["guild_abonnes"][gid]
+                            if not data["alliances"][a_id].get("abonnes", {}) and not data["alliances"][a_id].get(
+                                "guild_abonnes", {}
+                            ):
+                                del data["alliances"][a_id]
+
+                logger.info(f"🧹 Purge Guilds terminée pour {len(self.guilds_to_purge)} serveur(s).")
+                self.guilds_to_purge.clear()
+                changes_detected = True
+
             if changes_detected:
                 await save_surveillance_async(data)
 

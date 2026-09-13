@@ -43,10 +43,10 @@ HELP_CONFIG = {
         "color": discord.Color.from_rgb(102, 102, 102),
         "title_key": "help_cat_config",
         "commands": [
-            {"name": "/setup", "desc_key": "help_cmd_setup"},
-            {"name": "/link_account", "desc_key": "help_cmd_link_account"},
-            {"name": "/status", "desc_key": "help_cmd_status"},
-            {"name": "/help", "desc_key": "help_cmd_help"},
+            {"name": "/setup", "desc_key": "help_cmd_setup", "server_only": False, "private_only": False},
+            {"name": "/link_account", "desc_key": "help_cmd_link_account", "server_only": False, "private_only": False},
+            {"name": "/status", "desc_key": "help_cmd_status", "server_only": False, "private_only": False},
+            {"name": "/help", "desc_key": "help_cmd_help", "server_only": False, "private_only": False},
         ],
     },
     "communaute": {
@@ -54,12 +54,17 @@ HELP_CONFIG = {
         "color": discord.Color.from_rgb(230, 230, 250),
         "title_key": "help_cat_communaute",
         "commands": [
-            {"name": "/hub (setup / stop)", "desc_key": "help_cmd_hub_group"},
-            {"name": "/news", "desc_key": "help_cmd_news"},
-            {"name": "/support", "desc_key": "help_cmd_support"},
-            {"name": "/contact", "desc_key": "help_cmd_contact"},
-            {"name": "/vote", "desc_key": "help_cmd_vote"},
-            {"name": "/discover", "desc_key": "help_cmd_discover"},
+            {
+                "name": "/hub (setup / stop)",
+                "desc_key": "help_cmd_hub_group",
+                "server_only": True,
+                "private_only": False,
+            },
+            {"name": "/news", "desc_key": "help_cmd_news", "server_only": False, "private_only": False},
+            {"name": "/support", "desc_key": "help_cmd_support", "server_only": False, "private_only": False},
+            {"name": "/contact", "desc_key": "help_cmd_contact", "server_only": False, "private_only": False},
+            {"name": "/vote", "desc_key": "help_cmd_vote", "server_only": False, "private_only": False},
+            {"name": "/discover", "desc_key": "help_cmd_discover", "server_only": False, "private_only": False},
         ],
     },
     "profils": {
@@ -67,15 +72,50 @@ HELP_CONFIG = {
         "color": discord.Color.from_rgb(50, 214, 50),
         "title_key": "help_cat_profils",
         "commands": [
-            {"name": "/server", "desc_key": "help_cmd_server"},
-            {"name": "/player profile", "desc_key": "help_cmd_player_profile"},
-            {"name": "/player history", "desc_key": "help_cmd_player_history"},
-            {"name": "/player dove", "desc_key": "help_cmd_player_dove"},
-            {"name": "/player compare", "desc_key": "help_cmd_player_compare"},
-            {"name": "/alliance profile", "desc_key": "help_cmd_alliance_profile"},
-            {"name": "/alliance might", "desc_key": "help_cmd_alliance_might"},
-            {"name": "/alliance property", "desc_key": "help_cmd_alliance_property"},
-            {"name": "/alliance description", "desc_key": "help_cmd_alliance_desc"},
+            {"name": "/server", "desc_key": "help_cmd_server", "server_only": True, "private_only": False},
+            {
+                "name": "/player profile",
+                "desc_key": "help_cmd_player_profile",
+                "server_only": False,
+                "private_only": False,
+            },
+            {
+                "name": "/player history",
+                "desc_key": "help_cmd_player_history",
+                "server_only": False,
+                "private_only": False,
+            },
+            {"name": "/player dove", "desc_key": "help_cmd_player_dove", "server_only": False, "private_only": False},
+            {
+                "name": "/player compare",
+                "desc_key": "help_cmd_player_compare",
+                "server_only": False,
+                "private_only": False,
+            },
+            {
+                "name": "/alliance profile",
+                "desc_key": "help_cmd_alliance_profile",
+                "server_only": False,
+                "private_only": False,
+            },
+            {
+                "name": "/alliance might",
+                "desc_key": "help_cmd_alliance_might",
+                "server_only": False,
+                "private_only": False,
+            },
+            {
+                "name": "/alliance property",
+                "desc_key": "help_cmd_alliance_property",
+                "server_only": False,
+                "private_only": False,
+            },
+            {
+                "name": "/alliance description",
+                "desc_key": "help_cmd_alliance_desc",
+                "server_only": False,
+                "private_only": False,
+            },
         ],
     },
     "guerre": {
@@ -83,8 +123,19 @@ HELP_CONFIG = {
         "color": discord.Color.from_rgb(139, 0, 0),
         "title_key": "help_cat_guerre",
         "commands": [
-            {"name": "/alliance scanner", "desc_key": "help_cmd_alliance_scanner"},
-            {"name": "/target (setup / search)", "desc_key": "help_cmd_target_group", "wip": True},
+            {
+                "name": "/alliance scanner",
+                "desc_key": "help_cmd_alliance_scanner",
+                "server_only": False,
+                "private_only": False,
+            },
+            {
+                "name": "/target (setup / search)",
+                "desc_key": "help_cmd_target_group",
+                "wip": True,
+                "server_only": False,
+                "private_only": False,
+            },
         ],
     },
     "events": {
@@ -92,15 +143,37 @@ HELP_CONFIG = {
         "color": discord.Color.from_rgb(175, 238, 238),
         "title_key": "help_cat_events",
         "commands": [
-            {"name": "/event player", "desc_key": "help_cmd_event_player"},
-            {"name": "/event alliance", "desc_key": "help_cmd_event_alliance"},
-            {"name": "/calendar (setup / track / untrack / current)", "desc_key": "help_cmd_calendar_group"},
+            {"name": "/event player", "desc_key": "help_cmd_event_player", "server_only": False, "private_only": False},
+            {
+                "name": "/event alliance",
+                "desc_key": "help_cmd_event_alliance",
+                "server_only": False,
+                "private_only": False,
+            },
+            {
+                "name": "/calendar (setup / track / untrack / current)",
+                "desc_key": "help_cmd_calendar_group",
+                "server_only": True,
+                "private_only": False,
+            },
             {
                 "name": "/rank (event / league / contests / statistics / gacha / realms / alliance)",
                 "desc_key": "help_cmd_rank_group",
+                "server_only": False,
+                "private_only": False,
             },
-            {"name": "/leaderboard (woa / storm_islands)", "desc_key": "help_cmd_leaderboard_group"},
-            {"name": "/woa (history / summary)", "desc_key": "help_cmd_woa_group"},
+            {
+                "name": "/leaderboard (woa / storm_islands)",
+                "desc_key": "help_cmd_leaderboard_group",
+                "server_only": False,
+                "private_only": False,
+            },
+            {
+                "name": "/woa (history / summary)",
+                "desc_key": "help_cmd_woa_group",
+                "server_only": False,
+                "private_only": False,
+            },
         ],
     },
     "radars": {
@@ -108,14 +181,40 @@ HELP_CONFIG = {
         "color": discord.Color.from_rgb(255, 174, 25),
         "title_key": "help_cat_radars",
         "commands": [
-            {"name": "/radar (add / remove / list)", "desc_key": "help_cmd_radar_group", "advanced": False},
-            {"name": "/radar alliance (add / remove)", "desc_key": "help_cmd_radar_alliance_group", "advanced": False},
-            {"name": "/rival (start / stop / add / list)", "desc_key": "help_cmd_rival_group", "advanced": False},
-            {"name": "/fortress (scan / stop)", "desc_key": "help_cmd_fortress_group", "advanced": True},
+            {
+                "name": "/radar private (add_... / remove_... / list)",
+                "desc_key": "help_cmd_radar_private_group",
+                "advanced": False,
+                "server_only": False,
+                "private_only": True,
+            },
+            {
+                "name": "/radar server (setup / add_... / remove_... / list)",
+                "desc_key": "help_cmd_radar_server_group",
+                "advanced": False,
+                "server_only": True,
+                "private_only": False,
+            },
+            {
+                "name": "/rival (start / stop / add / list)",
+                "desc_key": "help_cmd_rival_group",
+                "advanced": False,
+                "server_only": False,
+                "private_only": True,
+            },
+            {
+                "name": "/fortress (scan / stop)",
+                "desc_key": "help_cmd_fortress_group",
+                "advanced": True,
+                "server_only": False,
+                "private_only": True,
+            },
             {
                 "name": "/storm (forts / isles / occupier / status / setup / stop)",
                 "desc_key": "help_cmd_storm_group",
                 "advanced": True,
+                "server_only": True,
+                "private_only": False,
             },
         ],
     },
@@ -738,6 +837,7 @@ class AideCog(commands.Cog):
         t(langue, "help_cmd_woa_group")
         t(langue, "help_cmd_radar_group")
         t(langue, "help_cmd_radar_alliance_group")
+        t(langue, "help_cmd_radar_server_group")
         t(langue, "help_cmd_rival_group")
         t(langue, "help_cmd_fortress_group")
         t(langue, "help_cmd_storm_group")
