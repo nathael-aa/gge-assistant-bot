@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  push:
+    branches: [ "main" ]
   schedule:
     - cron: "0 3 * * *"
   pull_request:
@@ -8,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   lint:
@@ -54,13 +57,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
+          
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build image
+        
+      # 1. On compile l'image en local uniquement pour Trivy
+      - name: Build image for scan
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -68,6 +75,8 @@ jobs:
           tags: discord-bot:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          
+      # 2. Trivy scanne l'image locale (Si faille trouvée = Arrêt du workflow)
       - name: Scan image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
@@ -77,3 +86,31 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
           skip-dirs: /usr/local/lib/python3.11/site-packages/pip/_vendor,/usr/local/lib/python3.11/site-packages/setuptools/_vendor
+
+      # 3. Si on passe le scan, on se connecte à GHCR (Sauf pour les Pull Requests)
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        if: github.event_name != 'pull_request'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+
+      # 4. On pousse l'image scannée sur GHCR
+      - name: Push image to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
