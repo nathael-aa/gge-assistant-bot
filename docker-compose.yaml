@@ -2,8 +2,7 @@ version: '3.8'
 
 services:
   discord-bot:
-    build:
-      context: .
+    image: ghcr.io/nathael-aa/gge-assistant-bot:latest
     container_name: gge-assistant
     restart: unless-stopped
     dns:
@@ -19,4 +18,5 @@ services:
       - TZ=Europe/Paris
     user: "1001:1001"
     volumes:
-      - .:/app
+      - ./data:/app/data
+      - ./logs:/app/logs
