@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import traceback
 from datetime import datetime
 
@@ -101,11 +102,116 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
         return translated_text
 
+    async def _build_and_send_embed(
+        self, article, channel, ping_role, langue, serveur, final_titre, final_resume, final_full_md
+    ):
+        """Méthode utilitaire pour générer l'embed complet et l'envoyer proprement."""
+        if article["type"] == "patchnotes":
+            couleur = 0x2ECC71
+            titre_prefix = t(langue, "hub_patchnote_prefix", defaut="⚙️ [MISE À JOUR]")
+        elif article["type"] == "alerts":
+            couleur = 0xE74C3C
+            titre_prefix = t(langue, "hub_alerts_prefix", defaut="⚠️ [ALERTE / INFOS]")
+        else:
+            couleur = 0x3498DB
+            titre_prefix = t(langue, "hub_news_prefix", defaut="📰 [ACTUALITÉ]")
+
+        resume_fallback = t(
+            langue,
+            "hub_news_resume_fallback",
+            defaut="Cliquez sur le lien ci-dessous pour découvrir les détails de cette annonce.",
+        )
+        read_more_text = t(langue, "hub_news_read_more_append", defaut="*(Lisez la suite sur le site complet)*")
+        date_label = t(langue, "hub_news_date_label", defaut="Date :")
+        link_label = t(langue, "hub_news_link_label", defaut="🔗 Voir l'annonce complète")
+
+        if final_resume:
+            if article["type"] == "patchnotes":
+                thread_hint = t(
+                    langue,
+                    "hub_thread_hint",
+                    defaut="👇 *Le détail complet de la mise à jour est disponible dans le fil de discussion ci-dessous !*",
+                )
+                final_resume_texte = f"{final_resume}\n\n{thread_hint}"
+            else:
+                final_resume_texte = f"{final_resume}\n\n{read_more_text}"
+        else:
+            final_resume_texte = resume_fallback
+
+        embed = discord.Embed(
+            title=f"{titre_prefix} {final_titre}",
+            url=article["url"],
+            description=f"**{date_label}** {article['date_discord']}\n\n{final_resume_texte}\n\n[{link_label}]({article['url']})",
+            color=couleur,
+        )
+
+        if article.get("image"):
+            embed.set_image(url=article["image"])
+        embed.set_thumbnail(
+            url="https://i0.wp.com/communityhub.goodgamestudios.com/wp-content/uploads/2023/11/cropped-ggs_logo_reg_rgb_v_300c.png"
+        )
+
+        await setup_embed_footer(embed, None, langue)
+
+        try:
+            message = await channel.send(content=ping_role if ping_role else None, embed=embed)
+
+            if article["type"] == "patchnotes" and final_full_md:
+                try:
+                    thread_name = t(
+                        langue,
+                        "hub_thread_name",
+                        titre=final_titre,
+                        defaut=f"📄 Détails : {final_titre}",
+                    )
+                    thread = await message.create_thread(name=thread_name[:100], auto_archive_duration=1440)
+
+                    chunks_md = []
+                    current_chunk = ""
+                    for ligne in final_full_md.split("\n"):
+                        if len(current_chunk) + len(ligne) < 1900:
+                            current_chunk += ligne + "\n"
+                        else:
+                            chunks_md.append(current_chunk)
+                            current_chunk = ligne + "\n"
+                    if current_chunk:
+                        chunks_md.append(current_chunk)
+
+                    for chunk in chunks_md:
+                        if chunk.strip():
+                            await thread.send(chunk)
+                except Exception as e:
+                    logger.error(f"Erreur création thread patchnote : {e}")
+
+            obs.record_alert(
+                source="hub_news",
+                alert_type=article["type"],
+                gge_server=serveur,
+                channel="guild",
+                recipients=1,
+                delivered=1,
+                failed=0,
+                dm_blocked=0,
+            )
+        except Exception as e:
+            logger.error(f"Erreur d'envoi annonce HUB : {e}")
+            obs.record_alert(
+                source="hub_news",
+                alert_type=article["type"],
+                gge_server=serveur,
+                channel="guild",
+                recipients=1,
+                delivered=0,
+                failed=1,
+                dm_blocked=0,
+            )
+
     @app_commands.command(name="setup", description="Configure the channel for GGE announcements")
     @app_commands.choices(
         categorie=[
             app_commands.Choice(name="News (General news, Offers, Teasers)", value="news"),
             app_commands.Choice(name="Patchnotes (Game updates, Changelogs)", value="patchnotes"),
+            app_commands.Choice(name="Alerts (Bugs, Delays, Server issues)", value="alerts"),
         ]
     )
     @app_commands.describe(
@@ -139,15 +245,23 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
         guild_id = str(interaction.guild_id)
 
         if guild_id not in data["guilds"]:
-            data["guilds"][guild_id] = {"news": {}, "patchnotes": {}, "langue": langue, "gge_server": serveur}
+            data["guilds"][guild_id] = {
+                "news": {},
+                "patchnotes": {},
+                "alerts": {},
+                "langue": langue,
+                "gge_server": serveur,
+            }
+        elif "alerts" not in data["guilds"][guild_id]:
+            data["guilds"][guild_id]["alerts"] = {}
 
+        # FIX : Suppression du double ping éventuel.
         if role:
-            ping_format = "@everyone" if role.is_default() else role.mention
+            ping_format = role.mention
         else:
             ping_format = ""
 
         data["guilds"][guild_id][categorie] = {"channel_id": channel.id, "role": ping_format}
-
         await save_hub_config(data)
 
         obs.record_guild_event(
@@ -172,11 +286,65 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
         await interaction.followup.send(msg)
 
+        # FIX : Envoi forcé de la dernière annonce correspondante lors de l'activation
+        try:
+            articles = await self.fetch_latest_news()
+            cat_articles = [a for a in articles if a["type"] == categorie]
+
+            if cat_articles:
+                latest_article = cat_articles[-1]
+                texte_resume = latest_article.get("resume_content", "")
+
+                # Fetching contenu complet si nécessaire
+                if not texte_resume and latest_article["type"] in ["news", "alerts"]:
+                    try:
+                        async with self.bot.session.get(latest_article["url"], headers=self.headers, timeout=10) as r:
+                            if r.status == 200:
+                                html_article = await r.text()
+                                soup_art = await asyncio.to_thread(BeautifulSoup, html_article, "html.parser")
+                                content_div = soup_art.find("div", class_="elementor-widget-theme-post-content")
+                                if content_div:
+                                    for header in content_div.find_all(["h1", "h2", "h3"]):
+                                        header.decompose()
+                                    texte_complet = content_div.get_text(separator=" ", strip=True)
+                                    texte_resume = (
+                                        texte_complet[:400] + "..." if len(texte_complet) > 400 else texte_complet
+                                    )
+                    except Exception as e:
+                        logger.error(f"Setup fetch error: {e}")
+
+                # Traductions rapides
+                if latest_article["type"] == "patchnotes":
+                    final_titre = latest_article["title"]
+                else:
+                    final_titre = await self.translate_text(latest_article["title"], langue)
+
+                final_resume = await self.translate_text(texte_resume, langue) if texte_resume else ""
+                final_full_md = (
+                    await self.translate_text(latest_article.get("full_content", ""), langue)
+                    if latest_article.get("full_content")
+                    else ""
+                )
+
+                await self._build_and_send_embed(
+                    article=latest_article,
+                    channel=channel,
+                    ping_role=ping_format,
+                    langue=langue,
+                    serveur=serveur,
+                    final_titre=final_titre,
+                    final_resume=final_resume,
+                    final_full_md=final_full_md,
+                )
+        except Exception as e:
+            logger.error(f"❌ [Hub] Erreur lors de l'envoi de bienvenue : {e}")
+
     @app_commands.command(name="stop", description="Disable specific Hub announcements for this server")
     @app_commands.choices(
         categorie=[
             app_commands.Choice(name="News (General news)", value="news"),
             app_commands.Choice(name="Patchnotes (Game updates)", value="patchnotes"),
+            app_commands.Choice(name="Alerts (Bugs, Delays, Server issues)", value="alerts"),
         ]
     )
     @app_commands.describe(categorie="Which type of announcement do you want to disable?")
@@ -192,7 +360,11 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
         if guild_id in data["guilds"] and data["guilds"][guild_id].get(categorie):
             data["guilds"][guild_id][categorie] = {}
 
-            if not data["guilds"][guild_id].get("news") and not data["guilds"][guild_id].get("patchnotes"):
+            if (
+                not data["guilds"][guild_id].get("news")
+                and not data["guilds"][guild_id].get("patchnotes")
+                and not data["guilds"][guild_id].get("alerts")
+            ):
                 del data["guilds"][guild_id]
 
             await save_hub_config(data)
@@ -221,14 +393,19 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
         """Scrape le Hub, crée le résumé propre ET extrait la version Markdown complète pour le fil Discord."""
         articles = []
 
-        # 1. PARSING DES NEWS CLASSIQUES
+        # 1. PARSING DES NEWS CLASSIQUES ET ALERTES
         try:
             async with self.bot.session.get(self.hub_url, headers=self.headers, timeout=15) as r:
                 if r.status == 200:
                     html_content = await r.text()
                     soup = await asyncio.to_thread(BeautifulSoup, html_content, "html.parser")
 
+                    # --- A. PARSING DES NEWS CLASSIQUES ---
                     for post in soup.find_all("article", class_="elementor-post"):
+                        classes = post.get("class", [])
+                        if "category-alertsempire" in classes or "category-alertse4k" in classes:
+                            continue
+
                         title_elem = post.find("h2", class_="elementor-post__title")
                         if not title_elem:
                             continue
@@ -272,8 +449,51 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                 "type": "news",
                             }
                         )
+
+                    # --- B. PARSING DES ALERTES ---
+                    for post in soup.find_all(
+                        "article", class_=lambda c: c and ("category-alertsempire" in c or "category-alertse4k" in c)
+                    ):
+                        title_elem = post.find(["h1", "h2", "h3"], class_="elementor-post__title")
+                        if not title_elem:
+                            continue
+
+                        link_elem = title_elem.find("a", href=True)
+                        if not link_elem:
+                            continue
+
+                        url_article = link_elem["href"]
+                        title = title_elem.get_text(strip=True)
+
+                        article_id = hashlib.md5((url_article + title).encode()).hexdigest()
+
+                        match = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", url_article)
+                        if match:
+                            try:
+                                date_obj = datetime(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+                                discord_date = f"<t:{int(date_obj.timestamp())}:D>"
+                            except Exception:
+                                date_obj = discord.utils.utcnow()
+                                discord_date = "Récemment"
+                        else:
+                            date_obj = discord.utils.utcnow()
+                            discord_date = "Récemment"
+
+                        articles.append(
+                            {
+                                "id": article_id,
+                                "title": title,
+                                "url": url_article,
+                                "date_discord": discord_date,
+                                "date_obj": date_obj,
+                                "image": None,
+                                "type": "alerts",
+                                "resume_content": "",
+                            }
+                        )
+
         except Exception as e:
-            logger.error(f"❌ [Hub] Erreur de parsing HTML News : {e}")
+            logger.error(f"❌ [Hub] Erreur de parsing HTML News & Alerts : {e}")
 
         # 2. PARSING DE LA PAGE DES PATCHNOTES
         try:
@@ -307,7 +527,6 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             bug_count = 0
 
                             for element in content_div.find_all(["h2", "h3", "h4", "li", "p"]):
-                                # GESTION DES TITRES
                                 if element.name in ["h2", "h3", "h4"]:
                                     if in_bug_section and bug_count > 0:
                                         lignes_resume.append(f"• {bug_count} bug fixes and optimizations.")
@@ -320,23 +539,20 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
                                     if lignes_full:
                                         lignes_full.append("")
-                                    lignes_full.append(f"### {header_text}")  # Titre Markdown pour le fil
+                                    lignes_full.append(f"### {header_text}")
 
                                     if "bug" in header_text.lower() or "fix" in header_text.lower():
                                         in_bug_section = True
                                     else:
                                         in_bug_section = False
 
-                                # GESTION DES PARAGRAPHES STANDARDS
                                 elif element.name == "p":
                                     text_brut = element.get_text(separator=" ", strip=True)
                                     lignes_full.append(text_brut)
                                     if not in_bug_section:
                                         lignes_resume.append(text_brut)
 
-                                # GESTION DES LISTES A PUCES
                                 elif element.name == "li":
-                                    # Pour la version Full Markdown (On tente de conserver le gras)
                                     strong_tag = element.find("strong")
                                     full_text_brut = element.get_text(separator=" ", strip=True)
                                     if strong_tag:
@@ -346,7 +562,6 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                     else:
                                         lignes_full.append(f"- {full_text_brut}")
 
-                                    # Pour la version Résumé (Embed)
                                     if in_bug_section:
                                         bug_count += 1
                                         continue
@@ -420,10 +635,9 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                 langues_cibles = set(config.get("langue", "fr") for config in guilds_config.values())
 
                 for article in articles_a_publier:
-                    # Lecture des News classiques si le texte n'a pas été pré-généré
                     texte_resume = article.get("resume_content", "")
 
-                    if not texte_resume and article["type"] == "news":
+                    if not texte_resume and article["type"] in ["news", "alerts"]:
                         try:
                             async with self.bot.session.get(article["url"], headers=self.headers, timeout=10) as r:
                                 if r.status == 200:
@@ -449,17 +663,12 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             trad_titre = await self.translate_text(article["title"], lang)
 
                         trad_resume = await self.translate_text(texte_resume, lang) if texte_resume else ""
-
-                        # Traduction du texte complet du fil (Si patchnote)
                         trad_full = (
                             await self.translate_text(article.get("full_content", ""), lang)
                             if article.get("full_content")
                             else ""
                         )
-
                         traductions[lang] = {"title": trad_titre, "resume": trad_resume, "full": trad_full}
-
-                    couleur = 0x2ECC71 if article["type"] == "patchnotes" else 0x3498DB
 
                     for guild_id_str, config in guilds_config.items():
                         cat_config = config.get(article["type"], {})
@@ -472,54 +681,9 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                         langue = config.get("langue", "fr")
                         serveur_cible = config.get("gge_server", "E4K_FR1")
 
-                        titre_prefix = (
-                            t(langue, "hub_patchnote_prefix", defaut="⚙️ [MISE À JOUR]")
-                            if article["type"] == "patchnotes"
-                            else t(langue, "hub_news_prefix", defaut="📰 [ACTUALITÉ]")
-                        )
-                        resume_fallback = t(
-                            langue,
-                            "hub_news_resume_fallback",
-                            defaut="Cliquez sur le lien ci-dessous pour découvrir les détails de cette annonce.",
-                        )
-                        read_more_text = t(
-                            langue, "hub_news_read_more_append", defaut="*(Lisez la suite sur le site complet)*"
-                        )
-                        date_label = t(langue, "hub_news_date_label", defaut="Date :")
-                        link_label = t(langue, "hub_news_link_label", defaut="🔗 Voir l'annonce complète")
-
                         final_titre = traductions.get(langue, {}).get("title", article["title"])
                         final_resume = traductions.get(langue, {}).get("resume", "")
                         final_full_md = traductions.get(langue, {}).get("full", "")
-
-                        if final_resume:
-                            # On ajoute la mention "Voir le fil" si c'est un patchnote
-                            if article["type"] == "patchnotes":
-                                thread_hint = t(
-                                    langue,
-                                    "hub_thread_hint",
-                                    defaut="👇 *Le détail complet de la mise à jour est disponible dans le fil de discussion ci-dessous !*",
-                                )
-                                final_resume_texte = f"{final_resume}\n\n{thread_hint}"
-                            else:
-                                final_resume_texte = f"{final_resume}\n\n{read_more_text}"
-                        else:
-                            final_resume_texte = resume_fallback
-
-                        embed = discord.Embed(
-                            title=f"{titre_prefix} {final_titre}",
-                            url=article["url"],
-                            description=f"**{date_label}** {article['date_discord']}\n\n{final_resume_texte}\n\n[{link_label}]({article['url']})",
-                            color=couleur,
-                        )
-
-                        if article["image"]:
-                            embed.set_image(url=article["image"])
-                        embed.set_thumbnail(
-                            url="https://i0.wp.com/communityhub.goodgamestudios.com/wp-content/uploads/2023/11/cropped-ggs_logo_reg_rgb_v_300c.png"
-                        )
-
-                        await setup_embed_footer(embed, None, langue)
 
                         channel = self.bot.get_channel(channel_id)
                         if not channel:
@@ -528,64 +692,16 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             except:
                                 continue
 
-                        if channel:
-                            try:
-                                # 1. Envoi du message principal
-                                message = await channel.send(content=ping_role if ping_role else None, embed=embed)
-
-                                # 2. Création du fil de discussion SI patchnote
-                                if article["type"] == "patchnotes" and final_full_md:
-                                    try:
-                                        thread_name = t(
-                                            langue,
-                                            "hub_thread_name",
-                                            titre=final_titre,
-                                            defaut=f"📄 Détails : {final_titre}",
-                                        )
-                                        thread = await message.create_thread(
-                                            name=thread_name[:100], auto_archive_duration=1440
-                                        )
-
-                                        # Découpage intelligent par sauts de ligne pour éviter les coupures de mots (Limite Discord = 2000)
-                                        chunks_md = []
-                                        current_chunk = ""
-                                        for ligne in final_full_md.split("\n"):
-                                            if len(current_chunk) + len(ligne) < 1900:
-                                                current_chunk += ligne + "\n"
-                                            else:
-                                                chunks_md.append(current_chunk)
-                                                current_chunk = ligne + "\n"
-                                        if current_chunk:
-                                            chunks_md.append(current_chunk)
-
-                                        for chunk in chunks_md:
-                                            if chunk.strip():
-                                                await thread.send(chunk)
-                                    except Exception as e:
-                                        logger.error(f"Erreur création thread patchnote : {e}")
-
-                                obs.record_alert(
-                                    source="hub_news",
-                                    alert_type=article["type"],
-                                    gge_server=serveur_cible,
-                                    channel="guild",
-                                    recipients=1,
-                                    delivered=1,
-                                    failed=0,
-                                    dm_blocked=0,
-                                )
-                            except Exception as e:
-                                logger.error(f"Erreur d'envoi annonce HUB : {e}")
-                                obs.record_alert(
-                                    source="hub_news",
-                                    alert_type=article["type"],
-                                    gge_server=serveur_cible,
-                                    channel="guild",
-                                    recipients=1,
-                                    delivered=0,
-                                    failed=1,
-                                    dm_blocked=0,
-                                )
+                        await self._build_and_send_embed(
+                            article=article,
+                            channel=channel,
+                            ping_role=ping_role,
+                            langue=langue,
+                            serveur=serveur_cible,
+                            final_titre=final_titre,
+                            final_resume=final_resume,
+                            final_full_md=final_full_md,
+                        )
 
                     posted_news.append(article["id"])
 
