@@ -284,6 +284,22 @@ class GGEAssistantBot(commands.Bot):
         charger_langues()
         logger.info(f"✅ Bot connecté en tant que {self.user} (ID: {self.user.id})")
 
+        # ==========================================
+        # 📢 WEBHOOK START NOTIFICATION
+        # ==========================================
+        webhook_start = os.getenv("WEBHOOK_START")
+        if webhook_start and webhook_start.startswith("http"):
+            embed = discord.Embed(
+                title="🚀 Redémarrage Réussi",
+                description=f"Le bot est de nouveau en ligne et 100% opérationnel.\n**Version :** `{BOT_VERSION}`\n**Serveurs :** `{len(self.guilds)}`",
+                color=0x2ECC71,
+            )
+            try:
+                webhook = discord.Webhook.from_url(webhook_start, session=self.session)
+                self.loop.create_task(webhook.send(embed=embed, username="GGE Console 🟢"))
+            except Exception as e:
+                logger.error(f"❌ Impossible d'envoyer le webhook de démarrage : {e}")
+
         try:
             path_fort = JOUEURS_DIR / "forteresses_sessions.json"
             path_users = CONFIG_DIR / "users.json"
@@ -351,20 +367,16 @@ class GGEAssistantBot(commands.Bot):
         webhook_servers = os.getenv("WEBHOOK_JOIN")
         if webhook_servers and webhook_servers.startswith("http"):
             proprio = guild.owner.name if guild.owner else "Inconnu"
-            payload = {
-                "username": "GGE Serveurs 📈",
-                "embeds": [
-                    {
-                        "title": "🎉 Nouveau Serveur Rejoint !",
-                        "description": f"**Nom :** `{guild.name}`\n**ID :** `{guild.id}`\n**Membres :** `{guild.member_count}`\n**Propriétaire :** `{proprio}`",
-                        "color": 0x2ECC71,
-                    }
-                ],
-            }
+            embed = discord.Embed(
+                title="🎉 Nouveau Serveur Rejoint !",
+                description=f"**Nom :** `{guild.name}`\n**ID :** `{guild.id}`\n**Membres :** `{guild.member_count}`\n**Propriétaire :** `{proprio}`",
+                color=0x2ECC71,
+            )
             try:
-                await self.session.post(webhook_servers, json=payload)
-            except:
-                pass
+                webhook = discord.Webhook.from_url(webhook_servers, session=self.session)
+                await webhook.send(embed=embed, username="GGE Serveurs 📈")
+            except Exception as e:
+                logger.error(f"❌ Erreur Webhook Join : {e}")
 
         channel_to_send = guild.system_channel
 
@@ -405,20 +417,16 @@ class GGEAssistantBot(commands.Bot):
 
         webhook_servers = os.getenv("WEBHOOK_LEAVE")
         if webhook_servers and webhook_servers.startswith("http"):
-            payload = {
-                "username": "GGE Serveurs 📉",
-                "embeds": [
-                    {
-                        "title": "👋 Serveur Quitté",
-                        "description": f"**Nom :** `{guild.name}`\n**ID :** `{guild.id}`\n**Membres perdus :** `{guild.member_count}`",
-                        "color": 0xE74C3C,
-                    }
-                ],
-            }
+            embed = discord.Embed(
+                title="👋 Serveur Quitté",
+                description=f"**Nom :** `{guild.name}`\n**ID :** `{guild.id}`\n**Membres perdus :** `{guild.member_count}`",
+                color=0xE74C3C,
+            )
             try:
-                await self.session.post(webhook_servers, json=payload)
-            except:
-                pass
+                webhook = discord.Webhook.from_url(webhook_servers, session=self.session)
+                await webhook.send(embed=embed, username="GGE Serveurs 📉")
+            except Exception as e:
+                logger.error(f"❌ Erreur Webhook Leave : {e}")
 
     @tasks.loop(seconds=15)
     async def flag_watcher_task(self):
