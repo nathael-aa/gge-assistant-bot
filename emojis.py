@@ -1,6 +1,9 @@
 DICT_EMOJIS = {
     "e_2_": "<:2_:1512574740915818527>",
     "e_4_": "<:4_:1512574743369224303>",
+    "e_dm": "<:message:1549475851161047060>",
+    "e_server": "<:channel:1549476991512743937>",
+    "e_staff": "<:moderador:1549477528568078447>",
     "e_alliance": "<:alliance:1512503083861540914>",
     "e_alliance_icon": "<:alliance_icon:1512574688415580242>",
     "e_aquamarinedepenser": "<:aquamarinedepenser:1512162297425039423>",

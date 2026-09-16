@@ -693,7 +693,7 @@ def get_file_lock(filepath):
     return FILE_LOCKS[path_key]
 
 
-BOT_VERSION = "GGE Assistant • Version 1.2.9"
+BOT_VERSION = "GGE Assistant • Version 1.3.0"
 
 
 async def setup_embed_footer(

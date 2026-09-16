@@ -34,24 +34,56 @@ CONTACTS_FILE = ADMINS_DIR / "contacts.json"
 HELP_CONFIG = {
     "home": {
         "emoji": "🏠",
-        "color": discord.Color.from_rgb(198, 226, 255),
+        "color": discord.Color.from_rgb(88, 101, 242),
         "title_key": "help_home_title",
         "desc_key": "aide_p0_desc",
     },
     "config": {
         "emoji": "⚙️",
-        "color": discord.Color.from_rgb(102, 102, 102),
+        "color": discord.Color.from_rgb(149, 165, 166),
         "title_key": "help_cat_config",
         "commands": [
-            {"name": "/setup", "desc_key": "help_cmd_setup", "server_only": False, "private_only": False},
-            {"name": "/link_account", "desc_key": "help_cmd_link_account", "server_only": False, "private_only": False},
-            {"name": "/status", "desc_key": "help_cmd_status", "server_only": False, "private_only": False},
-            {"name": "/help", "desc_key": "help_cmd_help", "server_only": False, "private_only": False},
+            {
+                "name": "/setup",
+                "desc_key": "help_cmd_setup",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
+            },
+            {
+                "name": "/link_account",
+                "desc_key": "help_cmd_link_account",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
+            },
+            {
+                "name": "/status",
+                "desc_key": "help_cmd_status",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
+            },
+            {
+                "name": "/help",
+                "desc_key": "help_cmd_help",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
+            },
         ],
     },
     "communaute": {
         "emoji": "💬",
-        "color": discord.Color.from_rgb(230, 230, 250),
+        "color": discord.Color.from_rgb(155, 89, 182),
         "title_key": "help_cat_communaute",
         "commands": [
             {
@@ -59,68 +91,148 @@ HELP_CONFIG = {
                 "desc_key": "help_cmd_hub_group",
                 "server_only": True,
                 "private_only": False,
+                "admin_only": True,
+                "advanced": False,
+                "wip": False,
             },
-            {"name": "/news", "desc_key": "help_cmd_news", "server_only": False, "private_only": False},
-            {"name": "/support", "desc_key": "help_cmd_support", "server_only": False, "private_only": False},
-            {"name": "/contact", "desc_key": "help_cmd_contact", "server_only": False, "private_only": False},
-            {"name": "/vote", "desc_key": "help_cmd_vote", "server_only": False, "private_only": False},
-            {"name": "/discover", "desc_key": "help_cmd_discover", "server_only": False, "private_only": False},
+            {
+                "name": "/news",
+                "desc_key": "help_cmd_news",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
+            },
+            {
+                "name": "/support",
+                "desc_key": "help_cmd_support",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
+            },
+            {
+                "name": "/contact",
+                "desc_key": "help_cmd_contact",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
+            },
+            {
+                "name": "/vote",
+                "desc_key": "help_cmd_vote",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
+            },
+            {
+                "name": "/discover",
+                "desc_key": "help_cmd_discover",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
+            },
         ],
     },
     "profils": {
         "emoji": "👥",
-        "color": discord.Color.from_rgb(50, 214, 50),
+        "color": discord.Color.from_rgb(46, 204, 113),
         "title_key": "help_cat_profils",
         "commands": [
-            {"name": "/server", "desc_key": "help_cmd_server", "server_only": True, "private_only": False},
+            {
+                "name": "/server",
+                "desc_key": "help_cmd_server",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
+            },
             {
                 "name": "/player profile",
                 "desc_key": "help_cmd_player_profile",
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
             },
             {
                 "name": "/player history",
                 "desc_key": "help_cmd_player_history",
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
             },
-            {"name": "/player dove", "desc_key": "help_cmd_player_dove", "server_only": False, "private_only": False},
+            {
+                "name": "/player dove",
+                "desc_key": "help_cmd_player_dove",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
+            },
             {
                 "name": "/player compare",
                 "desc_key": "help_cmd_player_compare",
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
             },
             {
                 "name": "/alliance profile",
                 "desc_key": "help_cmd_alliance_profile",
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
             },
             {
                 "name": "/alliance might",
                 "desc_key": "help_cmd_alliance_might",
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
             },
             {
                 "name": "/alliance property",
                 "desc_key": "help_cmd_alliance_property",
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
             },
             {
                 "name": "/alliance description",
                 "desc_key": "help_cmd_alliance_desc",
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
             },
         ],
     },
     "guerre": {
         "emoji": "⚔️",
-        "color": discord.Color.from_rgb(139, 0, 0),
+        "color": discord.Color.from_rgb(231, 76, 60),
         "title_key": "help_cat_guerre",
         "commands": [
             {
@@ -128,6 +240,9 @@ HELP_CONFIG = {
                 "desc_key": "help_cmd_alliance_scanner",
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
             },
             {
                 "name": "/target (setup / search)",
@@ -135,65 +250,94 @@ HELP_CONFIG = {
                 "wip": True,
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
             },
         ],
     },
     "events": {
         "emoji": "🏆",
-        "color": discord.Color.from_rgb(175, 238, 238),
+        "color": discord.Color.from_rgb(241, 196, 15),
         "title_key": "help_cat_events",
         "commands": [
-            {"name": "/event player", "desc_key": "help_cmd_event_player", "server_only": False, "private_only": False},
+            {
+                "name": "/event player",
+                "desc_key": "help_cmd_event_player",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
+            },
             {
                 "name": "/event alliance",
                 "desc_key": "help_cmd_event_alliance",
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
             },
             {
                 "name": "/calendar (setup / track / untrack / current)",
                 "desc_key": "help_cmd_calendar_group",
                 "server_only": True,
                 "private_only": False,
+                "admin_only": True,
+                "advanced": False,
+                "wip": False,
             },
             {
                 "name": "/rank (event / league / contests / statistics / gacha / realms / alliance)",
                 "desc_key": "help_cmd_rank_group",
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
             },
             {
                 "name": "/leaderboard (woa / storm_islands)",
                 "desc_key": "help_cmd_leaderboard_group",
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
             },
             {
                 "name": "/woa (history / summary)",
                 "desc_key": "help_cmd_woa_group",
                 "server_only": False,
                 "private_only": False,
+                "admin_only": False,
+                "advanced": False,
+                "wip": False,
             },
         ],
     },
     "radars": {
         "emoji": "📡",
-        "color": discord.Color.from_rgb(255, 174, 25),
+        "color": discord.Color.from_rgb(230, 126, 34),
         "title_key": "help_cat_radars",
         "commands": [
             {
-                "name": "/radar private (add_... / remove_... / list)",
+                "name": "/radar private (add... / remove... / list)",
                 "desc_key": "help_cmd_radar_private_group",
                 "advanced": False,
                 "server_only": False,
                 "private_only": True,
+                "admin_only": False,
+                "wip": False,
             },
             {
-                "name": "/radar server (setup / add_... / remove_... / list)",
+                "name": "/radar server (setup / add... / remove... / list)",
                 "desc_key": "help_cmd_radar_server_group",
                 "advanced": False,
                 "server_only": True,
                 "private_only": False,
+                "admin_only": True,
+                "wip": False,
             },
             {
                 "name": "/rival (start / stop / add / list)",
@@ -201,6 +345,8 @@ HELP_CONFIG = {
                 "advanced": False,
                 "server_only": False,
                 "private_only": True,
+                "admin_only": False,
+                "wip": False,
             },
             {
                 "name": "/fortress (scan / stop)",
@@ -208,6 +354,8 @@ HELP_CONFIG = {
                 "advanced": True,
                 "server_only": False,
                 "private_only": True,
+                "admin_only": False,
+                "wip": False,
             },
             {
                 "name": "/storm (forts / isles / occupier / status / setup / stop)",
@@ -215,6 +363,8 @@ HELP_CONFIG = {
                 "advanced": True,
                 "server_only": True,
                 "private_only": False,
+                "admin_only": True,
+                "wip": False,
             },
         ],
     },
@@ -337,8 +487,8 @@ class HelpSelect(discord.ui.Select):
         else:
             legende = t(
                 self.langue,
-                "help_legend",
-                defaut="🟢 `Standard` ｜ 🌟 `Fonctions Avancées` ｜ {e_working} `En travaux`",
+                "help_legend_v2",
+                defaut="🟢 `Standard` ｜ 🌟 `Avancé` ｜ {e_staff} `Admin` ｜ {e_working} `En travaux`\n{e_server} `Serveur Uniquement` ｜ {e_dm} `MP Uniquement`",
             )
 
             embed.description = f"{legende}\n\u200b"
@@ -348,15 +498,34 @@ class HelpSelect(discord.ui.Select):
 
                 is_wip = cmd.get("wip", False)
                 is_advanced = cmd.get("advanced", False)
+                is_admin = cmd.get("admin_only", False)
+                is_server = cmd.get("server_only", False)
+                is_private = cmd.get("private_only", False)
 
+                # 1. La pastille de statut principale (Standard, Avancé, En travaux)
                 if is_wip:
-                    emoji_statut = t(self.langue, "format_wip", defaut="{e_working}")
+                    emoji_statut = "{e_working}"
                 elif is_advanced:
                     emoji_statut = "🌟"
                 else:
                     emoji_statut = "🟢"
 
-                embed.add_field(name=f"{emoji_statut} **`{cmd['name']}`**", value=f"{cmd_desc}", inline=False)
+                # 2. Le badge Admin (s'ajoute s'il s'agit d'une commande admin)
+                emoji_admin = "{e_staff}" if is_admin else ""
+
+                # 3. Le badge de lieu (Serveur ou MP) à la fin
+                emoji_lieu = ""
+                if is_server:
+                    emoji_lieu = "{e_server}"
+                elif is_private:
+                    emoji_lieu = "{e_dm}"
+
+                # Assemblage final : [Pastille] [Admin] `[Nom de la commande]` [Lieu]
+                embed.add_field(
+                    name=f"{emoji_statut}{emoji_admin} **`{cmd['name']}`**{emoji_lieu}",
+                    value=f"{cmd_desc}",
+                    inline=False,
+                )
 
         await setup_embed_footer(embed, interaction, self.langue)
         if not self.view.message:
@@ -800,7 +969,7 @@ class AideCog(commands.Cog):
         langue = "fr"
 
         t(langue, "help_home_title")
-        t(langue, "help_legend")
+        t(langue, "help_legend_v2")
         t(langue, "aide_p0_desc")
         t(langue, "help_cat_config")
         t(langue, "help_cat_communaute")
