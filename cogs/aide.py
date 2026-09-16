@@ -485,6 +485,11 @@ class HelpSelect(discord.ui.Select):
             )
             embed.description = desc
         else:
+            e_staff = DICT_EMOJIS.get("e_staff", "🛡️")
+            e_working = DICT_EMOJIS.get("e_working", "🛠️")
+            e_server = DICT_EMOJIS.get("e_server", "🏢")
+            e_dm = DICT_EMOJIS.get("e_dm", "✉️")
+
             legende = t(
                 self.langue,
                 "help_legend_v2",
@@ -504,7 +509,7 @@ class HelpSelect(discord.ui.Select):
 
                 # 1. La pastille de statut principale (Standard, Avancé, En travaux)
                 if is_wip:
-                    emoji_statut = "{e_working}"
+                    emoji_statut = e_working
                 elif is_advanced:
                     emoji_statut = "🌟"
                 else:
@@ -516,9 +521,9 @@ class HelpSelect(discord.ui.Select):
                 # 3. Le badge de lieu (Serveur ou MP) à la fin
                 emoji_lieu = ""
                 if is_server:
-                    emoji_lieu = "{e_server}"
+                    emoji_lieu = f" {e_server}"
                 elif is_private:
-                    emoji_lieu = "{e_dm}"
+                    emoji_lieu = f" {e_dm}"
 
                 # Assemblage final : [Pastille] [Admin] `[Nom de la commande]` [Lieu]
                 embed.add_field(
