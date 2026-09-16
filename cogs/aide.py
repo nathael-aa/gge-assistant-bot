@@ -516,7 +516,7 @@ class HelpSelect(discord.ui.Select):
                     emoji_statut = "🟢"
 
                 # 2. Le badge Admin (s'ajoute s'il s'agit d'une commande admin)
-                emoji_admin = "{e_staff}" if is_admin else ""
+                emoji_admin = f" {e_staff}" if is_admin else ""
 
                 # 3. Le badge de lieu (Serveur ou MP) à la fin
                 emoji_lieu = ""
