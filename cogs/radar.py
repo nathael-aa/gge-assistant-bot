@@ -399,6 +399,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         except:
             return
         langue, serveur = await get_server_config(interaction)
+
         # 🛡️ Anti-crash : Blocage des Messages Privés
         if not interaction.guild:
             msg = t(langue, "cmd_guild_only", defaut="❌ Cette commande ne peut être utilisée que sur un serveur.")
@@ -410,9 +411,13 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         if "guild_configs" not in data:
             data["guild_configs"] = {}
 
+        ping_val = None
+        if role:
+            ping_val = "@everyone" if role.is_default() else role.mention
+
         data["guild_configs"][str(interaction.guild.id)] = {
             "channel_id": channel.id,
-            "ping_role": role.mention if role else None,
+            "ping_role": ping_val,
             "langue": langue,
             "serveur": serveur,
         }

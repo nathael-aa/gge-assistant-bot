@@ -9,8 +9,10 @@ from discord.ext import commands
 
 import observability as obs
 from utils import (
+    BRACKETS,
     CONFIG_DIR,
     DICT_EMOJIS,
+    EVENT_IDS,
     PaginationView,
     alliance_autocomplete,
     get_api_headers,
@@ -109,38 +111,27 @@ class ClassementCog(commands.Cog):
         self.logger = logging.getLogger("GGEAssistant")
         self.ranking_api_url = "https://empire-api.fly.dev"
 
-        self.config_path = CONFIG_DIR / "configuration.json"
+    def get_serveur_api(self, serveur_local: str) -> str:
+        """Récupère dynamiquement le nom API du serveur pour Fly.dev"""
+        from utils import FLYDEV_MAPPING
 
-        self.servers_map = {}
-        self.event_ids = {}
-        self.brackets_map = {}
-        self.load_rankings_config()
+        serveur_lower = serveur_local.lower()
 
-    def load_rankings_config(self):
-        try:
-            self.logger.info(f"📝 [Classement] Tentative de chargement du JSON à : {self.config_path}")
-            if self.config_path.exists():
-                with open(self.config_path, encoding="utf-8") as f:
-                    config_data = json.load(f)
+        if serveur_lower in FLYDEV_MAPPING:
+            return FLYDEV_MAPPING[serveur_lower]
 
-                    servers_info = config_data.get("servers_info", {})
-                    self.servers_map = {
-                        srv_name.lower(): srv_data.get("api_name")
-                        for srv_name, srv_data in servers_info.items()
-                        if isinstance(srv_data, dict) and srv_data.get("api_name")
-                    }
-                    self.event_ids = config_data.get("event_ids", {})
-                    self.brackets_map = config_data.get("brackets", {})
+        cache_file = CONFIG_DIR / "servers_cache.json"
+        if cache_file.exists():
+            try:
+                with open(cache_file, encoding="utf-8") as f:
+                    data = json.load(f).get("servers_info", {})
+                    for srv_name, srv_data in data.items():
+                        if srv_name.lower() == serveur_lower:
+                            return srv_data.get("api_name", serveur_local)
+            except Exception as e:
+                self.logger.error(f"❌ Erreur lecture servers_cache.json : {e}")
 
-                self.logger.info(
-                    f"📝 [Classement] Fichier chargé ! Serveurs API: {len(self.servers_map)}, Events: {len(self.event_ids)}"
-                )
-            else:
-                self.logger.warning(
-                    f"⚠️ [Classement] Fichier introuvable à {self.config_path} ! Les dictionnaires de secours prendront le relais."
-                )
-        except Exception as e:
-            self.logger.error(f"❌ [Classement] Erreur critique lors de l'initialisation du JSON : {e}")
+        return serveur_local
 
     async def tranche_autocomplete(self, interaction: discord.Interaction, current: str):
         ns = interaction.namespace
@@ -384,8 +375,8 @@ class ClassementCog(commands.Cog):
             loc_tranche = tranche
 
             langue, serveur_local = await get_server_config(ctx_int)
-            serveur_api = self.servers_map.get(serveur_local.lower(), serveur_local)
-            event_id = self.event_ids.get(statistic, 1)
+            serveur_api = self.get_serveur_api(serveur_local)
+            event_id = EVENT_IDS.get(statistic, 1)
 
             STAT_MAP = {
                 "achievements": {
@@ -705,8 +696,8 @@ class ClassementCog(commands.Cog):
             loc_tranche = tranche
 
             langue, serveur_local = await get_server_config(ctx_int)
-            serveur_api = self.servers_map.get(serveur_local.lower(), serveur_local)
-            event_id = self.event_ids.get(evenement, 30 if evenement == "berimond" else 44)
+            serveur_api = self.get_serveur_api(serveur_local)
+            event_id = EVENT_IDS.get(evenement, 30 if evenement == "berimond" else 44)
 
             EVENT_MAP = {
                 "nomads": {
@@ -921,7 +912,7 @@ class ClassementCog(commands.Cog):
                     camp_txt = "Les deux camps"
                 titre = f"{get_emo(langue, '{e_berimond}')} Bataille de Bérimond — {camp_txt}\n{get_emo(langue, '{e_lvl}')} {lvl_txt}"
             else:
-                nom_tranche_defaut = self.brackets_map.get(str(found_lid), f"Tranche {found_lid}")
+                nom_tranche_defaut = BRACKETS.get(str(found_lid), f"Tranche {found_lid}")
                 nom_tranche = t(langue, f"ev_bracket_{found_lid}", defaut=nom_tranche_defaut)
                 titre = (
                     f"{ev_info['emoji']} {mot_classement} {ev_info['name']}\n{get_emo(langue, '{e_lvl}')} {nom_tranche}"
@@ -1025,8 +1016,8 @@ class ClassementCog(commands.Cog):
             loc_rank = rank
 
             langue, serveur_local = await get_server_config(ctx_int)
-            serveur_api = self.servers_map.get(serveur_local.lower(), serveur_local)
-            event_id = self.event_ids.get(evenement, 80)
+            serveur_api = self.get_serveur_api(serveur_local)
+            event_id = EVENT_IDS.get(evenement, 80)
 
             EVENT_MAP = {
                 "flora": {
@@ -1299,14 +1290,14 @@ class ClassementCog(commands.Cog):
             loc_rank = rank
 
             langue, serveur_local = await get_server_config(ctx_int)
-            serveur_api = self.servers_map.get(serveur_local.lower(), serveur_local)
+            serveur_api = self.get_serveur_api(serveur_local)
 
             if evenement == "realms_current":
                 event_id = 62
             elif evenement == "realms_finished":
-                event_id = self.event_ids.get("realms", 76)
+                event_id = EVENT_IDS.get("realms", 76)
             else:
-                event_id = self.event_ids.get("horizon", 78)
+                event_id = EVENT_IDS.get("horizon", 78)
 
             EVENT_MAP = {
                 "realms_current": {
@@ -1575,8 +1566,8 @@ class ClassementCog(commands.Cog):
             loc_tranche = tranche
 
             langue, serveur_local = await get_server_config(ctx_int)
-            serveur_api = self.servers_map.get(serveur_local.lower(), serveur_local)
-            event_id = self.event_ids.get(evenement, 53)
+            serveur_api = self.get_serveur_api(serveur_local)
+            event_id = EVENT_IDS.get(evenement, 53)
 
             EVENT_MAP = {
                 "season": {
@@ -1895,8 +1886,8 @@ class ClassementCog(commands.Cog):
             loc_tranche = tranche
 
             langue, serveur_local = await get_server_config(ctx_int)
-            serveur_api = self.servers_map.get(serveur_local.lower(), serveur_local)
-            event_id = self.event_ids.get(evenement, 60)
+            serveur_api = self.get_serveur_api(serveur_local)
+            event_id = EVENT_IDS.get(evenement, 60)
 
             EVENT_MAP = {
                 "shapeshifters": {
@@ -2109,7 +2100,7 @@ class ClassementCog(commands.Cog):
                 nom_tranche = t(langue, "ev_bracket_all", defaut="Classement Global")
                 bracket_icon = get_emo(langue, "{e_events4}")
             elif evenement == "shapeshifters":
-                nom_tranche_defaut = self.brackets_map.get(str(found_lid), f"Tranche {found_lid}")
+                nom_tranche_defaut = BRACKETS.get(str(found_lid), f"Tranche {found_lid}")
                 nom_tranche = t(langue, f"ev_bracket_{found_lid}", defaut=nom_tranche_defaut)
                 bracket_icon = get_emo(langue, "{e_lvl}")
             elif evenement == "nobility":
@@ -2214,8 +2205,8 @@ class ClassementCog(commands.Cog):
             loc_rank = rank
 
             langue, serveur_local = await get_server_config(ctx_int)
-            serveur_api = self.servers_map.get(serveur_local.lower(), serveur_local)
-            event_id = self.event_ids.get(categorie, 10)
+            serveur_api = self.get_serveur_api(serveur_local)
+            event_id = EVENT_IDS.get(categorie, 10)
 
             CAT_MAP = {
                 "alliance_honor": {

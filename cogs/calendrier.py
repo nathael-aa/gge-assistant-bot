@@ -13,8 +13,8 @@ from discord.ext import commands, tasks
 
 import observability as obs
 from utils import (
-    CONFIG_DIR,
     DICT_EMOJIS,
+    EVENT_MAPPING,
     SERVEURS_DIR,
     TRACKER_EVENTS,
     alliance_autocomplete,
@@ -27,7 +27,6 @@ from utils import (
 logger = logging.getLogger("GGE_Bot")
 
 CALENDRIER_FILE = SERVEURS_DIR / "calendrier.json"
-MAPPING_FILE = CONFIG_DIR / "event_mapping.json"
 
 
 # ===========================================
@@ -137,26 +136,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
         self.bot = bot
         self.cached_events = []
         self.last_scrape_time = None
-        self.event_mapping = self.load_event_mapping()
-
-    def load_event_mapping(self):
-        """Charge la configuration des événements depuis le fichier JSON externe"""
-        if not MAPPING_FILE.exists():
-            logger.error(f"❌ Le fichier {MAPPING_FILE} est introuvable !")
-            return {}
-
-        try:
-            with open(MAPPING_FILE, encoding="utf-8") as f:
-                mapping = json.load(f)
-
-            for key, data in mapping.items():
-                if isinstance(data.get("color"), str) and data["color"].startswith("0x"):
-                    data["color"] = int(data["color"], 16)
-
-            return mapping
-        except Exception as e:
-            logger.error(f"❌ Erreur lors de la lecture de {MAPPING_FILE} : {e}")
-            return {}
+        self.event_mapping = EVENT_MAPPING
 
     async def load_cache_from_file(self):
         data = await load_calendrier_async()

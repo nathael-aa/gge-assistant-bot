@@ -381,7 +381,7 @@ class AdminCog(commands.Cog):
                 xml_text = await r.text()
                 root = ET.fromstring(xml_text)
 
-                config_file = CONFIG_DIR / "configuration.json"
+                config_file = CONFIG_DIR / "servers_cache.json"
                 if not config_file.exists():
                     await msg_wait.edit(content="❌ Fichier `configuration.json` introuvable.")
                     return

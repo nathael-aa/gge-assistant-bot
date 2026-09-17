@@ -14,6 +14,7 @@ from discord import app_commands
 import observability as obs
 
 logger = logging.getLogger("GGE_Bot")
+BOT_VERSION = "GGE Assistant • Version 1.3.0"
 
 # ========================================
 # ⚙️ GESTION DES CHEMINS & DOSSIER
@@ -31,16 +32,30 @@ ADMINS_DIR = BASE_DATA_PATH / "admins"
 for directory in [CONFIG_DIR, JOUEURS_DIR, SERVEURS_DIR, ADMINS_DIR, LOCALES_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
+# ========================================
+# ⚙️ RECUPERATION .ENV
+# ========================================
 
-USERS_CONFIG_CACHE = None
-GUILDS_CONFIG_CACHE = None
-BLOCKS_CACHE = None
+MON_ID_DISCORD = int(os.getenv("MON_ID_DISCORD", 0))
+TOKEN = os.getenv("DISCORD_TOKEN")
+TOPGG_TOKEN = os.getenv("TOPGG_TOKEN")
+
+CACHE = {}
 
 
 def clear_config_cache():
     global USERS_CONFIG_CACHE, GUILDS_CONFIG_CACHE
     USERS_CONFIG_CACHE = None
     GUILDS_CONFIG_CACHE = None
+
+
+USERS_CONFIG_CACHE = None
+GUILDS_CONFIG_CACHE = None
+BLOCKS_CACHE = None
+
+# ========================================
+# CONFIGURATION UTILISATEUR
+# ========================================
 
 
 async def get_server_config(interaction: discord.Interaction):
@@ -89,6 +104,11 @@ async def get_server_config(interaction: discord.Interaction):
     return default_lang, default_server
 
 
+# ========================================
+# HEADERS
+# ========================================
+
+
 async def get_api_headers(interaction: discord.Interaction = None, custom_server: str = None):
     server = "E4K_FR1"
     if custom_server:
@@ -102,6 +122,10 @@ async def get_api_headers(interaction: discord.Interaction = None, custom_server
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) GGE-Assistant/3.0 (Async)",
     }
 
+
+# ========================================
+# EMOJIS ET TRADUCTIONS
+# ========================================
 
 try:
     from emojis import DICT_EMOJIS
@@ -145,6 +169,11 @@ def t(langue: str, cle: str, defaut: str = None, **kwargs) -> str:
         return texte.format_map(SafeDict(**variables_fusionnees))
 
     return texte
+
+
+# ========================================
+# CLASSE PAGINATION
+# ========================================
 
 
 class PaginationView(discord.ui.View):
@@ -232,6 +261,10 @@ class RefreshOnlyView(discord.ui.View):
                 pass
 
 
+# ========================================
+# VOTES ET RAPPELS
+# ========================================
+
 VOTES_FILE = JOUEURS_DIR / "votes.json"
 
 
@@ -285,6 +318,11 @@ async def prompt_vote_if_lucky(interaction: discord.Interaction, probability_per
         pass
 
 
+# ========================================
+# RESULTAT API
+# ========================================
+
+
 def _get_api_timestamp(*sources):
     """
     Explore de manière récursive et profonde les structures de données renvoyées par l'API.
@@ -330,6 +368,11 @@ def _get_api_timestamp(*sources):
     return discord.utils.utcnow()
 
 
+# ========================================
+# FORMAT DES NOMBRES
+# ========================================
+
+
 def format_num(n):
     try:
         n = int(n)
@@ -347,12 +390,22 @@ def format_num(n):
         return "0"
 
 
+# ========================================
+# TIMESTAMP DISCORD
+# ========================================
+
+
 def get_discord_timestamp(iso_str, style="R", langue="fr"):
     try:
         dt = datetime.fromisoformat(str(iso_str).replace("Z", "+00:00"))
         return f"<t:{int(dt.timestamp())}:{style}>"
     except:
         return t(langue, "utils_unknown_date", defaut="Date inconnue")
+
+
+# ========================================
+# RECUPERATION DONNEES EN CACHE
+# ========================================
 
 
 async def get_cached_data(serveur="E4K_FR1"):
@@ -403,6 +456,11 @@ async def get_cached_data(serveur="E4K_FR1"):
     return CACHE[serveur]
 
 
+# ========================================
+# FONCTIONS AUTOCOMPLETE DISCORD
+# ========================================
+
+
 async def joueur_autocomplete(interaction: discord.Interaction, current: str):
     _, serveur = await get_server_config(interaction)
     data = await get_cached_data(serveur)
@@ -438,6 +496,11 @@ async def event_autocomplete(interaction: discord.Interaction, current: str):
 async def event_alliance_autocomplete(interaction: discord.Interaction, current: str):
     events_en = ["Nomad Invasion", "Samurai Invasion", "Bloodcrow Invasion", "War of the Realms", "Battle of Berimond"]
     return [app_commands.Choice(name=e, value=e) for e in events_en if current.lower() in e.lower()][:25]
+
+
+# ========================================
+# FONCTION EMBED RESULTAT EVENT
+# ========================================
 
 
 async def generer_rapport_alliance_embed(
@@ -661,11 +724,154 @@ async def generer_rapport_alliance_embed(
     return embed, lignes_classement, stats_text, global_latest_str
 
 
-MON_ID_DISCORD = int(os.getenv("MON_ID_DISCORD", 0))
-TOKEN = os.getenv("DISCORD_TOKEN")
-TOPGG_TOKEN = os.getenv("TOPGG_TOKEN")
+# ==========================================
+# 🌍 CORRESPONDANCE DES SERVEURS (FLY.DEV)
+# ==========================================
+FLYDEV_MAPPING = {
+    "int1": "EmpireEx",
+    "de1": "EmpireEx_2",
+    "fr1": "EmpireEx_3",
+    "cz1": "EmpireEx_4",
+    "pl1": "EmpireEx_5",
+    "pt1": "EmpireEx_6",
+    "int2": "EmpireEx_7",
+    "es1": "EmpireEx_8",
+    "it1": "EmpireEx_9",
+    "tr1": "EmpireEx_10",
+    "nl1": "EmpireEx_11",
+    "hu1": "EmpireEx_12",
+    "skn1": "EmpireEx_13",
+    "ru1": "EmpireEx_14",
+    "ro1": "EmpireEx_15",
+    "bg1": "EmpireEx_16",
+    "hu2": "EmpireEx_17",
+    "sk1": "EmpireEx_18",
+    "gb1": "EmpireEx_19",
+    "br1": "EmpireEx_20",
+    "us1": "EmpireEx_21",
+    "au1": "EmpireEx_22",
+    "kr1": "EmpireEx_23",
+    "jp1": "EmpireEx_24",
+    "his1": "EmpireEx_25",
+    "in1": "EmpireEx_26",
+    "cn1": "EmpireEx_27",
+    "gr1": "EmpireEx_28",
+    "lt1": "EmpireEx_29",
+    "sa1": "EmpireEx_32",
+    "ae1": "EmpireEx_33",
+    "eg1": "EmpireEx_34",
+    "arab1": "EmpireEx_35",
+    "asia": "EmpireEx_36",
+    "hant1": "EmpireEx_37",
+    "es2": "EmpireEx_38",
+    "int3": "EmpireEx_43",
+    "world1": "EmpireEx_46",
+    "world2": "EmpireEx_49",
+    "global": None,
+    "partner_sp3": None,
+    "e4k_ro1": None,
+    "e4k_hu1": None,
+    "e4k_cz1": None,
+    "e4k_sk1": None,
+    "e4k_bg1": None,
+    "e4k_hr1": None,
+    "e4k_se1": None,
+    "e4k_no1": None,
+    "e4k_fi1": None,
+    "e4k_dk1": None,
+    "e4k_tw1": None,
+    "e4k_int1": None,
+    "e4k_de1": "EmpirefourkingdomsExGG",
+    "e4k_fr1": "EmpirefourkingdomsExGG_2",
+    "e4k_pl1": "EmpirefourkingdomsExGG_3",
+    "e4k_us1": "EmpirefourkingdomsExGG_4",
+    "e4k_gb1": "EmpirefourkingdomsExGG_5",
+    "e4k_nl1": "EmpirefourkingdomsExGG_6",
+    "e4k_es1": "EmpirefourkingdomsExGG_7",
+    "e4k_pt1": "EmpirefourkingdomsExGG_8",
+    "e4k_it1": "EmpirefourkingdomsExGG_9",
+    "e4k_ru1": "EmpirefourkingdomsExGG_10",
+    "e4k_skn1": "EmpirefourkingdomsExGG_11",
+    "e4k_his1": "EmpirefourkingdomsExGG_12",
+    "e4k_br1": "EmpirefourkingdomsExGG_13",
+    "e4k_jp1": "EmpirefourkingdomsExGG_14",
+    "e4k_kr1": "EmpirefourkingdomsExGG_15",
+    "e4k_cn1": "EmpirefourkingdomsExGG_16",
+    "e4k_au1": "EmpirefourkingdomsExGG_17",
+    "e4k_ph1": "EmpirefourkingdomsExGG_18",
+    "e4k_ar1": "EmpirefourkingdomsExGG_19",
+    "e4k_mx1": "EmpirefourkingdomsExGG_20",
+    "e4k_int2": "EmpirefourkingdomsExGG_21",
+    "e4k_tr1": "EmpirefourkingdomsExGG_22",
+    "e4k_gr1": "EmpirefourkingdomsExGG_23",
+    "e4k_arab1": "EmpirefourkingdomsExGG_24",
+    "e4k_in1": "EmpirefourkingdomsExGG_25",
+    "e4k_id1": "EmpirefourkingdomsExGG_26",
+    "e4k_asia1": "EmpirefourkingdomsExGG_27",
+    "e4k_de2": "EmpirefourkingdomsExGG_28",
+    "e4k_us2": "EmpirefourkingdomsExGG_29",
+    "e4k_hant1": "EmpirefourkingdomsExGG_30",
+    "e4k_ru2": "EmpirefourkingdomsExGG_31",
+    "e4k_int3": "EmpirefourkingdomsExGG_32",
+    "e4k_int4": "EmpirefourkingdomsExGG_34",
+    "e4k_world1": "EmpirefourkingdomsExGG_36",
+    "e4k_world2": "EmpirefourkingdomsExGG_37",
+}
 
-CACHE = {}
+# ==========================================
+# 📊 CONSTANTES DES ÉVÉNEMENTS & CLASSEMENTS
+# ==========================================
+
+EVENT_IDS = {
+    "achievements": 1,
+    "plunder": 2,
+    "honor": 5,
+    "might": 6,
+    "legendary": 7,
+    "berimond": 30,
+    "nobility": 40,
+    "foreigners": 44,
+    "nomads": 46,
+    "samurais": 51,
+    "season": 53,
+    "bloodcrows": 58,
+    "shapeshifters": 60,
+    "master": 61,
+    "league": 63,
+    "woa": 72,
+    "realms": 76,
+    "horizon": 78,
+    "patronage": 79,
+    "flora": 80,
+    "snowglobe": 81,
+    "hollowmoon": 82,
+    "sandfortune": 83,
+    "banquet": 85,
+    "midnight": 87,
+    "alliance_honor": 10,
+    "alliance_might": 11,
+    "alliance_command": 12,
+    "alliance_cargo": 13,
+    "alliance_foreigners": 45,
+    "alliance_nomad": 47,
+    "alliance_samurais": 52,
+    "alliance_bloodcrows": 59,
+    "alliance_league": 67,
+    "alliance_horizon": 77,
+}
+
+BRACKETS = {
+    "1": "Niveaux Classiques (< 70)",
+    "2": "Légendaire 1 - 299",
+    "3": "Légendaire 300 - 649",
+    "4": "Légendaire 650 - 949",
+    "5": "Légendaire 950+",
+    "6": "Niveau 70",
+}
+
+# ==========================================
+# CORRESPONDANCE NOM DES EVENTS
+# ==========================================
 
 TRACKER_EVENTS = {
     "Nomades": ["player_event_nomad_history"],
@@ -682,18 +888,124 @@ TRACKER_EVENTS = {
     "Battle of Berimond": ["player_event_berimond_invasion_history", "player_event_berimond_kingdom_history"],
 }
 
+# ==========================================
+# GESTION DES EVENEMENTS ET DESCIPRTIONS
+# ==========================================
 
-FILE_LOCKS = {}
+EVENT_MAPPING = {
+    "samurai invasion": {
+        "name_key": "cal_ev_samurai",
+        "name_default": "Samouraï",
+        "emoji": "<:samurai:1512430844935929868>",
+        "color": 0xBF0000,
+        "tracker_name": "Samouraïs",
+        "start": "11:00",
+        "end": "09:00",
+    },
+    "nomad invasion": {
+        "name_key": "cal_ev_nomad",
+        "name_default": "Nomade",
+        "emoji": "<:nomads:1512431070719774750>",
+        "color": 0xEDC951,
+        "tracker_name": "Nomades",
+        "start": "11:00",
+        "end": "09:00",
+    },
+    "bloodcrow invasion": {
+        "name_key": "cal_ev_bloodcrow",
+        "name_default": "Corbeaux de Sang",
+        "emoji": "<:bloodcrow:1512430942990368928>",
+        "color": 0xEDC951,
+        "tracker_name": "Corbeaux de Sang",
+        "start": "11:00",
+        "end": "09:00",
+    },
+    "war of the realms": {
+        "name_key": "cal_ev_realms",
+        "name_default": "Guerre des Royaumes",
+        "emoji": "<:war_realms:1512573773658980504>",
+        "color": 0xA69EB0,
+        "tracker_name": "Guerre des Royaumes",
+        "start": "11:00",
+        "end": "09:00",
+    },
+    "berimond": {
+        "name_key": "cal_ev_berimond",
+        "name_default": "Bérimond",
+        "emoji": "<:berimond:1512430901756428390>",
+        "color": 0x4B86B4,
+        "tracker_name": "Bataille de Bérimond",
+        "start": "11:00",
+        "end": "08:30",
+    },
+    "bladecoast": {
+        "name_key": "cal_ev_bladecoast",
+        "name_default": "Côte Tranchante",
+        "emoji": "<:bladecoast:1514704235894407399>",
+        "color": 0xBFB5B2,
+        "tracker_name": None,
+        "start": "11:00",
+        "end": "09:00",
+    },
+    "rift raid": {
+        "name_key": "cal_ev_rift",
+        "name_default": "Raid de la Faille",
+        "emoji": "<:riftraid:1514704237206966272>",
+        "color": 0xFB2E01,
+        "tracker_name": None,
+        "start": "11:00",
+        "end": "09:00",
+    },
+    "grand tournament": {
+        "name_key": "cal_ev_tournament",
+        "name_default": "Grand Tournoi",
+        "emoji": "<:grandtournament:1514704234128343040>",
+        "color": 0x03396C,
+        "tracker_name": None,
+        "start": "11:00",
+        "end": "12:00",
+    },
+    "beyond the horizon": {
+        "name_key": "cal_ev_horizon",
+        "name_default": "Au-delà de l'horizon",
+        "emoji": "<:bth:1512574690441302026>",
+        "color": 0x006666,
+        "tracker_name": None,
+        "start": "11:00",
+        "end": "00:40",
+    },
+    "outer realms": {
+        "name_key": "cal_ev_outer",
+        "name_default": "Royaumes extérieurs",
+        "emoji": "<:outerrealmsicon:1512573734404231329>",
+        "color": 0xFFE28A,
+        "tracker_name": None,
+        "start": "11:00",
+        "end": "00:40",
+    },
+    "imperial patronage": {
+        "name_key": "cal_ev_patronage",
+        "name_default": "Patronage impérial",
+        "emoji": "<:patronage:1514704230106140874>",
+        "color": 0xE8702A,
+        "tracker_name": None,
+        "start": "11:00",
+        "end": "09:30",
+    },
+    "grand nobility contest": {
+        "name_key": "cal_ev_nobility",
+        "name_default": "Grand concours de noblesse",
+        "emoji": "<:ltpe:1514704228801708052>",
+        "color": 0xE8702A,
+        "tracker_name": None,
+        "start": "11:00",
+        "end": "09:00",
+    },
+}
 
-
-def get_file_lock(filepath):
-    path_key = str(Path(filepath).resolve())
-    if path_key not in FILE_LOCKS:
-        FILE_LOCKS[path_key] = asyncio.Lock()
-    return FILE_LOCKS[path_key]
-
-
-BOT_VERSION = "GGE Assistant • Version 1.3.0"
+# ==========================================
+# FOOTER COMMUN TOUT EMBED
+# ==========================================
 
 
 async def setup_embed_footer(
@@ -708,16 +1020,23 @@ async def setup_embed_footer(
     embed.set_footer(text=txt)
 
 
-def load_maintenance():
-    path = ADMINS_DIR / "maintenance.json"
-    if os.path.exists(path):
-        try:
-            with open(path, encoding="utf-8") as f:
-                return json.load(f).get("maintenance_mode", False)
-        except Exception as e:
-            logger.error(f"❌ Impossible de lire maintenance.json : {e}")
-            obs.record_error(source="utils", scope="load_maintenance", exception=e, cog="utils")
-    return False
+# ==========================================
+# FILELOCK
+# ==========================================
+
+FILE_LOCKS = {}
+
+
+def get_file_lock(filepath):
+    path_key = str(Path(filepath).resolve())
+    if path_key not in FILE_LOCKS:
+        FILE_LOCKS[path_key] = asyncio.Lock()
+    return FILE_LOCKS[path_key]
+
+
+# ==========================================
+# LOAD / SAVE
+# ==========================================
 
 
 async def load_blocks_async():
@@ -750,20 +1069,20 @@ async def save_blocks_async(data):
 
 
 async def load_configuration_async():
-    path = CONFIG_DIR / "configuration.json"
+    path = CONFIG_DIR / "servers_cache.json"
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
                 with open(path, encoding="utf-8") as f:
                     return json.load(f)
             except Exception as e:
-                logger.error(f"❌ Erreur configuration.json : {e}")
+                logger.error(f"❌ Erreur lecture servers_cache.json : {e}")
                 obs.record_error(source="utils", scope="load_configuration", exception=e, cog="utils")
         return {"servers_info": {}}
 
 
 async def save_configuration_async(data):
-    path = CONFIG_DIR / "configuration.json"
+    path = CONFIG_DIR / "servers_cache.json"
     async with get_file_lock(path):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
@@ -827,6 +1146,18 @@ async def save_dungeons_async(data):
     async with get_file_lock(path):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
+
+
+def load_maintenance():
+    path = ADMINS_DIR / "maintenance.json"
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f).get("maintenance_mode", False)
+        except Exception as e:
+            logger.error(f"❌ Impossible de lire maintenance.json : {e}")
+            obs.record_error(source="utils", scope="load_maintenance", exception=e, cog="utils")
+    return False
 
 
 async def load_maintenance_async():

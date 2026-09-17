@@ -346,7 +346,7 @@ class GGEAssistantBot(commands.Bot):
             logger.error(f"❌ Erreur lors de l'envoi du préavis au démarrage : {e}")
 
         if self.maintenance_mode:
-            statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
+            statut_maint = t("en", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
             activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
             target_status = discord.Status.dnd
         else:
@@ -731,16 +731,12 @@ class GGEAssistantBot(commands.Bot):
                     xml_text = await r.text()
                     root = ET.fromstring(xml_text)
 
-                    config_file = CONFIG_DIR / "configuration.json"
-                    if not config_file.exists():
-                        return logger.error("❌ Fichier de configuration introuvable.")
+                    cache_file = CONFIG_DIR / "servers_cache.json"
 
-                    with open(config_file, encoding="utf-8") as f:
-                        config_data = json.load(f)
-
-                    anciennes_infos = config_data.get("servers_info", {})
-                    vieux_scan_minutes = config_data.get("scan_minutes", {})
-                    vieux_noms_api = config_data.get("servers", {})
+                    anciennes_infos = {}
+                    if cache_file.exists():
+                        with open(cache_file, encoding="utf-8") as f:
+                            anciennes_infos = json.load(f).get("servers_info", {})
 
                     nouveau_servers_info = {}
 
@@ -751,7 +747,6 @@ class GGEAssistantBot(commands.Bot):
 
                         if name_elem is not None and name_elem.text:
                             name = name_elem.text.strip()
-
                             is_enabled = (
                                 (enabled_elem.text.strip().lower() == "true")
                                 if (enabled_elem is not None and enabled_elem.text)
@@ -763,18 +758,12 @@ class GGEAssistantBot(commands.Bot):
                                 else False
                             )
 
-                            minutes = anciennes_infos.get(name, {}).get("scan_minutes")
-                            if minutes is None:
-                                minutes = vieux_scan_minutes.get(name)
-
-                            api_name = anciennes_infos.get(name, {}).get("api_name")
-                            if api_name is None:
-                                api_name = vieux_noms_api.get(name.lower())
+                            # Récupération de l'api_name directement depuis l'XML si on l'ajoute un jour, sinon fallback
+                            api_name = anciennes_infos.get(name, {}).get("api_name", name.lower().replace(" ", "_"))
 
                             nouveau_servers_info[name] = {
                                 "enabled": is_enabled,
                                 "featured": is_featured,
-                                "scan_minutes": minutes,
                                 "api_name": api_name,
                             }
 
@@ -790,59 +779,44 @@ class GGEAssistantBot(commands.Bot):
                                 etat = "🌟 Activées (Featured)" if new_data["featured"] else "❌ Désactivées"
                                 changements_featured.append(f"• **{name}** ➔ Fonctions avancées : {etat}")
 
-                    vieilles_cles_presentes = any(
-                        k in config_data for k in ["active_servers", "special_servers", "scan_minutes", "servers"]
+                    # On sauvegarde UNIQUEMENT les serveurs dans le fichier dynamique
+                    with open(cache_file, "w", encoding="utf-8") as f:
+                        json.dump({"servers_info": nouveau_servers_info}, f, indent=4, ensure_ascii=False)
+
+                    logger.info(
+                        f"🔄 [XML Sync] Cache dynamique des serveurs mis à jour avec {len(nouveau_servers_info)} serveurs."
                     )
 
-                    if nouveau_servers_info != anciennes_infos or vieilles_cles_presentes:
-                        config_data["servers_info"] = nouveau_servers_info
+                    if nouveaux_serveurs or changements_featured:
+                        desc_parts = ["Le catalogue GGE-Tracker a évolué :"]
 
-                        config_data.pop("active_servers", None)
-                        config_data.pop("special_servers", None)
-                        config_data.pop("scan_minutes", None)
-                        config_data.pop("servers", None)
+                        if nouveaux_serveurs:
+                            desc_parts.append(
+                                "\n🌍 **Nouveaux serveurs détectés :**\n"
+                                + "\n".join([f"• `{s}`" for s in nouveaux_serveurs])
+                            )
 
-                        if "live_api_commands" not in config_data:
-                            config_data["live_api_commands"] = {"groups": ["storm", "fortress"], "specific": []}
+                        if changements_featured:
+                            desc_parts.append(
+                                "\n⭐ **Changements de fonctionnalités avancées :**\n" + "\n".join(changements_featured)
+                            )
 
-                        with open(config_file, "w", encoding="utf-8") as f:
-                            json.dump(config_data, f, indent=4, ensure_ascii=False)
-
-                        logger.info(
-                            f"🔄 [XML Sync] Base de données unifiée mise à jour avec {len(nouveau_servers_info)} serveurs."
-                        )
-
-                        if nouveaux_serveurs or changements_featured:
-                            desc_parts = ["Le catalogue GGE-Tracker a évolué :"]
-
-                            if nouveaux_serveurs:
-                                desc_parts.append(
-                                    "\n🌍 **Nouveaux serveurs détectés :**\n"
-                                    + "\n".join([f"• `{s}`" for s in nouveaux_serveurs])
-                                )
-
-                            if changements_featured:
-                                desc_parts.append(
-                                    "\n⭐ **Changements de fonctionnalités avancées :**\n"
-                                    + "\n".join(changements_featured)
-                                )
-
-                            payload = {
-                                "embeds": [
-                                    {
-                                        "title": "🔄 Alerte Synchro GGE-Tracker",
-                                        "description": "\n".join(desc_parts),
-                                        "color": 3447003,
-                                        "timestamp": datetime.now().isoformat(),
-                                    }
-                                ]
-                            }
-                            if webhook_url and webhook_url.startswith("http"):
-                                try:
-                                    async with self.session.post(webhook_url, json=payload) as resp:
-                                        pass
-                                except Exception as webhook_err:
-                                    logger.error(f"❌ Erreur envoi webhook admin synchro : {webhook_err}")
+                        payload = {
+                            "embeds": [
+                                {
+                                    "title": "🔄 Alerte Synchro GGE-Tracker",
+                                    "description": "\n".join(desc_parts),
+                                    "color": 3447003,
+                                    "timestamp": datetime.now().isoformat(),
+                                }
+                            ]
+                        }
+                        if webhook_url and webhook_url.startswith("http"):
+                            try:
+                                async with self.session.post(webhook_url, json=payload) as resp:
+                                    pass
+                            except Exception as webhook_err:
+                                logger.error(f"❌ Erreur envoi webhook admin synchro : {webhook_err}")
                 else:
                     logger.warning(f"⚠️ [XML Sync] Impossible d'accéder au XML (Erreur {r.status})")
         except Exception as e:
@@ -1102,24 +1076,35 @@ class GGEAssistantBot(commands.Bot):
                 obs.deny_command(obs_ctx, "no_user_config")
                 return False
 
-        commandes_privees = [
-            "fortress",
-            "fortress scan",
-            "fortress stop",
-            "rival",
-            "rival start",
-            "rival add",
-            "rival list",
-            "rival stop",
-            "radar add",
-            "radar remove",
-            "radar list",
-            "radar alliance",
-            "radar alliance add",
-            "radar alliance remove",
-        ]
+        # ====================================================
+        # 🛡️ VÉRIFICATION DYNAMIQUE DES CONTRAINTES DE COMMANDE
+        # ====================================================
+        is_server_only = False
+        is_private_only = False
+        requires_featured_server = False
+        is_admin_only = False
 
-        if interaction.guild and cmd_name in commandes_privees:
+        try:
+            from cogs.aide import HELP_CONFIG
+
+            best_match_len = 0
+            for categorie in HELP_CONFIG.values():
+                for cmd in categorie.get("commands", []):
+                    # Nettoyage du nom : "/radar server (setup...)" devient "radar server"
+                    config_cmd_base = cmd["name"].split(" (")[0].replace("/", "").strip()
+
+                    if cmd_name.startswith(config_cmd_base):
+                        if len(config_cmd_base) > best_match_len:
+                            best_match_len = len(config_cmd_base)
+                            is_server_only = cmd.get("server_only", False)
+                            is_private_only = cmd.get("private_only", False)
+                            requires_featured_server = cmd.get("advanced", False)
+                            is_admin_only = cmd.get("admin_only", False)
+        except Exception as e:
+            logger.error(f"❌ Erreur lors de la lecture de HELP_CONFIG : {e}")
+
+        # 1. Vérification : Messages Privés Uniquement
+        if interaction.guild and is_private_only:
             if interaction.type == discord.InteractionType.application_command:
                 msg = t(
                     langue,
@@ -1130,25 +1115,8 @@ class GGEAssistantBot(commands.Bot):
             obs.deny_command(obs_ctx, "dm_only")
             return False
 
-        commandes_serveur = [
-            "calendar",
-            "calendar setup",
-            "calendar track",
-            "calendar untrack",
-            "storm setup",
-            "storm stop",
-            "radar server",
-            "radar server setup",
-            "radar server add_player",
-            "radar server add_alliance",
-            "radar server remove_player",
-            "radar server remove_alliance",
-            "radar server list",
-            "hub setup",
-            "hub stop",
-        ]
-
-        if not interaction.guild and cmd_name in commandes_serveur:
+        # 2. Vérification : Serveurs Uniquement
+        if not interaction.guild and is_server_only:
             if interaction.type == discord.InteractionType.application_command:
                 msg = t(
                     langue,
@@ -1159,47 +1127,54 @@ class GGEAssistantBot(commands.Bot):
             obs.deny_command(obs_ctx, "guild_only")
             return False
 
-        try:
-            import json
+        # 3. Vérification : Permissions Administrateur (Gérer le serveur)
+        if interaction.guild and is_admin_only:
+            if not interaction.user.guild_permissions.manage_guild:
+                if interaction.type == discord.InteractionType.application_command:
+                    msg = t(
+                        langue,
+                        "err_admin_only",
+                        defaut="<:error:1512505075220611172> Vous devez avoir la permission **Gérer le serveur** pour utiliser cette commande.",
+                    )
+                    await interaction.response.send_message(msg, ephemeral=True)
+                obs.deny_command(obs_ctx, "admin_only")
+                return False
 
-            from utils import CONFIG_DIR
+        # 4. Vérification : Fonctions Avancées (API Live)
+        if requires_featured_server:
+            try:
+                import json
 
-            config_file = CONFIG_DIR / "configuration.json"
-            if config_file.exists():
-                with open(config_file, encoding="utf-8") as f:
-                    config_data = json.load(f)
+                cache_file = CONFIG_DIR / "servers_cache.json"
+                is_featured = False
 
-                    servers_info = config_data.get("servers_info", {})
-                    live_config = config_data.get("live_api_commands", {})
-                    groupes_live = live_config.get("groups", [])
-                    commandes_live = live_config.get("specific", [])
+                if cache_file.exists():
+                    with open(cache_file, encoding="utf-8") as f:
+                        servers_info = json.load(f).get("servers_info", {})
+                        is_featured = servers_info.get(serveur, {}).get("featured", False)
 
-                base_cmd = cmd_name.split(" ")[0]
+                if obs_ctx is not None:
+                    obs_ctx.server_featured = bool(is_featured)
 
-                if base_cmd in groupes_live or cmd_name in groupes_live or cmd_name in commandes_live:
-                    is_featured = servers_info.get(serveur, {}).get("featured", False)
-                    if obs_ctx is not None:
-                        obs_ctx.server_featured = bool(is_featured)
-
-                    if serveur and not is_featured:
-                        if interaction.type == discord.InteractionType.application_command:
-                            msg = t(
-                                langue,
-                                "err_unsupported_special",
-                                defaut="⚠️ La commande n'est actuellement pas supportée pour ton serveur de jeu GGE. Pour avoir plus d'informations, merci d'utiliser /support.",
-                            )
-                            await interaction.response.send_message(msg, ephemeral=True)
-                        obs.deny_command(obs_ctx, "server_not_featured")
-                        return False
-        except Exception as e:
-            logger.error(f"❌ Erreur lors de la vérification des serveurs spéciaux : {e}")
-            self.loop.create_task(
-                self._send_system_alert(
-                    interaction,
-                    "🐛 Erreur Console (Vérification Serveur)",
-                    f"Impossible de valider le serveur de l'utilisateur.\n```py\n{e}\n```",
+                if serveur and not is_featured:
+                    if interaction.type == discord.InteractionType.application_command:
+                        msg = t(
+                            langue,
+                            "err_unsupported_special",
+                            defaut="⚠️ La commande n'est actuellement pas supportée pour ton serveur de jeu GGE. Pour avoir plus d'informations, merci d'utiliser /support.",
+                        )
+                        await interaction.response.send_message(msg, ephemeral=True)
+                    obs.deny_command(obs_ctx, "server_not_featured")
+                    return False
+            except Exception as e:
+                logger.error(f"❌ Erreur lors de la vérification du serveur Featured : {e}")
+                self.loop.create_task(
+                    self._send_system_alert(
+                        interaction,
+                        "🐛 Erreur Console (Vérification Serveur)",
+                        f"Impossible de valider le statut 'Featured' du serveur.\n```py\n{e}\n```",
+                    )
                 )
-            )
 
         if self.maintenance_mode:
             if interaction.type == discord.InteractionType.application_command:

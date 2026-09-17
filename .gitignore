@@ -6,16 +6,7 @@
 # ----------------------------------
 # 🗄️ BASES DE DONNÉES LOCALES
 # ----------------------------------
-# On ignore tout le dossier data/
-data/*
-
-# Mais on autorise Git à lire le dossier configs...
-!data/configs/
-# ... pour y ignorer tout son contenu...
-data/configs/*
-# ... SAUF le fameux fichier configuration.json et event_mapping.json!
-!data/configs/configuration.json
-!data/configs/event_mapping.json
+data/
 
 # ----------------------------------
 # 📝 LOGS
@@ -25,7 +16,6 @@ logs/
 # ----------------------------------
 # 🐍 CACHE PYTHON & SYSTÈME
 # ----------------------------------
-# Ignore tous les dossiers __pycache__ (cogs, locales, racine...)
 __pycache__/
 production/
 *.py[cod]

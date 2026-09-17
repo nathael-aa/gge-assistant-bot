@@ -85,6 +85,82 @@ A comprehensive Discord bot designed to assist "Goodgame Empire" (GGE) and "Empi
 <!-- TREE-END -->
 *(This section is auto-updated via GitHub Actions)*
 
+## ⌨️ Features & Commands Reference
+
+GGE Assistant provides a vast array of slash commands designed to track, analyze, and dominate in Goodgame Empire. Commands are categorized by their primary tactical use.
+
+### 🛠️ Core & Utility
+Essential commands to configure the bot, link accounts, and interact with the ecosystem.
+
+| Command | Description |
+|---|---|
+| `/setup` | Configure your language and primary GGE server. |
+| `/link_account` | Link your Discord account to your GGE username for quicker commands. |
+| `/help` | Displays the complete user manual for the GGE Assistant bot. |
+| `/status` | Checks the overall health status of the system (Bot, NAS, API). |
+| `/news` | Read the latest bot updates and patch notes. |
+| `/discover` | Discover useful tools and community projects for GGE. |
+| `/vote` \| `/support` \| `/contact` | Support the bot, join the server, or message the developer. |
+
+### 📅 Events & Community
+Automated tracking for game events, alliance performance, and community news.
+
+| Command | Description |
+|---|---|
+| `/calendar current` | Displays the complete, real-time calendar of events. |
+| `/calendar setup` | Defines the channel where automated calendar alerts will be sent. |
+| `/calendar track` / `untrack` | Manage alliances for automated end-of-event performance reports. |
+| `/calendar stop` | Disable calendar alerts and event reports for the server. |
+| `/hub setup` / `stop` | Configure or disable GGE Community Hub official announcements. |
+
+### 🏆 Rankings & Leaderboards
+Live parsing of the GGE-Tracker and Empire APIs for real-time competitive analysis.
+
+| Command | Description |
+|---|---|
+| `/rank event` / `gacha` | Displays live rankings for standard events (Nomads, Bloodcrows, etc.) and Gachas. |
+| `/rank realms` / `league` | Live rankings for cross-server events (Outer Realms, Horizon) and Kingdom Leagues. |
+| `/rank statistics` / `contests` | Player statistics (Might, Plunder, Achievements) and specific contests (Nobility, Shapeshifters). |
+| `/rank alliance` | Displays live rankings and statistics specifically for alliances. |
+| `/leaderboard woa` | Displays the Top 100 from the latest Wheel of Affluence. |
+| `/leaderboard storm_islands` | Displays the Top 100 looters of Aquamarine. |
+
+### 👥 Intelligence (Player & Alliance)
+In-depth historical and current data for specific entities on the map.
+
+| Command | Description |
+|---|---|
+| `/player profile` / `history` | View a player's detailed profile and complete historical data. |
+| `/player compare` | Responsive comparative analysis and calculation of the hazard index between players. |
+| `/player dove` | Check the exact date and time a player's protection ended. |
+| `/alliance profile` / `might` | Detailed profile of an alliance (paginated) and historical Power (PP) over time. |
+| `/alliance scanner` | Analyze the enemy roster in real time (Doves, PP, Targets). |
+| `/alliance property` / `description`| Displays all properties of an alliance and the history of wall changes. |
+| `/event_player` / `event_alliance` | View a player's or an alliance's latest score, history, and participation in an event. |
+| `/server` | Displays the global aggregated statistics of your current server. |
+
+### ⚔️ Radars & War Tracking
+The tactical core of the bot: scanning the map for targets, rivals, and free outposts.
+
+| Command | Description |
+|---|---|
+| `/target setup` / `search` | Configure filters and launch the search engine to find specific targets on the map. |
+| `/fortress scan` / `stop` | Manage automatic radar scanning for free fortresses (Sands, Ice, Peaks). |
+| `/fortress history` | View a player's fortress attack history (up to 365 days). |
+| `/radar server` / `private` | Manage the Server-wide or Personal War Radar (Live target notifications). |
+| `/rival start` / `add` / `list` / `stop` | Manage a Competition Radar (up to 10 rivals) via Direct Messages. |
+
+### ⛈️ Special Map Analyzers
+Tools dedicated to temporary kingdoms and specific economy loops.
+
+| Command | Description |
+|---|---|
+| `/storm forts` / `isles` | Search the Storm Islands map for available forts or resource islands. |
+| `/storm occupier` | List all islands currently held by a specific player. |
+| `/storm setup` / `stop` | Configure automatic pings for respawning islands in your server. |
+| `/storm status` | Displays the freshness state of the Storm Islands map scan. |
+| `/woa history` / `summary` | Analysis and statistics of the Wheel of Affluence (ticket consumption). |
+
 The project follows a modular architecture. While some directories are tracked by Git, others are generated automatically at runtime:
 
 **Tracked by Git:**
@@ -92,11 +168,10 @@ The project follows a modular architecture. While some directories are tracked b
 * **`empire-api/`**: Node.js REST API serving as a bridge to the game's WebSockets.
 * **`cogs/`**: Contains all feature modules including `forteresses.py`, `radar.py`, `storms.py`, `events.py`, and `classement.py`.
 * **`locales/`**: Internationalization files supporting French (`fr.json`), English (`en.json`), and German (`de.json`).
-* **`data/configs/`**: Core JSON configurations (`configuration.json`, `event_mapping.json`).
 
 **Locally Generated (Ignored by Git):**
-* **`data/`**: The main data store holding `joueurs/` (player tracking, votes) and `server_scans/` (daily dumps for dozens of servers).
-* **`.env`**: Stores sensitive API keys, Webhook URL and Discord tokens.
+* **`data/`**: The main data store holding `joueurs/` (player tracking, votes), `server_scans/` (daily dumps for dozens of servers), and dynamically generated configuration caches (`servers_cache.json`).
+* **`.env`**: Stores sensitive API keys, Webhook URLs, and Discord tokens.
 * **`logs/`**: Automated daily rotating logs (`discord_bot.log`) generated by the `TimedRotatingFileHandler`.
 
 ## 🤝 Contributing
