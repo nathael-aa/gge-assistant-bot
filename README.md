@@ -54,10 +54,6 @@ A comprehensive Discord bot designed to assist "Goodgame Empire" (GGE) and "Empi
 │   ├── scan_server.py
 │   ├── storms.py
 │   └── target.py
-├── data
-│   └── configs
-│       ├── configuration.json
-│       └── event_mapping.json
 ├── database
 │   └── schema.sql
 ├── discord_bot.py
@@ -80,7 +76,7 @@ A comprehensive Discord bot designed to assist "Goodgame Empire" (GGE) and "Empi
 ├── ruff.toml
 └── utils.py
 
-8 directories, 38 files
+6 directories, 36 files
 ```
 <!-- TREE-END -->
 *(This section is auto-updated via GitHub Actions)*
