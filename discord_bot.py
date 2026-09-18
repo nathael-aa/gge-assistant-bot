@@ -826,7 +826,7 @@ class GGEAssistantBot(commands.Bot):
     @update_servers_task.before_loop
     async def before_update_servers(self):
         await self.wait_until_ready()
-        await asyncio.sleep(5)
+        await asyncio.sleep(3)
 
     # ==========================================
     # ENVOI NOMBRE SERVEUR A TOPGG

@@ -48,7 +48,10 @@ async def save_hub_config(data):
 class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description="GGE Community Hub News"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.hub_url = "https://communityhub.goodgamestudios.com/newshubempire/"
+        self.hub_urls = {
+            "e4k": "https://communityhub.goodgamestudios.com/newshube4k/",
+            "empire": "https://communityhub.goodgamestudios.com/newshubempire/",
+        }
         self.changelog_url = "https://communityhub.goodgamestudios.com/2026/05/18/goodgame-empire-changelog/"
         self.headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
@@ -147,9 +150,6 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
         if article.get("image"):
             embed.set_image(url=article["image"])
-        embed.set_thumbnail(
-            url="https://i0.wp.com/communityhub.goodgamestudios.com/wp-content/uploads/2023/11/cropped-ggs_logo_reg_rgb_v_300c.png"
-        )
 
         await setup_embed_footer(embed, None, langue)
 
@@ -255,7 +255,6 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
         elif "alerts" not in data["guilds"][guild_id]:
             data["guilds"][guild_id]["alerts"] = {}
 
-        # FIX : Suppression du double ping éventuel.
         if role:
             ping_format = role.mention
         else:
@@ -287,9 +286,15 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
         await interaction.followup.send(msg)
 
         # FIX : Envoi forcé de la dernière annonce correspondante lors de l'activation
+        # FIX : Envoi forcé de la dernière annonce correspondante lors de l'activation
         try:
             articles = await self.fetch_latest_news()
-            cat_articles = [a for a in articles if a["type"] == categorie]
+
+            # 🎯 On détermine à quel jeu joue ce serveur Discord
+            guild_game = "e4k" if serveur.startswith("E4K_") else "empire"
+
+            # On filtre pour ne garder que la bonne catégorie ET le bon jeu (ou "both" pour le changelog)
+            cat_articles = [a for a in articles if a["type"] == categorie and a["game"] in [guild_game, "both"]]
 
             if cat_articles:
                 latest_article = cat_articles[-1]
@@ -390,110 +395,106 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
             await interaction.followup.send(msg_fail)
 
     async def fetch_latest_news(self):
-        """Scrape le Hub, crée le résumé propre ET extrait la version Markdown complète pour le fil Discord."""
+        """Scrape les Hubs, crée le résumé propre ET extrait la version Markdown complète pour le fil Discord."""
         articles = []
 
-        # 1. PARSING DES NEWS CLASSIQUES ET ALERTES
-        try:
-            async with self.bot.session.get(self.hub_url, headers=self.headers, timeout=15) as r:
-                if r.status == 200:
-                    html_content = await r.text()
-                    soup = await asyncio.to_thread(BeautifulSoup, html_content, "html.parser")
+        # 1. PARSING DES NEWS CLASSIQUES ET ALERTES (POUR E4K ET EMPIRE)
+        for game_type, url in self.hub_urls.items():
+            try:
+                async with self.bot.session.get(url, headers=self.headers, timeout=15) as r:
+                    if r.status == 200:
+                        html_content = await r.text()
+                        soup = await asyncio.to_thread(BeautifulSoup, html_content, "html.parser")
 
-                    # --- A. PARSING DES NEWS CLASSIQUES ---
-                    for post in soup.find_all("article", class_="elementor-post"):
-                        classes = post.get("class", [])
-                        if "category-alertsempire" in classes or "category-alertse4k" in classes:
-                            continue
+                        # --- A. PARSING DES HERO BANNERS (Les gros articles tout en haut) ---
+                        for heading in soup.find_all(["h1", "h2"]):
+                            if "e-heading-base" in heading.get("class", []):
+                                parent = heading.find_parent("div", class_="elementor-element")
+                                if parent:
+                                    link_elem = parent.find("a", href=True)
+                                    if link_elem and re.search(r"/\d{4}/\d{2}/\d{2}/", link_elem["href"]):
+                                        url_article = link_elem["href"]
+                                        if url_article.rstrip("/") == self.changelog_url.rstrip("/"):
+                                            continue
 
-                        title_elem = post.find("h2", class_="elementor-post__title")
-                        if not title_elem:
-                            continue
+                                        title = heading.get_text(strip=True)
+                                        match = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", url_article)
+                                        date_obj = datetime(
+                                            int(match.group(1)), int(match.group(2)), int(match.group(3))
+                                        )
+                                        discord_date = f"<t:{int(date_obj.timestamp())}:D>"
 
-                        link_elem = title_elem.find("a", href=True)
-                        if not link_elem:
-                            continue
+                                        article_id = hashlib.md5((url_article + title + game_type).encode()).hexdigest()
 
-                        url_article = link_elem["href"]
-                        if url_article.rstrip("/") == self.changelog_url.rstrip("/"):
-                            continue
+                                        articles.append(
+                                            {
+                                                "id": article_id,
+                                                "title": title,
+                                                "url": url_article,
+                                                "date_discord": discord_date,
+                                                "date_obj": date_obj,
+                                                "image": None,
+                                                "type": "news",  # Par défaut les Heroes sont des news
+                                                "resume_content": "",
+                                                "game": game_type,
+                                            }
+                                        )
 
-                        date_elem = post.find("span", class_="elementor-post-date")
-                        img_elem = post.find("img")
+                        # --- B. PARSING DE LA GRILLE (Articles standards) ---
+                        for post in soup.find_all("article", class_="elementor-grid-item"):
+                            title_elem = post.find(["h1", "h2", "h3"], class_="elementor-post__title")
+                            if not title_elem:
+                                continue
 
-                        title = title_elem.get_text(strip=True)
-                        date_str = date_elem.get_text(strip=True) if date_elem else ""
+                            link_elem = title_elem.find("a", href=True)
+                            if not link_elem:
+                                continue
 
-                        img_url = img_elem["src"] if img_elem else None
-                        if img_url and "?" in img_url:
-                            img_url = img_url.split("?")[0]
+                            url_article = link_elem["href"]
+                            title = title_elem.get_text(strip=True)
 
-                        article_id = hashlib.md5(url_article.encode()).hexdigest()
+                            if url_article.rstrip("/") == self.changelog_url.rstrip("/"):
+                                continue
 
-                        try:
-                            clean_date_str = date_str.replace(".", "").strip()
-                            date_obj = datetime.strptime(clean_date_str, "%d %B %Y")
-                            discord_date = f"<t:{int(date_obj.timestamp())}:D>"
-                        except Exception:
-                            date_obj = datetime.min
-                            discord_date = date_str
+                            date_elem = post.find("span", class_="elementor-post-date")
+                            date_str = date_elem.get_text(strip=True) if date_elem else ""
 
-                        articles.append(
-                            {
-                                "id": article_id,
-                                "title": title,
-                                "url": url_article,
-                                "date_discord": discord_date,
-                                "date_obj": date_obj,
-                                "image": img_url,
-                                "type": "news",
-                            }
-                        )
+                            img_elem = post.find("img")
+                            img_url = img_elem["src"] if img_elem else None
+                            if img_url and "?" in img_url:
+                                img_url = img_url.split("?")[0]
 
-                    # --- B. PARSING DES ALERTES ---
-                    for post in soup.find_all(
-                        "article", class_=lambda c: c and ("category-alertsempire" in c or "category-alertse4k" in c)
-                    ):
-                        title_elem = post.find(["h1", "h2", "h3"], class_="elementor-post__title")
-                        if not title_elem:
-                            continue
+                            classes = " ".join(post.get("class", [])).lower()
+                            is_alert = "alert" in classes or "alert" in url_article.lower()
+                            article_type = "alerts" if is_alert else "news"
 
-                        link_elem = title_elem.find("a", href=True)
-                        if not link_elem:
-                            continue
+                            article_id = hashlib.md5((url_article + title + game_type).encode()).hexdigest()
 
-                        url_article = link_elem["href"]
-                        title = title_elem.get_text(strip=True)
+                            # Sécurité anti-doublon (si l'article est en Hero ET dans la grille)
+                            if not any(a["id"] == article_id for a in articles):
+                                try:
+                                    clean_date_str = date_str.replace(".", "").strip()
+                                    date_obj = datetime.strptime(clean_date_str, "%d %B %Y")
+                                    discord_date = f"<t:{int(date_obj.timestamp())}:D>"
+                                except Exception:
+                                    date_obj = discord.utils.utcnow()
+                                    discord_date = date_str if date_str else "Récemment"
 
-                        article_id = hashlib.md5((url_article + title).encode()).hexdigest()
-
-                        match = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", url_article)
-                        if match:
-                            try:
-                                date_obj = datetime(int(match.group(1)), int(match.group(2)), int(match.group(3)))
-                                discord_date = f"<t:{int(date_obj.timestamp())}:D>"
-                            except Exception:
-                                date_obj = discord.utils.utcnow()
-                                discord_date = "Récemment"
-                        else:
-                            date_obj = discord.utils.utcnow()
-                            discord_date = "Récemment"
-
-                        articles.append(
-                            {
-                                "id": article_id,
-                                "title": title,
-                                "url": url_article,
-                                "date_discord": discord_date,
-                                "date_obj": date_obj,
-                                "image": None,
-                                "type": "alerts",
-                                "resume_content": "",
-                            }
-                        )
-
-        except Exception as e:
-            logger.error(f"❌ [Hub] Erreur de parsing HTML News & Alerts : {e}")
+                                articles.append(
+                                    {
+                                        "id": article_id,
+                                        "title": title,
+                                        "url": url_article,
+                                        "date_discord": discord_date,
+                                        "date_obj": date_obj,
+                                        "image": img_url,
+                                        "type": article_type,
+                                        "resume_content": "",
+                                        "game": game_type,
+                                    }
+                                )
+            except Exception as e:
+                logger.error(f"❌ [Hub] Erreur de parsing HTML ({game_type}) : {e}")
 
         # 2. PARSING DE LA PAGE DES PATCHNOTES
         try:
@@ -516,9 +517,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             discord_date = date_str
 
                         content_div = details.find("div", role="region")
-
-                        texte_resume = ""
-                        texte_full_md = ""
+                        texte_resume, texte_full_md = "", ""
 
                         if content_div:
                             lignes_resume = []
@@ -596,6 +595,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                 "type": "patchnotes",
                                 "resume_content": texte_resume,
                                 "full_content": texte_full_md,
+                                "game": "both",
                             }
                         )
         except Exception as e:
@@ -620,16 +620,36 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
             posted_news = data.get("posted_news", [])
             guilds_config = data.get("guilds", {})
 
-            if not posted_news:
-                data["posted_news"] = [art["id"] for art in nouveaux_articles]
-                await save_hub_config(data)
-                logger.info("📡 [Hub] Initialisation : Articles actuels mémorisés en silence.")
-                return
-
             if not guilds_config:
                 return
 
-            articles_a_publier = [art for art in nouveaux_articles if art["id"] not in posted_news]
+            # ==========================================
+            # 🛡️ GESTION DU DÉMARRAGE ET BOUCLIER ANTI-SPAM
+            # ==========================================
+            if not posted_news:
+                logger.info("📡 [Hub] Initialisation. Mémorisation de l'historique et envoi du tout dernier article.")
+                # S'il y a des articles, on archive tout sauf le dernier
+                for art in nouveaux_articles[:-1]:
+                    posted_news.append(art["id"])
+
+                data["posted_news"] = posted_news[-100:]
+                await save_hub_config(data)
+
+                articles_a_publier = [nouveaux_articles[-1]]
+            else:
+                articles_a_publier = [art for art in nouveaux_articles if art["id"] not in posted_news]
+
+                if len(articles_a_publier) > 3:
+                    logger.warning(
+                        f"🛡️ [Hub] Bouclier activé ({len(articles_a_publier)} articles détectés). Envoi uniquement du dernier au cas où."
+                    )
+
+                    # On archive tout en silence dans la base de données... SAUF le dernier !
+                    for art in articles_a_publier[:-1]:
+                        posted_news.append(art["id"])
+
+                    # On ne laisse que le tout dernier article pour la suite du processus d'envoi
+                    articles_a_publier = [articles_a_publier[-1]]
 
             if articles_a_publier:
                 langues_cibles = set(config.get("langue", "fr") for config in guilds_config.values())
@@ -677,9 +697,15 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                         if not channel_id:
                             continue
 
+                        serveur_cible = config.get("gge_server", "E4K_FR1")
+                        guild_game = "e4k" if serveur_cible.startswith("E4K_") else "empire"
+
+                        # 🎯 On ignore cette annonce si elle ne correspond pas au jeu de ce serveur
+                        if article["game"] not in [guild_game, "both"]:
+                            continue
+
                         ping_role = cat_config.get("role", "")
                         langue = config.get("langue", "fr")
-                        serveur_cible = config.get("gge_server", "E4K_FR1")
 
                         final_titre = traductions.get(langue, {}).get("title", article["title"])
                         final_resume = traductions.get(langue, {}).get("resume", "")
