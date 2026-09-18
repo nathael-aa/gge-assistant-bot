@@ -759,11 +759,18 @@ class GGEAssistantBot(commands.Bot):
                             except Exception as webhook_err:
                                 logger.error(f"❌ Erreur envoi webhook admin synchro : {webhook_err}")
                 else:
-                    logger.warning(f"⚠️ [XML Sync] Impossible d'accéder au XML (Erreur {r.status})")
+                    err_txt = await r.text()
+                    logger.warning(
+                        f"⚠️ [XML Sync] Impossible d'accéder au XML (Erreur {r.status}). Réponse : {err_txt[:300]}"
+                    )
         except Exception as e:
-            tb_str = traceback.format_exc()
-            logger.error(f"❌ [XML Sync] Erreur lors de l'unification des serveurs :\n{tb_str}")
+            logger.error(f"❌ [XML Sync] Erreur lors de l'unification des serveurs : {e}", exc_info=True)
             obs.record_error(source="task", scope="update_servers_task", exception=e, cog="core")
+
+    @update_servers_task.before_loop
+    async def before_update_servers(self):
+        await self.wait_until_ready()
+        await asyncio.sleep(5)
 
     @tasks.loop(minutes=30)
     async def post_server_count_task(self):
