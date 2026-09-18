@@ -27,6 +27,7 @@ from utils import (
     TOKEN,
     TOPGG_TOKEN,
     charger_langues,
+    get_api_headers,
     get_server_config,
     load_blocks_async,
     load_maintenance,
@@ -725,8 +726,11 @@ class GGEAssistantBot(commands.Bot):
         url = "https://api-beta.gge-tracker.com/api/v1/servers/catalog"
         webhook_url = os.getenv("WEBHOOK_SYNC")
 
+        headers = await get_api_headers()
+        headers["Accept"] = "text/xml,application/xml,application/xhtml+xml"
+
         try:
-            async with self.session.get(url, timeout=10) as r:
+            async with self.session.get(url, headers=headers, timeout=10) as r:
                 if r.status == 200:
                     xml_text = await r.text()
                     root = ET.fromstring(xml_text)
