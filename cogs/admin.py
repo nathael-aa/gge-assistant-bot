@@ -64,7 +64,8 @@ class AdminCog(commands.Cog):
             "`!m` ➔ Active/Désactive le mode maintenance.\n"
             "`!setstatus [msg]` ➔ Ajoute/retire un statut personnalisé.\n"
             "`!log [date]` ➔ Télécharge les logs système.\n"
-            "`!bypass` ➔ Active/Désactive ton immunité.\n",
+            "`!bypass` ➔ Active/Désactive ton immunité.\n"
+            "`!export_cmds` ➔ Exporte l'arbre des commandes en JSON.\n",
             inline=False,
         )
 
@@ -183,6 +184,79 @@ class AdminCog(commands.Cog):
         await ctx.send(msg)
         logger.warning(f"🔄 Redémarrage forcé déclenché par l'administrateur ({ctx.author.name})")
         await self.bot.close()
+
+    @commands.command(name="export_cmds", hidden=True)
+    async def export_commands(self, ctx):
+        """[CACHÉE] !export_cmds : Exporte l'arbre des commandes en JSON."""
+        msg = await ctx.send("⏳ **Génération du fichier JSON des commandes...**")
+
+        try:
+            payload = []
+
+            def process_command(cmd, group_name=""):
+                if isinstance(cmd, discord.app_commands.Group):
+                    group_data = {
+                        "name": f"{group_name}{cmd.name}",
+                        "description": cmd.description,
+                        "type": 1,
+                        "options": [],
+                    }
+                    for sub_cmd in cmd.commands:
+                        sub_data = {
+                            "name": sub_cmd.name,
+                            "description": sub_cmd.description,
+                            "type": 1,
+                            "options": self.serialize_options(sub_cmd.options) if hasattr(sub_cmd, "options") else [],
+                        }
+                        group_data["options"].append(sub_data)
+                    payload.append(group_data)
+                else:
+                    cmd_data = {
+                        "name": cmd.name,
+                        "description": cmd.description,
+                        "type": 1,
+                        "options": self.serialize_options(cmd.options) if hasattr(cmd, "options") else [],
+                    }
+                    payload.append(cmd_data)
+
+            # On récupère les commandes depuis l'arbre du bot
+            for cmd in self.bot.tree.get_commands():
+                process_command(cmd)
+
+            # Création du fichier en mémoire pour l'envoyer directement sur Discord
+            import io
+
+            json_str = json.dumps(payload, indent=4, ensure_ascii=False)
+            fichier_virtuel = io.BytesIO(json_str.encode("utf-8"))
+            fichier_discord = discord.File(fp=fichier_virtuel, filename="commands.json")
+
+            logger.info(f"📄 [JSON] Commandes exportées manuellement par {ctx.author.name}.")
+            await msg.edit(content="✅ **Export réussi !** Voici l'arborescence des commandes :")
+            await ctx.send(file=fichier_discord)
+
+        except Exception as e:
+            logger.error(f"❌ Erreur lors de l'export JSON : {e}")
+            obs.record_error(source="admin", scope="export_commands", exception=e, cog="admin")
+            await msg.edit(content=f"❌ Erreur lors de l'export : `{e}`")
+
+    def serialize_options(self, options):
+        """Transforme les options en format JSON pur."""
+        serialized = []
+        for opt in options:
+            opt_data = {
+                "name": opt.name,
+                "description": opt.description,
+                "type": opt.type.value,
+                "required": opt.required,
+            }
+            if opt.autocomplete:
+                opt_data["autocomplete"] = True
+            if hasattr(opt, "choices") and opt.choices:
+                opt_data["choices"] = [{"name": c.name, "value": c.value} for c in opt.choices]
+            if hasattr(opt, "options") and opt.options:
+                opt_data["options"] = self.serialize_options(opt.options)
+            serialized.append(opt_data)
+        return serialized
 
     @commands.command(name="m", hidden=True)
     async def toggle_maintenance(self, ctx):

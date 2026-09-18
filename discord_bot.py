@@ -145,70 +145,6 @@ class GGEAssistantBot(commands.Bot):
 
         self.tree.on_error = self.on_tree_error
 
-    def export_commands_json(self):
-        """Exporte le 'Slash Command Payload' incluant les groupes et sous-commandes."""
-        try:
-            payload = []
-
-            def process_command(cmd, group_name=""):
-
-                if isinstance(cmd, discord.app_commands.Group):
-                    group_data = {
-                        "name": f"{group_name}{cmd.name}",
-                        "description": cmd.description,
-                        "type": 1,
-                        "options": [],
-                    }
-
-                    for sub_cmd in cmd.commands:
-                        sub_data = {
-                            "name": sub_cmd.name,
-                            "description": sub_cmd.description,
-                            "type": 1,
-                            "options": self.serialize_options(sub_cmd.options) if hasattr(sub_cmd, "options") else [],
-                        }
-                        group_data["options"].append(sub_data)
-
-                    payload.append(group_data)
-                else:
-                    cmd_data = {
-                        "name": cmd.name,
-                        "description": cmd.description,
-                        "type": 1,
-                        "options": self.serialize_options(cmd.options) if hasattr(cmd, "options") else [],
-                    }
-                    payload.append(cmd_data)
-
-            for cmd in self.tree.get_commands():
-                process_command(cmd)
-
-            with open("commands.json", "w", encoding="utf-8") as f:
-                json.dump(payload, f, indent=4, ensure_ascii=False)
-
-            logger.info("📄 [JSON] Commandes et sous-commandes actuelles générées avec succès.")
-        except Exception as e:
-            logger.error(f"❌ Erreur lors de l'export JSON : {e}")
-            obs.record_error(source="background", scope="export_commands", exception=e, cog="core")
-
-    def serialize_options(self, options):
-        """Transforme les options en format JSON pur."""
-        serialized = []
-        for opt in options:
-            opt_data = {
-                "name": opt.name,
-                "description": opt.description,
-                "type": opt.type.value,
-                "required": opt.required,
-            }
-            if opt.autocomplete:
-                opt_data["autocomplete"] = True
-            if hasattr(opt, "choices") and opt.choices:
-                opt_data["choices"] = [{"name": c.name, "value": c.value} for c in opt.choices]
-            if hasattr(opt, "options") and opt.options:
-                opt_data["options"] = self.serialize_options(opt.options)
-            serialized.append(opt_data)
-        return serialized
-
     async def setup_hook(self):
         if TOPGG_TOKEN and TOPGG_TOKEN != "FAUX_TOKEN":
             self.topgg_token = TOPGG_TOKEN
@@ -247,8 +183,6 @@ class GGEAssistantBot(commands.Bot):
                 logger.error(f"❌ Erreur {ext} : {e}")
 
         await self.tree.sync()
-
-        self.export_commands_json()
 
         if not self.flag_watcher_task.is_running():
             self.flag_watcher_task.start()
@@ -728,6 +662,9 @@ class GGEAssistantBot(commands.Bot):
 
         headers = await get_api_headers()
         headers["Accept"] = "text/xml,application/xml,application/xhtml+xml"
+        headers["User-Agent"] = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
 
         try:
             async with self.session.get(url, headers=headers, timeout=10) as r:
@@ -824,7 +761,8 @@ class GGEAssistantBot(commands.Bot):
                 else:
                     logger.warning(f"⚠️ [XML Sync] Impossible d'accéder au XML (Erreur {r.status})")
         except Exception as e:
-            logger.error(f"❌ [XML Sync] Erreur lors de l'unification des serveurs : {e}")
+            tb_str = traceback.format_exc()
+            logger.error(f"❌ [XML Sync] Erreur lors de l'unification des serveurs :\n{tb_str}")
             obs.record_error(source="task", scope="update_servers_task", exception=e, cog="core")
 
     @tasks.loop(minutes=30)
