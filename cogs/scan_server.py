@@ -11,7 +11,7 @@ import aiohttp
 from discord.ext import commands, tasks
 
 import observability as obs
-from utils import get_api_headers
+from utils import CONFIG_DIR, get_api_headers
 
 logger = logging.getLogger("GGE_Bot")
 
@@ -22,7 +22,7 @@ class ScanCog(commands.Cog):
         self.api_url = "https://api.gge-tracker.com/api/v1"
         data_path = os.getenv("DATA_PATH", "/app/data")
         self.base_output_dir = Path(data_path) / "server_scans"
-        self.configuration_path = Path(data_path) / "configs" / "configuration.json"
+        self.configuration_path = CONFIG_DIR / "servers_cache.json"
 
         self.webhook_url = os.getenv("WEBHOOK_SCAN")
         self._scan_kind = "daily"
