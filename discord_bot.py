@@ -35,7 +35,7 @@ from utils import (
 )
 
 # =======================================
-# ⚙️ INITIALISATION DU BOT ET DES LOGS
+# INITIALISATION DU BOT, OBS ET DES LOGS
 # =======================================
 os.makedirs("/app/logs/general", exist_ok=True)
 os.makedirs("/app/data", exist_ok=True)
@@ -62,9 +62,11 @@ console_handler = logging.StreamHandler()
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-# Mirror the log stream above into ClickHouse (stays inert when CLICKHOUSE_HOST is unset)
 obs.setup(logger, bot_version=BOT_VERSION)
 
+# =======================================
+# DEMMARAGE ESTETHIQUE EN LOG
+# =======================================
 print(
     "\n" + "█" * 60 + "\n" + "█" + " " * 18 + "NOUVEAU DÉMARRAGE DU BOT" + " " * 16 + "█\n" + "█" * 60 + "\n",
     flush=True,
@@ -72,6 +74,9 @@ print(
 logger.info("🟢 Démarrage du système de logs...")
 
 
+# =======================================
+# MESSAGE BIENVENUE/TUTOS AU NOUVEAUX SERVEURS
+# =======================================
 class WelcomeView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -129,6 +134,9 @@ class WelcomeView(discord.ui.View):
         await interaction.response.edit_message(embed=self.get_welcome_embed("de"))
 
 
+# =======================================
+# CLASSE PRINCIPALE
+# =======================================
 class GGEAssistantBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
@@ -145,7 +153,14 @@ class GGEAssistantBot(commands.Bot):
 
         self.tree.on_error = self.on_tree_error
 
+    # =======================================
+    # SETUP
+    # =======================================
     async def setup_hook(self):
+
+        # =======================================
+        # VERIFICATION TOKEN TOPGG
+        # =======================================
         if TOPGG_TOKEN and TOPGG_TOKEN != "FAUX_TOKEN":
             self.topgg_token = TOPGG_TOKEN
             logger.info("🟢 Token Top.gg enregistré (utilisation via aiohttp v1).")
@@ -153,12 +168,20 @@ class GGEAssistantBot(commands.Bot):
             self.topgg_token = None
             logger.warning("⚠️ Aucun token Top.gg détecté. Les requêtes de vote seront ignorées.")
 
-        # Must run before self.session exists: aiohttp tracing only covers sessions created afterwards
+        # =======================================
+        # DEMMARAGE OBS
+        # =======================================
         await obs.start(self)
 
+        # =======================================
+        # CONNEXION IPV4
+        # =======================================
         connecteur_ipv4 = aiohttp.TCPConnector(family=socket.AF_INET)
         self.session = aiohttp.ClientSession(connector=connecteur_ipv4)
 
+        # =======================================
+        # CHARGEMENT DES COGS
+        # =======================================
         logger.info("🔌 Chargement des modules ...")
         extensions = [
             "cogs.admin",
@@ -182,8 +205,14 @@ class GGEAssistantBot(commands.Bot):
             except Exception as e:
                 logger.error(f"❌ Erreur {ext} : {e}")
 
+        # =======================================
+        # SYNCHRONISATION COMMANDES DISCORD
+        # =======================================
         await self.tree.sync()
 
+        # =======================================
+        # INITIALISATION DES TASKS
+        # =======================================
         if not self.flag_watcher_task.is_running():
             self.flag_watcher_task.start()
             logger.info("🛰️ [Tasks] flag_watcher_task initialisée dans le setup_hook.")
@@ -215,12 +244,15 @@ class GGEAssistantBot(commands.Bot):
         await self.web_site.start()
         logger.info("🌐 [Webhook] Serveur web en écoute sur le port 5011.")
 
+    # =======================================
+    # BOT PRÊT
+    # =======================================
     async def on_ready(self):
         charger_langues()
         logger.info(f"✅ Bot connecté en tant que {self.user} (ID: {self.user.id})")
 
         # ==========================================
-        # 📢 WEBHOOK START NOTIFICATION
+        # WEBHOOK START NOTIFICATION
         # ==========================================
         webhook_start = os.getenv("WEBHOOK_START")
         if webhook_start and webhook_start.startswith("http"):
@@ -280,6 +312,9 @@ class GGEAssistantBot(commands.Bot):
         except Exception as e:
             logger.error(f"❌ Erreur lors de l'envoi du préavis au démarrage : {e}")
 
+        # ==========================================
+        # VERIFICATION MAINTENANCE
+        # ==========================================
         if self.maintenance_mode:
             statut_maint = t("en", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
             activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
@@ -291,6 +326,9 @@ class GGEAssistantBot(commands.Bot):
         await self.change_presence(activity=activity, status=target_status)
         logger.info(f"📡 Statut mis à jour : {activity.name} | Pastille : {target_status}")
 
+    # ==========================================
+    # NOUVEAU SERVEUR
+    # ==========================================
     async def on_guild_join(self, guild: discord.Guild):
         logger.info(
             f"🎉 [NOUVEAU SERVEUR] Le bot a rejoint '{guild.name}' (ID: {guild.id}) | Membres : {guild.member_count}"
@@ -344,6 +382,9 @@ class GGEAssistantBot(commands.Bot):
                     )
                 )
 
+    # ==========================================
+    # SERVEUR SUPPRIME
+    # ==========================================
     async def on_guild_remove(self, guild: discord.Guild):
         logger.warning(f"👋 [DÉPART SERVEUR] Le bot a été retiré de '{guild.name}' (ID: {guild.id})")
 
@@ -363,6 +404,9 @@ class GGEAssistantBot(commands.Bot):
             except Exception as e:
                 logger.error(f"❌ Erreur Webhook Leave : {e}")
 
+    # ==========================================
+    # VERIFICATION SI SCAN EN COURS
+    # ==========================================
     @tasks.loop(seconds=15)
     async def flag_watcher_task(self):
         obs.set_task_name("flag_watcher_task")
@@ -390,6 +434,9 @@ class GGEAssistantBot(commands.Bot):
         except Exception as e:
             obs.record_error(source="task", scope="flag_watcher_task", exception=e, cog="core")
 
+    # ==========================================
+    # LOOP DE STATUS DU BOT
+    # ==========================================
     @tasks.loop(seconds=20)
     async def status_task(self):
         obs.set_task_name("status_task")
@@ -435,6 +482,9 @@ class GGEAssistantBot(commands.Bot):
     async def before_status_task(self):
         await self.wait_until_ready()
 
+    # ==========================================
+    # WEBHOOK TOPGG
+    # ==========================================
     async def vote_handler(self, request):
         secret = os.getenv("TOPGG_WEBHOOK_SECRET", "faux_secret")
 
@@ -577,6 +627,9 @@ class GGEAssistantBot(commands.Bot):
 
         return web.Response(status=200, text="OK")
 
+    # ==========================================
+    # SYNCHRONISATION VOTES
+    # ==========================================
     @tasks.loop(hours=12)
     async def sync_topgg_votes_task(self):
         obs.set_task_name("sync_topgg_votes_task")
@@ -653,6 +706,9 @@ class GGEAssistantBot(commands.Bot):
     async def before_sync_votes(self):
         await self.wait_until_ready()
 
+    # ==========================================
+    # SYNCHRONISATION SERVEURS ET GGE-TRACKER
+    # ==========================================
     @tasks.loop(hours=3)
     async def update_servers_task(self):
         obs.set_task_name("update_servers_task")
@@ -772,6 +828,9 @@ class GGEAssistantBot(commands.Bot):
         await self.wait_until_ready()
         await asyncio.sleep(5)
 
+    # ==========================================
+    # ENVOI NOMBRE SERVEUR A TOPGG
+    # ==========================================
     @tasks.loop(minutes=30)
     async def post_server_count_task(self):
         obs.set_task_name("post_server_count_task")
@@ -796,6 +855,9 @@ class GGEAssistantBot(commands.Bot):
     async def before_post_stats(self):
         await self.wait_until_ready()
 
+    # ==========================================
+    # WEBHOOK ALERT
+    # ==========================================
     async def _send_system_alert(
         self, interaction: discord.Interaction, titre: str, description: str, couleur: int = 0xFF0000
     ):
@@ -932,6 +994,9 @@ class GGEAssistantBot(commands.Bot):
         except Exception:
             pass
 
+    # ==========================================
+    # VIDEUR
+    # ==========================================
     async def global_interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.type == discord.InteractionType.autocomplete:
             return True
@@ -940,7 +1005,6 @@ class GGEAssistantBot(commands.Bot):
             interaction.command.qualified_name if interaction.command else interaction.data.get("name", "inconnue")
         )
 
-        # The trace_id set here is inherited by the command's API calls and log lines
         is_mine = interaction.user.id == MON_ID_DISCORD
         obs_ctx = obs.start_command(interaction, cmd_name, is_owner=is_mine)
 
@@ -1026,7 +1090,7 @@ class GGEAssistantBot(commands.Bot):
                 return False
 
         # ====================================================
-        # 🛡️ VÉRIFICATION DYNAMIQUE DES CONTRAINTES DE COMMANDE
+        # VÉRIFICATION DYNAMIQUE DES CONTRAINTES DE COMMANDE
         # ====================================================
         is_server_only = False
         is_private_only = False
@@ -1039,7 +1103,6 @@ class GGEAssistantBot(commands.Bot):
             best_match_len = 0
             for categorie in HELP_CONFIG.values():
                 for cmd in categorie.get("commands", []):
-                    # Nettoyage du nom : "/radar server (setup...)" devient "radar server"
                     config_cmd_base = cmd["name"].split(" (")[0].replace("/", "").strip()
 
                     if cmd_name.startswith(config_cmd_base):
@@ -1076,7 +1139,7 @@ class GGEAssistantBot(commands.Bot):
             obs.deny_command(obs_ctx, "guild_only")
             return False
 
-        # 3. Vérification : Permissions Administrateur (Gérer le serveur)
+        # 3. Vérification : Permissions Administrateur
         if interaction.guild and is_admin_only:
             if not interaction.user.guild_permissions.manage_guild:
                 if interaction.type == discord.InteractionType.application_command:
@@ -1089,7 +1152,7 @@ class GGEAssistantBot(commands.Bot):
                 obs.deny_command(obs_ctx, "admin_only")
                 return False
 
-        # 4. Vérification : Fonctions Avancées (API Live)
+        # 4. Vérification : Fonctions Avancées
         if requires_featured_server:
             try:
                 import json
@@ -1140,10 +1203,10 @@ class GGEAssistantBot(commands.Bot):
         global_cmds = blocks_data.get("global_commands", {})
         blocked_users = blocks_data.get("blocked_users", {})
 
-        # Découpage du nom de la commande pour vérifier la hiérarchie ("rank contests" -> ["rank", "rank contests"])
+        # Découpage du nom de la commande pour vérifier la hiérarchie
         parts = cmd_name.split()
 
-        # 1. Vérification des bans globaux (en cascade)
+        # 1. Vérification des bans globaux
         for i in range(1, len(parts) + 1):
             check_name = " ".join(parts[:i])
             if check_name in global_cmds:
@@ -1181,7 +1244,7 @@ class GGEAssistantBot(commands.Bot):
                 obs.deny_command(obs_ctx, "user_banned_all")
                 return False
 
-            # Ban de commande spécifique (en cascade)
+            # Ban de commande spécifique
             for i in range(1, len(parts) + 1):
                 check_name = " ".join(parts[:i])
                 if check_name in user_blocks:
@@ -1208,6 +1271,9 @@ class GGEAssistantBot(commands.Bot):
 
         return True
 
+    # ==========================================
+    # FERMETURE DES TACHES
+    # ==========================================
     async def close(self):
 
         if hasattr(self, "flag_watcher_task"):
