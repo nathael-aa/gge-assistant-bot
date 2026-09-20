@@ -49,7 +49,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -58,7 +58,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -67,7 +67,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -76,7 +76,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
         ],
@@ -92,7 +92,7 @@ HELP_CONFIG = {
                 "server_only": True,
                 "private_only": False,
                 "admin_only": True,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -101,7 +101,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -110,7 +110,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -119,7 +119,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -128,7 +128,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -137,7 +137,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
         ],
@@ -153,7 +153,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -162,7 +162,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -171,7 +171,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -180,7 +180,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -189,7 +189,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -198,7 +198,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -207,7 +207,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -216,7 +216,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -225,7 +225,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
         ],
@@ -241,7 +241,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -251,7 +251,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": "advanced_castle",
             },
         ],
     },
@@ -266,7 +266,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -275,7 +275,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -284,7 +284,7 @@ HELP_CONFIG = {
                 "server_only": True,
                 "private_only": False,
                 "admin_only": True,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -293,7 +293,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -302,7 +302,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
             {
@@ -311,7 +311,7 @@ HELP_CONFIG = {
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "advanced": False,
+                "required_module": None,
                 "wip": False,
             },
         ],
@@ -324,7 +324,7 @@ HELP_CONFIG = {
             {
                 "name": "/radar private (add... / remove... / list)",
                 "desc_key": "help_cmd_radar_private_group",
-                "advanced": False,
+                "required_module": None,
                 "server_only": False,
                 "private_only": True,
                 "admin_only": False,
@@ -333,7 +333,7 @@ HELP_CONFIG = {
             {
                 "name": "/radar server (setup / add... / remove... / list)",
                 "desc_key": "help_cmd_radar_server_group",
-                "advanced": False,
+                "required_module": None,
                 "server_only": True,
                 "private_only": False,
                 "admin_only": True,
@@ -342,7 +342,7 @@ HELP_CONFIG = {
             {
                 "name": "/rival (start / stop / add / list)",
                 "desc_key": "help_cmd_rival_group",
-                "advanced": False,
+                "required_module": None,
                 "server_only": False,
                 "private_only": True,
                 "admin_only": False,
@@ -351,7 +351,7 @@ HELP_CONFIG = {
             {
                 "name": "/fortress (scan / stop)",
                 "desc_key": "help_cmd_fortress_group",
-                "advanced": True,
+                "required_module": "fortress",
                 "server_only": False,
                 "private_only": True,
                 "admin_only": False,
@@ -360,7 +360,7 @@ HELP_CONFIG = {
             {
                 "name": "/storm (forts / isles / occupier / status / setup / stop)",
                 "desc_key": "help_cmd_storm_group",
-                "advanced": True,
+                "required_module": "storm",
                 "server_only": True,
                 "private_only": False,
                 "admin_only": True,

@@ -740,7 +740,9 @@ class GGEAssistantBot(commands.Bot):
                     for server in root.findall(".//server"):
                         name_elem = server.find("name")
                         enabled_elem = server.find("enabled")
-                        featured_elem = server.find("featured")
+                        storm_elem = server.find("storm")
+                        fortress_elem = server.find("fortress")
+                        advanced_castle_elem = server.find("advanced-castle")
 
                         if name_elem is not None and name_elem.text:
                             name = name_elem.text.strip()
@@ -749,34 +751,57 @@ class GGEAssistantBot(commands.Bot):
                                 if (enabled_elem is not None and enabled_elem.text)
                                 else False
                             )
-                            is_featured = (
-                                (featured_elem.text.strip().lower() == "true")
-                                if (featured_elem is not None and featured_elem.text)
+                            is_storm = (
+                                (storm_elem.text.strip().lower() == "true")
+                                if (storm_elem is not None and storm_elem.text)
+                                else False
+                            )
+                            is_fortress = (
+                                (fortress_elem.text.strip().lower() == "true")
+                                if (fortress_elem is not None and fortress_elem.text)
+                                else False
+                            )
+                            is_advanced_castle = (
+                                (advanced_castle_elem.text.strip().lower() == "true")
+                                if (advanced_castle_elem is not None and advanced_castle_elem.text)
                                 else False
                             )
 
-                            # Récupération de l'api_name directement depuis l'XML si on l'ajoute un jour, sinon fallback
                             api_name = anciennes_infos.get(name, {}).get("api_name", name.lower().replace(" ", "_"))
 
                             nouveau_servers_info[name] = {
                                 "enabled": is_enabled,
-                                "featured": is_featured,
+                                "storm": is_storm,
+                                "fortress": is_fortress,
+                                "advanced_castle": is_advanced_castle,
                                 "api_name": api_name,
                             }
 
                     nouveaux_serveurs = []
-                    changements_featured = []
+                    changements_features = []
 
                     for name, new_data in nouveau_servers_info.items():
                         if name not in anciennes_infos:
                             nouveaux_serveurs.append(name)
                         else:
-                            old_featured = anciennes_infos[name].get("featured", False)
-                            if old_featured != new_data["featured"]:
-                                etat = "🌟 Activées (Featured)" if new_data["featured"] else "❌ Désactivées"
-                                changements_featured.append(f"• **{name}** ➔ Fonctions avancées : {etat}")
+                            old_data = anciennes_infos[name]
 
-                    # On sauvegarde UNIQUEMENT les serveurs dans le fichier dynamique
+                            changed_flags = []
+                            if old_data.get("storm", False) != new_data["storm"]:
+                                etat = "✅ Activé" if new_data["storm"] else "❌ Désactivé"
+                                changed_flags.append(f"Storm: {etat}")
+
+                            if old_data.get("fortress", False) != new_data["fortress"]:
+                                etat = "✅ Activé" if new_data["fortress"] else "❌ Désactivé"
+                                changed_flags.append(f"Fortress: {etat}")
+
+                            if old_data.get("advanced_castle", False) != new_data["advanced_castle"]:
+                                etat = "✅ Activé" if new_data["advanced_castle"] else "❌ Désactivé"
+                                changed_flags.append(f"Advanced Castle: {etat}")
+
+                            if changed_flags:
+                                changements_features.append(f"• **{name}** ➔ " + " | ".join(changed_flags))
+
                     with open(cache_file, "w", encoding="utf-8") as f:
                         json.dump({"servers_info": nouveau_servers_info}, f, indent=4, ensure_ascii=False)
 
@@ -784,7 +809,7 @@ class GGEAssistantBot(commands.Bot):
                         f"🔄 [XML Sync] Cache dynamique des serveurs mis à jour avec {len(nouveau_servers_info)} serveurs."
                     )
 
-                    if nouveaux_serveurs or changements_featured:
+                    if nouveaux_serveurs or changements_features:
                         desc_parts = ["Le catalogue GGE-Tracker a évolué :"]
 
                         if nouveaux_serveurs:
@@ -793,10 +818,8 @@ class GGEAssistantBot(commands.Bot):
                                 + "\n".join([f"• `{s}`" for s in nouveaux_serveurs])
                             )
 
-                        if changements_featured:
-                            desc_parts.append(
-                                "\n⭐ **Changements de fonctionnalités avancées :**\n" + "\n".join(changements_featured)
-                            )
+                        if changements_features:
+                            desc_parts.append("\n⭐ **Changements de modules :**\n" + "\n".join(changements_features))
 
                         payload = {
                             "embeds": [
@@ -1094,7 +1117,7 @@ class GGEAssistantBot(commands.Bot):
         # ====================================================
         is_server_only = False
         is_private_only = False
-        requires_featured_server = False
+        required_module = None
         is_admin_only = False
 
         try:
@@ -1110,7 +1133,7 @@ class GGEAssistantBot(commands.Bot):
                             best_match_len = len(config_cmd_base)
                             is_server_only = cmd.get("server_only", False)
                             is_private_only = cmd.get("private_only", False)
-                            requires_featured_server = cmd.get("advanced", False)
+                            required_module = cmd.get("required_module", None)
                             is_admin_only = cmd.get("admin_only", False)
         except Exception as e:
             logger.error(f"❌ Erreur lors de la lecture de HELP_CONFIG : {e}")
@@ -1152,39 +1175,40 @@ class GGEAssistantBot(commands.Bot):
                 obs.deny_command(obs_ctx, "admin_only")
                 return False
 
-        # 4. Vérification : Fonctions Avancées
-        if requires_featured_server:
+        # 4. Vérification : Modules Avancés (Storm, Fortress, Advanced Castle)
+        if required_module:
             try:
                 import json
 
                 cache_file = CONFIG_DIR / "servers_cache.json"
-                is_featured = False
+                is_module_active = False
 
                 if cache_file.exists():
                     with open(cache_file, encoding="utf-8") as f:
                         servers_info = json.load(f).get("servers_info", {})
-                        is_featured = servers_info.get(serveur, {}).get("featured", False)
+                        is_module_active = servers_info.get(serveur, {}).get(required_module, False)
 
                 if obs_ctx is not None:
-                    obs_ctx.server_featured = bool(is_featured)
+                    setattr(obs_ctx, f"server_module_{required_module}", bool(is_module_active))
 
-                if serveur and not is_featured:
+                if serveur and not is_module_active:
                     if interaction.type == discord.InteractionType.application_command:
+                        nom_module_propre = required_module.replace("_", " ").title()
                         msg = t(
                             langue,
-                            "err_unsupported_special",
-                            defaut="⚠️ La commande n'est actuellement pas supportée pour ton serveur de jeu GGE. Pour avoir plus d'informations, merci d'utiliser /support.",
+                            f"err_unsupported_{required_module}",
+                            defaut=f"⚠️ La commande `/{cmd_name}` nécessite le module **{nom_module_propre}**, qui n'est pas activé sur le serveur **{serveur}**. Pour plus d'informations, rejoins notre serveur de support avec `/contact`.",
                         )
                         await interaction.response.send_message(msg, ephemeral=True)
-                    obs.deny_command(obs_ctx, "server_not_featured")
+                    obs.deny_command(obs_ctx, f"missing_module_{required_module}")
                     return False
             except Exception as e:
-                logger.error(f"❌ Erreur lors de la vérification du serveur Featured : {e}")
+                logger.error(f"❌ Erreur lors de la vérification du module {required_module} : {e}")
                 self.loop.create_task(
                     self._send_system_alert(
                         interaction,
                         "🐛 Erreur Console (Vérification Serveur)",
-                        f"Impossible de valider le statut 'Featured' du serveur.\n```py\n{e}\n```",
+                        f"Impossible de valider le module '{required_module}' du serveur.\n```py\n{e}\n```",
                     )
                 )
 
