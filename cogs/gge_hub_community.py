@@ -459,6 +459,23 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             date_elem = post.find("span", class_="elementor-post-date")
                             date_str = date_elem.get_text(strip=True) if date_elem else ""
 
+                            # Recherche d'une date alternative ou parsing intelligent
+                            date_obj = None
+                            for fmt in ("%d %B %Y", "%d.%m.%Y", "%B %d, %Y", "%Y-%m-%d"):
+                                try:
+                                    clean_date_str = date_str.replace(".", "").strip()
+                                    date_obj = datetime.strptime(clean_date_str, fmt)
+                                    break
+                                except ValueError:
+                                    continue
+
+                            if not date_obj:
+                                # Si aucune date valide n'est trouvée, on prend l'heure actuelle (naïve)
+                                date_obj = datetime.now()
+                                discord_date = date_str if date_str else "Récemment"
+                            else:
+                                discord_date = f"<t:{int(date_obj.timestamp())}:D>"
+
                             img_elem = post.find("img")
                             img_url = img_elem["src"] if img_elem else None
                             if img_url and "?" in img_url:
@@ -472,13 +489,33 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
                             # Sécurité anti-doublon (si l'article est en Hero ET dans la grille)
                             if not any(a["id"] == article_id for a in articles):
+                                date_obj = None
+                                # 1. On essaye d'abord de lire le texte normal de la date
                                 try:
                                     clean_date_str = date_str.replace(".", "").strip()
                                     date_obj = datetime.strptime(clean_date_str, "%d %B %Y")
-                                    discord_date = f"<t:{int(date_obj.timestamp())}:D>"
                                 except Exception:
-                                    date_obj = discord.utils.utcnow()
+                                    pass
+
+                                # 2. Si ça échoue, on extrait la date directement de l'URL !
+                                if not date_obj:
+                                    match = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", url_article)
+                                    if match:
+                                        date_obj = datetime(
+                                            int(match.group(1)), int(match.group(2)), int(match.group(3))
+                                        )
+
+                                # 3. Si vraiment tout échoue (impossible sauf si l'URL n'a pas de date)
+                                if date_obj:
+                                    discord_date = f"<t:{int(date_obj.timestamp())}:D>"
+                                else:
+                                    date_obj = datetime.now()
                                     discord_date = date_str if date_str else "Récemment"
+
+                                # --- NETTOYAGE DU TITRE ---
+                                title = re.sub(
+                                    r"(?i)\[TODO\]\s*(Missing Text|Texte manquant|Fehlender Text)?\s*", "", title
+                                ).strip()
 
                                 articles.append(
                                     {
@@ -668,6 +705,13 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                         for header in content_div.find_all(["h1", "h2", "h3"]):
                                             header.decompose()
                                         texte_complet = content_div.get_text(separator=" ", strip=True)
+
+                                        texte_complet = (
+                                            texte_complet.replace("[TODO] Missing text", "")
+                                            .replace("[TODO] Texte manquant", "")
+                                            .strip()
+                                        )
+
                                         if len(texte_complet) > 400:
                                             texte_resume = texte_complet[:400] + "..."
                                         else:
