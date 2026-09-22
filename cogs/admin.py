@@ -75,7 +75,8 @@ class AdminCog(commands.Cog):
             value="`!bot_servers` ➔ Liste les serveurs Discord utilisant le bot.\n"
             "`!bot_leave [ID]` ➔ Force le bot à quitter un serveur Discord.\n"
             "`!sync_servers` ➔ MAJ de la liste des serveurs GGE via XML (GGE-Tracker).\n"
-            "`!scan_manuel [ALL/SRV]` ➔ Lance manuellement le scanner de joueurs.",
+            "`!scan_manuel [ALL/SRV]` ➔ Lance manuellement le scanner de joueurs."
+            "`!broadcast_fix` ➔ Envoie un message à tous les users inscrits sur le bot",
             inline=False,
         )
 
@@ -570,6 +571,98 @@ class AdminCog(commands.Cog):
                 logger.error(f"❌ Erreur critique scan manuel ({cible}) : {e}")
                 obs.record_error(source="admin", scope="scan_manuel_specific", exception=e, cog="admin")
                 await ctx.send(f"⚠️ **Erreur lors de l'exécution ({cible}) :**\n```py\n{e}\n```")
+
+    @commands.command(name="broadcast_fix")
+    @commands.is_owner()
+    async def broadcast_fix(self, ctx: commands.Context):
+        import asyncio
+        import json
+
+        # --- METS TES VRAIS LIENS ICI (Garde bien les guillemets) ---
+        lien_bot = "https://discord.com/oauth2/authorize?client_id=1472309793065533493"
+        lien_support = "https://discord.com/invite/zrrhxp6wDj"
+
+        path_users = CONFIG_DIR / "users.json"
+        if not path_users.exists():
+            return await ctx.send("❌ Fichier users.json introuvable.")
+
+        with open(path_users, encoding="utf-8") as f:
+            users_data = json.load(f)
+
+        total_users = len(users_data)
+        await ctx.send(
+            f"⏳ Démarrage de l'envoi à {total_users} utilisateurs. Temps estimé : ~{total_users * 3} secondes. Regarde la console."
+        )
+
+        succes = 0
+        echecs = 0
+
+        for user_id_str, user_info in users_data.items():
+            langue = user_info.get("langue", "en")
+
+            # --- TEXTE DU MESSAGE ---
+            if langue == "fr":
+                titre = "⚠️ Mise à jour requise"
+                message = (
+                    "Bonjour ! 👋\n\n"
+                    "Suite à un changement de permissions sur Discord, il est possible que **les commandes de GGE Assistant aient disparu** de votre serveur ou que certaines fonctionnalités **soient capricieuses**.\n\n"
+                    "🛠️ **Comment réparer ?**\n"
+                    "Si vous êtes administrateur ou manager du serveur, il vous suffit de **réinviter le bot** avec ce lien (il n'est pas nécessaire de l'expulser avant) :\n"
+                    f"🔗 **[Lien d'invitation du Bot]({lien_bot})**\n\n"
+                    "💬 **Besoin d'aide, envie de connaître les nouveautés en avance, de donner un avis ou de faire une suggestion ?**\n"
+                    "Rejoignez notre serveur de support officiel :\n"
+                    f"🔗 **[Lien du Serveur Support]({lien_support})**\n\n"
+                    "💡 *Pour rappel, certaines commandes sont uniquement disponibles en message privé, ici, et d'autres uniquement sur votre serveur.*\n\n"
+                    "*Merci pour votre confiance et bon jeu ! ⚔️*"
+                )
+            elif langue == "de":
+                titre = "⚠️ Update erforderlich"
+                message = (
+                    "Hallo! 👋\n\n"
+                    "Aufgrund einer Änderung der Discord-Berechtigungen kann es sein, dass **die Befehle des GGE-Assistenten von Ihrem Server verschwunden sind** oder dass einige Funktionen **fehlerhaft reagieren**.\n\n"
+                    "🛠️ **Wie behebt man das?**\n"
+                    "Wenn Sie Serveradministrator oder Manager sind, laden Sie den Bot einfach über diesen Link **erneut ein** (er muss vorher nicht gekickt werden):\n"
+                    f"🔗 **[Bot-Einladungslink]({lien_bot})**\n\n"
+                    "💬 **Brauchen Sie Hilfe, möchten Sie vorab über Neuigkeiten informiert werden oder haben Sie Feedback und Vorschläge?**\n"
+                    "Treten Sie unserem offiziellen Support-Server bei:\n"
+                    f"🔗 **[Support-Server-Link]({lien_support})**\n\n"
+                    "💡 *Zur Erinnerung: Einige Befehle sind nur hier in privaten Nachrichten verfügbar und andere nur auf Ihrem Server.*\n\n"
+                    "*Vielen Dank für Ihre Unterstützung und viel Spaß beim Spielen! ⚔️*"
+                )
+            else:
+                titre = "⚠️ Update Required"
+                message = (
+                    "Hello! 👋\n\n"
+                    "Due to a change in Discord permissions, it is possible that **GGE Assistant's commands have disappeared** from your server or that some features **are acting up**.\n\n"
+                    "🛠️ **How to fix it?**\n"
+                    "If you are a server administrator or manager, simply **re-invite the bot** using this link (no need to kick it first):\n"
+                    f"🔗 **[Bot Invite Link]({lien_bot})**\n\n"
+                    "💬 **Need help, want to know about new features in advance, or have feedback and suggestions?**\n"
+                    "Join our official support server:\n"
+                    f"🔗 **[Support Server Link]({lien_support})**\n\n"
+                    "💡 *As a reminder, some commands are only available in private messages (here), and others only on your server.*\n\n"
+                    "*Thank you for your support and happy gaming! ⚔️*"
+                )
+
+            embed = discord.Embed(title=titre, description=message, color=0xF39C12)
+
+            try:
+                user_id = int(user_id_str)
+                user = self.bot.get_user(user_id) or await self.bot.fetch_user(user_id)
+                await user.send(embed=embed)
+                succes += 1
+                print(f"✅ MP envoyé à {user.name} ({langue})")
+            except discord.Forbidden:
+                echecs += 1
+                print(f"❌ MP bloqué par l'utilisateur {user_id_str}")
+            except Exception as e:
+                echecs += 1
+                print(f"⚠️ Erreur inattendue pour {user_id_str} : {e}")
+
+            # 🛑 PAUSE OBLIGATOIRE DE 3 SECONDES POUR NE PAS ÊTRE BANNI 🛑
+            await asyncio.sleep(3.0)
+
+        await ctx.send(f"✅ **Broadcast terminé !**\nSuccès : `{succes}` | Échecs (MP fermés) : `{echecs}`")
 
     # ==========================================
     # 📅 3. GESTIONNAIRE DU CALENDRIER (ADMIN)
