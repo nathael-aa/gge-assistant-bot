@@ -900,7 +900,7 @@ EVENT_MAPPING = {
         "color": 0xBF0000,
         "tracker_name": "Samouraïs",
         "start": "11:00",
-        "end": "09:00",
+        "end": "10:00",
     },
     "nomad invasion": {
         "name_key": "cal_ev_nomad",
@@ -909,7 +909,7 @@ EVENT_MAPPING = {
         "color": 0xEDC951,
         "tracker_name": "Nomades",
         "start": "11:00",
-        "end": "09:00",
+        "end": "10:00",
     },
     "bloodcrow invasion": {
         "name_key": "cal_ev_bloodcrow",
@@ -918,7 +918,7 @@ EVENT_MAPPING = {
         "color": 0xEDC951,
         "tracker_name": "Corbeaux de Sang",
         "start": "11:00",
-        "end": "09:00",
+        "end": "10:00",
     },
     "war of the realms": {
         "name_key": "cal_ev_realms",
@@ -927,7 +927,7 @@ EVENT_MAPPING = {
         "color": 0xA69EB0,
         "tracker_name": "Guerre des Royaumes",
         "start": "11:00",
-        "end": "09:00",
+        "end": "10:00",
     },
     "berimond": {
         "name_key": "cal_ev_berimond",
@@ -936,7 +936,7 @@ EVENT_MAPPING = {
         "color": 0x4B86B4,
         "tracker_name": "Bataille de Bérimond",
         "start": "11:00",
-        "end": "08:30",
+        "end": "10:00",
     },
     "bladecoast": {
         "name_key": "cal_ev_bladecoast",
@@ -945,7 +945,7 @@ EVENT_MAPPING = {
         "color": 0xBFB5B2,
         "tracker_name": None,
         "start": "11:00",
-        "end": "09:00",
+        "end": "10:00",
     },
     "rift raid": {
         "name_key": "cal_ev_rift",
@@ -954,7 +954,7 @@ EVENT_MAPPING = {
         "color": 0xFB2E01,
         "tracker_name": None,
         "start": "11:00",
-        "end": "09:00",
+        "end": "10:00",
     },
     "grand tournament": {
         "name_key": "cal_ev_tournament",
@@ -963,7 +963,7 @@ EVENT_MAPPING = {
         "color": 0x03396C,
         "tracker_name": None,
         "start": "11:00",
-        "end": "12:00",
+        "end": "10:00",
     },
     "beyond the horizon": {
         "name_key": "cal_ev_horizon",
@@ -990,7 +990,7 @@ EVENT_MAPPING = {
         "color": 0xE8702A,
         "tracker_name": None,
         "start": "11:00",
-        "end": "09:30",
+        "end": "10:00",
     },
     "grand nobility contest": {
         "name_key": "cal_ev_nobility",
@@ -999,7 +999,7 @@ EVENT_MAPPING = {
         "color": 0xE8702A,
         "tracker_name": None,
         "start": "11:00",
-        "end": "09:00",
+        "end": "10:00",
     },
 }
 
