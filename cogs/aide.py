@@ -51,6 +51,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/link_account",
@@ -60,6 +61,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/status",
@@ -69,6 +71,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/help",
@@ -78,6 +81,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
         ],
     },
@@ -87,13 +91,24 @@ HELP_CONFIG = {
         "title_key": "help_cat_communaute",
         "commands": [
             {
-                "name": "/hub (setup / stop)",
-                "desc_key": "help_cmd_hub_group",
+                "name": "/hub setup",
+                "desc_key": "help_cmd_hub_setup",
                 "server_only": True,
                 "private_only": False,
                 "admin_only": True,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/hub stop",
+                "desc_key": "help_cmd_hub_stop",
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/news",
@@ -103,6 +118,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/support",
@@ -112,6 +128,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/contact",
@@ -121,6 +138,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/vote",
@@ -130,6 +148,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/discover",
@@ -139,6 +158,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
         ],
     },
@@ -155,6 +175,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/player profile",
@@ -164,6 +185,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/player history",
@@ -173,6 +195,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/player dove",
@@ -182,6 +205,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/player compare",
@@ -191,6 +215,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/alliance profile",
@@ -200,6 +225,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/alliance might",
@@ -209,6 +235,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/alliance property",
@@ -218,6 +245,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/alliance description",
@@ -227,6 +255,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
         ],
     },
@@ -243,15 +272,27 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
-                "name": "/target (setup / search)",
-                "desc_key": "help_cmd_target_group",
-                "wip": True,
+                "name": "/target search",
+                "desc_key": "help_cmd_target_search",
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
                 "required_module": "advanced_castle",
+                "wip": True,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/target setup",
+                "desc_key": "help_cmd_target_setup",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": "advanced_castle",
+                "wip": True,
+                "hide_in_help": False,
             },
         ],
     },
@@ -268,6 +309,7 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
                 "name": "/event alliance",
@@ -277,42 +319,167 @@ HELP_CONFIG = {
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
-                "name": "/calendar (setup / track / untrack / current)",
-                "desc_key": "help_cmd_calendar_group",
+                "name": "/calendar track",
+                "desc_key": "help_cmd_calendar_track",
                 "server_only": True,
                 "private_only": False,
                 "admin_only": True,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
-                "name": "/rank (event / league / contests / statistics / gacha / realms / alliance)",
-                "desc_key": "help_cmd_rank_group",
+                "name": "/calendar untrack",
+                "desc_key": "help_cmd_calendar_untrack",
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/calendar current",
+                "desc_key": "help_cmd_calendar_current",
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
-                "name": "/leaderboard (woa / storm_islands)",
-                "desc_key": "help_cmd_leaderboard_group",
+                "name": "/calendar setup",
+                "desc_key": "help_cmd_calendar_setup",
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/calendar stop",
+                "desc_key": "help_cmd_calendar_stop",
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/rank event",
+                "desc_key": "help_cmd_rank_event",
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
-                "name": "/woa (history / summary)",
-                "desc_key": "help_cmd_woa_group",
+                "name": "/rank league",
+                "desc_key": "help_cmd_rank_league",
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
                 "required_module": None,
                 "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/rank contests",
+                "desc_key": "help_cmd_rank_contests",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/rank statistics",
+                "desc_key": "help_cmd_rank_statistics",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/rank gacha",
+                "desc_key": "help_cmd_rank_gacha",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/rank realms",
+                "desc_key": "help_cmd_rank_realms",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/rank alliance",
+                "desc_key": "help_cmd_rank_alliance",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/leaderboard woa",
+                "desc_key": "help_cmd_leaderboard_woa",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/leaderboard storm_islands",
+                "desc_key": "help_cmd_leaderboard_storm",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/woa history",
+                "desc_key": "help_cmd_woa_history",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/woa summary",
+                "desc_key": "help_cmd_woa_summary",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
             },
         ],
     },
@@ -322,49 +489,234 @@ HELP_CONFIG = {
         "title_key": "help_cat_radars",
         "commands": [
             {
-                "name": "/radar private (add... / remove... / list)",
-                "desc_key": "help_cmd_radar_private_group",
+                "name": "/radar private add_player",
+                "desc_key": "help_cmd_radar_private_add_player",
                 "required_module": None,
                 "server_only": False,
                 "private_only": True,
                 "admin_only": False,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
-                "name": "/radar server (setup / add... / remove... / list)",
-                "desc_key": "help_cmd_radar_server_group",
+                "name": "/radar private add_alliance",
+                "desc_key": "help_cmd_radar_private_add_alliance",
+                "required_module": None,
+                "server_only": False,
+                "private_only": True,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/radar private remove_player",
+                "desc_key": "help_cmd_radar_private_remove_player",
+                "required_module": None,
+                "server_only": False,
+                "private_only": True,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/radar private remove_alliance",
+                "desc_key": "help_cmd_radar_private_remove_alliance",
+                "required_module": None,
+                "server_only": False,
+                "private_only": True,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/radar private list",
+                "desc_key": "help_cmd_radar_private_list",
+                "required_module": None,
+                "server_only": False,
+                "private_only": True,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/radar server setup",
+                "desc_key": "help_cmd_radar_server_setup",
                 "required_module": None,
                 "server_only": True,
                 "private_only": False,
                 "admin_only": True,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
-                "name": "/rival (start / stop / add / list)",
-                "desc_key": "help_cmd_rival_group",
+                "name": "/radar server add_player",
+                "desc_key": "help_cmd_radar_server_add_player",
+                "required_module": None,
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/radar server add_alliance",
+                "desc_key": "help_cmd_radar_server_add_alliance",
+                "required_module": None,
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/radar server remove_player",
+                "desc_key": "help_cmd_radar_server_remove_player",
+                "required_module": None,
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/radar server remove_alliance",
+                "desc_key": "help_cmd_radar_server_remove_alliance",
+                "required_module": None,
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/radar server list",
+                "desc_key": "help_cmd_radar_server_list",
+                "required_module": None,
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/rival start",
+                "desc_key": "help_cmd_rival_start",
                 "required_module": None,
                 "server_only": False,
                 "private_only": True,
                 "admin_only": False,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
-                "name": "/fortress (scan / stop)",
-                "desc_key": "help_cmd_fortress_group",
+                "name": "/rival stop",
+                "desc_key": "help_cmd_rival_stop",
+                "required_module": None,
+                "server_only": False,
+                "private_only": True,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/rival add",
+                "desc_key": "help_cmd_rival_add",
+                "required_module": None,
+                "server_only": False,
+                "private_only": True,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/rival list",
+                "desc_key": "help_cmd_rival_list",
+                "required_module": None,
+                "server_only": False,
+                "private_only": True,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/fortress scan",
+                "desc_key": "help_cmd_fortress_scan",
                 "required_module": "fortress",
                 "server_only": False,
                 "private_only": True,
                 "admin_only": False,
                 "wip": False,
+                "hide_in_help": False,
             },
             {
-                "name": "/storm (forts / isles / occupier / status / setup / stop)",
-                "desc_key": "help_cmd_storm_group",
+                "name": "/fortress stop",
+                "desc_key": "help_cmd_fortress_stop",
+                "required_module": "fortress",
+                "server_only": False,
+                "private_only": True,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/storm forts",
+                "desc_key": "help_cmd_storm_forts",
+                "required_module": "storm",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/storm isles",
+                "desc_key": "help_cmd_storm_isles",
+                "required_module": "storm",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/storm occupier",
+                "desc_key": "help_cmd_storm_occupier",
+                "required_module": "storm",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/storm status",
+                "desc_key": "help_cmd_storm_status",
+                "required_module": "storm",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/storm setup",
+                "desc_key": "help_cmd_storm_setup",
                 "required_module": "storm",
                 "server_only": True,
                 "private_only": False,
                 "admin_only": True,
                 "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/storm stop",
+                "desc_key": "help_cmd_storm_stop",
+                "required_module": "storm",
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "wip": False,
+                "hide_in_help": False,
             },
         ],
     },
@@ -499,6 +851,9 @@ class HelpSelect(discord.ui.Select):
             embed.description = f"{legende}\n\u200b"
 
             for cmd in cat_data["commands"]:
+                if cmd.get("hide_in_help", False):
+                    continue
+
                 cmd_desc = t(self.langue, cmd["desc_key"], defaut="> *Description manquante*")
 
                 is_wip = cmd.get("wip", False)
@@ -973,48 +1328,19 @@ class AideCog(commands.Cog):
     def _dummy_i18n():
         langue = "fr"
 
+        # --- Textes généraux et menus ---
         t(langue, "help_home_title")
         t(langue, "help_legend_v2")
         t(langue, "aide_p0_desc")
+        t(langue, "help_placeholder")
+
         t(langue, "help_cat_config")
         t(langue, "help_cat_communaute")
         t(langue, "help_cat_profils")
         t(langue, "help_cat_guerre")
         t(langue, "help_cat_events")
         t(langue, "help_cat_radars")
-        t(langue, "help_cmd_setup")
-        t(langue, "help_cmd_link_account")
-        t(langue, "help_cmd_hub_group")
-        t(langue, "help_cmd_status")
-        t(langue, "help_cmd_help")
-        t(langue, "help_cmd_news")
-        t(langue, "help_cmd_support")
-        t(langue, "help_cmd_contact")
-        t(langue, "help_cmd_vote")
-        t(langue, "help_cmd_discover")
-        t(langue, "help_cmd_server")
-        t(langue, "help_cmd_player_profile")
-        t(langue, "help_cmd_player_history")
-        t(langue, "help_cmd_player_dove")
-        t(langue, "help_cmd_player_compare")
-        t(langue, "help_cmd_alliance_profile")
-        t(langue, "help_cmd_alliance_might")
-        t(langue, "help_cmd_alliance_property")
-        t(langue, "help_cmd_alliance_desc")
-        t(langue, "help_cmd_alliance_scanner")
-        t(langue, "help_cmd_target_group")
-        t(langue, "help_cmd_event_player")
-        t(langue, "help_cmd_event_alliance")
-        t(langue, "help_cmd_calendar_group")
-        t(langue, "help_cmd_rank_group")
-        t(langue, "help_cmd_leaderboard_group")
-        t(langue, "help_cmd_woa_group")
-        t(langue, "help_cmd_radar_private_group")
-        t(langue, "help_cmd_radar_server_group")
-        t(langue, "help_cmd_rival_group")
-        t(langue, "help_cmd_fortress_group")
-        t(langue, "help_cmd_storm_group")
-        t(langue, "help_placeholder")
+
         t(langue, "help_menu_home")
         t(langue, "help_menu_home_desc")
         t(langue, "help_menu_config")
@@ -1023,6 +1349,8 @@ class AideCog(commands.Cog):
         t(langue, "help_menu_guerre")
         t(langue, "help_menu_events")
         t(langue, "help_menu_radars")
+
+        # --- Éléments de la page Discover ---
         t(langue, "cmd_discover_title")
         t(langue, "cmd_discover_desc")
         t(langue, "cmd_disc_gge_tracker_title")
@@ -1034,6 +1362,82 @@ class AideCog(commands.Cog):
         t(langue, "btn_website")
         t(langue, "btn_discord")
         t(langue, "btn_api")
+
+        # --- Commandes : Config ---
+        t(langue, "help_cmd_setup")
+        t(langue, "help_cmd_link_account")
+        t(langue, "help_cmd_status")
+        t(langue, "help_cmd_help")
+
+        # --- Commandes : Communauté ---
+        t(langue, "help_cmd_hub_setup")
+        t(langue, "help_cmd_hub_stop")
+        t(langue, "help_cmd_news")
+        t(langue, "help_cmd_support")
+        t(langue, "help_cmd_contact")
+        t(langue, "help_cmd_vote")
+        t(langue, "help_cmd_discover")
+
+        # --- Commandes : Profils ---
+        t(langue, "help_cmd_server")
+        t(langue, "help_cmd_player_profile")
+        t(langue, "help_cmd_player_history")
+        t(langue, "help_cmd_player_dove")
+        t(langue, "help_cmd_player_compare")
+        t(langue, "help_cmd_alliance_profile")
+        t(langue, "help_cmd_alliance_might")
+        t(langue, "help_cmd_alliance_property")
+        t(langue, "help_cmd_alliance_desc")
+
+        # --- Commandes : Guerre ---
+        t(langue, "help_cmd_alliance_scanner")
+        t(langue, "help_cmd_target_search")
+        t(langue, "help_cmd_target_setup")
+
+        # --- Commandes : Événements ---
+        t(langue, "help_cmd_event_player")
+        t(langue, "help_cmd_event_alliance")
+        t(langue, "help_cmd_calendar_track")
+        t(langue, "help_cmd_calendar_untrack")
+        t(langue, "help_cmd_calendar_current")
+        t(langue, "help_cmd_calendar_setup")
+        t(langue, "help_cmd_calendar_stop")
+        t(langue, "help_cmd_rank_event")
+        t(langue, "help_cmd_rank_league")
+        t(langue, "help_cmd_rank_contests")
+        t(langue, "help_cmd_rank_statistics")
+        t(langue, "help_cmd_rank_gacha")
+        t(langue, "help_cmd_rank_realms")
+        t(langue, "help_cmd_rank_alliance")
+        t(langue, "help_cmd_leaderboard_woa")
+        t(langue, "help_cmd_leaderboard_storm")
+        t(langue, "help_cmd_woa_history")
+        t(langue, "help_cmd_woa_summary")
+
+        # --- Commandes : Radars ---
+        t(langue, "help_cmd_radar_private_add_player")
+        t(langue, "help_cmd_radar_private_add_alliance")
+        t(langue, "help_cmd_radar_private_remove_player")
+        t(langue, "help_cmd_radar_private_remove_alliance")
+        t(langue, "help_cmd_radar_private_list")
+        t(langue, "help_cmd_radar_server_setup")
+        t(langue, "help_cmd_radar_server_add_player")
+        t(langue, "help_cmd_radar_server_add_alliance")
+        t(langue, "help_cmd_radar_server_remove_player")
+        t(langue, "help_cmd_radar_server_remove_alliance")
+        t(langue, "help_cmd_radar_server_list")
+        t(langue, "help_cmd_rival_start")
+        t(langue, "help_cmd_rival_stop")
+        t(langue, "help_cmd_rival_add")
+        t(langue, "help_cmd_rival_list")
+        t(langue, "help_cmd_fortress_scan")
+        t(langue, "help_cmd_fortress_stop")
+        t(langue, "help_cmd_storm_forts")
+        t(langue, "help_cmd_storm_isles")
+        t(langue, "help_cmd_storm_occupier")
+        t(langue, "help_cmd_storm_status")
+        t(langue, "help_cmd_storm_setup")
+        t(langue, "help_cmd_storm_stop")
 
 
 async def setup(bot: commands.Bot):

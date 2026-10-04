@@ -75,7 +75,7 @@ class AdminCog(commands.Cog):
             value="`!bot_servers` ➔ Liste les serveurs Discord utilisant le bot.\n"
             "`!bot_leave [ID]` ➔ Force le bot à quitter un serveur Discord.\n"
             "`!sync_servers` ➔ MAJ de la liste des serveurs GGE via XML (GGE-Tracker).\n"
-            "`!scan_manuel [ALL/SRV]` ➔ Lance manuellement le scanner de joueurs."
+            "`!scan_manuel [ALL/SRV]` ➔ Lance manuellement le scanner de joueurs.\n"
             "`!broadcast_fix` ➔ Envoie un message à tous les users inscrits sur le bot",
             inline=False,
         )
