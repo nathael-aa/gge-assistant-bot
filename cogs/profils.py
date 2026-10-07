@@ -593,6 +593,11 @@ class ProfilsCog(commands.Cog):
                 )
                 embed.add_field(name=vr_title, value=f"{v_txt}\n\n{v_coords}"[:1024], inline=False)
 
+            player_id = data.get("player_id")
+            if player_id:
+                image_url = f"https://api.gge-tracker.com/api/v1/assets/og/player/{player_id}.jpg"
+                embed.set_image(url=image_url)
+
             await setup_embed_footer(embed, interaction, langue)
             await interaction.followup.send(embed=embed)
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
@@ -1574,6 +1579,10 @@ class ProfilsCog(commands.Cog):
                     defaut=f"Membres (Page {page_actuelle}/{nb_pages})",
                 )
                 embed.add_field(name=memb_title, value=memb_txt, inline=False)
+
+                if target_alliance_id and page_actuelle == 1:
+                    image_url = f"https://api.gge-tracker.com/api/v1/assets/og/alliance/{target_alliance_id}.jpg"
+                    embed.set_image(url=image_url)
 
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)

@@ -13,6 +13,7 @@ from discord.ext import commands, tasks
 import observability as obs
 from utils import (
     CONFIG_DIR,
+    DICT_EMOJIS,
     TRACKER_EVENTS,
     PaginationView,
     alliance_autocomplete,
@@ -1555,13 +1556,16 @@ class EventsCog(commands.Cog):
             all_players = all_players[:100]
 
             lignes = []
+            e_woa = DICT_EMOJIS.get("e_woa_points", "")
+
             for idx, p in enumerate(all_players):
                 rang = idx + 1
                 nom = p.get("player_name", "???")
                 pts = f"{int(p.get('point', 0)):,}".replace(",", " ")
                 alli = p.get("alliance_name") or "Sans alliance"
                 medal = "🥇" if rang == 1 else "🥈" if rang == 2 else "🥉" if rang == 3 else f"**{rang}.**"
-                lignes.append(f"{medal} **{nom}** [{alli}] ➔ **{pts} {{e_woa_points}}**")
+
+                lignes.append(f"{medal} **{nom}** [{alli}] ➔ **{pts} {e_woa}**")
 
             actualisation_dt = _get_api_timestamp(data_rank, woa_base_data)
 
@@ -1656,13 +1660,16 @@ class EventsCog(commands.Cog):
                 )
 
             lignes = []
+            e_cargo = DICT_EMOJIS.get("e_pointscargo", "")
+
             for r_idx, p in enumerate(players):
                 rang = r_idx + 1
                 nom = p.get("player_name", "???")
                 metrics = p.get("metrics", {})
                 pts = f"{int(metrics.get('100', 0)):,}".replace(",", " ")
                 medal = "🥇" if rang == 1 else "🥈" if rang == 2 else "🥉" if rang == 3 else f"**{rang}.**"
-                lignes.append(f"{medal} **{nom}** ➔ **{pts} {{e_pointscargo}}**")
+
+                lignes.append(f"{medal} **{nom}** ➔ **{pts} {e_cargo}**")
 
             actualisation_dt = _get_api_timestamp(players)
 
