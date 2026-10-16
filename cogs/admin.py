@@ -76,7 +76,7 @@ class AdminCog(commands.Cog):
             "`!bot_leave [ID]` ➔ Force le bot à quitter un serveur Discord.\n"
             "`!sync_servers` ➔ MAJ de la liste des serveurs GGE via XML (GGE-Tracker).\n"
             "`!scan_manuel [ALL/SRV]` ➔ Lance manuellement le scanner de joueurs.\n"
-            "`!broadcast_fix` ➔ Envoie un message à tous les users inscrits sur le bot",
+            "`!broadcast_news` ➔ Envoie un message à tous les users inscrits sur le bot",
             inline=False,
         )
 
@@ -572,17 +572,15 @@ class AdminCog(commands.Cog):
                 obs.record_error(source="admin", scope="scan_manuel_specific", exception=e, cog="admin")
                 await ctx.send(f"⚠️ **Erreur lors de l'exécution ({cible}) :**\n```py\n{e}\n```")
 
-    @commands.command(name="broadcast_fix")
+    @commands.command(name="broadcast_news")
     @commands.is_owner()
-    async def broadcast_fix(self, ctx: commands.Context):
+    async def broadcast_news(self, ctx: commands.Context):
         import asyncio
         import json
 
-        # --- METS TES VRAIS LIENS ICI (Garde bien les guillemets) ---
-        lien_bot = "https://discord.com/oauth2/authorize?client_id=1472309793065533493"
         lien_support = "https://discord.com/invite/zrrhxp6wDj"
-
         path_users = CONFIG_DIR / "users.json"
+
         if not path_users.exists():
             return await ctx.send("❌ Fichier users.json introuvable.")
 
@@ -600,51 +598,47 @@ class AdminCog(commands.Cog):
         for user_id_str, user_info in users_data.items():
             langue = user_info.get("langue", "en")
 
-            # --- TEXTE DU MESSAGE ---
             if langue == "fr":
-                titre = "⚠️ Mise à jour requise"
+                titre = "📢 Indépendance et Avenir de GGE Assistant"
                 message = (
-                    "Bonjour ! 👋\n\n"
-                    "Suite à un changement de permissions sur Discord, il est possible que **les commandes de GGE Assistant aient disparu** de votre serveur ou que certaines fonctionnalités **soient capricieuses**.\n\n"
-                    "🛠️ **Comment réparer ?**\n"
-                    "Si vous êtes administrateur ou manager du serveur, il vous suffit de **réinviter le bot** avec ce lien (il n'est pas nécessaire de l'expulser avant) :\n"
-                    f"🔗 **[Lien d'invitation du Bot]({lien_bot})**\n\n"
-                    "💬 **Besoin d'aide, envie de connaître les nouveautés en avance, de donner un avis ou de faire une suggestion ?**\n"
-                    "Rejoignez notre serveur de support officiel :\n"
-                    f"🔗 **[Lien du Serveur Support]({lien_support})**\n\n"
-                    "💡 *Pour rappel, certaines commandes sont uniquement disponibles en message privé, ici, et d'autres uniquement sur votre serveur.*\n\n"
-                    "*Merci pour votre confiance et bon jeu ! ⚔️*"
+                    "Bonjour à tous ! 👋\n\n"
+                    "Comme certains le savent, Goodgame Empire a récemment lancé un programme officiel \"GGE EF Creator\" permettant aux créateurs (Outils, Contenu, Wiki ou autre) d'avoir certains avantages, notamment l'accès aux prochaines mises à jour, ce qui aurait permis à GGE Assistant de préparer les nouvelles fonctionnalités avant les sorties officielles. La décision est tombée : **notre candidature a été refusée**.\n\n"
+                    "La modération officielle considère que le bot enfreint les conditions d'utilisation du jeu en intégrant des liens et des données de sites communautaires tiers (comme GGE-Tracker). Pour obtenir le statut EF Creator, il aurait fallu supprimer toutes les commandes qui utilisent cette API.\n\n"
+                    "Les classements en direct, les radars et les historiques sont le cœur de GGE Assistant. Amputer le bot de ses capacités les plus utiles simplement pour la validation du studio de jeu va à l'encontre de la vision que j'ai pour ce projet. **J'ai donc choisi de maintenir GGE Assistant en tant que projet 100% indépendant et communautaire.**\n\n"
+                    "**Qu'est-ce que cela change pour la suite ?**\n"
+                    "Vos fonctionnalités actuelles restent intactes, gratuites et sans publicité. Cependant, je tiens à être transparent : entre mes obligations personnelles et l'absence de soutien officiel de l'éditeur, le développement de nouvelles fonctionnalités va considérablement ralentir par manque de temps. Je continuerai d'assurer la maintenance technique et la stabilité du bot au quotidien, mais les grandes nouveautés se feront plus rares.\n\n"
+                    "💬 **Une question ou un mot de soutien ?**\n"
+                    f"Rejoignez notre serveur officiel : **[Serveur Support]({lien_support})**\n\n"
+                    "*Merci infiniment pour votre confiance, vos retours et votre soutien. Bon jeu à tous ! ⚔️*"
                 )
             elif langue == "de":
-                titre = "⚠️ Update erforderlich"
+                titre = "📢 Unabhängigkeit und Zukunft des GGE-Assistenten"
                 message = (
-                    "Hallo! 👋\n\n"
-                    "Aufgrund einer Änderung der Discord-Berechtigungen kann es sein, dass **die Befehle des GGE-Assistenten von Ihrem Server verschwunden sind** oder dass einige Funktionen **fehlerhaft reagieren**.\n\n"
-                    "🛠️ **Wie behebt man das?**\n"
-                    "Wenn Sie Serveradministrator oder Manager sind, laden Sie den Bot einfach über diesen Link **erneut ein** (er muss vorher nicht gekickt werden):\n"
-                    f"🔗 **[Bot-Einladungslink]({lien_bot})**\n\n"
-                    "💬 **Brauchen Sie Hilfe, möchten Sie vorab über Neuigkeiten informiert werden oder haben Sie Feedback und Vorschläge?**\n"
-                    "Treten Sie unserem offiziellen Support-Server bei:\n"
-                    f"🔗 **[Support-Server-Link]({lien_support})**\n\n"
-                    "💡 *Zur Erinnerung: Einige Befehle sind nur hier in privaten Nachrichten verfügbar und andere nur auf Ihrem Server.*\n\n"
-                    "*Vielen Dank für Ihre Unterstützung und viel Spaß beim Spielen! ⚔️*"
+                    "Hallo zusammen! 👋\n\n"
+                    "Wie einige von euch wissen, hat Goodgame Empire kürzlich ein offizielles Programm „GGE EF Creator“ gestartet, das es Erstellern (Tools, Inhalte, Wiki usw.) ermöglicht, bestimmte Vorteile zu erhalten, insbesondere den Zugang zu kommenden Updates. Dies hätte es dem GGE-Assistenten ermöglicht, neue Funktionen vor den offiziellen Veröffentlichungen vorzubereiten. Die Entscheidung ist gefallen: **Unsere Bewerbung wurde abgelehnt**.\n\n"
+                    "Die offizielle Moderation ist der Ansicht, dass der Bot gegen die Nutzungsbedingungen des Spiels verstößt, indem er Links und Daten von externen Community-Seiten (wie GGE-Tracker) integriert. Um den EF Creator-Status zu erhalten, hätten wir alle Befehle löschen müssen, die diese API verwenden.\n\n"
+                    "Live-Rankings, Radare und Historien sind das Herzstück des GGE-Assistenten. Den Bot seiner nützlichsten Fähigkeiten zu berauben, nur um die Bestätigung des Spielestudios zu erhalten, widerspricht meiner Vision für dieses Projekt. **Ich habe mich daher entschieden, den GGE-Assistenten als 100% unabhängiges und Community-basiertes Projekt beizubehalten.**\n\n"
+                    "**Was ändert sich für die Zukunft?**\n"
+                    "Eure aktuellen Funktionen bleiben intakt, kostenlos und werbefrei. Ich möchte jedoch transparent sein: Zwischen meinen persönlichen Verpflichtungen und der fehlenden offiziellen Unterstützung durch den Herausgeber wird sich die Entwicklung neuer Funktionen aus Zeitmangel deutlich verlangsamen. Ich werde weiterhin die tägliche technische Wartung und Stabilität des Bots sicherstellen, aber große Neuerungen werden seltener.\n\n"
+                    "💬 **Fragen oder Feedback?**\n"
+                    f"Treten Sie unserem offiziellen Server bei: **[Support-Server]({lien_support})**\n\n"
+                    "*Vielen Dank für euer Vertrauen, euer Feedback und eure Unterstützung. Viel Spaß beim Spielen! ⚔️*"
                 )
             else:
-                titre = "⚠️ Update Required"
+                titre = "📢 Independence and Future of GGE Assistant"
                 message = (
-                    "Hello! 👋\n\n"
-                    "Due to a change in Discord permissions, it is possible that **GGE Assistant's commands have disappeared** from your server or that some features **are acting up**.\n\n"
-                    "🛠️ **How to fix it?**\n"
-                    "If you are a server administrator or manager, simply **re-invite the bot** using this link (no need to kick it first):\n"
-                    f"🔗 **[Bot Invite Link]({lien_bot})**\n\n"
-                    "💬 **Need help, want to know about new features in advance, or have feedback and suggestions?**\n"
-                    "Join our official support server:\n"
-                    f"🔗 **[Support Server Link]({lien_support})**\n\n"
-                    "💡 *As a reminder, some commands are only available in private messages (here), and others only on your server.*\n\n"
-                    "*Thank you for your support and happy gaming! ⚔️*"
+                    "Hello everyone! 👋\n\n"
+                    'As some of you may know, Goodgame Empire recently launched an official "GGE EF Creator" program allowing creators (Tools, Content, Wiki, etc.) to have certain benefits, notably early access to upcoming updates, which would have allowed GGE Assistant to prepare new features before official releases. The decision has been made: **our application was rejected**.\n\n'
+                    "Official moderation considers that the bot violates the game's terms of service by integrating links and data from third-party community sites (like GGE-Tracker). To obtain the EF Creator status, we would have had to delete all commands that use this API.\n\n"
+                    "Live rankings, radars, and histories are the very heart of GGE Assistant. Crippling the bot of its most useful capabilities simply for the game studio's validation goes against my vision for this project. **I have therefore chosen to maintain GGE Assistant as a 100% independent and community-driven project.**\n\n"
+                    "**What does this change moving forward?**\n"
+                    "Your current features remain intact, free, and ad-free. However, I want to be transparent: between my personal obligations and the lack of official support from the publisher, the development of new features will significantly slow down due to a lack of time. I will continue to ensure the technical maintenance and daily stability of the bot, but major new features will become rarer.\n\n"
+                    "💬 **Questions or a word of support?**\n"
+                    f"Join our official server: **[Support Server]({lien_support})**\n\n"
+                    "*Thank you so much for your trust, your feedback, and your support. Happy gaming to all! ⚔️*"
                 )
 
-            embed = discord.Embed(title=titre, description=message, color=0xF39C12)
+            embed = discord.Embed(title=titre, description=message, color=0xC1121F)
 
             try:
                 user_id = int(user_id_str)
@@ -659,7 +653,7 @@ class AdminCog(commands.Cog):
                 echecs += 1
                 print(f"⚠️ Erreur inattendue pour {user_id_str} : {e}")
 
-            # 🛑 PAUSE OBLIGATOIRE DE 3 SECONDES POUR NE PAS ÊTRE BANNI 🛑
+            # Pause pour éviter le Rate Limit
             await asyncio.sleep(3.0)
 
         await ctx.send(f"✅ **Broadcast terminé !**\nSuccès : `{succes}` | Échecs (MP fermés) : `{echecs}`")
