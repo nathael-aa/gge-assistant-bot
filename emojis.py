@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+
 import discord
 
 logger = logging.getLogger("GGE_Bot")

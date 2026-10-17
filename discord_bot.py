@@ -8,7 +8,6 @@ import socket
 import sys
 import traceback
 import xml.etree.ElementTree as ET
-from emojis import sync_and_load_emojis
 from datetime import datetime, timedelta
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
@@ -19,6 +18,7 @@ from aiohttp import web
 from discord.ext import commands, tasks
 
 import observability as obs
+from emojis import sync_and_load_emojis
 from utils import (
     BOT_VERSION,
     CACHE,
