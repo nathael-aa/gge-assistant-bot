@@ -16,7 +16,7 @@ import observability as obs
 logger = logging.getLogger("GGE_Bot")
 BOT_VERSION = "GGE Assistant • Version 1.3.3"
 
-# ========================================
+# =======================================
 # ⚙️ GESTION DES CHEMINS & DOSSIER
 # ========================================
 BASE_DIR = Path(__file__).parent
