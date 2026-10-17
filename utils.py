@@ -116,11 +116,17 @@ async def get_api_headers(interaction: discord.Interaction = None, custom_server
     elif interaction:
         _, server = await get_server_config(interaction)
 
-    return {
+    headers = {
         "Accept": "application/json",
         "gge-server": server,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) GGE-Assistant/3.0 (Async)",
     }
+
+    api_key = os.getenv("GGETRACKER_API_KEY")
+    if api_key:
+        headers["X-Api-Key"] = api_key
+
+    return headers
 
 
 # ========================================

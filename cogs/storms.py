@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -1006,6 +1007,7 @@ class StormsCog(commands.Cog):
     @storm_alert_loop.before_loop
     async def before_storm_alert_loop(self):
         await self.bot.wait_until_ready()
+        await asyncio.sleep(15)
 
     @storm_group.command(name="stop", description="Stop automatic alerts for respawning islands")
     @app_commands.guild_only()

@@ -177,7 +177,7 @@ class ScanCog(commands.Cog):
                 if res:
                     parse_players(res)
 
-                await asyncio.sleep(1.2)
+                await asyncio.sleep(0.2)
 
         duration = round(asyncio.get_event_loop().time() - start_time, 2)
         logger.info(
@@ -290,7 +290,7 @@ class ScanCog(commands.Cog):
                         players, duration = result
                         await asyncio.to_thread(self.save_results, players, duration, srv)
 
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(1)
 
             await self.send_discord_alert(
                 "✅ Multi-Scan Terminé",
