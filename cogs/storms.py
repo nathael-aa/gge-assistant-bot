@@ -861,11 +861,20 @@ class StormsCog(commands.Cog):
                 return
 
             servers_to_check = {}
+            needs_isles = set()
+            needs_forts = set()
+
             for guild_id_str, config in guilds_config.items():
                 gge_server = config.get("gge_server", "E4K_FR1")
+
                 if gge_server not in servers_to_check:
                     servers_to_check[gge_server] = []
                 servers_to_check[gge_server].append((guild_id_str, config))
+
+                if config.get("isle_channel_id"):
+                    needs_isles.add(gge_server)
+                if config.get("fort_channel_id"):
+                    needs_forts.add(gge_server)
 
             servers_with_spawned = {
                 alert["gge_server"]
@@ -883,22 +892,23 @@ class StormsCog(commands.Cog):
                 # ==========================================
                 # 🏝️ SCAN DES ÎLES
                 # ==========================================
-                params_respawning = {"size": 4000, "filterByState": 3}
                 isles_respawning = []
-                try:
-                    url_respawning = f"{self.api_base}storms/isles"
-                    async with self.bot.session.get(
-                        url_respawning, headers=headers, params=params_respawning, timeout=15
-                    ) as r:
-                        if r.status == 200:
-                            api_data = await r.json()
-                            isles_respawning = api_data.get("isles", [])
-                        else:
-                            logger.warning(
-                                f"⚠️ [Storm Alerts] Code {r.status} reçu de l'API. URL: {r.url} - Serveur configuré: {gge_server}"
-                            )
-                except Exception as e:
-                    logger.error(f"❌ [Storm Alerts] Erreur API Respawning pour {gge_server} : {e}")
+                if gge_server in needs_isles:  # 👈 AJOUT DU IF
+                    params_respawning = {"size": 4000, "filterByState": 3}
+                    try:
+                        url_respawning = f"{self.api_base}storms/isles"
+                        async with self.bot.session.get(
+                            url_respawning, headers=headers, params=params_respawning, timeout=15
+                        ) as r:
+                            if r.status == 200:
+                                api_data = await r.json()
+                                isles_respawning = api_data.get("isles", [])
+                            else:
+                                logger.warning(
+                                    f"⚠️ [Storm Alerts] Code {r.status} reçu de l'API. URL: {r.url} - Serveur configuré: {gge_server}"
+                                )
+                    except Exception as e:
+                        logger.error(f"❌ [Storm Alerts] Erreur API Respawning pour {gge_server} : {e}")
 
                 if gge_server in servers_with_spawned:
                     params_occupied = {"size": 4000, "filterByState": 2}
@@ -923,18 +933,21 @@ class StormsCog(commands.Cog):
                 # ==========================================
                 # 🏰 SCAN DES FORTS
                 # ==========================================
-                params_forts = {"size": 4000, "filterByAvailability": 2}
                 forts_respawning = []
-                try:
-                    url_forts = f"{self.api_base}storms/forts"
-                    async with self.bot.session.get(url_forts, headers=headers, params=params_forts, timeout=15) as r:
-                        if r.status == 200:
-                            api_data = await r.json()
-                            forts_respawning = api_data.get("forts", [])
-                        else:
-                            logger.warning(f"⚠️ [Storm Alerts] Code {r.status} API (Forts). Serveur: {gge_server}")
-                except Exception as e:
-                    logger.error(f"❌ [Storm Alerts] Erreur API Forts pour {gge_server} : {e}")
+                if gge_server in needs_forts:
+                    params_forts = {"size": 4000, "filterByAvailability": 2}
+                    try:
+                        url_forts = f"{self.api_base}storms/forts"
+                        async with self.bot.session.get(
+                            url_forts, headers=headers, params=params_forts, timeout=15
+                        ) as r:
+                            if r.status == 200:
+                                api_data = await r.json()
+                                forts_respawning = api_data.get("forts", [])
+                            else:
+                                logger.warning(f"⚠️ [Storm Alerts] Code {r.status} API (Forts). Serveur: {gge_server}")
+                    except Exception as e:
+                        logger.error(f"❌ [Storm Alerts] Erreur API Forts pour {gge_server} : {e}")
 
                 # -- Préparation des annonces Îles --
                 isles_to_announce = []
