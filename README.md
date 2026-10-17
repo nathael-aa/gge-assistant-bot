@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-A comprehensive Discord bot designed to assist "Goodgame Empire" (GGE) and "Empire: Four Kingdoms" (E4K) players. It provides server tracking, fortress radars, event management, and automated alerts by leveraging direct game connections and the GGE-Tracker API.
+A comprehensive Discord bot designed to assist "Goodgame Empire" (GGE) and "Empire: Four Kingdoms" (E4K) players. It provides server tracking, fortress radars, event management, and automated alerts by leveraging direct game connections and the GGE-Tracker API
 </p>
 
 ---
