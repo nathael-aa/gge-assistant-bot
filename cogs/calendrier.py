@@ -162,7 +162,6 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                 logger.error(f"❌ Erreur lecture date: {e}")
 
         self.cached_events = events_actifs
-        logger.info(f"📂 [Calendrier] {len(self.cached_events)} événements chargés (doublons purgés).")
 
     async def save_cache_to_file(self):
         data = await load_calendrier_async()

@@ -28,6 +28,9 @@ logger = logging.getLogger("GGE_Bot")
 STORM_CONFIG_PATH = SERVEURS_DIR / "storm_alerts.json"
 
 
+# ===========================================
+# 💾 GESTION DE LA SAUVEGARDE
+# ===========================================
 async def load_storm_config():
     if not os.path.exists(STORM_CONFIG_PATH):
         return {"guilds": {}, "notified": []}
@@ -45,7 +48,7 @@ async def save_storm_config(data):
 
 
 # ===========================================
-# ⚙️ CONFIGURATION ID DE L'API STORM
+# ⚙️ MAPPINGS (FORTS ET ÎLES)
 # ===========================================
 FORT_LEVELS_MAPPING = {
     10: {"lvl": 40, "desc": "40"},
@@ -59,12 +62,12 @@ FORT_LEVELS_MAPPING = {
 }
 
 ISLE_RESOURCE_MAPPING = {
-    1: {"key": "storm_res_wood", "def": "Wood", "qty": f"40,000{DICT_EMOJIS.get('e_wood', '🪵')}"},
-    4: {"key": "storm_res_wood", "def": "Wood", "qty": f"20,000{DICT_EMOJIS.get('e_wood', '🪵')}"},
-    2: {"key": "storm_res_stone", "def": "Stone", "qty": f"40,000{DICT_EMOJIS.get('e_stone', '🪨')}"},
-    5: {"key": "storm_res_stone", "def": "Stone", "qty": f"20,000{DICT_EMOJIS.get('e_stone', '🪨')}"},
-    3: {"key": "storm_res_aqua", "def": "Aquamarine", "qty": f"52,000{DICT_EMOJIS.get('e_aquamarine_brut', '💎')}"},
-    6: {"key": "storm_res_aqua", "def": "Aquamarine", "qty": f"11,500{DICT_EMOJIS.get('e_aquamarine_brut', '💎')}"},
+    1: {"key": "storm_res_wood", "def": "Wood", "qty": f"40,000 {DICT_EMOJIS.get('e_wood', '🪵')}"},
+    4: {"key": "storm_res_wood", "def": "Wood", "qty": f"20,000 {DICT_EMOJIS.get('e_wood', '🪵')}"},
+    2: {"key": "storm_res_stone", "def": "Stone", "qty": f"40,000 {DICT_EMOJIS.get('e_stone', '🪨')}"},
+    5: {"key": "storm_res_stone", "def": "Stone", "qty": f"20,000 {DICT_EMOJIS.get('e_stone', '🪨')}"},
+    3: {"key": "storm_res_aqua", "def": "Aquamarine", "qty": f"52,000 {DICT_EMOJIS.get('e_aquamarine_brut', '💎')}"},
+    6: {"key": "storm_res_aqua", "def": "Aquamarine", "qty": f"11,500 {DICT_EMOJIS.get('e_aquamarine_brut', '💎')}"},
 }
 
 
@@ -76,11 +79,13 @@ def get_isle_name(isle_id, langue):
     return f"{name} ({res_data['qty']})"
 
 
+# ===========================================
+# 🖼️ VUES (UI INTERACTIVE)
+# ===========================================
 class RefreshOnlyView(discord.ui.View):
     def __init__(self, callback_func, langue="fr", timeout=3600):
         super().__init__(timeout=timeout)
         self.message = None
-
         self.refresh_btn = discord.ui.Button(
             style=discord.ButtonStyle.primary,
             emoji=DICT_EMOJIS.get("e_refresh", "🔄"),
@@ -105,10 +110,8 @@ class LocalPaginationView(discord.ui.View):
         self.embeds = embeds
         self.current_page = 0
         self.message = None
-
         self.btn_prev.emoji = DICT_EMOJIS.get("e_last", "⏮️")
         self.btn_next.emoji = DICT_EMOJIS.get("e_next", "⏭️")
-
         self.update_buttons()
 
     async def on_timeout(self):
@@ -141,20 +144,25 @@ class LocalPaginationView(discord.ui.View):
         await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
 
 
+# ===========================================
+# 🚀 MODULE PRINCIPAL
+# ===========================================
 class StormsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.clr_forts = discord.Color.from_rgb(139, 196, 191)
-        self.clr_isles = discord.Color.from_rgb(211, 240, 227)
+        self.clr_forts = discord.Color.from_rgb(230, 126, 34)  # Orange
+        self.clr_isles = discord.Color.from_rgb(64, 224, 208)  # Cyan
         self.clr_occupier = discord.Color.from_rgb(137, 196, 199)
         self.clr_status = discord.Color.from_rgb(132, 206, 209)
         self.clr_setup = discord.Color.from_rgb(144, 232, 219)
         self.api_base = "https://api.gge-tracker.com/api/v1/"
-
         self.active_alerts = []
 
     storm_group = app_commands.Group(name="storm", description="Commands for the Storm Islands event")
 
+    # -------------------------------------------
+    # 🔍 COMMANDES DE RECHERCHE
+    # -------------------------------------------
     @storm_group.command(name="forts", description="Search for storm forts based on your criteria")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.choices(
@@ -212,37 +220,20 @@ class StormsCog(commands.Cog):
                 "filterByIsleIds": f"[{','.join(map(str, isle_ids))}]",
                 "orderDirection": "desc",
             }
-
             if availability != 0:
                 params["filterByAvailability"] = availability
 
             url = f"{self.api_base}/storms/forts"
             async with self.bot.session.get(url, headers=headers, params=params, timeout=15) as r:
                 if r.status != 200:
-                    msg = t(
-                        langue,
-                        "cmd_storm_api_err",
-                        defaut="{e_error} Error connecting to the Storms API.",
-                    )
-                    return (
-                        await current_inter.followup.send(msg, ephemeral=True)
-                        if is_refresh
-                        else await current_inter.followup.send(msg)
-                    )
+                    msg = t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
+                    return await current_inter.followup.send(msg, ephemeral=is_refresh)
                 data = await r.json()
 
             forts = data.get("forts", [])
             if not forts:
-                msg = t(
-                    langue,
-                    "cmd_storm_no_forts",
-                    defaut="{e_information} No forts match your criteria.",
-                )
-                return (
-                    await current_inter.followup.send(msg, ephemeral=True)
-                    if is_refresh
-                    else await current_inter.followup.send(msg)
-                )
+                msg = t(langue, "cmd_storm_no_forts", defaut="{e_information} No forts match your criteria.")
+                return await current_inter.followup.send(msg, ephemeral=is_refresh)
 
             forts_filtres = []
             for fort in forts:
@@ -254,13 +245,11 @@ class StormsCog(commands.Cog):
 
                 def sort_by_spawn(item):
                     desc, fort = item
-                    raw_time = fort.get("available_at", "")
                     try:
-                        dt = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
-                        ts = int(dt.timestamp())
+                        dt = datetime.fromisoformat(fort.get("available_at", "").replace("Z", "+00:00"))
+                        return (int(dt.timestamp()), -fort.get("isle_id", 0))
                     except:
-                        ts = 9999999999
-                    return (ts, -fort.get("isle_id", 0))
+                        return (9999999999, -fort.get("isle_id", 0))
 
                 forts_filtres.sort(key=sort_by_spawn)
             else:
@@ -270,31 +259,25 @@ class StormsCog(commands.Cog):
             items_par_page = 15
             total_pages = (len(forts_filtres) - 1) // items_par_page + 1
             titre_base = t(langue, "cmd_storm_forts_title", defaut="{e_aquamarineforts} Available Storm Forts")
-
-            lbl_refreshed = t(langue, "storm_last_refreshed", defaut="Last refreshed:")
-            last_update = f"\n*{{e_time}} {lbl_refreshed} <t:{int(datetime.now().timestamp())}:T>*"
+            last_update = f"\n*{{e_time}} {t(langue, 'storm_last_refreshed', defaut='Last refreshed:')} <t:{int(datetime.now().timestamp())}:T>*"
             lbl_att_left = t(langue, "storm_att_left", defaut="att. left")
 
             for i in range(0, len(forts_filtres), items_par_page):
                 page_items = forts_filtres[i : i + items_par_page]
                 numero_page = (i // items_par_page) + 1
-
                 embed = discord.Embed(title=f"{titre_base} (Page {numero_page}/{total_pages})", color=self.clr_forts)
 
                 lignes_description = []
                 for desc, fort in page_items:
                     attaques = fort.get("attacks_left", 0)
                     x, y = fort.get("position_x", 0), fort.get("position_y", 0)
-
                     time_str = ""
                     if availability in [2, 3]:
-                        raw_time = fort.get("available_at", "")
                         try:
-                            dt = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+                            dt = datetime.fromisoformat(fort.get("available_at", "").replace("Z", "+00:00"))
                             time_str = f" | {{e_time}} <t:{int(dt.timestamp())}:R>"
                         except:
                             pass
-
                     lignes_description.append(
                         f"**Lvl. {desc}** | {{e_compass}} `({x}:{y})` | {{e_attaque}} {attaques} {lbl_att_left}{time_str}"
                     )
@@ -307,8 +290,8 @@ class StormsCog(commands.Cog):
                 await btn_inter.response.defer()
                 await fetch_and_build_view(btn_inter, is_refresh=True)
 
-            if len(embeds) > 1:
-                view = LocalPaginationView(embeds)
+            view = LocalPaginationView(embeds) if len(embeds) > 1 else RefreshOnlyView(refresh_callback, langue)
+            if isinstance(view, LocalPaginationView):
                 refresh_btn = discord.ui.Button(
                     style=discord.ButtonStyle.primary,
                     emoji=DICT_EMOJIS.get("e_refresh", "🔄"),
@@ -316,8 +299,6 @@ class StormsCog(commands.Cog):
                 )
                 refresh_btn.callback = refresh_callback
                 view.add_item(refresh_btn)
-            else:
-                view = RefreshOnlyView(refresh_callback, langue)
 
             if is_refresh:
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
@@ -351,10 +332,7 @@ class StormsCog(commands.Cog):
         headers = await get_api_headers(interaction)
 
         async def fetch_and_build_view(current_inter: discord.Interaction, is_refresh: bool):
-            params = {
-                "page": 1,
-                "size": 500,
-            }
+            params = {"page": 1, "size": 500}
             if status.value != 0:
                 params["filterByState"] = status.value
 
@@ -362,41 +340,30 @@ class StormsCog(commands.Cog):
             async with self.bot.session.get(url, headers=headers, params=params, timeout=15) as r:
                 if r.status != 200:
                     msg = t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
-                    return (
-                        await current_inter.followup.send(msg, ephemeral=True)
-                        if is_refresh
-                        else await current_inter.followup.send(msg)
-                    )
+                    return await current_inter.followup.send(msg, ephemeral=is_refresh)
                 data = await r.json()
 
             isles = data.get("isles", [])
-
+            allowed_isles = []
             if resource.value == 1:
                 allowed_isles = [3, 6]
             elif resource.value == 2:
                 allowed_isles = [1, 4]
             elif resource.value == 3:
                 allowed_isles = [2, 5]
-            else:
-                allowed_isles = []
 
             if allowed_isles:
                 isles = [i for i in isles if i.get("isle_id") in allowed_isles]
 
             if not isles:
                 msg = t(langue, "cmd_storm_no_isles", defaut="{e_information} No islands match your criteria.")
-                return (
-                    await current_inter.followup.send(msg, ephemeral=True)
-                    if is_refresh
-                    else await current_inter.followup.send(msg)
-                )
+                return await current_inter.followup.send(msg, ephemeral=is_refresh)
 
             if status.value == 3:
 
                 def sort_by_spawn(isle):
-                    raw_time = isle.get("available_at", "")
                     try:
-                        dt = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+                        dt = datetime.fromisoformat(isle.get("available_at", "").replace("Z", "+00:00"))
                         return int(dt.timestamp())
                     except:
                         return 9999999999
@@ -410,20 +377,22 @@ class StormsCog(commands.Cog):
             total_pages = (len(isles) - 1) // items_par_page + 1
 
             titre_base = t(langue, "cmd_storm_isles_title", defaut="{e_aquamarineiles} Storm Islands")
-            lbl_refreshed = t(langue, "storm_last_refreshed", defaut="Last refreshed:")
-            last_update = f"\n*{{e_refresh}} {lbl_refreshed} <t:{int(datetime.now().timestamp())}:T>*"
-
-            lbl_free = t(langue, "storm_isle_free", defaut="Free!")
-            lbl_respawns = t(langue, "storm_isle_respawns", defaut="Respawns:")
-            lbl_unknown_state = t(langue, "storm_isle_unknown", defaut="State unknown")
-            lbl_unknown_player = t(langue, "storm_unknown_player", defaut="Unknown")
-            lbl_none_alliance = t(langue, "storm_none_alliance", defaut="None")
+            last_update = f"\n*{{e_refresh}} {t(langue, 'storm_last_refreshed', defaut='Last refreshed:')} <t:{int(datetime.now().timestamp())}:T>*"
+            lbl_free, lbl_respawns, lbl_unknown_state = (
+                t(langue, "storm_isle_free", defaut="Free!"),
+                t(langue, "storm_isle_respawns", defaut="Respawns:"),
+                t(langue, "storm_isle_unknown", defaut="State unknown"),
+            )
+            lbl_unknown_player, lbl_none_alliance = (
+                t(langue, "storm_unknown_player", defaut="Unknown"),
+                t(langue, "storm_none_alliance", defaut="None"),
+            )
 
             for i in range(0, len(isles), items_par_page):
                 page_items = isles[i : i + items_par_page]
-                numero_page = (i // items_par_page) + 1
-
-                embed = discord.Embed(title=f"{titre_base} (Page {numero_page}/{total_pages})", color=self.clr_isles)
+                embed = discord.Embed(
+                    title=f"{titre_base} (Page {(i // items_par_page) + 1}/{total_pages})", color=self.clr_isles
+                )
 
                 lignes_description = []
                 for isle in page_items:
@@ -434,21 +403,18 @@ class StormsCog(commands.Cog):
                     if etat == 0:
                         ligne = f"{{e_greencirclebullet}} **{res_nom}** | {{e_compass}} `({x}:{y})` | *{lbl_free}*"
                     elif etat == 1:
-                        occupant = isle.get("occupier_name") or lbl_unknown_player
-                        alliance = isle.get("occupier_alliance_name") or lbl_none_alliance
-                        ligne = f"{{e_std_red_circle}} **{res_nom}** | {{e_compass}} `({x}:{y})` | {{e_std_shield}} {occupant} (*{alliance}*)"
+                        ligne = f"{{e_std_red_circle}} **{res_nom}** | {{e_compass}} `({x}:{y})` | {{e_std_shield}} {isle.get('occupier_name') or lbl_unknown_player} (*{isle.get('occupier_alliance_name') or lbl_none_alliance}*)"
                     elif etat == 2:
-                        raw_time = isle.get("available_at", "")
                         try:
-                            dt = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
-                            ts = int(dt.timestamp())
+                            ts = int(
+                                datetime.fromisoformat(isle.get("available_at", "").replace("Z", "+00:00")).timestamp()
+                            )
                             time_str = f"<t:{ts}:R>"
                         except:
                             time_str = t(langue, "storm_isle_soon", defaut="Soon")
                         ligne = f"{{e_time}} **{res_nom}** | {{e_compass}} `({x}:{y})` | {lbl_respawns} {time_str}"
                     else:
                         ligne = f"{{e_information}} **{res_nom}** | {{e_compass}} `({x}:{y})` | {lbl_unknown_state}"
-
                     lignes_description.append(ligne)
 
                 embed.description = ("\n".join(lignes_description) + "\n" + last_update).format(**DICT_EMOJIS)
@@ -459,8 +425,8 @@ class StormsCog(commands.Cog):
                 await btn_inter.response.defer()
                 await fetch_and_build_view(btn_inter, is_refresh=True)
 
-            if len(embeds) > 1:
-                view = LocalPaginationView(embeds)
+            view = LocalPaginationView(embeds) if len(embeds) > 1 else RefreshOnlyView(refresh_callback, langue)
+            if isinstance(view, LocalPaginationView):
                 refresh_btn = discord.ui.Button(
                     style=discord.ButtonStyle.primary,
                     emoji=DICT_EMOJIS.get("e_refresh", "🔄"),
@@ -468,8 +434,6 @@ class StormsCog(commands.Cog):
                 )
                 refresh_btn.callback = refresh_callback
                 view.add_item(refresh_btn)
-            else:
-                view = RefreshOnlyView(refresh_callback, langue)
 
             if is_refresh:
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
@@ -487,20 +451,14 @@ class StormsCog(commands.Cog):
         await interaction.response.defer(thinking=True)
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
-
         safe_joueur = urllib.parse.quote(player)
 
         async def fetch_and_build_view(current_inter: discord.Interaction, is_refresh: bool):
             url = f"{self.api_base}/storms/isles?filterByOccupierName={safe_joueur}&size=4000"
-
             async with self.bot.session.get(url, headers=headers, timeout=15) as r:
                 if r.status != 200:
                     msg = t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
-                    return (
-                        await current_inter.followup.send(msg, ephemeral=True)
-                        if is_refresh
-                        else await current_inter.followup.send(msg)
-                    )
+                    return await current_inter.followup.send(msg, ephemeral=is_refresh)
                 data = await r.json()
 
             isles = data.get("isles", [])
@@ -511,42 +469,30 @@ class StormsCog(commands.Cog):
                     player=player,
                     defaut=f"{{e_information}} The player **{player}** does not currently hold any resource islands.",
                 )
-                return (
-                    await current_inter.followup.send(msg, ephemeral=True)
-                    if is_refresh
-                    else await current_inter.followup.send(msg)
-                )
+                return await current_inter.followup.send(msg, ephemeral=is_refresh)
 
             embeds = []
             items_par_page = 20
             total_pages = (len(isles) - 1) // items_par_page + 1
-
             titre_base = t(
                 langue, "cmd_storm_occupier_title", player=player, defaut=f"{{e_players}} Islands held by {player}"
             )
             desc_total = t(
                 langue, "storm_occ_total", count=len(isles), defaut=f"Total islands under control: **{len(isles)}**"
             )
-
-            lbl_refreshed = t(langue, "storm_last_refreshed", defaut="Last refreshed:")
-            last_update = f"\n*{{e_refresh}} {lbl_refreshed} <t:{int(datetime.now().timestamp())}:T>*"
+            last_update = f"\n*{{e_refresh}} {t(langue, 'storm_last_refreshed', defaut='Last refreshed:')} <t:{int(datetime.now().timestamp())}:T>*"
 
             for i in range(0, len(isles), items_par_page):
                 page_items = isles[i : i + items_par_page]
-                numero_page = (i // items_par_page) + 1
-
                 embed = discord.Embed(
-                    title=f"{titre_base} (Page {numero_page}/{total_pages})",
+                    title=f"{titre_base} (Page {(i // items_par_page) + 1}/{total_pages})",
                     description=f"{desc_total}\n\n",
                     color=self.clr_occupier,
                 )
-
-                lignes_description = []
-                for isle in page_items:
-                    x, y = isle.get("position_x"), isle.get("position_y")
-                    res_nom = get_isle_name(isle.get("isle_id"), langue)
-                    lignes_description.append(f"{{e_compass}} `({x}:{y})` | {res_nom}")
-
+                lignes_description = [
+                    f"{{e_compass}} `({isle.get('position_x')}:{isle.get('position_y')})` | {get_isle_name(isle.get('isle_id'), langue)}"
+                    for isle in page_items
+                ]
                 embed.description += "\n".join(lignes_description) + "\n" + last_update
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
@@ -555,8 +501,8 @@ class StormsCog(commands.Cog):
                 await btn_inter.response.defer()
                 await fetch_and_build_view(btn_inter, is_refresh=True)
 
-            if len(embeds) > 1:
-                view = LocalPaginationView(embeds)
+            view = LocalPaginationView(embeds) if len(embeds) > 1 else RefreshOnlyView(refresh_callback, langue)
+            if isinstance(view, LocalPaginationView):
                 refresh_btn = discord.ui.Button(
                     style=discord.ButtonStyle.primary,
                     emoji=DICT_EMOJIS.get("e_refresh", "🔄"),
@@ -564,8 +510,6 @@ class StormsCog(commands.Cog):
                 )
                 refresh_btn.callback = refresh_callback
                 view.add_item(refresh_btn)
-            else:
-                view = RefreshOnlyView(refresh_callback, langue)
 
             if is_refresh:
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
@@ -586,25 +530,19 @@ class StormsCog(commands.Cog):
         async with self.bot.session.get(url, headers=headers, timeout=10) as r:
             if r.status != 200:
                 return await interaction.followup.send(
-                    t(
-                        langue,
-                        "cmd_storm_api_err",
-                        defaut="{e_error} Error connecting to the Storms API.",
-                    )
+                    t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
                 )
             data = await r.json()
 
-        last_scan = data.get("last_scan_at", "")
         try:
-            ts_scan = int(datetime.fromisoformat(last_scan.replace("Z", "+00:00")).timestamp())
-            scan_str = f"<t:{ts_scan}:R>"
+            scan_str = (
+                f"<t:{int(datetime.fromisoformat(data.get('last_scan_at', '').replace('Z', '+00:00')).timestamp())}:R>"
+            )
         except:
             scan_str = t(langue, "storm_status_unknown", defaut="Unknown")
 
-        season_start = data.get("season_started_at", "")
         try:
-            ts_season = int(datetime.fromisoformat(season_start.replace("Z", "+00:00")).timestamp())
-            season_str = f"<t:{ts_season}:D>"
+            season_str = f"<t:{int(datetime.fromisoformat(data.get('season_started_at', '').replace('Z', '+00:00')).timestamp())}:D>"
         except:
             season_str = t(langue, "storm_status_unknown", defaut="Unknown")
 
@@ -612,8 +550,7 @@ class StormsCog(commands.Cog):
             title=t(langue, "cmd_storm_status_title", defaut="{e_std_satellite} Storm Islands Status"),
             color=self.clr_status,
         )
-
-        desc = t(
+        embed.description = t(
             langue,
             "storm_status_desc_v2",
             season=season_str,
@@ -622,19 +559,18 @@ class StormsCog(commands.Cog):
             forts=format_num(data.get("forts_count", 0)),
             isles=format_num(data.get("isles_count", 0)),
             defaut=(
-                f"**Season Started:** {season_str}\n"
-                f"**Last Scan:** {scan_str}\n"
-                f"**Covered Radius:** {data.get('scan_radius', 0)} tiles\n\n"
+                f"**Season Started:** {season_str}\n**Last Scan:** {scan_str}\n**Covered Radius:** {data.get('scan_radius', 0)} tiles\n\n"
                 f"{{e_aquamarineforts}} **Tracked Forts:** {format_num(data.get('forts_count', 0))}\n"
                 f"{{e_aquamarineiles}} **Tracked Isles:** {format_num(data.get('isles_count', 0))}"
             ),
         )
-
-        embed.description = desc
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed)
 
-    @storm_group.command(name="setup", description="Configure automatic alerts for respawning islands")
+    # -------------------------------------------
+    # 🔔 CONFIGURATION ALERTES ÎLES
+    # -------------------------------------------
+    @storm_group.command(name="setup_isles", description="Configure automatic alerts for respawning islands")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
@@ -642,9 +578,9 @@ class StormsCog(commands.Cog):
         channel="The channel where notifications will be sent",
         ping_small="Ping for small islands (Default: False)",
         ping_big="Ping for big islands (Default: False)",
-        role="Role to ping (Leave empty to use @here if a ping is active)",
+        role="Role to ping (Leave empty for no mention)",
     )
-    async def storm_setup(
+    async def storm_setup_isles(
         self,
         interaction: discord.Interaction,
         channel: discord.TextChannel,
@@ -664,24 +600,30 @@ class StormsCog(commands.Cog):
             )
             return await interaction.followup.send(msg)
 
-        ping_format = role.mention if role else "@here"
-
+        ping_format = role.mention if role else ""
         data = await load_storm_config()
         if "guilds" not in data:
             data["guilds"] = {}
+        guild_id_str = str(interaction.guild.id)
 
-        data["guilds"][str(interaction.guild.id)] = {
-            "channel_id": channel.id,
-            "ping_small": ping_small,
-            "ping_big": ping_big,
-            "ping_role": ping_format,
-            "gge_server": serveur,
-            "langue": langue,
-        }
+        if guild_id_str not in data["guilds"]:
+            data["guilds"][guild_id_str] = {"gge_server": serveur, "langue": langue}
+
+        data["guilds"][guild_id_str].update(
+            {
+                "isle_channel_id": channel.id,
+                "isle_ping_small": ping_small,
+                "isle_ping_big": ping_big,
+                "isle_ping_role": ping_format,
+                "gge_server": serveur,
+                "langue": langue,
+            }
+        )
+
         await save_storm_config(data)
 
         obs.record_guild_event(
-            "storm_setup",
+            "storm_setup_isles",
             guild=interaction.guild,
             user_id=interaction.user.id,
             gge_server=serveur,
@@ -694,23 +636,21 @@ class StormsCog(commands.Cog):
             channel=channel.mention,
             defaut=f"Notifications will be sent in {channel.mention}.",
         )
-        embed = discord.Embed(
-            title=t(
-                langue,
-                "cmd_storm_setup_title",
-                defaut="{e_greencirclebullet} Storm Islands Alerts Configured!",
-            ),
-            color=self.clr_setup,
-            description=desc,
-        )
+        titre = t(
+            langue, "cmd_storm_setup_isles_title", defaut="{e_greencirclebullet} Storm Islands Alerts Configured!"
+        ).format(**DICT_EMOJIS)
+        embed = discord.Embed(title=titre, color=self.clr_setup, description=desc)
 
         val_yes = t(langue, "storm_setup_yes", defaut="Yes")
         val_no = t(langue, "storm_setup_no", defaut="No")
         val_no_mention = t(langue, "storm_setup_no_mention", defaut="No mention")
 
-        etat_big = f"{{e_greencirclebullet}} {val_yes}" if ping_big else f"{{e_tomatobulletpoint}} {val_no}"
-        etat_small = f"{{e_greencirclebullet}} {val_yes}" if ping_small else f"{{e_tomatobulletpoint}} {val_no}"
-        mention_txt = ping_format if (ping_big or ping_small) else val_no_mention
+        emo_yes = DICT_EMOJIS.get("e_greencirclebullet", "🟢")
+        emo_no = DICT_EMOJIS.get("e_tomatobulletpoint", "🔴")
+
+        etat_big = f"{emo_yes} {val_yes}" if ping_big else f"{emo_no} {val_no}"
+        etat_small = f"{emo_yes} {val_yes}" if ping_small else f"{emo_no} {val_no}"
+        mention_txt = ping_format if ping_format else val_no_mention
 
         embed.add_field(name=t(langue, "storm_setup_field_big", defaut="Ping Big Isles"), value=etat_big, inline=True)
         embed.add_field(
@@ -721,6 +661,187 @@ class StormsCog(commands.Cog):
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed)
 
+    @storm_group.command(name="stop_isles", description="Stop automatic alerts for respawning islands")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
+    async def storm_stop_isles(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True)
+        langue, serveur = await get_server_config(interaction)
+
+        data = await load_storm_config()
+        guild_id_str = str(interaction.guild.id)
+
+        if "guilds" in data and guild_id_str in data["guilds"] and "isle_channel_id" in data["guilds"][guild_id_str]:
+            keys_to_remove = ["isle_channel_id", "isle_ping_small", "isle_ping_big", "isle_ping_role"]
+            for k in keys_to_remove:
+                data["guilds"][guild_id_str].pop(k, None)
+
+            if "fort_channel_id" not in data["guilds"][guild_id_str]:
+                del data["guilds"][guild_id_str]
+
+            await save_storm_config(data)
+            obs.record_guild_event(
+                "storm_stop_isles", guild=interaction.guild, user_id=interaction.user.id, gge_server=serveur
+            )
+
+            embed = discord.Embed(
+                title=t(langue, "cmd_storm_stop_isles_title", defaut="🛑 Alerts Stopped"),
+                description=t(
+                    langue,
+                    "cmd_storm_stop_isles_desc",
+                    defaut="Automatic Storm Islands alerts have been successfully disabled for this server.",
+                ),
+                color=discord.Color.red(),
+            )
+            await setup_embed_footer(embed, interaction, langue)
+            await interaction.followup.send(embed=embed)
+        else:
+            msg = t(
+                langue,
+                "cmd_storm_stop_none",
+                defaut="{e_information} No active alerts configuration found for this server.",
+            )
+            await interaction.followup.send(msg)
+
+    # -------------------------------------------
+    # 🔔 CONFIGURATION ALERTES FORTS
+    # -------------------------------------------
+    @storm_group.command(name="setup_forts", description="Configure automatic alerts for returning storm forts")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
+    @app_commands.describe(
+        channel="The channel where notifications will be sent",
+        min_level="Minimum fort level to receive alerts for",
+        role="Role to ping (Leave empty for no mention)",
+    )
+    @app_commands.choices(
+        min_level=[
+            app_commands.Choice(name="Level 80 only", value=80),
+            app_commands.Choice(name="Level 70 and 80", value=70),
+            app_commands.Choice(name="Level 60+", value=60),
+            app_commands.Choice(name="All forts (40+)", value=40),
+        ]
+    )
+    async def storm_setup_forts(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel,
+        min_level: app_commands.Choice[int],
+        role: discord.Role = None,
+    ):
+        await interaction.response.defer(thinking=True)
+        langue, serveur = await get_server_config(interaction)
+
+        bot_permissions = channel.permissions_for(interaction.guild.me)
+        if not bot_permissions.send_messages or not bot_permissions.embed_links:
+            msg = t(
+                langue,
+                "cmd_storm_setup_perms",
+                defaut=f"{{e_error}} I need permissions to send messages and embed links in {channel.mention}.",
+            )
+            return await interaction.followup.send(msg)
+
+        ping_format = role.mention if role else ""
+        data = await load_storm_config()
+        if "guilds" not in data:
+            data["guilds"] = {}
+        guild_id_str = str(interaction.guild.id)
+
+        if guild_id_str not in data["guilds"]:
+            data["guilds"][guild_id_str] = {"gge_server": serveur, "langue": langue}
+
+        data["guilds"][guild_id_str].update(
+            {
+                "fort_channel_id": channel.id,
+                "fort_min_level": min_level.value,
+                "fort_ping_role": ping_format,
+                "gge_server": serveur,
+                "langue": langue,
+            }
+        )
+        await save_storm_config(data)
+
+        obs.record_guild_event(
+            "storm_setup_forts",
+            guild=interaction.guild,
+            user_id=interaction.user.id,
+            gge_server=serveur,
+            new_value=f"channel:{channel.id}|min_lvl:{min_level.value}",
+        )
+
+        desc = t(
+            langue,
+            "storm_setup_forts_desc",
+            channel=channel.mention,
+            lvl=min_level.value,
+            defaut=f"Fort notifications (Level {min_level.value}+) will be sent in {channel.mention}.",
+        )
+        titre = t(langue, "cmd_storm_setup_forts_title", defaut="{e_greencirclebullet} Fort Alerts Configured!").format(
+            **DICT_EMOJIS
+        )
+        embed = discord.Embed(title=titre, color=self.clr_setup, description=desc)
+
+        val_no_mention = t(langue, "storm_setup_no_mention", defaut="No mention")
+        mention_txt = ping_format if ping_format else val_no_mention
+
+        embed.add_field(
+            name=t(langue, "storm_setup_field_min_lvl", defaut="Min. Level"),
+            value=f"**{min_level.value}+**",
+            inline=True,
+        )
+        embed.add_field(name=t(langue, "storm_setup_field_mention", defaut="Mention"), value=mention_txt, inline=True)
+
+        await setup_embed_footer(embed, interaction, langue)
+        await interaction.followup.send(embed=embed)
+
+    @storm_group.command(name="stop_forts", description="Stop automatic alerts for storm forts")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
+    async def storm_stop_forts(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True)
+        langue, serveur = await get_server_config(interaction)
+
+        data = await load_storm_config()
+        guild_id_str = str(interaction.guild.id)
+
+        if "guilds" in data and guild_id_str in data["guilds"] and "fort_channel_id" in data["guilds"][guild_id_str]:
+            keys_to_remove = ["fort_channel_id", "fort_min_level", "fort_ping_role"]
+            for k in keys_to_remove:
+                data["guilds"][guild_id_str].pop(k, None)
+
+            if "isle_channel_id" not in data["guilds"][guild_id_str]:
+                del data["guilds"][guild_id_str]
+
+            await save_storm_config(data)
+            obs.record_guild_event(
+                "storm_stop_forts", guild=interaction.guild, user_id=interaction.user.id, gge_server=serveur
+            )
+
+            embed = discord.Embed(
+                title=t(langue, "cmd_storm_stop_forts_title", defaut="🛑 Fort Alerts Stopped"),
+                description=t(
+                    langue,
+                    "cmd_storm_stop_forts_desc",
+                    defaut="Automatic Storm Forts alerts have been successfully disabled for this server.",
+                ),
+                color=discord.Color.red(),
+            )
+            await setup_embed_footer(embed, interaction, langue)
+            await interaction.followup.send(embed=embed)
+        else:
+            msg = t(
+                langue,
+                "cmd_storm_stop_none",
+                defaut="{e_information} No active alerts configuration found for this server.",
+            )
+            await interaction.followup.send(msg)
+
+    # -------------------------------------------
+    # 🔄 TÂCHE DE FOND (BOUCLE D'ALERTES)
+    # -------------------------------------------
     def cog_load(self):
         self.storm_alert_loop.start()
 
@@ -732,7 +853,6 @@ class StormsCog(commands.Cog):
         obs.set_task_name("storm_alert_loop")
         try:
             now = datetime.now().timestamp()
-
             data = await load_storm_config()
             guilds_config = data.get("guilds", {})
             notified = data.get("notified", [])
@@ -760,6 +880,9 @@ class StormsCog(commands.Cog):
             for gge_server, guilds_list in servers_to_check.items():
                 headers = await get_api_headers(custom_server=gge_server)
 
+                # ==========================================
+                # 🏝️ SCAN DES ÎLES
+                # ==========================================
                 params_respawning = {"size": 4000, "filterByState": 3}
                 isles_respawning = []
                 try:
@@ -792,25 +915,39 @@ class StormsCog(commands.Cog):
                                 }
                             else:
                                 logger.warning(
-                                    f"⚠️ [Storm Alerts] Code {r.status} reçu de l'API (Occupied). URL: {r.url} - Serveur configuré: {gge_server}"
+                                    f"⚠️ [Storm Alerts] Code {r.status} API (Occupied). Serveur: {gge_server}"
                                 )
                     except Exception as e:
                         logger.error(f"❌ [Storm Alerts] Erreur API Occupied pour {gge_server} : {e}")
 
+                # ==========================================
+                # 🏰 SCAN DES FORTS
+                # ==========================================
+                params_forts = {"size": 4000, "filterByAvailability": 2}
+                forts_respawning = []
+                try:
+                    url_forts = f"{self.api_base}storms/forts"
+                    async with self.bot.session.get(url_forts, headers=headers, params=params_forts, timeout=15) as r:
+                        if r.status == 200:
+                            api_data = await r.json()
+                            forts_respawning = api_data.get("forts", [])
+                        else:
+                            logger.warning(f"⚠️ [Storm Alerts] Code {r.status} API (Forts). Serveur: {gge_server}")
+                except Exception as e:
+                    logger.error(f"❌ [Storm Alerts] Erreur API Forts pour {gge_server} : {e}")
+
+                # -- Préparation des annonces Îles --
                 isles_to_announce = []
                 for isle in isles_respawning:
                     isle_id = isle.get("isle_id")
                     if isle_id not in [3, 6]:
                         continue
-
-                    raw_time = isle.get("available_at", "")
                     try:
-                        dt = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+                        dt = datetime.fromisoformat(isle.get("available_at", "").replace("Z", "+00:00"))
                         ts = dt.timestamp()
                         time_left = ts - now
-
                         x, y = isle.get("position_x"), isle.get("position_y")
-                        uid = f"{gge_server}_{x}_{y}_{int(ts) // 3600}"
+                        uid = f"isle_{gge_server}_{x}_{y}_{int(ts) // 3600}"
 
                         if 0 < time_left <= 300 and uid not in notified:
                             isles_to_announce.append((isle, ts))
@@ -819,104 +956,176 @@ class StormsCog(commands.Cog):
                     except:
                         continue
 
-                if not isles_to_announce:
+                # -- Préparation des annonces Forts --
+                forts_to_announce = []
+                for fort in forts_respawning:
+                    isle_id = fort.get("isle_id")
+                    fort_info = FORT_LEVELS_MAPPING.get(isle_id)
+                    if not fort_info:
+                        continue
+                    try:
+                        dt = datetime.fromisoformat(fort.get("available_at", "").replace("Z", "+00:00"))
+                        ts = dt.timestamp()
+                        time_left = ts - now
+                        x, y = fort.get("position_x"), fort.get("position_y")
+                        uid = f"fort_{gge_server}_{x}_{y}_{int(ts) // 3600}"
+
+                        if 0 < time_left <= 300 and uid not in notified:
+                            forts_to_announce.append((fort, ts, fort_info["lvl"], fort_info["desc"]))
+                            notified.append(uid)
+                            modifie = True
+                    except:
+                        continue
+
+                if not isles_to_announce and not forts_to_announce:
                     continue
 
-                total_annoncailles += len(isles_to_announce)
+                total_annoncailles += len(isles_to_announce) + len(forts_to_announce)
 
                 for guild_id_str, config in guilds_list:
-                    channel_id = config.get("channel_id")
-                    ping_small = config.get("ping_small", False)
-                    ping_big = config.get("ping_big", False)
-                    ping_role = config.get("ping_role", "")
                     langue = config.get("langue", "fr")
 
-                    channel = self.bot.get_channel(channel_id)
-                    if not channel:
-                        try:
-                            channel = await self.bot.fetch_channel(channel_id)
-                        except:
-                            continue
+                    # ==========================================
+                    # 📣 ENVOI DES ALERTES ÎLES
+                    # ==========================================
+                    channel_id = config.get("isle_channel_id")
+                    if channel_id and isles_to_announce:
+                        channel = self.bot.get_channel(channel_id)
+                        if not channel:
+                            try:
+                                channel = await self.bot.fetch_channel(channel_id)
+                            except:
+                                pass
 
-                    for isle, ts in isles_to_announce:
-                        isle_id = isle.get("isle_id")
-                        is_big = isle_id == 3
-                        is_small = isle_id == 6
+                        if channel:
+                            ping_small = config.get("isle_ping_small", False)
+                            ping_big = config.get("isle_ping_big", False)
+                            ping_role = config.get("isle_ping_role", "")
 
-                        should_ping = (is_big and ping_big) or (is_small and ping_small)
-                        res_nom = get_isle_name(isle_id, langue)
-                        x, y = isle.get("position_x"), isle.get("position_y")
+                            for isle, ts in isles_to_announce:
+                                isle_id = isle.get("isle_id")
+                                is_big = isle_id == 3
+                                is_small = isle_id == 6
+                                should_ping = (is_big and ping_big) or (is_small and ping_small)
+                                res_nom = get_isle_name(isle_id, langue)
+                                x, y = isle.get("position_x"), isle.get("position_y")
 
-                        msg_content = f"{ping_role}" if should_ping else None
-                        titre = t(
-                            langue,
-                            "alert_storm_title",
-                            defaut="{e_aquamarineiles} Island Respawning Soon!",
-                        )
+                                msg_content = ping_role if (should_ping and ping_role) else None
+                                titre = t(
+                                    langue, "alert_storm_title", defaut="{e_aquamarineiles} Island Respawning Soon!"
+                                )
+                                desc = t(
+                                    langue,
+                                    "alert_storm_desc",
+                                    name=res_nom,
+                                    ts=int(ts),
+                                    x=x,
+                                    y=y,
+                                    defaut=f"**{res_nom}** will spawn at **<t:{int(ts)}:T>** (<t:{int(ts)}:R>)\n{{e_compass}} Coords: `{x}:{y}`",
+                                )
+                                embed = discord.Embed(
+                                    title=titre, description=desc.format(**DICT_EMOJIS), color=self.clr_isles
+                                )
 
-                        desc = t(
-                            langue,
-                            "alert_storm_desc",
-                            name=res_nom,
-                            ts=int(ts),
-                            x=x,
-                            y=y,
-                            defaut=f"**{res_nom}** will spawn at **<t:{int(ts)}:T>** (<t:{int(ts)}:R>)\n{{e_compass}} Coords: `{x}:{y}`",
-                        )
+                                try:
+                                    sent_msg = await channel.send(content=msg_content, embed=embed)
+                                    obs.record_alert(
+                                        source="storm_islands",
+                                        alert_type="respawn",
+                                        gge_server=gge_server,
+                                        channel="guild",
+                                        recipients=1,
+                                        delivered=1,
+                                        failed=0,
+                                        dm_blocked=0,
+                                    )
+                                    self.active_alerts.append(
+                                        {
+                                            "type": "isle",
+                                            "message": sent_msg,
+                                            "embed": embed,
+                                            "ts": ts,
+                                            "langue": langue,
+                                            "x": x,
+                                            "y": y,
+                                            "gge_server": gge_server,
+                                            "res_nom": res_nom,
+                                            "status": "pending",
+                                        }
+                                    )
+                                except discord.Forbidden:
+                                    obs.record_alert(
+                                        source="storm_islands",
+                                        alert_type="respawn",
+                                        gge_server=gge_server,
+                                        channel="guild",
+                                        recipients=1,
+                                        delivered=0,
+                                        failed=1,
+                                        dm_blocked=1,
+                                    )
+                                except discord.HTTPException as e:
+                                    logger.error(f"❌ [Storm Alerts] Erreur réseau Discord : {e}")
 
-                        embed = discord.Embed(title=titre, description=desc, color=self.clr_isles)
+                    # ==========================================
+                    # 📣 ENVOI DES ALERTES FORTS
+                    # ==========================================
+                    fort_channel_id = config.get("fort_channel_id")
+                    if fort_channel_id and forts_to_announce:
+                        fort_channel = self.bot.get_channel(fort_channel_id)
+                        if not fort_channel:
+                            try:
+                                fort_channel = await self.bot.fetch_channel(fort_channel_id)
+                            except:
+                                pass
 
-                        try:
-                            sent_msg = await channel.send(content=msg_content, embed=embed)
+                        if fort_channel:
+                            fort_min_level = config.get("fort_min_level", 80)
+                            fort_ping_role = config.get("fort_ping_role", "")
 
-                            obs.record_alert(
-                                source="storm_islands",
-                                alert_type="respawn",
-                                gge_server=gge_server,
-                                channel="guild",
-                                recipients=1,
-                                delivered=1,
-                                failed=0,
-                                dm_blocked=0,
-                            )
+                            for fort, ts, lvl, desc_str in forts_to_announce:
+                                if lvl >= fort_min_level:
+                                    x, y = fort.get("position_x"), fort.get("position_y")
 
-                            self.active_alerts.append(
-                                {
-                                    "message": sent_msg,
-                                    "embed": embed,
-                                    "ts": ts,
-                                    "langue": langue,
-                                    "x": x,
-                                    "y": y,
-                                    "gge_server": gge_server,
-                                    "res_nom": res_nom,
-                                    "status": "pending",
-                                }
-                            )
-                        except discord.Forbidden:
-                            obs.record_alert(
-                                source="storm_islands",
-                                alert_type="respawn",
-                                gge_server=gge_server,
-                                channel="guild",
-                                recipients=1,
-                                delivered=0,
-                                failed=1,
-                                dm_blocked=1,
-                            )
-                        except discord.HTTPException as e:
-                            logger.error(f"❌ [Storm Alerts] Erreur réseau Discord : {e}")
-                            obs.record_alert(
-                                source="storm_islands",
-                                alert_type="respawn",
-                                gge_server=gge_server,
-                                channel="guild",
-                                recipients=1,
-                                delivered=0,
-                                failed=1,
-                                dm_blocked=0,
-                            )
+                                    titre = t(
+                                        langue, "alert_fort_title", defaut="{e_aquamarineforts} Fort Available Soon!"
+                                    )
+                                    desc = t(
+                                        langue,
+                                        "alert_fort_desc",
+                                        lvl=desc_str,
+                                        ts=int(ts),
+                                        x=x,
+                                        y=y,
+                                        defaut=f"A **Level {desc_str} Fort** will be attackable at **<t:{int(ts)}:T>** (<t:{int(ts)}:R>)\n{{e_compass}} Coords: `{x}:{y}`",
+                                    )
+                                    embed = discord.Embed(
+                                        title=titre, description=desc.format(**DICT_EMOJIS), color=self.clr_forts
+                                    )
 
+                                    msg_content = fort_ping_role if fort_ping_role else None
+                                    try:
+                                        sent_msg = await fort_channel.send(content=msg_content, embed=embed)
+                                        self.active_alerts.append(
+                                            {
+                                                "type": "fort",
+                                                "message": sent_msg,
+                                                "embed": embed,
+                                                "ts": ts,
+                                                "langue": langue,
+                                                "x": x,
+                                                "y": y,
+                                                "gge_server": gge_server,
+                                                "res_nom": f"Fort {desc_str}",
+                                                "status": "pending",
+                                            }
+                                        )
+                                    except Exception as e:
+                                        logger.error(f"❌ [Storm Alerts] Erreur envoi Fort sur {fort_channel_id} : {e}")
+
+            # ==========================================
+            # 🔄 MISE À JOUR DES ANCIENS MESSAGES
+            # ==========================================
             alerts_to_keep = []
             for alert in self.active_alerts:
                 status = alert.get("status", "pending")
@@ -924,6 +1133,7 @@ class StormsCog(commands.Cog):
                 langue_alert = alert["langue"]
                 emb = alert["embed"]
                 msg = alert["message"]
+                is_fort = alert.get("type") == "fort"
 
                 if now < ts:
                     alerts_to_keep.append(alert)
@@ -931,12 +1141,17 @@ class StormsCog(commands.Cog):
 
                 if status == "pending":
                     alert["status"] = "spawned"
-                    emb.color = discord.Color.green()
-                    emb.title = t(
-                        langue_alert,
-                        "alert_storm_spawned_title",
-                        defaut="{e_aquamarineiles} Island Spawned!",
-                    )
+                    emb.color = discord.Color.dark_green() if is_fort else discord.Color.green()
+
+                    if is_fort:
+                        emb.title = t(
+                            langue_alert, "alert_fort_spawned_title", defaut="{e_aquamarineforts} Fort Available!"
+                        ).format(**DICT_EMOJIS)
+                    else:
+                        emb.title = t(
+                            langue_alert, "alert_storm_spawned_title", defaut="{e_aquamarineiles} Island Spawned!"
+                        ).format(**DICT_EMOJIS)
+
                     emb.description = t(
                         langue_alert,
                         "alert_storm_spawned_desc",
@@ -944,7 +1159,8 @@ class StormsCog(commands.Cog):
                         x=alert["x"],
                         y=alert["y"],
                         defaut=f"**{alert['res_nom']}** is now available!\n{{e_compass}} Coords: `{alert['x']}:{alert['y']}`",
-                    )
+                    ).format(**DICT_EMOJIS)
+
                     try:
                         await msg.edit(embed=emb)
                     except:
@@ -955,7 +1171,6 @@ class StormsCog(commands.Cog):
                 if status == "spawned":
                     gge_server = alert["gge_server"]
                     x, y = alert["x"], alert["y"]
-
                     occ_dict = occupied_isles_by_server.get(gge_server, {})
                     isle_data = occ_dict.get((x, y))
 
@@ -963,12 +1178,17 @@ class StormsCog(commands.Cog):
                         occupier = isle_data.get("occupier_name") or "Unknown"
                         alliance = isle_data.get("occupier_alliance_name") or "None"
 
-                        emb.color = discord.Color.red()
-                        emb.title = t(
-                            langue_alert,
-                            "alert_storm_captured_title",
-                            defaut="{e_aquamarineiles} Island Captured!",
-                        )
+                        emb.color = discord.Color.dark_red() if is_fort else discord.Color.red()
+
+                        if is_fort:
+                            emb.title = t(
+                                langue_alert, "alert_fort_captured_title", defaut="{e_aquamarineforts} Fort Captured!"
+                            ).format(**DICT_EMOJIS)
+                        else:
+                            emb.title = t(
+                                langue_alert, "alert_storm_captured_title", defaut="{e_aquamarineiles} Island Captured!"
+                            ).format(**DICT_EMOJIS)
+
                         emb.description = t(
                             langue_alert,
                             "alert_storm_captured_desc",
@@ -978,13 +1198,12 @@ class StormsCog(commands.Cog):
                             occupier=occupier,
                             alliance=alliance,
                             defaut=f"**{alert['res_nom']}** was captured by **{occupier}** (*{alliance}*)!\n{{e_compass}} Coords: `{x}:{y}`",
-                        )
+                        ).format(**DICT_EMOJIS)
 
                         try:
                             await msg.edit(embed=emb)
                         except:
                             pass
-
                     else:
                         if now <= ts + 7200:
                             alerts_to_keep.append(alert)
@@ -998,7 +1217,9 @@ class StormsCog(commands.Cog):
                 await save_storm_config(data)
 
             if total_annoncailles > 0:
-                logger.info(f"📝 [Storm Alerts] {total_annoncailles} îles annoncées au total ce cycle !")
+                logger.info(
+                    f"📝 [Storm Alerts] {total_annoncailles} alertes envoyées au total ce cycle (Îles + Forts) !"
+                )
 
         except Exception as e:
             logger.error(f"❌ [Storm Alerts CRASH FATAL] : {traceback.format_exc()}")
@@ -1008,48 +1229,6 @@ class StormsCog(commands.Cog):
     async def before_storm_alert_loop(self):
         await self.bot.wait_until_ready()
         await asyncio.sleep(15)
-
-    @storm_group.command(name="stop", description="Stop automatic alerts for respawning islands")
-    @app_commands.guild_only()
-    @app_commands.default_permissions(manage_guild=True)
-    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
-    async def storm_stop(self, interaction: discord.Interaction):
-        await interaction.response.defer(thinking=True)
-        langue, serveur = await get_server_config(interaction)
-
-        if not interaction.guild:
-            msg = t(langue, "cmd_guild_only", defaut="❌ This command can only be used in a server.")
-            return await interaction.followup.send(msg)
-
-        data = await load_storm_config()
-        guild_id_str = str(interaction.guild.id)
-
-        if "guilds" in data and guild_id_str in data["guilds"]:
-            del data["guilds"][guild_id_str]
-            await save_storm_config(data)
-
-            obs.record_guild_event(
-                "storm_stop", guild=interaction.guild, user_id=interaction.user.id, gge_server=serveur
-            )
-
-            embed = discord.Embed(
-                title=t(langue, "cmd_storm_stop_title", defaut="🛑 Alerts Stopped"),
-                description=t(
-                    langue,
-                    "cmd_storm_stop_desc",
-                    defaut="Automatic Storm Islands alerts have been successfully disabled for this server.",
-                ),
-                color=discord.Color.red(),
-            )
-            await setup_embed_footer(embed, interaction, langue)
-            await interaction.followup.send(embed=embed)
-        else:
-            msg = t(
-                langue,
-                "cmd_storm_stop_none",
-                defaut="{e_information} No active alerts configuration found for this server.",
-            )
-            await interaction.followup.send(msg)
 
     def _dummy_i18n():
         langue = "fr"
