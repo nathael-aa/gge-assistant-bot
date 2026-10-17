@@ -14,7 +14,7 @@ from discord import app_commands
 import observability as obs
 
 logger = logging.getLogger("GGE_Bot")
-BOT_VERSION = "GGE Assistant • Version 1.3.2"
+BOT_VERSION = "GGE Assistant • Version 1.3.3"
 
 # ========================================
 # ⚙️ GESTION DES CHEMINS & DOSSIER

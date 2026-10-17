@@ -64,7 +64,7 @@ class RankingPaginationView(PaginationView):
         self.message = None
 
         btn = discord.ui.Button(
-            label="Actualiser",
+            label="Refresh",
             style=discord.ButtonStyle.secondary,
             row=1,
             emoji=DICT_EMOJIS.get("e_refresh", "🔄"),
