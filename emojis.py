@@ -1,3 +1,9 @@
+import logging
+from pathlib import Path
+import discord
+
+logger = logging.getLogger("GGE_Bot")
+
 DICT_EMOJIS = {
     "e_2_": "<:2_:1512574740915818527>",
     "e_4_": "<:4_:1512574743369224303>",
@@ -154,3 +160,74 @@ DICT_EMOJIS = {
     "e_dev": "<:developer:1542207399476330497>",
     "e_w2chatlogo": "<:w2chat_logo:1542290796416467026>",
 }
+
+EMOJI_ALIASES = {
+    "e_dm": "message",
+    "e_staff": "moderador",
+    "e_information": "Information",
+    "e_le_hraut_lumbricus_2": "Le_Hraut_Lumbricus_2",
+    "e_std_chart_decreasing": "chart_down",
+    "e_std_chart_increasing": "chart_up",
+    "e_std_satellite": "status",
+    "e_std_satellite_antenna": "status",
+    "e_std_scroll": "book",
+    "e_std_shield": "shield",
+    "e_std_sleeping_face": "sleepy",
+    "e_std_small_blue_diamond": "whitedot",
+    "e_std_star": "sparkles",
+    "e_std_stopwatch": "timer",
+    "e_std_three_o_clock": "clock",
+    "e_std_trophy": "season",
+    "e_std_vs_button": "versus",
+    "e_std_winking_face": "guides",
+    "e_std_world_map": "words",
+    "e_time": "waitingids",
+    "e_heart": "pinkhearts",
+    "e_marshal": "stalwartmarshal",
+    "e_next": "nextpage",
+    "e_last": "lastpage",
+    "e_casleruin": "ruins",
+    "e_level_title_1": "title_level_1",
+    "e_level_title_2": "title_level_2",
+    "e_level_title_3": "title_level_3",
+    "e_generalsforumlogo": "generalforum",
+    "e_dev": "developer",
+    "e_w2chatlogo": "w2chat_logo",
+}
+
+
+async def sync_and_load_emojis(bot: discord.Client, auto_upload: bool = False):
+    """
+    Récupère les émojis directement depuis le portail développeur Discord
+    et met à jour DICT_EMOJIS en mémoire (in-place).
+    """
+    try:
+        app_emojis = await bot.fetch_application_emojis()
+        discord_map = {e.name.lower(): str(e) for e in app_emojis}
+
+        if auto_upload:
+            assets_dir = Path(__file__).parent / "assets" / "emojis"
+            if assets_dir.exists():
+                for img_path in assets_dir.iterdir():
+                    if img_path.suffix.lower() in (".png", ".gif") and img_path.stem.lower() not in discord_map:
+                        try:
+                            new_emo = await bot.create_application_emoji(
+                                name=img_path.stem, image=img_path.read_bytes()
+                            )
+                            discord_map[new_emo.name.lower()] = str(new_emo)
+                            logger.info(f"✨ [Emojis] Nouvel émoji uploadé : {new_emo.name}")
+                        except Exception as e:
+                            logger.warning(f"⚠️ [Emojis] Impossible d'uploader {img_path.name} : {e}")
+
+        for emo in app_emojis:
+            DICT_EMOJIS[f"e_{emo.name}"] = str(emo)
+            DICT_EMOJIS[f"e_{emo.name.lower()}"] = str(emo)
+
+        for code_key, target_name in EMOJI_ALIASES.items():
+            if target_name.lower() in discord_map:
+                DICT_EMOJIS[code_key] = discord_map[target_name.lower()]
+
+        logger.info(f"🎨 [Emojis] {len(app_emojis)} émojis d'application synchronisés en mémoire.")
+
+    except Exception as e:
+        logger.error(f"❌ [Emojis] Échec de la synchronisation dynamique : {e}")

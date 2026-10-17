@@ -8,6 +8,7 @@ import socket
 import sys
 import traceback
 import xml.etree.ElementTree as ET
+from emojis import sync_and_load_emojis
 from datetime import datetime, timedelta
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
@@ -178,6 +179,11 @@ class GGEAssistantBot(commands.Bot):
         # =======================================
         connecteur_ipv4 = aiohttp.TCPConnector(family=socket.AF_INET)
         self.session = aiohttp.ClientSession(connector=connecteur_ipv4)
+
+        # =======================================
+        # Upload emojis
+        # =======================================
+        await sync_and_load_emojis(self, auto_upload=True)
 
         # =======================================
         # CHARGEMENT DES COGS
