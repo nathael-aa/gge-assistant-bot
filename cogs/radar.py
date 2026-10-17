@@ -267,7 +267,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         self.users_lang_cache = {}
         self.users_cache_mtime = 0
 
-        # ⚡ CACHE ETAG POUR LA BETA API
+        # ⚡ CACHE ETAG POUR L API
         self.etags_cache = {}
         self.next_scan = {}
         # GGE server currently being scanned by radar_spy_task
@@ -1323,7 +1323,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     continue
 
                 # 🚪 2. On toque à la porte globale du serveur pour savoir si les données ont bougé
-                url_base = "https://api-beta.gge-tracker.com/api/v1/"
+                url_base = "https://api.gge-tracker.com/api/v1/"
                 req_headers = headers.copy()
                 if cache_key_server in self.etags_cache:
                     req_headers["If-None-Match"] = self.etags_cache[cache_key_server]
@@ -1361,7 +1361,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                         continue
 
                     try:
-                        url_alli_live = f"https://api-beta.gge-tracker.com/api/v1/alliances/id/{a_id}"
+                        url_alli_live = f"https://api.gge-tracker.com/api/v1/alliances/id/{a_id}"
                         # Requête simple, sans If-None-Match car on sait que ça a bougé
                         async with session.get(url_alli_live, headers=headers, timeout=10) as r_live:
                             if r_live.status == 200:
@@ -1610,7 +1610,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 if tracked_players:
                     player_ids = [p_id for p_id, p_info in tracked_players]
                     try:
-                        url_bulk = "https://api-beta.gge-tracker.com/api/v1/players"
+                        url_bulk = "https://api.gge-tracker.com/api/v1/players"
                         # Envoi direct sans ETag
                         async with session.post(url_bulk, headers=headers, json=player_ids, timeout=10) as r:
                             if r.status == 200:
@@ -1929,7 +1929,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 # ==========================================
                 try:
                     url_movements = (
-                        "https://api-beta.gge-tracker.com/api/v1/server/movements?page=1&castleType=1&movementType=3"
+                        "https://api.gge-tracker.com/api/v1/server/movements?page=1&castleType=1&movementType=3"
                     )
                     # Pas d'ETag ici non plus, on prend directement les données fraîches
                     async with session.get(url_movements, headers=headers, timeout=5) as r:

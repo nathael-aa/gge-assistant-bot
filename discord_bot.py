@@ -719,7 +719,7 @@ class GGEAssistantBot(commands.Bot):
     async def update_servers_task(self):
         obs.set_task_name("update_servers_task")
 
-        url = "https://api-beta.gge-tracker.com/api/v1/servers/catalog"
+        url = "https://api.gge-tracker.com/api/v1/servers/catalog"
         webhook_url = os.getenv("WEBHOOK_SYNC")
 
         headers = await get_api_headers()
