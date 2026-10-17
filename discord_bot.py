@@ -143,7 +143,9 @@ class GGEAssistantBot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
-        super().__init__(command_prefix="!", intents=intents, help_command=None)
+
+        super().__init__(command_prefix="!", intents=intents, help_command=None, chunk_guilds_at_startup=False)
+
         self.maintenance_mode = load_maintenance()
 
         self.tree.interaction_check = self.global_interaction_check
@@ -807,6 +809,110 @@ class GGEAssistantBot(commands.Bot):
 
                             if changed_flags:
                                 changements_features.append(f"• **{name}** ➔ " + " | ".join(changed_flags))
+
+                                # ==========================================
+                                # 🧹 NETTOYAGE DES ABONNEMENTS TEMPÊTES
+                                # ==========================================
+                                if old_data.get("storm", False) and not new_data["storm"]:
+                                    try:
+                                        storm_file = Path("data/serveurs/storm_alerts.json")
+                                        if storm_file.exists():
+                                            with open(storm_file, encoding="utf-8") as fs:
+                                                storm_data = json.load(fs)
+
+                                            guilds_modified = False
+                                            guilds_to_remove = []
+
+                                            for gid, config in storm_data.get("guilds", {}).items():
+                                                if config.get("gge_server") == name:
+                                                    guilds_to_remove.append((gid, config))
+
+                                            for gid, config in guilds_to_remove:
+                                                channel_id = config.get("channel_id")
+                                                langue_serveur = config.get("langue", "fr")
+                                                channel = self.get_channel(channel_id) or await self.fetch_channel(
+                                                    channel_id
+                                                )
+                                                if channel:
+                                                    titre = t(
+                                                        langue_serveur,
+                                                        "bot_alert_module_disabled_title",
+                                                        defaut="⚠️ Fin des alertes Tempêtes",
+                                                    )
+                                                    desc = t(
+                                                        langue_serveur,
+                                                        "bot_alert_module_disabled_desc",
+                                                        server=name,
+                                                        defaut=f"Le serveur de jeu **{name}** ne gère plus les îles orageuses (ou a été désactivé par GGE-Tracker). Les alertes automatiques ont été désactivées pour ce salon.",
+                                                    )
+                                                    embed = discord.Embed(
+                                                        title=titre, description=desc, color=discord.Color.red()
+                                                    )
+                                                    self.loop.create_task(channel.send(embed=embed))
+
+                                                del storm_data["guilds"][gid]
+                                                guilds_modified = True
+
+                                            if guilds_modified:
+                                                with open(storm_file, "w", encoding="utf-8") as fs:
+                                                    json.dump(storm_data, fs, indent=4, ensure_ascii=False)
+                                                logger.info(
+                                                    f"🧹 [XML Sync] Nettoyage : {len(guilds_to_remove)} serveurs Discord désabonnés du radar tempête pour {name}."
+                                                )
+                                    except Exception as e:
+                                        logger.error(f"❌ [XML Sync] Erreur nettoyage tempêtes pour {name} : {e}")
+
+                                # ==========================================
+                                # 🧹 NETTOYAGE DES SESSIONS FORTERESSES
+                                # ==========================================
+                                if old_data.get("fortress", False) and not new_data["fortress"]:
+                                    try:
+                                        fortress_file = JOUEURS_DIR / "forteresses_sessions.json"
+                                        if fortress_file.exists():
+                                            with open(fortress_file, encoding="utf-8") as fs:
+                                                fort_data = json.load(fs)
+
+                                            sessions_modified = False
+                                            users_to_remove = []
+
+                                            for uid, config in fort_data.get("sessions", {}).items():
+                                                srv = config.get("serveur") or config.get("gge_server")
+                                                if srv == name:
+                                                    users_to_remove.append(uid)
+
+                                            for uid in users_to_remove:
+                                                try:
+                                                    user = self.get_user(int(uid)) or await self.fetch_user(int(uid))
+                                                    if user:
+                                                        titre = t(
+                                                            "fr",
+                                                            "bot_alert_fortress_disabled_title",
+                                                            defaut="⚠️ Fin du Radar Forteresses",
+                                                        )
+                                                        desc = t(
+                                                            "fr",
+                                                            "bot_alert_fortress_disabled_desc",
+                                                            server=name,
+                                                            defaut=f"Le serveur de jeu **{name}** ne gère plus les forteresses (ou a été désactivé par l'API).\nTon radar automatique vient d'être arrêté en arrière-plan.",
+                                                        )
+                                                        embed = discord.Embed(
+                                                            title=titre, description=desc, color=discord.Color.red()
+                                                        )
+                                                        self.loop.create_task(user.send(embed=embed))
+                                                except Exception:
+                                                    pass
+
+                                                del fort_data["sessions"][uid]
+                                                sessions_modified = True
+
+                                            if sessions_modified:
+                                                with open(fortress_file, "w", encoding="utf-8") as fs:
+                                                    json.dump(fort_data, fs, indent=4, ensure_ascii=False)
+                                                logger.info(
+                                                    f"🧹 [XML Sync] Nettoyage : {len(users_to_remove)} sessions forteresses arrêtées pour {name}."
+                                                )
+                                    except Exception as e:
+                                        logger.error(f"❌ [XML Sync] Erreur nettoyage forteresses pour {name} : {e}")
 
                     with open(cache_file, "w", encoding="utf-8") as f:
                         json.dump({"servers_info": nouveau_servers_info}, f, indent=4, ensure_ascii=False)

@@ -762,7 +762,6 @@ class StormsCog(commands.Cog):
                 params_respawning = {"size": 4000, "filterByState": 3}
                 isles_respawning = []
                 try:
-                    # AJOUT DU LOG POUR DEBUG LES ERREURS HTTP 400
                     url_respawning = f"{self.api_base}storms/isles"
                     async with self.bot.session.get(
                         url_respawning, headers=headers, params=params_respawning, timeout=15
@@ -771,7 +770,6 @@ class StormsCog(commands.Cog):
                             api_data = await r.json()
                             isles_respawning = api_data.get("isles", [])
                         else:
-                            # Affiche l'URL complète avec les paramètres pour analyse
                             logger.warning(
                                 f"⚠️ [Storm Alerts] Code {r.status} reçu de l'API. URL: {r.url} - Serveur configuré: {gge_server}"
                             )
@@ -781,7 +779,6 @@ class StormsCog(commands.Cog):
                 if gge_server in servers_with_spawned:
                     params_occupied = {"size": 4000, "filterByState": 2}
                     try:
-                        # AJOUT DU LOG POUR DEBUG LES ERREURS HTTP 400
                         url_occupied = f"{self.api_base}storms/isles"
                         async with self.bot.session.get(
                             url_occupied, headers=headers, params=params_occupied, timeout=15
@@ -793,7 +790,6 @@ class StormsCog(commands.Cog):
                                     for isle in occ_data.get("isles", [])
                                 }
                             else:
-                                # Affiche l'URL complète avec les paramètres pour analyse
                                 logger.warning(
                                     f"⚠️ [Storm Alerts] Code {r.status} reçu de l'API (Occupied). URL: {r.url} - Serveur configuré: {gge_server}"
                                 )
