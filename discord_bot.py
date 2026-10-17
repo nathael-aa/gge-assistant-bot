@@ -83,23 +83,23 @@ class WelcomeView(discord.ui.View):
         super().__init__(timeout=None)
 
     def get_welcome_embed(self, lang="fr"):
-        title = t(lang, "welcome_title", defaut="<:guides:1533429318947045616> Welcome to GGE Assistant!")
+        title = t(lang, "welcome_title", defaut="{e_guides} Welcome to GGE Assistant!")
         desc = t(lang, "welcome_desc", defaut="Here is how to get started:")
 
         embed = discord.Embed(title=title, description=desc, color=0x0B1D51)
 
         embed.add_field(
-            name=t(lang, "welcome_step1_title", defaut="<:one:1533556309838790796> Configuration"),
+            name=t(lang, "welcome_step1_title", defaut="{e_one} Configuration"),
             value=t(lang, "welcome_step1_desc", defaut="Use </setup:0> to configure your profile."),
             inline=False,
         )
         embed.add_field(
-            name=t(lang, "welcome_step2_title", defaut="<:two:1533556308723109999> Tools"),
+            name=t(lang, "welcome_step2_title", defaut="{e_two} Tools"),
             value=t(lang, "welcome_step2_desc", defaut="Type </help:0> to see all commands."),
             inline=False,
         )
         embed.add_field(
-            name=t(lang, "welcome_step3_title", defaut="<:three:1533556307511087144> Calendar"),
+            name=t(lang, "welcome_step3_title", defaut="{e_three} Calendar"),
             value=t(lang, "welcome_step3_desc", defaut="Use </calendar setup:0> to get alerts."),
             inline=False,
         )
@@ -109,7 +109,7 @@ class WelcomeView(discord.ui.View):
 
     @discord.ui.button(
         label="Français",
-        emoji="<:flagfrench:1535281050249601105>",
+        emoji="{e_flagfrench}",
         style=discord.ButtonStyle.secondary,
         custom_id="welc_fr",
     )
@@ -118,7 +118,7 @@ class WelcomeView(discord.ui.View):
 
     @discord.ui.button(
         label="English",
-        emoji="<:flagunitedkingdom:1535281046394769429>",
+        emoji="{e_flagunitedkingdom}",
         style=discord.ButtonStyle.secondary,
         custom_id="welc_en",
     )
@@ -127,7 +127,7 @@ class WelcomeView(discord.ui.View):
 
     @discord.ui.button(
         label="Deutsch",
-        emoji="<:flaggermany:1535281037716889750>",
+        emoji="{e_flaggermany}",
         style=discord.ButtonStyle.secondary,
         custom_id="welc_de",
     )
@@ -1150,7 +1150,7 @@ class GGEAssistantBot(commands.Bot):
                 msg = t(
                     langue,
                     "err_dm_only",
-                    defaut="<:error:1512505075220611172> Cette commande est uniquement utilisable en **Messages Privés**.",
+                    defaut="{e_error} Cette commande est uniquement utilisable en **Messages Privés**.",
                 )
                 await interaction.response.send_message(msg, ephemeral=True)
             obs.deny_command(obs_ctx, "dm_only")
@@ -1162,7 +1162,7 @@ class GGEAssistantBot(commands.Bot):
                 msg = t(
                     langue,
                     "err_guild_only",
-                    defaut="<:error:1512505075220611172> Cette commande est uniquement utilisable sur des **Serveurs Discord**.",
+                    defaut="{e_error} Cette commande est uniquement utilisable sur des **Serveurs Discord**.",
                 )
                 await interaction.response.send_message(msg, ephemeral=True)
             obs.deny_command(obs_ctx, "guild_only")
@@ -1175,7 +1175,7 @@ class GGEAssistantBot(commands.Bot):
                     msg = t(
                         langue,
                         "err_admin_only",
-                        defaut="<:error:1512505075220611172> Vous devez avoir la permission **Gérer le serveur** pour utiliser cette commande.",
+                        defaut="{e_error} Vous devez avoir la permission **Gérer le serveur** pour utiliser cette commande.",
                     )
                     await interaction.response.send_message(msg, ephemeral=True)
                 obs.deny_command(obs_ctx, "admin_only")

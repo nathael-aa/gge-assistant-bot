@@ -115,6 +115,7 @@ class AdminCog(commands.Cog):
             name="🛠️ Code & Emojis",
             value="`!emojis_list` ➔ Liste tous les émojis utilisés.\n"
             "`!replace_raw [old] [new]` ➔ Remplace un texte/émoji dans tout le code.\n"
+            "`!i18n_emojis` ➔ Vérifie et corrige les émojis entre les langues.\n"
             "`!check_emojis` ➔ Détécteur d'émojis fantômes dans le code.\n"
             "`!check_bad_emojis` ➔ Détécteur de syntaxe d'émojis cassée.\n"
             "`!export_app_emojis` ➔ Télécharge tous les émojis dans le dev bot dans le fichier assets.",
@@ -1488,6 +1489,99 @@ class AdminCog(commands.Cog):
             await ctx.send(embed=embed, file=fichier_joint)
         else:
             await ctx.send(embed=embed)
+
+    @commands.command(name="i18n_emojis", hidden=True)
+    async def i18n_emojis(self, ctx):
+        """[CACHÉE] !i18n_emojis : Vérifie et corrige les émojis dans les traductions."""
+        import json
+        import re
+
+        msg_wait = await ctx.send("⏳ **Analyse de la cohérence des émojis entre les langues...**")
+
+        # Regex pour capter tes nouvelles balises {e_nom}
+        tag_pattern = re.compile(r"(\{e_[a-zA-Z0-9_]+\})")
+
+        locales_data = {}
+        for fichier in LOCALES_DIR.glob("*.json"):
+            with open(fichier, encoding="utf-8") as f:
+                locales_data[fichier.stem] = json.load(f)
+
+        fr_data = locales_data.get("fr", {})
+        if not fr_data:
+            return await msg_wait.edit(content="❌ Fichier `fr.json` introuvable ou vide.")
+
+        rapport = []
+        corrections_auto = 0
+        erreurs_manuelles = 0
+
+        for lang, data in locales_data.items():
+            if lang == "fr":
+                continue
+
+            modifie = False
+            for cle, texte_fr in fr_data.items():
+                if cle not in data:
+                    continue
+
+                texte_cible = data[cle]
+                fr_emojis = tag_pattern.findall(texte_fr)
+                cible_emojis = tag_pattern.findall(texte_cible)
+
+                # Si les émojis diffèrent entre la FR et la langue cible
+                if fr_emojis != cible_emojis:
+                    # CAS 1 : Le même nombre d'émojis, mais ce ne sont pas les bons
+                    if len(fr_emojis) == len(cible_emojis):
+                        # On remplace séquentiellement par ceux de la version FR
+                        iter_emojis = iter(fr_emojis)
+                        nouveau_texte = tag_pattern.sub(lambda m: next(iter_emojis), texte_cible)
+                        data[cle] = nouveau_texte
+                        corrections_auto += 1
+                        modifie = True
+
+                    # CAS 2 : Nombre différent d'émojis (oubliés ou en trop dans la trad)
+                    else:
+                        if not texte_cible.startswith("[⚠️ EMOJIS]"):
+                            data[cle] = f"[⚠️ EMOJIS] {texte_cible}"
+                            modifie = True
+                        erreurs_manuelles += 1
+                        rapport.append(
+                            f"• `{lang}.json` | Clé `{cle}` : FR a {len(fr_emojis)} émoji(s), {lang.upper()} en a {len(cible_emojis)}"
+                        )
+
+            # Sauvegarde du fichier si des modifications ont été faites
+            if modifie:
+                fichier = LOCALES_DIR / f"{lang}.json"
+                with open(fichier, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4, ensure_ascii=False)
+
+        # On recharge les langues en RAM pour appliquer les modifs
+        charger_langues()
+
+        if corrections_auto == 0 and erreurs_manuelles == 0:
+            return await msg_wait.edit(
+                content="✅ **Parfait !** Tous les émojis sont parfaitement synchronisés dans toutes les langues."
+            )
+
+        embed = discord.Embed(
+            title="🔄 Synchronisation des Émojis (i18n)",
+            description=(
+                f"✅ **Corrections automatiques :** `{corrections_auto}`\n"
+                f"*(Les émojis ont été remplacés car le nombre correspondait à la FR)*\n\n"
+                f"⚠️ **Interventions manuelles requises :** `{erreurs_manuelles}`\n"
+                f"*(Le nombre d'émojis est différent de la version FR)*"
+            ),
+            color=discord.Color.gold(),
+        )
+
+        if rapport:
+            lignes = "\n".join(rapport[:15])
+            if len(rapport) > 15:
+                lignes += f"\n*...et {len(rapport) - 15} autres alertes.*"
+            embed.add_field(name="Détails des erreurs (Quantité différente)", value=lignes, inline=False)
+            embed.set_footer(text="Les textes avec un problème ont été préfixés par [⚠️ EMOJIS] dans les JSON.")
+
+        await msg_wait.delete()
+        await ctx.send(embed=embed)
 
     @commands.command(name="check_bad_emojis", hidden=True)
     async def check_bad_emojis(self, ctx):

@@ -75,9 +75,9 @@ class RankingPaginationView(PaginationView):
 
     async def refresh_action(self, interaction: discord.Interaction):
         if interaction.user.id != self.user_id:
-            return await interaction.response.send_message(
-                "❌ Seul l'auteur de la commande peut l'actualiser.", ephemeral=True
-            )
+            langue, _ = await get_server_config(interaction)
+            msg_err = t(langue, "err_not_author", defaut="❌ Only the command author can refresh it.")
+            return await interaction.response.send_message(msg_err, ephemeral=True)
 
         await interaction.response.defer()
         new_embeds, new_page = await self.refresh_callback(interaction)
@@ -139,41 +139,41 @@ class ClassementCog(commands.Cog):
 
         if hasattr(ns, "statistic") and ns.statistic:
             if ns.statistic in ["plunder", "legendary"]:
-                choix = [app_commands.Choice(name="Classement Global", value=1)]
+                choix = [app_commands.Choice(name="Global Ranking", value=1)]
             else:
                 choix = [
-                    app_commands.Choice(name="Niveaux < 20", value=1),
-                    app_commands.Choice(name="Niveaux 20-29", value=2),
-                    app_commands.Choice(name="Niveaux 30-39", value=3),
-                    app_commands.Choice(name="Niveaux 40-49", value=4),
-                    app_commands.Choice(name="Niveaux 50-69", value=5),
-                    app_commands.Choice(name="Niveaux 70+", value=6),
+                    app_commands.Choice(name="Levels < 20", value=1),
+                    app_commands.Choice(name="Levels 20-29", value=2),
+                    app_commands.Choice(name="Levels 30-39", value=3),
+                    app_commands.Choice(name="Levels 40-49", value=4),
+                    app_commands.Choice(name="Levels 50-69", value=5),
+                    app_commands.Choice(name="Levels 70+", value=6),
                 ]
         elif hasattr(ns, "evenement") and ns.evenement:
             ev = ns.evenement
             if ev == "berimond":
                 choix = [
-                    app_commands.Choice(name="Ursidae (Niv 40-69)", value=1),
-                    app_commands.Choice(name="Gerbrandt (Niv 40-69)", value=2),
-                    app_commands.Choice(name="Ursidae (Niv 70+)", value=3),
-                    app_commands.Choice(name="Gerbrandt (Niv 70+)", value=4),
+                    app_commands.Choice(name="Ursidae (Lvl 40-69)", value=1),
+                    app_commands.Choice(name="Gerbrandt (Lvl 40-69)", value=2),
+                    app_commands.Choice(name="Ursidae (Lvl 70+)", value=3),
+                    app_commands.Choice(name="Gerbrandt (Lvl 70+)", value=4),
                 ]
             elif ev == "nobility":
                 choix = [
-                    app_commands.Choice(name="Niveaux 10-14", value=1),
-                    app_commands.Choice(name="Niveaux 15-19", value=2),
-                    app_commands.Choice(name="Niveaux 20-24", value=3),
-                    app_commands.Choice(name="Niveaux 25-29", value=4),
-                    app_commands.Choice(name="Niveaux 30-49", value=5),
-                    app_commands.Choice(name="Niveaux 50-69", value=6),
-                    app_commands.Choice(name="Légendaires (70+)", value=7),
+                    app_commands.Choice(name="Levels 10-14", value=1),
+                    app_commands.Choice(name="Levels 15-19", value=2),
+                    app_commands.Choice(name="Levels 20-24", value=3),
+                    app_commands.Choice(name="Levels 25-29", value=4),
+                    app_commands.Choice(name="Levels 30-49", value=5),
+                    app_commands.Choice(name="Levels 50-69", value=6),
+                    app_commands.Choice(name="Legendary (70+)", value=7),
                 ]
             elif ev == "season":
                 choix = [
-                    app_commands.Choice(name="Légendaire 1-199", value=1),
-                    app_commands.Choice(name="Légendaire 200-649", value=2),
-                    app_commands.Choice(name="Légendaire 650-949", value=3),
-                    app_commands.Choice(name="Légendaire 950+", value=4),
+                    app_commands.Choice(name="Legendary 1-199", value=1),
+                    app_commands.Choice(name="Legendary 200-649", value=2),
+                    app_commands.Choice(name="Legendary 650-949", value=3),
+                    app_commands.Choice(name="Legendary 950+", value=4),
                 ]
             elif ev in [
                 "flora",
@@ -189,17 +189,17 @@ class ClassementCog(commands.Cog):
                 "woa",
                 "patronage",
             ]:
-                choix = [app_commands.Choice(name="Classement Global", value=1)]
+                choix = [app_commands.Choice(name="Global Ranking", value=1)]
             else:
                 choix = [
-                    app_commands.Choice(name="Niveaux < 70", value=1),
-                    app_commands.Choice(name="Légendaire 1-299", value=2),
-                    app_commands.Choice(name="Légendaire 300-649", value=3),
-                    app_commands.Choice(name="Légendaire 650-949", value=4),
-                    app_commands.Choice(name="Légendaire 950+", value=5),
+                    app_commands.Choice(name="Levels < 70", value=1),
+                    app_commands.Choice(name="Legendary 1-299", value=2),
+                    app_commands.Choice(name="Legendary 300-649", value=3),
+                    app_commands.Choice(name="Legendary 650-949", value=4),
+                    app_commands.Choice(name="Legendary 950+", value=5),
                 ]
         else:
-            choix = [app_commands.Choice(name="Classement Global", value=1)]
+            choix = [app_commands.Choice(name="Global Ranking", value=1)]
 
         return [c for c in choix if current.lower() in c.name.lower()][:25]
 
@@ -233,6 +233,9 @@ class ClassementCog(commands.Cog):
         embed = discord.Embed(color=color)
         description = ""
 
+        txt_unknown = t(langue, "prof_unknown", defaut="Unknown")
+        txt_none = t(langue, "prof_none", defaut="None")
+
         TITRES_PRE = {
             13: get_emo(langue, "{e_title_0}"),
             103: get_emo(langue, "{e_title_1}"),
@@ -262,8 +265,8 @@ class ClassementCog(commands.Cog):
             if isinstance(p, dict):
                 rank = int(p.get("R", 0))
                 score = p.get("S", 0)
-                name = p.get("P", "Inconnu")
-                alliance = p.get("A", "Aucune")
+                name = p.get("P", txt_unknown)
+                alliance = p.get("A", txt_none)
             else:
                 if len(p) < 2:
                     continue
@@ -272,16 +275,16 @@ class ClassementCog(commands.Cog):
                 if len(p) >= 5 and isinstance(p[3], str) and not isinstance(p[2], dict):
                     rank = int(p[4])
                     name = p[3]
-                    alliance = "Aucune"
+                    alliance = txt_none
                 elif len(p) >= 3 and isinstance(p[2], list) and len(p[2]) >= 2:
                     rank = int(p[0])
                     name = p[2][1]
-                    alliance = "Aucune"
+                    alliance = txt_none
                 else:
                     rank = int(p[0])
                     info = next((item for item in p if isinstance(item, dict)), {})
-                    name = info.get("N", "Inconnu")
-                    alliance = info.get("AN", "Aucune")
+                    name = info.get("N", txt_unknown)
+                    alliance = info.get("AN", txt_none)
 
             league_str = ""
             if event_name == "league" and not is_alliance:
@@ -333,7 +336,7 @@ class ClassementCog(commands.Cog):
                 else:
                     description += f"{medal} {display_name}{league_str} | `{pts_str}` pts\n"
             else:
-                all_str = f" ({alliance})" if alliance and alliance != "Aucune" else ""
+                all_str = f" ({alliance})" if alliance and alliance != txt_none else ""
                 if event_name == "league":
                     valeur_txt = t(langue, "cal_league_value", defaut="Valeur")
                     description += f"{medal} {display_name}{all_str}{league_str} | `{valeur_txt} : {pts_str}`\n"
@@ -346,7 +349,7 @@ class ClassementCog(commands.Cog):
     @classement.command(name="statistics", description="Displays a live ranking for player statistics.")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.describe(
-        statistic="Catégorie", player="Pseudo (Optionnel)", rank="Rang (Optionnel)", tranche="Tranche (Optionnel)"
+        statistic="Category", player="Player (Optional)", rank="Rank (Optional)", tranche="Bracket (Optional)"
     )
     @app_commands.autocomplete(player=joueur_autocomplete, tranche=tranche_autocomplete)
     @app_commands.choices(
@@ -466,7 +469,7 @@ class ClassementCog(commands.Cog):
                 warning_msg += "\n" + t(
                     langue,
                     "info_max_bracket",
-                    defaut="*💡 Info : Tranche maximale affichée par défaut. Utilisez l'option `tranche` pour changer.*",
+                    defaut="*💡 Info: Maximum bracket displayed by default. Use the `bracket` option to change.*",
                 )
 
             accumulated_data = {lid: [] for lid in possible_lids}
@@ -497,7 +500,6 @@ class ClassementCog(commands.Cog):
                                 return await r.json()
                             else:
                                 self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                # Ajout des codes 500 (crash API) pour forcer le bot à faire une pause
                                 if r.status in [429, 500, 502, 503, 504]:
                                     await asyncio.sleep(2)
                     except TimeoutError:
@@ -578,13 +580,14 @@ class ClassementCog(commands.Cog):
                 if statistic in ["plunder", "legendary"]
                 else get_emo(langue, "{e_lvl}")
             )
+
             if statistic in ["plunder", "legendary"]:
-                nom_tranche = t(langue, "ev_bracket_all", defaut="Classement Global")
+                nom_tranche = t(langue, "ev_bracket_all", defaut="Global Ranking")
             else:
-                nom_tranche_defaut = "Niveaux 70+" if found_lid == 6 else f"Tranche {found_lid}"
+                nom_tranche_defaut = "Levels 70+" if found_lid == 6 else f"Bracket {found_lid}"
                 nom_tranche = t(langue, f"stat_bracket_{found_lid}", defaut=nom_tranche_defaut)
 
-            mot_classement = t(langue, "ev_word_rank", defaut="Classement")
+            mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
             titre = f"{stat_info['emoji']} {mot_classement} {stat_info['name']}\n{bracket_icon} {nom_tranche}"
 
             seen_players = set()
@@ -612,9 +615,23 @@ class ClassementCog(commands.Cog):
 
             if search_mode and not player_found:
                 if loc_rank:
-                    warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé. Voici le rang {loc_rank} à la place.*"
+                    msg = t(
+                        langue,
+                        "info_player_not_found_rank",
+                        joueur=loc_player,
+                        rang=loc_rank,
+                        defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
+                    )
+                    warning_msg += f"\n\n{msg}"
                 else:
-                    warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé dans le Top {max_sv_limit}. Voici la première page.*"
+                    msg = t(
+                        langue,
+                        "info_player_not_found_top",
+                        joueur=loc_player,
+                        top=max_sv_limit,
+                        defaut="*💡 Info: Player **{joueur}** not found in the Top {top}. Showing first page instead.*",
+                    )
+                    warning_msg += f"\n\n{msg}"
                     page_cible = 0
 
             if statistic == "achievements":
@@ -645,7 +662,11 @@ class ClassementCog(commands.Cog):
                 embed.title = titre
                 if warning_msg and i == page_cible:
                     embed.description = embed.description + warning_msg
-                embed.set_footer(text=f"Page {i + 1}/{len(chunks)}")
+
+                footer_text = t(
+                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
+                )
+                embed.set_footer(text=footer_text)
                 await setup_embed_footer(embed, ctx_int, langue)
                 embeds.append(embed)
 
@@ -668,7 +689,7 @@ class ClassementCog(commands.Cog):
     @classement.command(name="event", description="Displays an event's live ranking.")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.describe(
-        evenement="Événement", player="Pseudo (Optionnel)", rank="Rang (Optionnel)", tranche="Tranche (Optionnel)"
+        evenement="Event", player="Player (Optional)", rank="Rank (Optional)", tranche="Bracket (Optional)"
     )
     @app_commands.autocomplete(player=joueur_autocomplete, tranche=tranche_autocomplete)
     @app_commands.choices(
@@ -786,7 +807,7 @@ class ClassementCog(commands.Cog):
                 warning_msg += "\n" + t(
                     langue,
                     "info_max_bracket",
-                    defaut="*💡 Info : Tranche maximale affichée par défaut. Utilisez l'option `tranche` pour changer.*",
+                    defaut="*💡 Info: Maximum bracket displayed by default. Use the `bracket` option to change.*",
                 )
             accumulated_data = {lid: [] for lid in possible_lids}
             player_found = False
@@ -816,7 +837,6 @@ class ClassementCog(commands.Cog):
                                 return await r.json()
                             else:
                                 self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                # Ajout des codes 500 (crash API) pour forcer le bot à faire une pause
                                 if r.status in [429, 500, 502, 503, 504]:
                                     await asyncio.sleep(2)
                     except TimeoutError:
@@ -842,7 +862,6 @@ class ClassementCog(commands.Cog):
                     if not task_coros:
                         break
                     responses = await asyncio.gather(*task_coros)
-
                     if all(resp is None for resp in responses):
                         if any(len(data) > 0 for data in accumulated_data.values()):
                             break
@@ -899,20 +918,25 @@ class ClassementCog(commands.Cog):
             else:
                 all_players_raw = accumulated_data[found_lid]
 
-            mot_classement = t(langue, "ev_word_rank", defaut="Classement")
+            mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
+
             if evenement == "berimond":
+                c1 = t(langue, "camp_ursidae", defaut="Ursidae Camp")
+                c2 = t(langue, "camp_gerbrandt", defaut="Gerbrandt Camp")
+                l1 = t(langue, "lvl_40_69", defaut="Levels 40-69")
+                l2 = t(langue, "lvl_70_plus", defaut="Legendary (70+)")
                 BERIMOND_DETAILS = {
-                    1: ("Camp Ursidae", "Niveaux 40-69"),
-                    2: ("Camp Gerbrandt", "Niveaux 40-69"),
-                    3: ("Camp Ursidae", "Légendaires (70+)"),
-                    4: ("Camp Gerbrandt", "Légendaires (70+)"),
+                    1: (c1, l1),
+                    2: (c2, l1),
+                    3: (c1, l2),
+                    4: (c2, l2),
                 }
-                camp_txt, lvl_txt = BERIMOND_DETAILS.get(found_lid, ("Bérimond", "Légendaires (70+)"))
+                camp_txt, lvl_txt = BERIMOND_DETAILS.get(found_lid, ("Berimond", l2))
                 if not search_mode and not loc_tranche:
-                    camp_txt = "Les deux camps"
-                titre = f"{get_emo(langue, '{e_berimond}')} Bataille de Bérimond — {camp_txt}\n{get_emo(langue, '{e_lvl}')} {lvl_txt}"
+                    camp_txt = t(langue, "camp_both", defaut="Both camps")
+                titre = f"{get_emo(langue, '{e_berimond}')} {t(langue, 'cal_ev_berimond', defaut='Battle of Berimond')} — {camp_txt}\n{get_emo(langue, '{e_lvl}')} {lvl_txt}"
             else:
-                nom_tranche_defaut = BRACKETS.get(str(found_lid), f"Tranche {found_lid}")
+                nom_tranche_defaut = BRACKETS.get(str(found_lid), f"Bracket {found_lid}")
                 nom_tranche = t(langue, f"ev_bracket_{found_lid}", defaut=nom_tranche_defaut)
                 titre = (
                     f"{ev_info['emoji']} {mot_classement} {ev_info['name']}\n{get_emo(langue, '{e_lvl}')} {nom_tranche}"
@@ -943,9 +967,23 @@ class ClassementCog(commands.Cog):
 
             if search_mode and not player_found:
                 if loc_rank:
-                    warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé. Voici le rang {loc_rank} à la place.*"
+                    msg = t(
+                        langue,
+                        "info_player_not_found_rank",
+                        joueur=loc_player,
+                        rang=loc_rank,
+                        defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
+                    )
+                    warning_msg += f"\n\n{msg}"
                 else:
-                    warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé dans le Top {max_sv_limit}. Voici la première page par défaut.*"
+                    msg = t(
+                        langue,
+                        "info_player_not_found_top",
+                        joueur=loc_player,
+                        top=max_sv_limit,
+                        defaut="*💡 Info: Player **{joueur}** not found in the Top {top}. Showing first page instead.*",
+                    )
+                    warning_msg += f"\n\n{msg}"
                     page_cible = 0
 
             if evenement == "berimond" and (search_mode or loc_tranche):
@@ -972,7 +1010,11 @@ class ClassementCog(commands.Cog):
                 embed.title = titre
                 if warning_msg and i == page_cible:
                     embed.description = embed.description + warning_msg
-                embed.set_footer(text=f"Page {i + 1}/{len(chunks)}")
+
+                footer_text = t(
+                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
+                )
+                embed.set_footer(text=footer_text)
                 await setup_embed_footer(embed, ctx_int, langue)
                 embeds.append(embed)
 
@@ -994,7 +1036,7 @@ class ClassementCog(commands.Cog):
 
     @classement.command(name="gacha", description="Displays a live ranking for Gacha events")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
-    @app_commands.describe(evenement="Événement", player="Pseudo (Optionnel)", rank="Rang (Optionnel)")
+    @app_commands.describe(evenement="Event", player="Player (Optional)", rank="Rank (Optional)")
     @app_commands.autocomplete(player=joueur_autocomplete)
     @app_commands.choices(
         evenement=[
@@ -1022,27 +1064,27 @@ class ClassementCog(commands.Cog):
             EVENT_MAP = {
                 "flora": {
                     "name": t(langue, "cal_ev_flora", defaut="Piège de la Flore Fatale"),
-                    "emoji": DICT_EMOJIS.get("e_FloraToken", "<:FloraToken:1532427755671650465>"),
+                    "emoji": DICT_EMOJIS.get("e_FloraToken", "{e_floratoken}"),
                 },
                 "snowglobe": {
                     "name": t(langue, "cal_ev_snowglobe", defaut="La Boule à Neige Enchantée"),
-                    "emoji": DICT_EMOJIS.get("e_FrozenCarrot", "<:FrozenCarrot:1532428873768374382>"),
+                    "emoji": DICT_EMOJIS.get("e_FrozenCarrot", "{e_frozencarrot}"),
                 },
                 "hollowmoon": {
                     "name": t(langue, "cal_ev_hollowmoon", defaut="Invocation de Lune"),
-                    "emoji": DICT_EMOJIS.get("e_Moonegg", "<:Moonegg:1532428876876091573>"),
+                    "emoji": DICT_EMOJIS.get("e_Moonegg", "{e_moonegg}"),
                 },
                 "sandfortune": {
                     "name": t(langue, "cal_ev_sandfortune", defaut="Sables de Fortune"),
-                    "emoji": DICT_EMOJIS.get("e_Orange", "<:Orange:1532428875424989246>"),
+                    "emoji": DICT_EMOJIS.get("e_Orange", "{e_orange}"),
                 },
                 "banquet": {
                     "name": t(langue, "cal_ev_banquet", defaut="Banquet du Roi"),
-                    "emoji": DICT_EMOJIS.get("e_Cake", "<:Cake:1532428872639971380>"),
+                    "emoji": DICT_EMOJIS.get("e_Cake", "{e_cake}"),
                 },
                 "midnight": {
                     "name": t(langue, "cal_ev_midnight", defaut="Marché de Minuit"),
-                    "emoji": DICT_EMOJIS.get("e_Midnight_key", "<:Midnight_key:1532429792413089835>"),
+                    "emoji": DICT_EMOJIS.get("e_Midnight_key", "{e_midnight_key}"),
                 },
             }
             ev_info = EVENT_MAP.get(
@@ -1102,7 +1144,6 @@ class ClassementCog(commands.Cog):
                                 return await r.json()
                             else:
                                 self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                # Ajout des codes 500 (crash API) pour forcer le bot à faire une pause
                                 if r.status in [429, 500, 502, 503, 504]:
                                     await asyncio.sleep(2)
                     except TimeoutError:
@@ -1177,8 +1218,8 @@ class ClassementCog(commands.Cog):
 
             all_players_raw = accumulated_data[1]
 
-            nom_tranche = t(langue, "ev_bracket_all", defaut="Classement Global")
-            mot_classement = t(langue, "ev_word_rank", defaut="Classement")
+            nom_tranche = t(langue, "ev_bracket_all", defaut="Global Ranking")
+            mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
             bracket_icon = get_emo(langue, "{e_icon_points}")
             titre = f"{ev_info['emoji']} {mot_classement} {ev_info['name']}\n{bracket_icon} {nom_tranche}"
 
@@ -1211,15 +1252,19 @@ class ClassementCog(commands.Cog):
                     msg = t(
                         langue,
                         "info_player_not_found_rank",
-                        defaut="*💡 Info : Le joueur **{joueur}** n'a pas été trouvé. Voici le rang {rang} à la place.*",
-                    ).format(joueur=loc_player, rang=loc_rank)
+                        joueur=loc_player,
+                        rang=loc_rank,
+                        defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
+                    )
                     warning_msg += f"\n\n{msg}"
                 else:
                     msg = t(
                         langue,
                         "info_player_not_found_top",
-                        defaut="*💡 Info : Le joueur **{joueur}** n'a pas été trouvé dans le Top {top}. Voici la première page par défaut.*",
-                    ).format(joueur=loc_player, top=max_sv_limit)
+                        joueur=loc_player,
+                        top=max_sv_limit,
+                        defaut="*💡 Info: Player **{joueur}** not found in the Top {top}. Showing first page instead.*",
+                    )
                     warning_msg += f"\n\n{msg}"
                     page_cible = 0
 
@@ -1249,7 +1294,11 @@ class ClassementCog(commands.Cog):
                 embed.title = titre
                 if warning_msg and i == page_cible:
                     embed.description = embed.description + warning_msg
-                embed.set_footer(text=f"Page {i + 1}/{len(chunks)}")
+
+                footer_text = t(
+                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
+                )
+                embed.set_footer(text=footer_text)
                 await setup_embed_footer(embed, ctx_int, langue)
                 embeds.append(embed)
 
@@ -1271,7 +1320,7 @@ class ClassementCog(commands.Cog):
 
     @classement.command(name="realms", description="Displays a ranking for cross-server events")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
-    @app_commands.describe(evenement="Événement", player="Pseudo (Optionnel)", rank="Rang (Optionnel)")
+    @app_commands.describe(evenement="Event", player="Player (Optional)", rank="Rank (Optional)")
     @app_commands.autocomplete(player=joueur_autocomplete)
     @app_commands.choices(
         evenement=[
@@ -1372,7 +1421,6 @@ class ClassementCog(commands.Cog):
                                 return await r.json()
                             else:
                                 self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                # Ajout des codes 500 (crash API) pour forcer le bot à faire une pause
                                 if r.status in [429, 500, 502, 503, 504]:
                                     await asyncio.sleep(2)
                     except TimeoutError:
@@ -1452,8 +1500,8 @@ class ClassementCog(commands.Cog):
 
             all_players_raw = accumulated_data[1]
 
-            nom_tranche = t(langue, "ev_bracket_cross_server", defaut="Classement Inter-Serveurs")
-            mot_classement = t(langue, "ev_word_rank", defaut="Classement")
+            nom_tranche = t(langue, "ev_bracket_cross_server", defaut="Cross-Server Ranking")
+            mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
             bracket_icon = get_emo(langue, "{e_icon_points}")
             titre = f"{ev_info['emoji']} {mot_classement} {ev_info['name']}\n{bracket_icon} {nom_tranche}"
 
@@ -1491,15 +1539,19 @@ class ClassementCog(commands.Cog):
                     msg = t(
                         langue,
                         "info_player_not_found_rank",
-                        defaut="*💡 Info : Le joueur **{joueur}** n'a pas été trouvé. Voici le rang {rang} à la place.*",
-                    ).format(joueur=loc_player, rang=loc_rank)
+                        joueur=loc_player,
+                        rang=loc_rank,
+                        defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
+                    )
                     warning_msg += f"\n\n{msg}"
                 else:
                     msg = t(
                         langue,
                         "info_player_not_found_top",
-                        defaut="*💡 Info : Le joueur **{joueur}** n'a pas été trouvé dans le Top {top}. Voici la première page par défaut.*",
-                    ).format(joueur=loc_player, top=max_sv_limit)
+                        joueur=loc_player,
+                        top=max_sv_limit,
+                        defaut="*💡 Info: Player **{joueur}** not found in the Top {top}. Showing first page instead.*",
+                    )
                     warning_msg += f"\n\n{msg}"
                     page_cible = 0
 
@@ -1518,7 +1570,11 @@ class ClassementCog(commands.Cog):
                 embed.title = titre
                 if warning_msg and i == page_cible:
                     embed.description = embed.description + warning_msg
-                embed.set_footer(text=f"Page {i + 1}/{len(chunks)}")
+
+                footer_text = t(
+                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
+                )
+                embed.set_footer(text=footer_text)
                 await setup_embed_footer(embed, ctx_int, langue)
                 embeds.append(embed)
 
@@ -1541,7 +1597,7 @@ class ClassementCog(commands.Cog):
     @classement.command(name="league", description="Displays a ranking for Season and League events")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.describe(
-        evenement="Événement", player="Pseudo (Optionnel)", rank="Rang (Optionnel)", tranche="Tranche (Optionnel)"
+        evenement="Event", player="Player (Optional)", rank="Rank (Optional)", tranche="Bracket (Optional)"
     )
     @app_commands.autocomplete(player=joueur_autocomplete, tranche=tranche_autocomplete)
     @app_commands.choices(
@@ -1657,7 +1713,7 @@ class ClassementCog(commands.Cog):
                 warning_msg += "\n" + t(
                     langue,
                     "info_max_bracket",
-                    defaut="*💡 Info : Tranche maximale affichée par défaut. Utilisez l'option `tranche` pour changer.*",
+                    defaut="*💡 Info: Maximum bracket displayed by default. Use the `bracket` option to change.*",
                 )
 
             accumulated_data = {lid: [] for lid in possible_lids}
@@ -1692,7 +1748,6 @@ class ClassementCog(commands.Cog):
                                 return await r.json()
                             else:
                                 self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                # Ajout des codes 500 (crash API) pour forcer le bot à faire une pause
                                 if r.status in [429, 500, 502, 503, 504]:
                                     await asyncio.sleep(2)
                     except TimeoutError:
@@ -1769,13 +1824,13 @@ class ClassementCog(commands.Cog):
             all_players_raw = accumulated_data[found_lid]
 
             if evenement == "league":
-                nom_tranche = t(langue, "ev_bracket_all", defaut="Classement Global")
+                nom_tranche = t(langue, "ev_bracket_all", defaut="Global Ranking")
             elif evenement == "season":
-                nom_tranche_defaut = f"Tranche {found_lid}" if found_lid != 4 else "Légendaire 950+"
+                nom_tranche_defaut = f"Bracket {found_lid}" if found_lid != 4 else "Legendary 950+"
                 nom_tranche = t(langue, f"season_bracket_{found_lid}", defaut=nom_tranche_defaut)
 
             bracket_icon = get_emo(langue, "{e_lvl}")
-            mot_classement = t(langue, "ev_word_rank", defaut="Classement")
+            mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
             titre = f"{ev_info['emoji']} {mot_classement} {ev_info['name']}\n{bracket_icon} {nom_tranche}"
 
             seen_players = set()
@@ -1814,11 +1869,26 @@ class ClassementCog(commands.Cog):
                     if trouve_dans_page:
                         break
 
+            warning_msg = ""
             if search_mode and not player_found:
                 if loc_rank:
-                    warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé. Voici le rang {loc_rank} à la place.*"
+                    msg = t(
+                        langue,
+                        "info_player_not_found_rank",
+                        joueur=loc_player,
+                        rang=loc_rank,
+                        defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
+                    )
+                    warning_msg += f"\n\n{msg}"
                 else:
-                    warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé dans le Top {max_sv_limit}. Voici la première page par défaut.*"
+                    msg = t(
+                        langue,
+                        "info_player_not_found_top",
+                        joueur=loc_player,
+                        top=max_sv_limit,
+                        defaut="*💡 Info: Player **{joueur}** not found in the Top {top}. Showing first page instead.*",
+                    )
+                    warning_msg += f"\n\n{msg}"
                     page_cible = 0
 
             embed_color = discord.Color(0xDDAADD) if evenement == "season" else discord.Color(0x004D25)
@@ -1836,7 +1906,11 @@ class ClassementCog(commands.Cog):
                 embed.title = titre
                 if warning_msg and i == page_cible:
                     embed.description = embed.description + warning_msg
-                embed.set_footer(text=f"Page {i + 1}/{len(chunks)}")
+
+                footer_text = t(
+                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
+                )
+                embed.set_footer(text=footer_text)
                 await setup_embed_footer(embed, ctx_int, langue)
                 embeds.append(embed)
 
@@ -1859,7 +1933,7 @@ class ClassementCog(commands.Cog):
     @classement.command(name="contests", description="Displays a ranking for specific contests")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.describe(
-        evenement="Événement", player="Pseudo (Optionnel)", rank="Rang (Optionnel)", tranche="Tranche (Optionnel)"
+        evenement="Event", player="Player (Optional)", rank="Rank (Optional)", tranche="Bracket (Optional)"
     )
     @app_commands.autocomplete(player=joueur_autocomplete, tranche=tranche_autocomplete)
     @app_commands.choices(
@@ -1989,7 +2063,7 @@ class ClassementCog(commands.Cog):
                 warning_msg += "\n" + t(
                     langue,
                     "info_max_bracket",
-                    defaut="*💡 Info : Tranche maximale affichée par défaut. Utilisez l'option `tranche` pour changer.*",
+                    defaut="*💡 Info: Maximum bracket displayed by default. Use the `bracket` option to change.*",
                 )
 
             accumulated_data = {lid: [] for lid in possible_lids}
@@ -2020,7 +2094,6 @@ class ClassementCog(commands.Cog):
                                 return await r.json()
                             else:
                                 self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                # Ajout des codes 500 (crash API) pour forcer le bot à faire une pause
                                 if r.status in [429, 500, 502, 503, 504]:
                                     await asyncio.sleep(2)
                     except TimeoutError:
@@ -2097,18 +2170,18 @@ class ClassementCog(commands.Cog):
             all_players_raw = accumulated_data[found_lid]
 
             if evenement in ["woa", "patronage"]:
-                nom_tranche = t(langue, "ev_bracket_all", defaut="Classement Global")
+                nom_tranche = t(langue, "ev_bracket_all", defaut="Global Ranking")
                 bracket_icon = get_emo(langue, "{e_events4}")
             elif evenement == "shapeshifters":
-                nom_tranche_defaut = BRACKETS.get(str(found_lid), f"Tranche {found_lid}")
+                nom_tranche_defaut = BRACKETS.get(str(found_lid), f"Bracket {found_lid}")
                 nom_tranche = t(langue, f"ev_bracket_{found_lid}", defaut=nom_tranche_defaut)
                 bracket_icon = get_emo(langue, "{e_lvl}")
             elif evenement == "nobility":
-                nom_tranche_defaut = f"Tranche {found_lid}" if found_lid != 7 else "Légendaires (70+)"
+                nom_tranche_defaut = f"Bracket {found_lid}" if found_lid != 7 else "Legendary (70+)"
                 nom_tranche = t(langue, f"nobility_bracket_{found_lid}", defaut=nom_tranche_defaut)
                 bracket_icon = get_emo(langue, "{e_lvl}")
 
-            mot_classement = t(langue, "ev_word_rank", defaut="Classement")
+            mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
             titre = f"{ev_info['emoji']} {mot_classement} {ev_info['name']}\n{bracket_icon} {nom_tranche}"
 
             seen_players = set()
@@ -2136,9 +2209,23 @@ class ClassementCog(commands.Cog):
 
             if search_mode and not player_found:
                 if loc_rank:
-                    warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé. Voici le rang {loc_rank} à la place.*"
+                    msg = t(
+                        langue,
+                        "info_player_not_found_rank",
+                        joueur=loc_player,
+                        rang=loc_rank,
+                        defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
+                    )
+                    warning_msg += f"\n\n{msg}"
                 else:
-                    warning_msg += f"\n\n*💡 Info : Le joueur **{loc_player}** n'a pas été trouvé dans le Top {max_sv_limit}. Voici la première page par défaut.*"
+                    msg = t(
+                        langue,
+                        "info_player_not_found_top",
+                        joueur=loc_player,
+                        top=max_sv_limit,
+                        defaut="*💡 Info: Player **{joueur}** not found in the Top {top}. Showing first page instead.*",
+                    )
+                    warning_msg += f"\n\n{msg}"
                     page_cible = 0
 
             embed_color = discord.Color.gold()
@@ -2155,7 +2242,11 @@ class ClassementCog(commands.Cog):
                 embed.title = titre
                 if warning_msg and i == page_cible:
                     embed.description = embed.description + warning_msg
-                embed.set_footer(text=f"Page {i + 1}/{len(chunks)}")
+
+                footer_text = t(
+                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
+                )
+                embed.set_footer(text=footer_text)
                 await setup_embed_footer(embed, ctx_int, langue)
                 embeds.append(embed)
 
@@ -2177,9 +2268,7 @@ class ClassementCog(commands.Cog):
 
     @classement.command(name="alliance", description="Displays live rankings and statistics for alliances")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
-    @app_commands.describe(
-        categorie="Événement", alliance_name="Nom de l'alliance (Optionnel)", rank="Rang (Optionnel)"
-    )
+    @app_commands.describe(categorie="Category", alliance_name="Alliance name (Optional)", rank="Rank (Optional)")
     @app_commands.choices(
         categorie=[
             app_commands.Choice(name="Honor Points", value="alliance_honor"),
@@ -2272,7 +2361,7 @@ class ClassementCog(commands.Cog):
             embed_color = cat_info["color"]
 
             tranche = 1
-            nom_tranche = t(langue, "ev_bracket_alliance", defaut="Classement Global Alliances")
+            nom_tranche = t(langue, "ev_bracket_alliance", defaut="Global Alliance Ranking")
 
             search_mode = bool(loc_alliance)
             all_alliances_raw = []
@@ -2351,12 +2440,12 @@ class ClassementCog(commands.Cog):
 
             if not all_alliances_raw:
                 embed_empty = discord.Embed(
-                    title="📭 Classement indisponible",
+                    title=t(langue, "ev_rank_empty_title", defaut="📭 Ranking unavailable"),
                     description=t(
                         langue,
                         "ev_rank_empty",
                         ev=cat_info["name"],
-                        defaut=f"Aucun classement trouvé pour **{cat_info['name']}**.",
+                        defaut=f"No ranking found for **{cat_info['name']}**.",
                     ),
                     color=discord.Color.light_grey(),
                 )
@@ -2392,19 +2481,24 @@ class ClassementCog(commands.Cog):
                     msg = t(
                         langue,
                         "info_alliance_not_found_rank",
-                        defaut="*💡 Info : L'alliance **{alliance}** n'a pas été trouvée. Voici le rang {rang} à la place.*",
-                    ).format(alliance=loc_alliance, rang=loc_rank)
+                        alliance=loc_alliance,
+                        rang=loc_rank,
+                        defaut="*💡 Info: Alliance **{alliance}** not found. Showing rank {rang} instead.*",
+                    )
                     warning_msg += f"\n\n{msg}"
                 else:
                     msg = t(
                         langue,
                         "info_alliance_not_found_top",
-                        defaut="*💡 Info : L'alliance **{alliance}** n'a pas été trouvée dans le Top {top}. Voici la première page par défaut.*",
-                    ).format(alliance=loc_alliance, top=max_sv_limit)
+                        alliance=loc_alliance,
+                        top=max_sv_limit,
+                        defaut="*💡 Info: Alliance **{alliance}** not found in the Top {top}. Showing first page instead.*",
+                    )
                     warning_msg += f"\n\n{msg}"
                     page_cible = 0
 
-            titre = f"{cat_info['emoji']} Classement {cat_info['name']}\n🛡️ {nom_tranche}"
+            mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
+            titre = f"{cat_info['emoji']} {mot_classement} {cat_info['name']}\n🛡️ {nom_tranche}"
 
             embeds = []
             for i, chunk in enumerate(chunks):
@@ -2420,7 +2514,11 @@ class ClassementCog(commands.Cog):
                 embed.title = titre
                 if warning_msg and i == page_cible:
                     embed.description = embed.description + warning_msg
-                embed.set_footer(text=f"Page {i + 1}/{len(chunks)}")
+
+                footer_text = t(
+                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
+                )
+                embed.set_footer(text=footer_text)
                 await setup_embed_footer(embed, ctx_int, langue)
                 embeds.append(embed)
 

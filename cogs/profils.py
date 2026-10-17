@@ -442,15 +442,15 @@ class ProfilsCog(commands.Cog):
 
             outposts = data.get("outposts", [])
             type_emojis = {
-                1: DICT_EMOJIS.get("e_castle1", "<:castle1:1512573817892110647>"),
-                3: DICT_EMOJIS.get("e_castle3", "<:castle3:1512573819313979544>"),
-                4: DICT_EMOJIS.get("e_castle4", "<:castle4:1512573820752498839>"),
-                10: DICT_EMOJIS.get("e_date", "<:date:1512573832375042340>"),
-                12: DICT_EMOJIS.get("e_castle12", "<:castle12:1521949211850182686>"),
-                22: DICT_EMOJIS.get("e_castle22", "<:castle22:1512573821520183347>"),
-                23: DICT_EMOJIS.get("e_castle23", "<:castle23:1512573823118086174>"),
-                24: DICT_EMOJIS.get("e_aquamarine_16", "<:aquamarine_16:1512573724786950346>"),
-                26: DICT_EMOJIS.get("e_castle26", "<:castle26:1512573824086835280>"),
+                1: DICT_EMOJIS.get("e_castle1", "{e_castle1}"),
+                3: DICT_EMOJIS.get("e_castle3", "{e_castle3}"),
+                4: DICT_EMOJIS.get("e_castle4", "{e_castle4}"),
+                10: DICT_EMOJIS.get("e_date", "{e_date}"),
+                12: DICT_EMOJIS.get("e_castle12", "{e_castle12}"),
+                22: DICT_EMOJIS.get("e_castle22", "{e_castle22}"),
+                23: DICT_EMOJIS.get("e_castle23", "{e_castle23}"),
+                24: DICT_EMOJIS.get("e_aquamarine_16", "{e_aquamarine_16}"),
+                26: DICT_EMOJIS.get("e_castle26", "{e_castle26}"),
             }
             sort_priority = {1: 0, 4: 1, 12: 2, 3: 3, 22: 4, 23: 5, 24: 7, 26: 6}
 
@@ -640,11 +640,11 @@ class ProfilsCog(commands.Cog):
         }
 
         world_emojis = {
-            0: DICT_EMOJIS.get("e_dungeon0", "<:dungeon0:1512573840704671775>"),
-            1: DICT_EMOJIS.get("e_dungeon1", "<:dungeon1:1512573842277794062>"),
-            2: DICT_EMOJIS.get("e_dungeon2", "<:dungeon2:1512573843267518546>"),
-            3: DICT_EMOJIS.get("e_dungeon3", "<:dungeon3:1512573844538396692>"),
-            4: DICT_EMOJIS.get("e_dungeon4", "<:dungeon4:1512573845737963722>"),
+            0: DICT_EMOJIS.get("e_dungeon0", "{e_dungeon0}"),
+            1: DICT_EMOJIS.get("e_dungeon1", "{e_dungeon1}"),
+            2: DICT_EMOJIS.get("e_dungeon2", "{e_dungeon2}"),
+            3: DICT_EMOJIS.get("e_dungeon3", "{e_dungeon3}"),
+            4: DICT_EMOJIS.get("e_dungeon4", "{e_dungeon4}"),
         }
 
         txt_unk_world = t(langue, "prof_world_unknown", defaut="Monde inconnu")
@@ -1515,16 +1515,16 @@ class ProfilsCog(commands.Cog):
 
             embeds = []
             rank_emojis = {
-                0: DICT_EMOJIS.get("e_title_0", "<:0_:1512574737677684818>"),
-                1: DICT_EMOJIS.get("e_title_1", "<:1_:1512574739208470640>"),
-                2: DICT_EMOJIS.get("e_title_2", "<:2_:1512574740915818527>"),
-                3: DICT_EMOJIS.get("e_title_3", "<:3_:1512574742245412874>"),
-                4: DICT_EMOJIS.get("e_title_4", "<:4_:1512574743369224303>"),
-                5: DICT_EMOJIS.get("e_title_5", "<:5_:1512574744501817515>"),
-                6: DICT_EMOJIS.get("e_title_6", "<:6_:1512574745617498172>"),
-                7: DICT_EMOJIS.get("e_title_7", "<:7_:1512574746989039839>"),
-                8: DICT_EMOJIS.get("e_title_8", "<:8_:1512574748356251691>"),
-                9: DICT_EMOJIS.get("e_title_9", "<:9_:1512574749430120519>"),
+                0: DICT_EMOJIS.get("e_0_", "{e_0_}"),
+                1: DICT_EMOJIS.get("e_1_", "{e_1_}"),
+                2: DICT_EMOJIS.get("e_2_", "{e_2_}"),
+                3: DICT_EMOJIS.get("e_3_", "{e_3_}"),
+                4: DICT_EMOJIS.get("e_4_", "{e_4_}"),
+                5: DICT_EMOJIS.get("e_5_", "{e_5_}"),
+                6: DICT_EMOJIS.get("e_6_", "{e_6_}"),
+                7: DICT_EMOJIS.get("e_7_", "{e_7_}"),
+                8: DICT_EMOJIS.get("e_8_", "{e_8_}"),
+                9: DICT_EMOJIS.get("e_9_", "{e_9_}"),
             }
             chunk_size = 15
             nb_pages = max(1, (len(members) - 1) // chunk_size + 1)
@@ -1985,32 +1985,32 @@ class ProfilsCog(commands.Cog):
         PROP_TYPES = {
             3: {
                 "name": t(langue, "prop_capital", defaut="Capitale"),
-                "emoji": DICT_EMOJIS.get("e_castle3", "<:castle3:1512573819313979544>"),
+                "emoji": DICT_EMOJIS.get("e_castle3", "{e_castle3}"),
             },
             22: {
                 "name": t(langue, "prop_city", defaut="Cité Marchande"),
-                "emoji": DICT_EMOJIS.get("e_castle22", "<:castle22:1512573821520183347>"),
+                "emoji": DICT_EMOJIS.get("e_castle22", "{e_castle22}"),
             },
             23: {
                 "name": t(langue, "prop_tower", defaut="Tour Royale"),
-                "emoji": DICT_EMOJIS.get("e_castle23", "<:castle23:1512573823118086174>"),
+                "emoji": DICT_EMOJIS.get("e_castle23", "{e_castle23}"),
             },
             26: {
                 "name": t(langue, "prop_monument", defaut="Monument"),
-                "emoji": DICT_EMOJIS.get("e_castle26", "<:castle26:1512573824086835280>"),
+                "emoji": DICT_EMOJIS.get("e_castle26", "{e_castle26}"),
             },
             28: {
                 "name": t(langue, "prop_lab", defaut="Laboratoire"),
-                "emoji": DICT_EMOJIS.get("e_castle28", "<:castle28:1512573825299251351>"),
+                "emoji": DICT_EMOJIS.get("e_castle28", "{e_castle28}"),
             },
         }
 
         REALM_EMOJIS = {
-            0: DICT_EMOJIS.get("e_dungeon0", "<:dungeon0:1512573840704671775>"),
-            1: DICT_EMOJIS.get("e_dungeon1", "<:dungeon1:1512573842277794062>"),
-            2: DICT_EMOJIS.get("e_dungeon2", "<:dungeon2:1512573843267518546>"),
-            3: DICT_EMOJIS.get("e_dungeon3", "<:dungeon3:1512573844538396692>"),
-            4: DICT_EMOJIS.get("e_dungeon4", "<:dungeon4:1512573845737963722>"),
+            0: DICT_EMOJIS.get("e_dungeon0", "{e_dungeon0}"),
+            1: DICT_EMOJIS.get("e_dungeon1", "{e_dungeon1}"),
+            2: DICT_EMOJIS.get("e_dungeon2", "{e_dungeon2}"),
+            3: DICT_EMOJIS.get("e_dungeon3", "{e_dungeon3}"),
+            4: DICT_EMOJIS.get("e_dungeon4", "{e_dungeon4}"),
         }
 
         all_props = []

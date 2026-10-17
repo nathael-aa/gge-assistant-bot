@@ -1419,17 +1419,20 @@ class EventsCog(commands.Cog):
             await interaction.response.defer(thinking=True)
         except:
             return
+
         langue, _ = await get_server_config(interaction)
         lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
 
         headers = await get_api_headers(interaction)
         session = self.bot.session
         base_api = "https://api.gge-tracker.com/api/v1"
+
         try:
             async with session.get(f"{base_api}/woa/events?page=1", headers=headers, timeout=8) as r:
                 data = await r.json()
                 all_events = data.get("events", [])
                 total_pages = data.get("pagination", {}).get("total_pages", 1)
+
             if total_pages > 1:
                 tasks_list = [
                     session.get(f"{base_api}/woa/events?page={p}", headers=headers, timeout=8)
@@ -1439,8 +1442,8 @@ class EventsCog(commands.Cog):
                 for resp in responses:
                     if isinstance(resp, aiohttp.ClientResponse) and resp.status == 200:
                         all_events.extend((await resp.json()).get("events", []))
-            all_events.sort(key=lambda x: x.get("date", ""), reverse=True)
 
+            all_events.sort(key=lambda x: x.get("date", ""), reverse=True)
             actualisation_dt = _get_api_timestamp(all_events)
 
             t_editions = len(all_events)
@@ -1466,6 +1469,12 @@ class EventsCog(commands.Cog):
                 ).replace(",", " "),
             )
 
+            # 🟢 RÉCUPÉRATION DIRECTE DES ÉMOJIS EN MÉMOIRE
+            from utils import DICT_EMOJIS
+
+            e_players = DICT_EMOJIS.get("e_players", "👤")
+            e_woa_points = DICT_EMOJIS.get("e_woa_points", "🎟️")
+
             lignes, j_vus = [], set()
             for ev in all_events:
                 try:
@@ -1477,13 +1486,11 @@ class EventsCog(commands.Cog):
                 j_vus.add(d_str)
                 parts = f"{int(ev.get('participants', 0)):,}".replace(",", " ")
                 tix = f"{int(ev.get('total_tickets', 0)):,}".replace(",", " ")
-                lignes.append(f"📅 **{d_str}** │ {{e_players}} {parts} │ {{e_woa_points}} **{tix}**")
 
-            title = t(
-                langue,
-                "ev_woa_bilan_title",
-                defaut="{e_woaicon} Bilan Économique : Roue d'Abondance",
-            )
+                # 🟢 UTILISATION DES VARIABLES D'ÉMOJIS (sans accolades)
+                lignes.append(f"📅 **{d_str}** │ {e_players} {parts} │ {e_woa_points} **{tix}**")
+
+            title = t(langue, "ev_woa_bilan_title", defaut="{e_woaicon} Bilan Économique : Roue d'Abondance")
             glob = t(langue, "ev_woa_bilan_global", defaut="**{e_icon_world} Statistiques Globales**")
             det = t(langue, "ev_woa_bilan_detail", defaut="**📜 Détail des 31 dernières éditions**")
 
@@ -1497,9 +1504,11 @@ class EventsCog(commands.Cog):
                 )
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
+
             view = PaginationView(embeds)
             view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
+
         except Exception as e:
             obs.record_error(source="command", scope="woa_summary", exception=e, cog="events")
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur : {e}"))

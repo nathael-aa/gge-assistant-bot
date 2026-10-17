@@ -1,6 +1,4 @@
-import json
 import logging
-import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -12,13 +10,10 @@ from discord.ext import commands
 
 import observability as obs
 from utils import (
-    ADMINS_DIR,
     BOT_VERSION,
     DICT_EMOJIS,
-    MON_ID_DISCORD,
     PaginationView,
     get_api_headers,
-    get_file_lock,
     get_server_config,
     setup_embed_footer,
     t,
@@ -26,7 +21,6 @@ from utils import (
 
 logger = logging.getLogger("GGE_Bot")
 
-CONTACTS_FILE = ADMINS_DIR / "contacts.json"
 
 # ===========================================
 # ⚙️ CONFIGURATION CENTRALISÉE DE L'AIDE
@@ -123,16 +117,6 @@ HELP_CONFIG = {
             {
                 "name": "/support",
                 "desc_key": "help_cmd_support",
-                "server_only": False,
-                "private_only": False,
-                "admin_only": False,
-                "required_module": None,
-                "wip": False,
-                "hide_in_help": False,
-            },
-            {
-                "name": "/contact",
-                "desc_key": "help_cmd_contact",
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
@@ -918,7 +902,6 @@ class AideCog(commands.Cog):
         self.clr_news = discord.Color.from_rgb(255, 191, 0)
         self.clr_vote = discord.Color.from_rgb(232, 198, 112)
         self.clr_support = discord.Color.from_rgb(241, 213, 143)
-        self.clr_contact = discord.Color.from_rgb(247, 226, 173)
 
     @app_commands.command(name="help", description="Displays the complete user manual for the GGE Assistant bot")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
@@ -1238,93 +1221,6 @@ class AideCog(commands.Cog):
 
         await interaction.response.send_message(embed=embed, view=view)
 
-    @app_commands.command(name="contact", description="Send a problem, bug, or suggestion directly to the developer")
-    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
-    @app_commands.describe(message="Write your problem or suggestion in detail here")
-    async def contact_commande(self, interaction: discord.Interaction, message: str):
-        try:
-            await interaction.response.defer(ephemeral=True, thinking=True)
-        except:
-            return
-
-        langue, _ = await get_server_config(interaction)
-
-        logger.info(f"📩 [Contact] Nouveau message de {interaction.user.name} ({interaction.user.id})")
-        maintenant_iso = discord.utils.utcnow().isoformat().replace("+00:00", "Z")
-
-        obs.record_guild_event(
-            "user_contact", guild=interaction.guild, user_id=interaction.user.id, new_value="contact_form_submitted"
-        )
-
-        async with get_file_lock(CONTACTS_FILE):
-            try:
-                tickets_existants = []
-                if os.path.exists(CONTACTS_FILE):
-                    with open(CONTACTS_FILE, encoding="utf-8") as f:
-                        try:
-                            tickets_existants = json.load(f)
-                        except json.JSONDecodeError:
-                            tickets_existants = []
-
-                nouveau_ticket = {
-                    "date": maintenant_iso,
-                    "user_id": str(interaction.user.id),
-                    "user_name": interaction.user.name,
-                    "serveur": interaction.guild.name if interaction.guild else "Message Privé",
-                    "message": message,
-                }
-                tickets_existants.append(nouveau_ticket)
-
-                with open(CONTACTS_FILE, "w", encoding="utf-8") as f:
-                    json.dump(tickets_existants, f, indent=4, ensure_ascii=False)
-
-            except Exception as e:
-                logger.error(f"❌ [Contact] Erreur écriture JSON : {e}")
-                err_msg = t(
-                    langue,
-                    "contact_err_write",
-                    defaut="❌ Une erreur technique interne a empêché l'enregistrement de ton message.",
-                )
-                return await interaction.followup.send(err_msg)
-
-        try:
-            developpeur = self.bot.get_user(MON_ID_DISCORD)
-            if not developpeur:
-                developpeur = await self.bot.fetch_user(MON_ID_DISCORD)
-
-            embed_mp = discord.Embed(
-                title="📩 Nouveau Ticket Reçu !", color=self.clr_contact, timestamp=discord.utils.utcnow()
-            )
-            embed_mp.add_field(
-                name="{e_players} Expéditeur",
-                value=f"**{interaction.user.name}** (`{interaction.user.id}`)",
-                inline=True,
-            )
-            embed_mp.add_field(name="{e_castles} Provenance", value=f"*{nouveau_ticket['serveur']}*", inline=True)
-            embed_mp.add_field(name="{e_memberlist} Message", value=f"```text\n{message}\n```", inline=False)
-
-            embed_mp.fields[0].name = embed_mp.fields[0].name.replace("{e_players}", DICT_EMOJIS.get("e_players", "👤"))
-            embed_mp.fields[1].name = embed_mp.fields[1].name.replace("{e_castles}", DICT_EMOJIS.get("e_castles", "🏰"))
-            embed_mp.fields[2].name = embed_mp.fields[2].name.replace(
-                "{e_memberlist}", DICT_EMOJIS.get("e_memberlist", "📋")
-            )
-
-            await setup_embed_footer(embed_mp, interaction, "fr")
-
-            await developpeur.send(embed=embed_mp)
-
-        except discord.Forbidden:
-            logger.warning(f"⚠️ [Contact] Impossible d'envoyer le MP à {MON_ID_DISCORD} (DMs fermés).")
-        except Exception as e:
-            logger.error(f"❌ [Contact] Erreur lors de l'alerte MP : {e}")
-
-        succ_msg = t(
-            langue,
-            "contact_success",
-            defaut="{e_players} **Merci !** Ton message a bien été enregistré et transmis au développeur.",
-        )
-        await interaction.followup.send(succ_msg)
-
     def _dummy_i18n():
         langue = "fr"
 
@@ -1374,7 +1270,6 @@ class AideCog(commands.Cog):
         t(langue, "help_cmd_hub_stop")
         t(langue, "help_cmd_news")
         t(langue, "help_cmd_support")
-        t(langue, "help_cmd_contact")
         t(langue, "help_cmd_vote")
         t(langue, "help_cmd_discover")
 
