@@ -1221,9 +1221,12 @@ class AideCog(commands.Cog):
 
         await interaction.response.send_message(embed=embed, view=view)
 
-    def _dummy_i18n():
-        langue = "fr"
-
+    def _i18n_dummy_keys(langue):
+        """
+        Fonction fantôme qui n'est jamais exécutée.
+        Elle sert uniquement de 'leurre' pour que l'expression régulière
+        de la commande !i18n_sync détecte ces clés et ne les supprime pas des JSON.
+        """
         # --- Textes généraux et menus ---
         t(langue, "help_home_title")
         t(langue, "help_legend_v2")
@@ -1333,6 +1336,17 @@ class AideCog(commands.Cog):
         t(langue, "help_cmd_storm_status")
         t(langue, "help_cmd_storm_setup")
         t(langue, "help_cmd_storm_stop")
+
+        # --- Commandes : Classement ---
+        t(langue, "ev_bracket_1")
+        t(langue, "ev_bracket_2")
+        t(langue, "ev_bracket_3")
+        t(langue, "ev_bracket_4")
+        t(langue, "ev_bracket_5")
+        t(langue, "season_bracket_1")
+        t(langue, "season_bracket_2")
+        t(langue, "season_bracket_3")
+        t(langue, "season_bracket_4")
 
 
 async def setup(bot: commands.Bot):
