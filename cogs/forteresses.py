@@ -504,7 +504,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         return False, None, []
 
     @app_commands.command(name="scan", description="Activates the automatic radar of the free fortresses")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(player=joueur_autocomplete)
     @app_commands.describe(
         player="The player's username to center the search on",
@@ -652,7 +652,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
 
     @app_commands.command(name="stop", description="Stop your fortress scanning session")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def f_stop(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=False, thinking=True)
@@ -809,7 +809,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             )
 
     @app_commands.command(name="history", description="View a player's fortress attack history (up to 365 days)")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(player=joueur_autocomplete)
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     async def f_history(self, interaction: discord.Interaction, player: str):

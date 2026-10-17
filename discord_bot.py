@@ -1095,6 +1095,37 @@ class GGEAssistantBot(commands.Bot):
 
     async def on_tree_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
         """Capture et signale automatiquement les plantages lors de l'exécution d'une commande Slash."""
+
+        try:
+            langue, _ = await get_server_config(interaction)
+        except Exception:
+            langue = "fr"
+
+        # ==========================================
+        # ⏳ GESTION DU COOLDOWN
+        # ==========================================
+        if isinstance(error, discord.app_commands.CommandOnCooldown):
+            retry_seconds = round(error.retry_after, 1)
+
+            msg = t(
+                langue,
+                "err_cooldown",
+                retry_seconds=retry_seconds,
+                defaut=f"⏳ **Attention, tu vas trop vite !** Tu dois patienter encore **{retry_seconds}s** avant de pouvoir réutiliser cette commande.",
+            )
+
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send(msg, ephemeral=True)
+                else:
+                    await interaction.response.send_message(msg, ephemeral=True)
+            except Exception:
+                pass
+            return
+
+        # ==========================================
+        # 💥 ERREURS TECHNIQUES CLASSIQUES
+        # ==========================================
         tb_str = "".join(traceback.format_exception(type(error), error, error.__traceback__))
         tb_str_short = tb_str[-2000:] if len(tb_str) > 2000 else tb_str
 
@@ -1125,7 +1156,11 @@ class GGEAssistantBot(commands.Bot):
         )
 
         try:
-            msg = "⚠️ Aïe ! Une erreur interne a fait planter cette commande. Mon créateur vient de recevoir le rapport de crash et va corriger ça au plus vite."
+            msg = t(
+                langue,
+                "err_internal_crash",
+                defaut="⚠️ Aïe ! Une erreur interne a fait planter cette commande. Mon créateur vient de recevoir le rapport de crash et va corriger ça au plus vite.",
+            )
             if interaction.response.is_done():
                 await interaction.followup.send(msg, ephemeral=True)
             else:

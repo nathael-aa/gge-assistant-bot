@@ -13,6 +13,8 @@
     "admin_restart": "**Redémarrage en cours...** Le bot se déconnecte et devrait revenir dans quelques secondes.",
     "admin_servers_desc_file": "Le bot est actuellement présent sur **{count} serveurs**.\n *La liste complète et détaillée est disponible dans le fichier ci-joint.*",
     "admin_servers_title": "{e_bot} Serveurs connectés",
+    "err_internal_crash": "{e_warning} Aïe ! Une erreur interne a fait planter cette commande. Mon créateur vient de recevoir le rapport de crash et va corriger ça au plus vite.",
+    "err_cooldown": "{e_time} **Attention, tu vas trop vite !** Tu dois patienter encore **{retry_seconds}s** avant de pouvoir réutiliser cette commande.",
     "bot_alert_module_disabled_title": "{e_warning} Fin des alertes Tempêtes",
     "bot_alert_module_disabled_desc": "Le serveur de jeu **{server}** ne gère plus les îles orageuses (ou a été désactivé par GGE-Tracker). Les alertes automatiques ont été désactivées pour ce salon.",
     "bot_alert_fortress_disabled_title": "{e_warning} Fin du Radar Forteresses",

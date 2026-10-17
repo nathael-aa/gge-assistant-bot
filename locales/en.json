@@ -13,6 +13,8 @@
     "admin_restart": "**Restarting...** The bot is disconnecting and should be back in a few seconds.",
     "admin_servers_desc_file": "The bot is currently on **{count} servers**.\n*The complete and detailed list is available in the attached file.*",
     "admin_servers_title": "{e_bot} Connected Servers",
+     "err_internal_crash": "{e_warning}  Ouch! An internal error crashed this command. My creator has received the crash report and will fix it as soon as possible.",
+    "err_cooldown": "{e_time} **Hold on, you're going too fast!** You must wait another **{retry_seconds}s** before using this command again.",
     "bot_alert_module_disabled_title": "{e_warning} Storm Alerts Disabled",
     "bot_alert_module_disabled_desc": "The game server **{server}** no longer supports Storm Islands (or was disabled by GGE-Tracker). Automatic alerts have been disabled for this channel.",
     "bot_alert_fortress_disabled_title": "{e_warning} Fortress Radar Disabled",

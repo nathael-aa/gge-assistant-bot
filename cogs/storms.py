@@ -156,7 +156,7 @@ class StormsCog(commands.Cog):
     storm_group = app_commands.Group(name="storm", description="Commands for the Storm Islands event")
 
     @storm_group.command(name="forts", description="Search for storm forts based on your criteria")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.choices(
         availability=[
             app_commands.Choice(name="Available Now", value=1),
@@ -328,7 +328,7 @@ class StormsCog(commands.Cog):
         await fetch_and_build_view(interaction, is_refresh=False)
 
     @storm_group.command(name="isles", description="Search for resource islands in the Storm Islands")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.choices(
         status=[
             app_commands.Choice(name="All", value=0),
@@ -480,7 +480,7 @@ class StormsCog(commands.Cog):
         await fetch_and_build_view(interaction, is_refresh=False)
 
     @storm_group.command(name="occupier", description="List all islands currently held by a specific player")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(player=joueur_autocomplete)
     @app_commands.describe(player="Exact player name")
     async def storm_occupier(self, interaction: discord.Interaction, player: str):
@@ -576,7 +576,7 @@ class StormsCog(commands.Cog):
         await fetch_and_build_view(interaction, is_refresh=False)
 
     @storm_group.command(name="status", description="Displays the freshness state of the Storm Islands map scan")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def storm_status(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
         langue, serveur = await get_server_config(interaction)
@@ -637,7 +637,7 @@ class StormsCog(commands.Cog):
     @storm_group.command(name="setup", description="Configure automatic alerts for respawning islands")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.describe(
         channel="The channel where notifications will be sent",
         ping_small="Ping for small islands (Default: False)",
@@ -1012,7 +1012,7 @@ class StormsCog(commands.Cog):
     @storm_group.command(name="stop", description="Stop automatic alerts for respawning islands")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def storm_stop(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
         langue, serveur = await get_server_config(interaction)

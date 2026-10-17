@@ -904,7 +904,7 @@ class AideCog(commands.Cog):
         self.clr_support = discord.Color.from_rgb(241, 213, 143)
 
     @app_commands.command(name="help", description="Displays the complete user manual for the GGE Assistant bot")
-    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     async def aide_commande(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=False)
@@ -933,7 +933,7 @@ class AideCog(commands.Cog):
     @app_commands.command(
         name="status", description="Checks the overall health status of the system (Bot, NAS Storage, GGE-Tracker API)"
     )
-    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     async def statut_commande(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(thinking=True)
@@ -1106,7 +1106,7 @@ class AideCog(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="discover", description="Discover useful tools and community projects for GGE")
-    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     async def discover(self, interaction: discord.Interaction):
         langue, _ = await get_server_config(interaction)
 
@@ -1152,7 +1152,7 @@ class AideCog(commands.Cog):
             view.message = await interaction.original_response()
 
     @app_commands.command(name="support", description="Get the invite link to the official support server")
-    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 1.0, key=lambda i: i.user.id)
     async def support(self, interaction: discord.Interaction):
         langue, _ = await get_server_config(interaction)
 
@@ -1176,7 +1176,7 @@ class AideCog(commands.Cog):
         await interaction.response.send_message(embed=embed, view=view)
 
     @app_commands.command(name="vote", description="Support the bot by voting on Top.gg")
-    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 1.0, key=lambda i: i.user.id)
     async def vote(self, interaction: discord.Interaction):
         langue, _ = await get_server_config(interaction)
 
@@ -1199,7 +1199,7 @@ class AideCog(commands.Cog):
         await interaction.response.send_message(embed=embed, view=view)
 
     @app_commands.command(name="news", description="Read the latest bot updates and patch notes")
-    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     async def news(self, interaction: discord.Interaction):
         langue, _ = await get_server_config(interaction)
 

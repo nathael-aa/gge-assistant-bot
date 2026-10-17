@@ -189,7 +189,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
     @app_commands.describe(channel="The text-based event lounge")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.guild_id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.guild_id)
     async def c_setup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         await interaction.response.defer(ephemeral=True)
 
@@ -228,7 +228,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     @app_commands.describe(alliance_name="Name of the alliance to follow")
     @app_commands.guild_only()
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.guild_id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.guild_id)
     async def c_track(self, interaction: discord.Interaction, alliance_name: str):
         await interaction.response.defer(ephemeral=True)
         langue, serveur = await get_server_config(interaction)
@@ -272,7 +272,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     @app_commands.describe(alliance_name="Name of the alliance to be withdrawn")
     @app_commands.guild_only()
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.guild_id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.guild_id)
     async def c_untrack(self, interaction: discord.Interaction, alliance_name: str):
         await interaction.response.defer(ephemeral=True)
         langue, serveur = await get_server_config(interaction)
@@ -312,7 +312,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
     @app_commands.command(name="stop", description="Disable calendar alerts and event reports for this server")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.guild_id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.guild_id)
     async def c_stop(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         langue, serveur = await get_server_config(interaction)
@@ -339,7 +339,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
             await interaction.followup.send(msg_fail)
 
     @app_commands.command(name="current", description="Displays the complete calendar of events")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     async def c_current(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=False)
         langue, _ = await get_server_config(interaction)

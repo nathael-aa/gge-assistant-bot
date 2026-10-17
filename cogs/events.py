@@ -305,7 +305,7 @@ class EventsCog(commands.Cog):
         self.rival_check_task.cancel()
 
     @app_commands.command(name="event_player", description="View a player's latest score or history")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(event_name=event_autocomplete)
     @app_commands.autocomplete(player=joueur_autocomplete)
     @app_commands.choices(
@@ -855,7 +855,7 @@ class EventsCog(commands.Cog):
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     @app_commands.command(name="event_alliance", description="Ranking and participation of an alliance in an event")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(event_name=event_alliance_autocomplete)
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     @app_commands.choices(
@@ -950,7 +950,7 @@ class EventsCog(commands.Cog):
         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     @app_commands.command(name="link_account", description="Link your Discord account to your GGE username")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(player=joueur_autocomplete)
     async def link_account(self, interaction: discord.Interaction, player: str):
         data = await load_pseudos_async()
@@ -972,7 +972,7 @@ class EventsCog(commands.Cog):
     )
 
     @rival_group.command(name="start", description="Turn on your competition radar")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(event_name=event_autocomplete)
     async def rival_start(self, interaction: discord.Interaction, event_name: str, threshold: int = 90):
         langue, serveur = await get_server_config(interaction)
@@ -1010,7 +1010,7 @@ class EventsCog(commands.Cog):
         await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
     @rival_group.command(name="add", description="Add rivals (Max 10)")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     async def rival_add(
         self,
         interaction: discord.Interaction,
@@ -1040,7 +1040,7 @@ class EventsCog(commands.Cog):
         )
 
     @rival_group.command(name="list", description="Show your rivals")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     async def rival_list(self, interaction: discord.Interaction):
         langue, _ = await get_server_config(interaction)
         if interaction.guild:
@@ -1069,7 +1069,7 @@ class EventsCog(commands.Cog):
         await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
     @rival_group.command(name="stop", description="Turn off the radar")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def rival_stop(self, interaction: discord.Interaction):
         langue, _ = await get_server_config(interaction)
         data = await load_rivals_async()
@@ -1273,7 +1273,7 @@ class EventsCog(commands.Cog):
     woa = app_commands.Group(name="woa", description="Analysis and statistics of the Wheel of Affluence")
 
     @woa.command(name="history", description="View the history of tickets spent by a player")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(player=joueur_autocomplete)
     async def woa_historique(self, interaction: discord.Interaction, player: str):
         try:
@@ -1413,7 +1413,7 @@ class EventsCog(commands.Cog):
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur : {e}"))
 
     @woa.command(name="summary", description="Displays the ticket consumption summary")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def woa_bilan(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(thinking=True)
@@ -1516,7 +1516,7 @@ class EventsCog(commands.Cog):
     leaderboard = app_commands.Group(name="leaderboard", description="General server rankings")
 
     @leaderboard.command(name="woa", description="Displays the Top 100 from the latest Wheel of Affluence")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def classement_woa(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(thinking=True)
@@ -1602,7 +1602,7 @@ class EventsCog(commands.Cog):
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur : {e}"))
 
     @leaderboard.command(name="storm_islands", description="Displays the Top 100 looters of Aquamarine")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def classement_iles(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(thinking=True)

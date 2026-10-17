@@ -347,7 +347,7 @@ class ClassementCog(commands.Cog):
         return embed
 
     @classement.command(name="statistics", description="Displays a live ranking for player statistics.")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.describe(
         statistic="Category", player="Player (Optional)", rank="Rank (Optional)", tranche="Bracket (Optional)"
     )
@@ -687,7 +687,7 @@ class ClassementCog(commands.Cog):
         view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
 
     @classement.command(name="event", description="Displays an event's live ranking.")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.describe(
         evenement="Event", player="Player (Optional)", rank="Rank (Optional)", tranche="Bracket (Optional)"
     )
@@ -1035,7 +1035,7 @@ class ClassementCog(commands.Cog):
         view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
 
     @classement.command(name="gacha", description="Displays a live ranking for Gacha events")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.describe(evenement="Event", player="Player (Optional)", rank="Rank (Optional)")
     @app_commands.autocomplete(player=joueur_autocomplete)
     @app_commands.choices(
@@ -1319,7 +1319,7 @@ class ClassementCog(commands.Cog):
         view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
 
     @classement.command(name="realms", description="Displays a ranking for cross-server events")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.describe(evenement="Event", player="Player (Optional)", rank="Rank (Optional)")
     @app_commands.autocomplete(player=joueur_autocomplete)
     @app_commands.choices(
@@ -1595,7 +1595,7 @@ class ClassementCog(commands.Cog):
         view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
 
     @classement.command(name="league", description="Displays a ranking for Season and League events")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.describe(
         evenement="Event", player="Player (Optional)", rank="Rank (Optional)", tranche="Bracket (Optional)"
     )
@@ -1931,7 +1931,7 @@ class ClassementCog(commands.Cog):
         view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
 
     @classement.command(name="contests", description="Displays a ranking for specific contests")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.describe(
         evenement="Event", player="Player (Optional)", rank="Rank (Optional)", tranche="Bracket (Optional)"
     )
@@ -2267,7 +2267,7 @@ class ClassementCog(commands.Cog):
         view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
 
     @classement.command(name="alliance", description="Displays live rankings and statistics for alliances")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.describe(categorie="Category", alliance_name="Alliance name (Optional)", rank="Rank (Optional)")
     @app_commands.choices(
         categorie=[

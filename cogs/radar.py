@@ -832,7 +832,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
     private_group = app_commands.Group(name="private", description="Manage your personal war radar (DMs)")
 
     @private_group.command(name="add_player", description="Add a player to your personal radar (Limit: 25 followed)")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(player=joueur_autocomplete)
     @app_commands.describe(reason="Reason for surveillance")
     async def private_add_player(self, interaction: discord.Interaction, player: str, reason: str = "Monitoring"):
@@ -942,7 +942,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         await prompt_vote_if_lucky(interaction, probability_percent=20, langue=langue)
 
     @private_group.command(name="add_alliance", description="Add an entire alliance to your radar (Limit: 3 followed)")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     @app_commands.describe(reason="Why are you monitoring this alliance?")
     async def private_add_alliance(
@@ -1075,7 +1075,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         await prompt_vote_if_lucky(interaction, probability_percent=20, langue=langue)
 
     @private_group.command(name="remove_player", description="Remove a player from your personal radar")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(player=joueur_autocomplete)
     async def private_remove_player(self, interaction: discord.Interaction, player: str):
         try:
@@ -1113,7 +1113,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             await interaction.followup.send(msg)
 
     @private_group.command(name="remove_alliance", description="Remove an alliance from your personal radar")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     async def private_remove_alliance(self, interaction: discord.Interaction, alliance_name: str):
         try:
@@ -1156,7 +1156,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             await interaction.followup.send(msg)
 
     @private_group.command(name="list", description="Display your personal radar (Players & Alliances)")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     async def private_list(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)

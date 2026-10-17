@@ -624,7 +624,7 @@ class TargetCog(commands.Cog):
     target_group = app_commands.Group(name="target", description="Search engine to find specific targets on the map")
 
     @target_group.command(name="setup", description="Set up your search engine filters")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def target_setup(self, interaction: discord.Interaction):
         langue, _ = await get_server_config(interaction)
         user_id = str(interaction.user.id)
@@ -634,7 +634,7 @@ class TargetCog(commands.Cog):
         await wizard.start(interaction)
 
     @target_group.command(name="search", description="Launch the radar based on your active filters")
-    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(origin_player=joueur_autocomplete)
     @app_commands.autocomplete(target_alliance=alliance_autocomplete)
     async def target_search(self, interaction: discord.Interaction, origin_player: str, target_alliance: str = None):

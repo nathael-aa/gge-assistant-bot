@@ -13,6 +13,8 @@
     "admin_restart": "**Neustart läuft...** Der Bot trennt die Verbindung und sollte in wenigen Sekunden wieder da sein.",
     "admin_servers_desc_file": "Der Bot ist derzeit auf **{count} Servern**.\n*Die vollständige und detaillierte Liste findest du in der angehängten Datei.*",
     "admin_servers_title": "{e_bot} Verbundene Server",
+    "err_internal_crash": "{e_warning} Aua! Ein internen Fehler hat diesen Befehl abstürzen lassen. Mein Ersteller hat den Absturzbericht erhalten und wird sich so schnell wie möglich darum kümmern.",
+    "err_cooldown": "{e_time} **Moment mal, du bist zu schnell!** Du musst noch **{retry_seconds}s** warten, bevor du diesen Befehl erneut verwenden kannst.",
     "admin_sync_error": "{e_error} Fehler bei der Synchronisierung: {error}",
     "admin_sync_start": "{e_time} Synchronisierung des Befehlsbaums läuft...",
     "admin_sync_success": "{e_greencirclebullet} Der Baum wurde erfolgreich synchronisiert! ({count} Befehle verfügbar)",

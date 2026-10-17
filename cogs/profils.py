@@ -181,7 +181,7 @@ class ProfilsCog(commands.Cog):
         self.clr_descalli = discord.Color.from_rgb(77, 111, 23)
 
     @app_commands.command(name="server", description="Affiche les statistiques globales de ton serveur")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def server_stats(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
 
@@ -365,7 +365,7 @@ class ProfilsCog(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     @player_group.command(name="profile", description="Detailed player profile")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(player=joueur_autocomplete)
     async def player_info(self, interaction: discord.Interaction, player: str):
         try:
@@ -816,7 +816,7 @@ class ProfilsCog(commands.Cog):
             return None
 
     @player_group.command(name="history", description="Displays a player's complete history")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(player=joueur_autocomplete)
     async def history(self, interaction: discord.Interaction, player: str):
         try:
@@ -971,7 +971,7 @@ class ProfilsCog(commands.Cog):
         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     @player_group.command(name="dove", description="Check the date and time a player's protection ended")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(player=joueur_autocomplete)
     async def dove(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
@@ -1048,7 +1048,7 @@ class ProfilsCog(commands.Cog):
     @player_group.command(
         name="compare", description="Responsive comparative analysis and calculation of the hazard index"
     )
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(player1=joueur_autocomplete)
     @app_commands.autocomplete(player2=joueur_autocomplete)
     async def compare(self, interaction: discord.Interaction, player1: str, player2: str):
@@ -1383,7 +1383,7 @@ class ProfilsCog(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     @alliance_group.command(name="profile", description="Detailed profile of an alliance (Quick and paginated)")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     async def alliance_info(self, interaction: discord.Interaction, alliance_name: str):
         try:
@@ -1724,7 +1724,7 @@ class ProfilsCog(commands.Cog):
         }
 
     @alliance_group.command(name="might", description="Historical Power (PP) of an alliance over X days")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     @app_commands.describe(days="Period to analyze in days (Default: 3, Maximum: 10)")
     async def alliance_might(self, interaction: discord.Interaction, alliance_name: str, days: int = 3):
@@ -1915,7 +1915,7 @@ class ProfilsCog(commands.Cog):
         await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
     @alliance_group.command(name="property", description="Displays all properties of an alliance")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
     @app_commands.describe(alliance_name="Alliance name")
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     async def alliance_property(self, interaction: discord.Interaction, alliance_name: str):
@@ -2080,7 +2080,7 @@ class ProfilsCog(commands.Cog):
         await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
     @alliance_group.command(name="description", description="View the history of the last wall changes")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     async def alliance_description(self, interaction: discord.Interaction, alliance_name: str):
         try:
@@ -2289,7 +2289,7 @@ class ProfilsCog(commands.Cog):
             await interaction.followup.send(embed=embeds[0], view=view)
 
     @alliance_group.command(name="scanner", description="Analyze the enemy roster in real time (Doves, PP, Targets)")
-    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     async def alliance_scanner(self, interaction: discord.Interaction, alliance_name: str):
         try:
