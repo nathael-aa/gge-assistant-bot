@@ -168,6 +168,9 @@ DICT_EMOJIS = {
     "e_share": "<:share:1542205484382167080>",
     "e_dev": "<:developer:1542207399476330497>",
     "e_w2chatlogo": "<:w2chat_logo:1542290796416467026>",
+    "e_fort": "<:fortresses:1512574700839239892>",
+    "e_storm": "<:aquamarine_brut:1533424307512807486>",
+    "e_castle": "<:castles:1512574693859786822>",
 }
 
 EMOJI_ALIASES = {

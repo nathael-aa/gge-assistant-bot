@@ -15,6 +15,7 @@ from utils import (
     PaginationView,
     get_api_headers,
     get_server_config,
+    load_configuration_async,
     setup_embed_footer,
     t,
 )
@@ -48,8 +49,8 @@ HELP_CONFIG = {
                 "hide_in_help": False,
             },
             {
-                "name": "/link_account",
-                "desc_key": "help_cmd_link_account",
+                "name": "/status",
+                "desc_key": "help_cmd_status",
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
@@ -58,8 +59,8 @@ HELP_CONFIG = {
                 "hide_in_help": False,
             },
             {
-                "name": "/status",
-                "desc_key": "help_cmd_status",
+                "name": "/link_account",
+                "desc_key": "help_cmd_link_account",
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
@@ -115,8 +116,8 @@ HELP_CONFIG = {
                 "hide_in_help": False,
             },
             {
-                "name": "/support",
-                "desc_key": "help_cmd_support",
+                "name": "/vote",
+                "desc_key": "help_cmd_vote",
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
@@ -125,8 +126,8 @@ HELP_CONFIG = {
                 "hide_in_help": False,
             },
             {
-                "name": "/vote",
-                "desc_key": "help_cmd_vote",
+                "name": "/support",
+                "desc_key": "help_cmd_support",
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
@@ -306,56 +307,6 @@ HELP_CONFIG = {
                 "hide_in_help": False,
             },
             {
-                "name": "/calendar track",
-                "desc_key": "help_cmd_calendar_track",
-                "server_only": True,
-                "private_only": False,
-                "admin_only": True,
-                "required_module": None,
-                "wip": False,
-                "hide_in_help": False,
-            },
-            {
-                "name": "/calendar untrack",
-                "desc_key": "help_cmd_calendar_untrack",
-                "server_only": True,
-                "private_only": False,
-                "admin_only": True,
-                "required_module": None,
-                "wip": False,
-                "hide_in_help": False,
-            },
-            {
-                "name": "/calendar current",
-                "desc_key": "help_cmd_calendar_current",
-                "server_only": False,
-                "private_only": False,
-                "admin_only": False,
-                "required_module": None,
-                "wip": False,
-                "hide_in_help": False,
-            },
-            {
-                "name": "/calendar setup",
-                "desc_key": "help_cmd_calendar_setup",
-                "server_only": True,
-                "private_only": False,
-                "admin_only": True,
-                "required_module": None,
-                "wip": False,
-                "hide_in_help": False,
-            },
-            {
-                "name": "/calendar stop",
-                "desc_key": "help_cmd_calendar_stop",
-                "server_only": True,
-                "private_only": False,
-                "admin_only": True,
-                "required_module": None,
-                "wip": False,
-                "hide_in_help": False,
-            },
-            {
                 "name": "/rank event",
                 "desc_key": "help_cmd_rank_event",
                 "server_only": False,
@@ -426,12 +377,42 @@ HELP_CONFIG = {
                 "hide_in_help": False,
             },
             {
-                "name": "/leaderboard woa",
-                "desc_key": "help_cmd_leaderboard_woa",
+                "name": "/storm forts",
+                "desc_key": "help_cmd_storm_forts",
+                "required_module": "storm",
                 "server_only": False,
                 "private_only": False,
                 "admin_only": False,
-                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/storm isles",
+                "desc_key": "help_cmd_storm_isles",
+                "required_module": "storm",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/storm occupier",
+                "desc_key": "help_cmd_storm_occupier",
+                "required_module": "storm",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/storm status",
+                "desc_key": "help_cmd_storm_status",
+                "required_module": "storm",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
                 "wip": False,
                 "hide_in_help": False,
             },
@@ -465,6 +446,26 @@ HELP_CONFIG = {
                 "wip": False,
                 "hide_in_help": False,
             },
+            {
+                "name": "/leaderboard woa",
+                "desc_key": "help_cmd_leaderboard_woa",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/calendar current",
+                "desc_key": "help_cmd_calendar_current",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
         ],
     },
     "radars": {
@@ -472,6 +473,46 @@ HELP_CONFIG = {
         "color": discord.Color.from_rgb(230, 126, 34),
         "title_key": "help_cat_radars",
         "commands": [
+            {
+                "name": "/calendar setup",
+                "desc_key": "help_cmd_calendar_setup",
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/calendar track",
+                "desc_key": "help_cmd_calendar_track",
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/calendar untrack",
+                "desc_key": "help_cmd_calendar_untrack",
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/calendar stop",
+                "desc_key": "help_cmd_calendar_stop",
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
             {
                 "name": "/radar private add_player",
                 "desc_key": "help_cmd_radar_private_add_player",
@@ -593,16 +634,6 @@ HELP_CONFIG = {
                 "hide_in_help": False,
             },
             {
-                "name": "/rival stop",
-                "desc_key": "help_cmd_rival_stop",
-                "required_module": None,
-                "server_only": False,
-                "private_only": True,
-                "admin_only": False,
-                "wip": False,
-                "hide_in_help": False,
-            },
-            {
                 "name": "/rival add",
                 "desc_key": "help_cmd_rival_add",
                 "required_module": None,
@@ -615,6 +646,16 @@ HELP_CONFIG = {
             {
                 "name": "/rival list",
                 "desc_key": "help_cmd_rival_list",
+                "required_module": None,
+                "server_only": False,
+                "private_only": True,
+                "admin_only": False,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/rival stop",
+                "desc_key": "help_cmd_rival_stop",
                 "required_module": None,
                 "server_only": False,
                 "private_only": True,
@@ -643,48 +684,8 @@ HELP_CONFIG = {
                 "hide_in_help": False,
             },
             {
-                "name": "/storm forts",
-                "desc_key": "help_cmd_storm_forts",
-                "required_module": "storm",
-                "server_only": False,
-                "private_only": False,
-                "admin_only": False,
-                "wip": False,
-                "hide_in_help": False,
-            },
-            {
-                "name": "/storm isles",
-                "desc_key": "help_cmd_storm_isles",
-                "required_module": "storm",
-                "server_only": False,
-                "private_only": False,
-                "admin_only": False,
-                "wip": False,
-                "hide_in_help": False,
-            },
-            {
-                "name": "/storm occupier",
-                "desc_key": "help_cmd_storm_occupier",
-                "required_module": "storm",
-                "server_only": False,
-                "private_only": False,
-                "admin_only": False,
-                "wip": False,
-                "hide_in_help": False,
-            },
-            {
-                "name": "/storm status",
-                "desc_key": "help_cmd_storm_status",
-                "required_module": "storm",
-                "server_only": False,
-                "private_only": False,
-                "admin_only": False,
-                "wip": False,
-                "hide_in_help": False,
-            },
-            {
-                "name": "/storm setup",
-                "desc_key": "help_cmd_storm_setup",
+                "name": "/storm setup_isles",
+                "desc_key": "help_cmd_storm_setup_isles",
                 "required_module": "storm",
                 "server_only": True,
                 "private_only": False,
@@ -693,8 +694,28 @@ HELP_CONFIG = {
                 "hide_in_help": False,
             },
             {
-                "name": "/storm stop",
-                "desc_key": "help_cmd_storm_stop",
+                "name": "/storm stop_isles",
+                "desc_key": "help_cmd_storm_stop_isles",
+                "required_module": "storm",
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/storm setup_forts",
+                "desc_key": "help_cmd_storm_setup_forts",
+                "required_module": "storm",
+                "server_only": True,
+                "private_only": False,
+                "admin_only": True,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/storm stop_forts",
+                "desc_key": "help_cmd_storm_stop_forts",
                 "required_module": "storm",
                 "server_only": True,
                 "private_only": False,
@@ -826,10 +847,26 @@ class HelpSelect(discord.ui.Select):
             e_server = DICT_EMOJIS.get("e_server", "🏢")
             e_dm = DICT_EMOJIS.get("e_dm", "✉️")
 
+            module_emojis = {
+                "storm": DICT_EMOJIS.get("e_aquamarine_brut", "<:aquamarine_brut:1533424307512807486>"),
+                "fortress": DICT_EMOJIS.get("e_fortresses", "<:fortresses:1512574700839239892>"),
+                "advanced_castle": DICT_EMOJIS.get("e_castles", "<:castles:1512574693859786822>"),
+            }
+
             legende = t(
                 self.langue,
-                "help_legend_v2",
-                defaut="🟢 `Standard` ｜ 🌟 `Avancé` ｜ {e_staff} `Admin` ｜ {e_working} `En travaux`\n{e_server} `Serveur Uniquement` ｜ {e_dm} `MP Uniquement`",
+                "help_legend_v3",
+                e_storm=module_emojis["storm"],
+                e_fortress=module_emojis["fortress"],
+                e_castle=module_emojis["advanced_castle"],
+                e_staff=e_staff,
+                e_working=e_working,
+                e_server=e_server,
+                e_dm=e_dm,
+                defaut=(
+                    f"🟢 `Standard` ｜ {module_emojis['storm']} `Storm` ｜ {module_emojis['fortress']} `Fortress` ｜ {module_emojis['advanced_castle']} `Adv. Castle`\n"
+                    f"{e_staff} `Admin` ｜ {e_working} `En travaux` ｜ {e_server} `Serveur Uniq.` ｜ {e_dm} `MP Uniq.`"
+                ),
             )
 
             embed.description = f"{legende}\n\u200b"
@@ -841,30 +878,27 @@ class HelpSelect(discord.ui.Select):
                 cmd_desc = t(self.langue, cmd["desc_key"], defaut="> *Description manquante*")
 
                 is_wip = cmd.get("wip", False)
-                is_advanced = cmd.get("advanced", False)
+                required_module = cmd.get("required_module")
+
                 is_admin = cmd.get("admin_only", False)
                 is_server = cmd.get("server_only", False)
                 is_private = cmd.get("private_only", False)
 
-                # 1. La pastille de statut principale (Standard, Avancé, En travaux)
                 if is_wip:
                     emoji_statut = e_working
-                elif is_advanced:
-                    emoji_statut = "🌟"
+                elif required_module:
+                    emoji_statut = module_emojis.get(required_module, "🌟")
                 else:
                     emoji_statut = "🟢"
 
-                # 2. Le badge Admin (s'ajoute s'il s'agit d'une commande admin)
                 emoji_admin = f" {e_staff}" if is_admin else ""
 
-                # 3. Le badge de lieu (Serveur ou MP) à la fin
                 emoji_lieu = ""
                 if is_server:
                     emoji_lieu = f" {e_server}"
                 elif is_private:
                     emoji_lieu = f" {e_dm}"
 
-                # Assemblage final : [Pastille] [Admin] `[Nom de la commande]` [Lieu]
                 embed.add_field(
                     name=f"{emoji_statut}{emoji_admin} **`{cmd['name']}`**{emoji_lieu}",
                     value=f"{cmd_desc}",
@@ -951,8 +985,8 @@ class AideCog(commands.Cog):
 
         ping = round(self.bot.latency * 1000)
 
-        val_oui = t(langue, "statut_yes", defaut="{e_parameters} Oui")
-        val_non = t(langue, "statut_no", defaut="{e_icon_friends2} Non")
+        val_oui = t(langue, "statut_yes", defaut="🟢 Oui")
+        val_non = t(langue, "statut_no", defaut="🔴 Non")
         maintenance_txt = val_oui if getattr(self.bot, "maintenance_mode", False) else val_non
 
         bot_txt = t(
@@ -978,7 +1012,7 @@ class AideCog(commands.Cog):
             pourcentage_plein = (used / total) * 100
 
             scans_dir = Path(f"/app/data/server_scans/{serveur}")
-            last_scan_txt = t(langue, "statut_storage_no_file", defaut="{e_error} Aucun fichier trouvé")
+            last_scan_txt = t(langue, "statut_storage_no_file", defaut="🔴 Aucun fichier trouvé")
 
             if scans_dir.exists():
                 server_files = list(scans_dir.rglob("*.json"))
@@ -1006,7 +1040,7 @@ class AideCog(commands.Cog):
                 langue,
                 "statut_storage_err",
                 error=str(e),
-                defaut=f"{{e_error}} Erreur de lecture de l'espace de stockage : {e}",
+                defaut=f"🔴 Erreur de lecture de l'espace de stockage : {e}",
             )
             obs.record_error(source="command", scope="status_disk", exception=e, cog="aide")
 
@@ -1035,7 +1069,7 @@ class AideCog(commands.Cog):
                     api_data = await r.json()
                     v_api = api_data.get("version", "Inconnue")
 
-                    val_prog = t(langue, "statut_api_prog", defaut="{e_error} En cours...")
+                    val_prog = t(langue, "statut_api_prog", defaut="🔴 En cours...")
                     val_done = t(langue, "statut_api_done", defaut="🟢 Terminé / À jour")
                     in_progress = val_prog if api_data.get("update_in_progress", False) else val_done
 
@@ -1073,9 +1107,9 @@ class AideCog(commands.Cog):
                             f"{{e_war_realms}} **Etrangers** : {to_discord_ts(updates.get('war_realms'))}\n"
                             f"{{e_berimond}} **Bérimond** : {to_discord_ts(updates.get('berimond_kingdom'))}"
                         ),
-                    )
+                    ).format(**DICT_EMOJIS)
                     embed.add_field(
-                        name=t(langue, "statut_api_events_title", defaut="⏱️ Dernière capture des données GGE-Tracker"),
+                        name=t(langue, "statut_api_events_title", defaut="⏱️ Dernière capture des données"),
                         value=events_txt,
                         inline=False,
                     )
@@ -1086,7 +1120,7 @@ class AideCog(commands.Cog):
                             langue,
                             "statut_api_err_instable",
                             code=r.status,
-                            defaut=f"{{e_error}} L'API répond mais rencontre une instabilité (Code : {r.status}).",
+                            defaut=f"🔴 L'API répond mais rencontre une instabilité (Code : {r.status}).",
                         ),
                         inline=False,
                     )
@@ -1097,10 +1131,48 @@ class AideCog(commands.Cog):
                     langue,
                     "statut_api_err_offline",
                     error=str(e),
-                    defaut=f"{{e_error}} **Hors ligne** : Impossible de joindre l'API de suivi du jeu ({e}).",
+                    defaut=f"🔴 **Hors ligne** : Impossible de joindre l'API ({e}).",
                 ),
                 inline=False,
             )
+
+        # ==========================================
+        # 🌟 VÉRIFICATION DES MODULES DU SERVEUR
+        # ==========================================
+        config_data = await load_configuration_async()
+        srv_data = config_data.get("servers_info", {}).get(serveur, {})
+
+        has_storm = srv_data.get("storm", False)
+        has_fortress = srv_data.get("fortress", False)
+        has_adv_castle = srv_data.get("advanced_castle", False)
+
+        e_yes = DICT_EMOJIS.get("e_greencirclebullet", "🟢")
+        e_no = DICT_EMOJIS.get("e_tomatobulletpoint", "🔴")
+        e_storm = DICT_EMOJIS.get("e_aquamarine_brut", "💎")
+        e_fort = DICT_EMOJIS.get("e_fortresses", "🏰")
+        e_castle = DICT_EMOJIS.get("e_castles", "🏯")
+
+        modules_val = t(
+            langue,
+            "statut_modules_desc",
+            storm_status=e_yes if has_storm else e_no,
+            fort_status=e_yes if has_fortress else e_no,
+            castle_status=e_yes if has_adv_castle else e_no,
+            e_storm=e_storm,
+            e_fort=e_fort,
+            e_castle=e_castle,
+            defaut=(
+                f"{e_storm} **Storm Islands** : {e_yes if has_storm else e_no}\n"
+                f"{e_fort} **Fortress** : {e_yes if has_fortress else e_no}\n"
+                f"{e_castle} **Advanced Castle** : {e_yes if has_adv_castle else e_no}"
+            ),
+        )
+
+        embed.add_field(
+            name=t(langue, "statut_modules_title", serveur=serveur, defaut=f"✨ Modules Actifs sur {serveur}"),
+            value=modules_val,
+            inline=False,
+        )
 
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed)
@@ -1229,7 +1301,7 @@ class AideCog(commands.Cog):
         """
         # --- Textes généraux et menus ---
         t(langue, "help_home_title")
-        t(langue, "help_legend_v2")
+        t(langue, "help_legend_v3")
         t(langue, "aide_p0_desc")
         t(langue, "help_placeholder")
 
@@ -1267,6 +1339,8 @@ class AideCog(commands.Cog):
         t(langue, "help_cmd_link_account")
         t(langue, "help_cmd_status")
         t(langue, "help_cmd_help")
+        t(langue, "config_featured")
+        t(langue, "config_supported")
 
         # --- Commandes : Communauté ---
         t(langue, "help_cmd_hub_setup")
@@ -1334,8 +1408,10 @@ class AideCog(commands.Cog):
         t(langue, "help_cmd_storm_isles")
         t(langue, "help_cmd_storm_occupier")
         t(langue, "help_cmd_storm_status")
-        t(langue, "help_cmd_storm_setup")
-        t(langue, "help_cmd_storm_stop")
+        t(langue, "help_cmd_storm_setup_isles")
+        t(langue, "help_cmd_storm_stop_isles")
+        t(langue, "help_cmd_storm_setup_forts")
+        t(langue, "help_cmd_storm_stop_forts")
 
         # --- Commandes : Classement ---
         t(langue, "ev_bracket_1")
