@@ -830,25 +830,29 @@ class GGEAssistantBot(commands.Bot):
                                             for gid, config in guilds_to_remove:
                                                 channel_id = config.get("channel_id")
                                                 langue_serveur = config.get("langue", "fr")
-                                                channel = self.get_channel(channel_id) or await self.fetch_channel(
-                                                    channel_id
-                                                )
-                                                if channel:
-                                                    titre = t(
-                                                        langue_serveur,
-                                                        "bot_alert_module_disabled_title",
-                                                        defaut="⚠️ Fin des alertes Tempêtes",
+
+                                                try:
+                                                    channel = self.get_channel(channel_id) or await self.fetch_channel(
+                                                        channel_id
                                                     )
-                                                    desc = t(
-                                                        langue_serveur,
-                                                        "bot_alert_module_disabled_desc",
-                                                        server=name,
-                                                        defaut=f"Le serveur de jeu **{name}** ne gère plus les îles orageuses (ou a été désactivé par GGE-Tracker). Les alertes automatiques ont été désactivées pour ce salon.",
-                                                    )
-                                                    embed = discord.Embed(
-                                                        title=titre, description=desc, color=discord.Color.red()
-                                                    )
-                                                    self.loop.create_task(channel.send(embed=embed))
+                                                    if channel:
+                                                        titre = t(
+                                                            langue_serveur,
+                                                            "bot_alert_module_disabled_title",
+                                                            defaut="⚠️ Fin des alertes Tempêtes",
+                                                        )
+                                                        desc = t(
+                                                            langue_serveur,
+                                                            "bot_alert_module_disabled_desc",
+                                                            server=name,
+                                                            defaut=f"Le serveur de jeu **{name}** ne gère plus les îles orageuses (ou a été désactivé par GGE-Tracker). Les alertes automatiques ont été désactivées pour ce salon.",
+                                                        )
+                                                        embed = discord.Embed(
+                                                            title=titre, description=desc, color=discord.Color.red()
+                                                        )
+                                                        self.loop.create_task(channel.send(embed=embed))
+                                                except Exception:
+                                                    pass
 
                                                 del storm_data["guilds"][gid]
                                                 guilds_modified = True
