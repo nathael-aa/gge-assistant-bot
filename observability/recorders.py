@@ -1,8 +1,13 @@
+import asyncio
 import hashlib
+import os
 import time
 import traceback
 from datetime import datetime
 from typing import Any
+
+import aiohttp
+import discord
 
 from .client import ch_datetime, ch_datetime64
 from .context import CommandContext, get_command_context, get_trace_id, new_trace_id, set_command_context
@@ -183,6 +188,23 @@ def fingerprint_exception(exception: BaseException) -> str:
     return hashlib.sha1(signature.encode("utf-8", "replace")).hexdigest()[:16]
 
 
+async def _send_observability_webhook(titre: str, description: str):
+    """Envoie le rapport de crash via Webhook sans dépendre de la session du bot."""
+    webhook_url = os.getenv("WEBHOOK_SYSTEM")
+    if not webhook_url or webhook_url.startswith("https://discord.com/api/webhooks/TON/"):
+        return
+
+    embed = discord.Embed(title=titre, description=description, color=0x8B0000)
+    embed.set_footer(text="GGE Assistant - Observability Crash Report")
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            webhook = discord.Webhook.from_url(webhook_url, session=session)
+            await webhook.send(embed=embed, username="GGE Crash Report 🐛")
+    except Exception as e:
+        print(f"❌ Échec de l'envoi du webhook d'observabilité : {e}")
+
+
 def record_error(
     source: str,
     scope: str = "",
@@ -227,6 +249,18 @@ def record_error(
                 **_base(),
             },
         )
+
+        if exception is not None:
+            tb_short = traceback_text[-2000:] if len(traceback_text) > 2000 else traceback_text
+            titre = f"💥 Crash [{source}] : {scope}"
+            description = f"**Erreur :** `{type(exception).__name__}: {exception}`\n```python\n{tb_short}\n```"
+
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(_send_observability_webhook(titre, description))
+            except RuntimeError:
+                pass
+
     except Exception:
         pass
 
