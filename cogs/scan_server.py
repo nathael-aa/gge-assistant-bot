@@ -4,7 +4,7 @@ import logging
 import os
 import shutil
 import traceback
-from datetime import UTC, datetime, time
+from datetime import datetime
 from pathlib import Path
 
 import aiohttp
@@ -27,7 +27,6 @@ class ScanCog(commands.Cog):
         self.webhook_url = os.getenv("WEBHOOK_SCAN")
         self._scan_kind = "daily"
 
-        # Démarrage de la tâche planifiée ex: tous les jours à 00:30 UTC
         self.daily_scan.start()
 
     def cog_unload(self):
@@ -70,26 +69,23 @@ class ScanCog(commands.Cog):
             active_servers.add("E4K_FR1")
         return list(active_servers)
 
-    async def fetch_page(self, session, server, page, max_retries=4, obs_stats=None):
-        """Télécharge UNE page avec gestion des erreurs 429 adaptées au rate limit de l'API"""
-        url = f"{self.api_url}/players"
+    async def fetch_export_page(self, session, server, cursor=None, max_retries=4, obs_stats=None):
+        """Télécharge une page de 5000 joueurs via le nouvel endpoint d'export."""
+        url = f"{self.api_url}/export/players"
+
         params = {
-            "limit": 100,
-            "page": page,
-            "banFilter": 0,
-            "allianceFilter": -1,
-            "protectionFilter": -1,
-            "inactiveFilter": 1,
-            "kingdomFilter": 999,
-            "orderBy": "might_current",
-            "orderType": "DESC",
+            "limit": 5000,
+            "fields": "player_id,player_name,alliance_id,alliance_name,level,legendary_level,honor,might_current",
         }
+
+        if cursor:
+            params["cursor"] = cursor
 
         headers = await get_api_headers(custom_server=server)
 
         for attempt in range(max_retries):
             try:
-                async with session.get(url, headers=headers, params=params, timeout=15) as response:
+                async with session.get(url, headers=headers, params=params, timeout=20) as response:
                     if response.status == 200:
                         if obs_stats is not None:
                             obs_stats["pages_ok"] += 1
@@ -99,17 +95,17 @@ class ScanCog(commands.Cog):
                         if obs_stats is not None:
                             obs_stats["http_429"] += 1
                             obs_stats["backoff_total_s"] += wait_time
-                        logger.warning(f"⚠️ 429 sur {server} (Page {page}). Purge API de {wait_time}s...")
+                        logger.warning(f"⚠️ 429 sur {server} (Curseur {cursor}). Purge API de {wait_time}s...")
                         await asyncio.sleep(wait_time)
                     else:
                         if obs_stats is not None:
                             obs_stats["http_errors"] += 1
-                        logger.error(f"❌ Erreur {response.status} sur {server} (Page {page}).")
+                        logger.error(f"❌ Erreur {response.status} sur {server} (Curseur {cursor}).")
                         await asyncio.sleep(2)
             except Exception as e:
                 if obs_stats is not None:
                     obs_stats["http_errors"] += 1
-                logger.error(f"❌ Exception réseau sur {server} (Page {page}): {e}")
+                logger.error(f"❌ Exception réseau sur {server} (Curseur {cursor}): {e}")
                 await asyncio.sleep(2)
 
         if obs_stats is not None:
@@ -117,32 +113,12 @@ class ScanCog(commands.Cog):
         return None
 
     async def scan_server(self, session, server, index_actuel, total_serveurs):
-        """Scanne un serveur complet de manière optimisée et non-bloquante"""
+        """Scanne un serveur complet en utilisant les curseurs (Pagination Keyset)"""
         logger.info(f"🔍 DÉMARRAGE [{index_actuel}/{total_serveurs}] : {server}")
         start_time = asyncio.get_event_loop().time()
 
         obs_stats = {"pages_ok": 0, "pages_failed": 0, "http_429": 0, "http_errors": 0, "backoff_total_s": 0}
         debut_scan = datetime.now()
-
-        first_page_data = await self.fetch_page(session, server, 1, obs_stats=obs_stats)
-
-        if not first_page_data or not first_page_data.get("players"):
-            logger.error(f"❌ Aucun joueur trouvé ou erreur fatale pour {server}.")
-            obs.record_scan_run(
-                gge_server=server,
-                status="failed",
-                started_at=debut_scan,
-                kind=self._scan_kind,
-                server_index=index_actuel,
-                servers_total=total_serveurs,
-                error_message="Aucun joueur trouvé ou erreur fatale sur la première page",
-                **obs_stats,
-            )
-            return None
-
-        total_pages = first_page_data.get("pagination", {}).get("total_pages", 1)
-        total_items = first_page_data.get("pagination", {}).get("total_items_count", "?")
-        logger.info(f"📊 {server} : {total_items} joueurs sur {total_pages} pages.")
 
         all_players = {}
 
@@ -165,23 +141,49 @@ class ScanCog(commands.Cog):
                     "legendary_level": p.get("legendary_level", 0),
                     "honor": p.get("honor", 0),
                     "victory_points": 0,
-                    "main_points": p.get("might_current", 0),
+                    "main_points": str(p.get("might_current", 0)),
                     "structures": [],
                 }
 
-        parse_players(first_page_data)
+        cursor = None
+        pages_count = 0
 
-        if total_pages > 1:
-            for page in range(2, total_pages + 1):
-                res = await self.fetch_page(session, server, page, obs_stats=obs_stats)
-                if res:
-                    parse_players(res)
+        while True:
+            res = await self.fetch_export_page(session, server, cursor, obs_stats=obs_stats)
 
-                await asyncio.sleep(0.2)
+            if not res or not res.get("players"):
+                if pages_count == 0:
+                    logger.error(f"❌ Aucun joueur trouvé ou erreur fatale pour {server} dès la première page.")
+                    obs.record_scan_run(
+                        gge_server=server,
+                        status="failed",
+                        started_at=debut_scan,
+                        kind=self._scan_kind,
+                        server_index=index_actuel,
+                        servers_total=total_serveurs,
+                        error_message="Erreur fatale sur la première page",
+                        **obs_stats,
+                    )
+                    return None
+                else:
+                    logger.warning(f"⚠️ Scan partiel pour {server} (Interrompu à la page {pages_count + 1}).")
+                break
+
+            parse_players(res)
+            pages_count += 1
+
+            page_info = res.get("page", {})
+            has_more = page_info.get("has_more", False)
+            cursor = page_info.get("next_cursor")
+
+            if not has_more or not cursor:
+                break
+
+            await asyncio.sleep(0.5)
 
         duration = round(asyncio.get_event_loop().time() - start_time, 2)
         logger.info(
-            f"✅ FINI [{index_actuel}/{total_serveurs}] : {server} - {len(all_players)} joueurs récupérés en {duration}s"
+            f"✅ FINI [{index_actuel}/{total_serveurs}] : {server} - {len(all_players)} joueurs récupérés en {duration}s ({pages_count} reqs)"
         )
 
         alliances_uniques = {p["alliance"] for p in all_players.values() if p.get("alliance") != "Sans alliance"}
@@ -193,12 +195,16 @@ class ScanCog(commands.Cog):
             server_index=index_actuel,
             servers_total=total_serveurs,
             duration_s=duration,
-            pages_total=total_pages,
+            pages_total=pages_count,
             players_total=len(all_players),
             alliances_total=len(alliances_uniques),
             **obs_stats,
         )
-        return all_players, duration
+
+        # Tri local par puissance (might_current -> main_points) pour rétrocompatibilité
+        all_players_sorted = dict(sorted(all_players.items(), key=lambda item: item[1]["main_points"], reverse=True))
+
+        return all_players_sorted, duration
 
     def save_results(self, players_data, duration, serveur):
         """Sauvegarde les résultats en JSON (Fonction bloquante isolée) et nettoie les anciens"""
@@ -251,7 +257,6 @@ class ScanCog(commands.Cog):
 
         try:
             async with aiohttp.ClientSession() as session:
-                # On triche un peu sur l'index (1/1) pour l'affichage des logs
                 result = await self.scan_server(session, server_name, 1, 1)
 
                 if result:
@@ -269,8 +274,8 @@ class ScanCog(commands.Cog):
         finally:
             self._scan_kind = "daily"
 
-    # Lancement tous les jours à 00h30 UTC
-    @tasks.loop(time=time(hour=0, minute=30, tzinfo=UTC))
+    # Lancement toutes les 3 heures
+    @tasks.loop(hours=3)
     async def daily_scan(self):
         self._scan_kind = "daily"
         obs.set_task_name("daily_scan")

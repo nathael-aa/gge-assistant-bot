@@ -778,7 +778,7 @@ PROJECTS_LIST = [
             {
                 "label_key": "btn_website",
                 "label_defaut": "Site Web",
-                "url": "https://gge-tracker.com/",
+                "url": "https://gge-tracker.com/?utm_source=gge_assistant",
                 "emoji": DICT_EMOJIS.get("e_website", "🌐"),
             },
             {
@@ -790,7 +790,7 @@ PROJECTS_LIST = [
             {
                 "label_key": "btn_api",
                 "label_defaut": "API",
-                "url": "https://docs.gge-tracker.com/",
+                "url": "https://docs.gge-tracker.com/?utm_source=gge_assistant",
                 "emoji": DICT_EMOJIS.get("e_developer", "💻"),
             },
         ],
