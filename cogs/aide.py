@@ -457,6 +457,26 @@ HELP_CONFIG = {
                 "hide_in_help": False,
             },
             {
+                "name": "/gt rank",
+                "desc_key": "help_cmd_gt_rank",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/gt alliance",
+                "desc_key": "help_cmd_gt_alliance",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
                 "name": "/calendar current",
                 "desc_key": "help_cmd_calendar_current",
                 "server_only": False,
@@ -1226,6 +1246,7 @@ class AideCog(commands.Cog):
     @app_commands.command(name="support", description="Get the invite link to the official support server")
     @app_commands.checks.cooldown(1, 1.0, key=lambda i: i.user.id)
     async def support(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         langue, _ = await get_server_config(interaction)
 
         embed = discord.Embed(
@@ -1245,7 +1266,7 @@ class AideCog(commands.Cog):
         )
         view.add_item(btn)
 
-        await interaction.response.send_message(embed=embed, view=view)
+        await interaction.followup.send(embed=embed, view=view)
 
     @app_commands.command(name="vote", description="Support the bot by voting on Top.gg")
     @app_commands.checks.cooldown(1, 1.0, key=lambda i: i.user.id)

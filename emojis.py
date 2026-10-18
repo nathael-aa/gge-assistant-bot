@@ -171,6 +171,12 @@ DICT_EMOJIS = {
     "e_fort": "<:fortresses:1512574700839239892>",
     "e_storm": "<:aquamarine_brut:1533424307512807486>",
     "e_castle": "<:castles:1512574693859786822>",
+    "e_grandtournament": "<:grandtournament:1560961272747663416>",
+    "e_division1": "<:division1:1560961264052600922>",
+    "e_division2": "<:division2:1560961065330802698>",
+    "e_division3": "<:division3:1560961020598558771>",
+    "e_division4": "<:division4:1560961259644387388>",
+    "e_division5": "<:division5:1560961250358460488>",
 }
 
 EMOJI_ALIASES = {

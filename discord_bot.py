@@ -205,6 +205,7 @@ class GGEAssistantBot(commands.Bot):
             "cogs.scan_server",
             "cogs.storms",
             "cogs.target",
+            "cogs.tournaments",
         ]
         for ext in extensions:
             try:
