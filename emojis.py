@@ -177,6 +177,7 @@ DICT_EMOJIS = {
     "e_division3": "<:division3:1560961020598558771>",
     "e_division4": "<:division4:1560961259644387388>",
     "e_division5": "<:division5:1560961250358460488>",
+    "e_division6": "<:division6:1561410251624816711>",
 }
 
 EMOJI_ALIASES = {

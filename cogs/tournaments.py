@@ -1,5 +1,4 @@
 import logging
-import urllib.parse
 from datetime import datetime
 
 import discord
@@ -26,7 +25,7 @@ class TournamentsCog(commands.Cog):
         self.clr_gt_rank = discord.Color.from_rgb(189, 224, 254)
         self.clr_gt_alliance = discord.Color.from_rgb(162, 210, 255)
 
-    gt_group = app_commands.Group(name="gt", description="Commandes liées au Grand Tournoi")
+    gt_group = app_commands.Group(name="gt", description="Commands related to the Grand Tournament")
 
     # ==========================================
     # 🛠️ FONCTION UTILITAIRE : DERNIER SNAPSHOT
@@ -67,23 +66,20 @@ class TournamentsCog(commands.Cog):
             app_commands.Choice(name="Division 3", value=3),
             app_commands.Choice(name="Division 2", value=2),
             app_commands.Choice(name="Division 1 (Lowest)", value=1),
-        ],
-        subdivision=[
-            app_commands.Choice(name="Subdivision 1 (Top)", value=1),
-            app_commands.Choice(name="Subdivision 2", value=2),
-            app_commands.Choice(name="Subdivision 3", value=3),
-            app_commands.Choice(name="Subdivision 4", value=4),
-            app_commands.Choice(name="Subdivision 5", value=5),
-        ],
+        ]
     )
     @app_commands.describe(
         division="The main division (1 to 5)",
-        subdivision="The subdivision (optional, defaults to 1)",
+        subdivision="The subdivision number (e.g., 1, 2, 3... Defaults to 1)",
         alliance="Optional: Find and highlight a specific alliance",
     )
     @app_commands.autocomplete(alliance=alliance_autocomplete)
     async def gt_rank(
-        self, interaction: discord.Interaction, division: int, subdivision: int = None, alliance: str = None
+        self,
+        interaction: discord.Interaction,
+        division: int,
+        subdivision: app_commands.Range[int, 1, 100] = 1,
+        alliance: str = None,
     ):
         await interaction.response.defer(thinking=True)
         langue, serveur = await get_server_config(interaction)
@@ -103,12 +99,11 @@ class TournamentsCog(commands.Cog):
         target_local_page = 0
 
         if alliance:
-            safe_ali = urllib.parse.quote(alliance)
             search_url = f"{self.api_base}/grand-tournament/search"
             async with self.bot.session.get(
                 search_url,
                 headers=headers,
-                params={"date": snapshot_date, "alliance_name": safe_ali, "page": 1},
+                params={"date": snapshot_date, "alliance_name": alliance, "page": 1},
                 timeout=15,
             ) as r:
                 if r.status == 200:
@@ -251,13 +246,13 @@ class TournamentsCog(commands.Cog):
         if alliance.isdigit():
             ali_id = int(alliance)
         else:
-            safe_ali = urllib.parse.quote(alliance)
-            params_search = {"date": snapshot_date, "alliance_name": safe_ali, "page": 1}
+            params_search = {"date": snapshot_date, "alliance_name": alliance, "page": 1}
             url_search = f"{self.api_base}/grand-tournament/search"
 
             async with self.bot.session.get(url_search, headers=headers, params=params_search, timeout=15) as r:
                 if r.status != 200:
                     err = (await r.text())[:150]
+                    logger.error(f"[GT ALLIANCE] Erreur Search API ({r.status}) : {err}")
                     emo = DICT_EMOJIS.get("e_error", "❌")
                     return await interaction.followup.send(f"{emo} **API Error (Search {r.status})** : `{err}`")
 
@@ -295,6 +290,7 @@ class TournamentsCog(commands.Cog):
                 )
             if r.status != 200:
                 err = (await r.text())[:150]
+                logger.error(f"[GT ALLIANCE] Erreur History API ({r.status}) : {err}")
                 emo = DICT_EMOJIS.get("e_error", "❌")
                 return await interaction.followup.send(f"{emo} **API Error (History {r.status})** : `{err}`")
 

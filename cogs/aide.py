@@ -477,6 +477,26 @@ HELP_CONFIG = {
                 "hide_in_help": False,
             },
             {
+                "name": "/rift rank",
+                "desc_key": "help_cmd_rift_rank",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
+                "name": "/rift alliance",
+                "desc_key": "help_cmd_rift_alliance",
+                "server_only": False,
+                "private_only": False,
+                "admin_only": False,
+                "required_module": None,
+                "wip": False,
+                "hide_in_help": False,
+            },
+            {
                 "name": "/calendar current",
                 "desc_key": "help_cmd_calendar_current",
                 "server_only": False,
@@ -1406,6 +1426,8 @@ class AideCog(commands.Cog):
         t(langue, "help_cmd_leaderboard_storm")
         t(langue, "help_cmd_gt_alliance")
         t(langue, "help_cmd_gt_rank")
+        t(langue, "help_cmd_rift_alliance")
+        t(langue, "help_cmd_rift_rank")
         t(langue, "help_cmd_woa_history")
         t(langue, "help_cmd_woa_summary")
 

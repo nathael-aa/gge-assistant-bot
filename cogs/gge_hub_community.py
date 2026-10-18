@@ -482,7 +482,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
                             title = title_elem.get_text(strip=True)
                             title = re.sub(
-                                r"(?i)[TODO]\s*(Missing Text|Texte manquant|Fehlender Text)?\s*", "", title
+                                r"(?i)\[TODO\]\s*(Missing Text|Texte manquant|Fehlender Text)?\s*", "", title
                             ).strip()
 
                             date_elem = post.find("span", class_="elementor-post-date")

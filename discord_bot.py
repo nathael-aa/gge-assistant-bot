@@ -205,6 +205,7 @@ class GGEAssistantBot(commands.Bot):
             "cogs.gge_hub_community",
             "cogs.profils",
             "cogs.radar",
+            "cogs.rift",
             "cogs.scan_server",
             "cogs.storms",
             "cogs.target",
