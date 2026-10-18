@@ -433,13 +433,20 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                             continue
 
                                         title = heading.get_text(strip=True)
+                                        title = re.sub(
+                                            r"(?i)\[TODO\]\s*(Missing Text|Texte manquant|Fehlender Text)?\s*",
+                                            "",
+                                            title,
+                                        ).strip()
+
                                         match = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", url_article)
                                         date_obj = datetime(
                                             int(match.group(1)), int(match.group(2)), int(match.group(3))
                                         )
                                         discord_date = f"<t:{int(date_obj.timestamp())}:D>"
 
-                                        article_id = hashlib.md5((url_article + title).encode()).hexdigest()
+                                        # ID basé UNIQUEMENT sur l'URL (insensible aux changements de titres)
+                                        article_id = hashlib.md5(url_article.encode()).hexdigest()
 
                                         articles.append(
                                             {
@@ -515,7 +522,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             is_alert = "alert" in classes or "alert" in url_article.lower()
                             article_type = "alerts" if is_alert else "news"
 
-                            article_id = hashlib.md5((url_article + title).encode()).hexdigest()
+                            article_id = hashlib.md5(url_article.encode()).hexdigest()
 
                             articles.append(
                                 {
