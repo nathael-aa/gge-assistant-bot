@@ -51,6 +51,7 @@ A comprehensive Discord bot designed to assist "Goodgame Empire" (GGE) and "Empi
 │   ├── gge_hub_community.py
 │   ├── profils.py
 │   ├── radar.py
+│   ├── rift.py
 │   ├── scan_server.py
 │   ├── storms.py
 │   ├── target.py
@@ -77,7 +78,7 @@ A comprehensive Discord bot designed to assist "Goodgame Empire" (GGE) and "Empi
 ├── ruff.toml
 └── utils.py
 
-6 directories, 37 files
+6 directories, 38 files
 ```
 <!-- TREE-END -->
 *(This section is auto-updated via GitHub Actions)*
