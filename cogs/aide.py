@@ -1404,6 +1404,8 @@ class AideCog(commands.Cog):
         t(langue, "help_cmd_rank_alliance")
         t(langue, "help_cmd_leaderboard_woa")
         t(langue, "help_cmd_leaderboard_storm")
+        t(langue, "help_cmd_gt_alliance")
+        t(langue, "help_cmd_gt_rank")
         t(langue, "help_cmd_woa_history")
         t(langue, "help_cmd_woa_summary")
 

@@ -119,6 +119,14 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
             couleur = 0x3498DB
             titre_prefix = t(langue, "hub_news_prefix", defaut="📰 [ACTUALITÉ]")
 
+        titre_complet = f"{titre_prefix} {final_titre}"
+        if len(titre_complet) > 250:
+            titre_complet = titre_complet[:247] + "..."
+
+        if final_resume and len(final_resume) > 3000:
+            msg_tronque = t(langue, "hub_resume_truncated", defaut="*(...Résumé tronqué car trop long...)*")
+            final_resume = final_resume[:3000] + f"...\n\n{msg_tronque}"
+
         resume_fallback = t(
             langue,
             "hub_news_resume_fallback",
@@ -142,7 +150,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
             final_resume_texte = resume_fallback
 
         embed = discord.Embed(
-            title=f"{titre_prefix} {final_titre}",
+            title=titre_complet,
             url=article["url"],
             description=f"**{date_label}** {article['date_discord']}\n\n{final_resume_texte}\n\n[{link_label}]({article['url']})",
             color=couleur,
@@ -168,12 +176,21 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
                     chunks_md = []
                     current_chunk = ""
+
                     for ligne in final_full_md.split("\n"):
-                        if len(current_chunk) + len(ligne) < 1900:
+                        if len(ligne) > 1900:
+                            if current_chunk:
+                                chunks_md.append(current_chunk)
+                                current_chunk = ""
+                            for i in range(0, len(ligne), 1900):
+                                chunks_md.append(ligne[i : i + 1900])
+
+                        elif len(current_chunk) + len(ligne) < 1900:
                             current_chunk += ligne + "\n"
                         else:
                             chunks_md.append(current_chunk)
                             current_chunk = ligne + "\n"
+
                     if current_chunk:
                         chunks_md.append(current_chunk)
 
@@ -195,16 +212,6 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
             )
         except Exception as e:
             logger.error(f"Erreur d'envoi annonce HUB : {e}")
-            obs.record_alert(
-                source="hub_news",
-                alert_type=article["type"],
-                gge_server=serveur,
-                channel="guild",
-                recipients=1,
-                delivered=0,
-                failed=1,
-                dm_blocked=0,
-            )
 
     @app_commands.command(name="setup", description="Configure the channel for GGE announcements")
     @app_commands.choices(
@@ -285,27 +292,32 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
         await interaction.followup.send(msg)
 
-        # FIX : Envoi forcé de la dernière annonce correspondante lors de l'activation
-        # FIX : Envoi forcé de la dernière annonce correspondante lors de l'activation
         try:
             articles = await self.fetch_latest_news()
 
-            # 🎯 On détermine à quel jeu joue ce serveur Discord
             guild_game = "e4k" if serveur.startswith("E4K_") else "empire"
 
-            # On filtre pour ne garder que la bonne catégorie ET le bon jeu (ou "both" pour le changelog)
             cat_articles = [a for a in articles if a["type"] == categorie and a["game"] in [guild_game, "both"]]
 
             if cat_articles:
                 latest_article = cat_articles[-1]
                 texte_resume = latest_article.get("resume_content", "")
 
-                # Fetching contenu complet si nécessaire
                 if not texte_resume and latest_article["type"] in ["news", "alerts"]:
                     try:
                         async with self.bot.session.get(latest_article["url"], headers=self.headers, timeout=10) as r:
                             if r.status == 200:
                                 html_article = await r.text()
+
+                                if not latest_article.get("image"):
+                                    match_img = re.search(r'"featuredImage":"([^"]+)"', html_article)
+                                    if match_img:
+                                        latest_article["image"] = match_img.group(1).replace("\\/", "/")
+                                    else:
+                                        match_poster = re.search(r'<video[^>]+poster="([^"]+)"', html_article)
+                                        if match_poster:
+                                            latest_article["image"] = match_poster.group(1)
+
                                 soup_art = await asyncio.to_thread(BeautifulSoup, html_article, "html.parser")
                                 content_div = soup_art.find("div", class_="elementor-widget-theme-post-content")
                                 if content_div:
@@ -318,7 +330,6 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                     except Exception as e:
                         logger.error(f"Setup fetch error: {e}")
 
-                # Traductions rapides
                 if latest_article["type"] == "patchnotes":
                     final_titre = latest_article["title"]
                 else:
@@ -398,7 +409,6 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
         """Scrape les Hubs, crée le résumé propre ET extrait la version Markdown complète pour le fil Discord."""
         articles = []
 
-        # 1. PARSING DES NEWS CLASSIQUES ET ALERTES (POUR E4K ET EMPIRE)
         for game_type, url in self.hub_urls.items():
             try:
                 async with self.bot.session.get(url, headers=self.headers, timeout=15) as r:
@@ -406,15 +416,20 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                         html_content = await r.text()
                         soup = await asyncio.to_thread(BeautifulSoup, html_content, "html.parser")
 
-                        # --- A. PARSING DES HERO BANNERS (Les gros articles tout en haut) ---
                         for heading in soup.find_all(["h1", "h2"]):
                             if "e-heading-base" in heading.get("class", []):
                                 parent = heading.find_parent("div", class_="elementor-element")
                                 if parent:
                                     link_elem = parent.find("a", href=True)
                                     if link_elem and re.search(r"/\d{4}/\d{2}/\d{2}/", link_elem["href"]):
-                                        url_article = link_elem["href"]
-                                        if url_article.rstrip("/") == self.changelog_url.rstrip("/"):
+                                        url_article = link_elem["href"].split("?")[0].rstrip("/")
+                                        if url_article == self.changelog_url.rstrip("/"):
+                                            continue
+
+                                        existing = next((a for a in articles if a["url"] == url_article), None)
+                                        if existing:
+                                            if existing["game"] != game_type:
+                                                existing["game"] = "both"
                                             continue
 
                                         title = heading.get_text(strip=True)
@@ -424,7 +439,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                         )
                                         discord_date = f"<t:{int(date_obj.timestamp())}:D>"
 
-                                        article_id = hashlib.md5((url_article + title + game_type).encode()).hexdigest()
+                                        article_id = hashlib.md5((url_article + title).encode()).hexdigest()
 
                                         articles.append(
                                             {
@@ -434,13 +449,12 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                                 "date_discord": discord_date,
                                                 "date_obj": date_obj,
                                                 "image": None,
-                                                "type": "news",  # Par défaut les Heroes sont des news
+                                                "type": "news",
                                                 "resume_content": "",
                                                 "game": game_type,
                                             }
                                         )
 
-                        # --- B. PARSING DE LA GRILLE (Articles standards) ---
                         for post in soup.find_all("article", class_="elementor-grid-item"):
                             title_elem = post.find(["h1", "h2", "h3"], class_="elementor-post__title")
                             if not title_elem:
@@ -450,16 +464,30 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             if not link_elem:
                                 continue
 
-                            url_article = link_elem["href"]
-                            title = title_elem.get_text(strip=True)
+                            url_article = link_elem["href"].split("?")[0].rstrip("/")
 
-                            if url_article.rstrip("/") == self.changelog_url.rstrip("/"):
+                            if url_article == self.changelog_url.rstrip("/"):
                                 continue
+
+                            existing = next((a for a in articles if a["url"] == url_article), None)
+                            if existing:
+                                if existing["game"] != game_type:
+                                    existing["game"] = "both"
+
+                                img_elem = post.find("img")
+                                img_url = img_elem["src"].split("?")[0] if img_elem else None
+                                if img_url and not existing["image"]:
+                                    existing["image"] = img_url
+                                continue
+
+                            title = title_elem.get_text(strip=True)
+                            title = re.sub(
+                                r"(?i)[TODO]\s*(Missing Text|Texte manquant|Fehlender Text)?\s*", "", title
+                            ).strip()
 
                             date_elem = post.find("span", class_="elementor-post-date")
                             date_str = date_elem.get_text(strip=True) if date_elem else ""
 
-                            # Recherche d'une date alternative ou parsing intelligent
                             date_obj = None
                             for fmt in ("%d %B %Y", "%d.%m.%Y", "%B %d, %Y", "%Y-%m-%d"):
                                 try:
@@ -470,70 +498,41 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                     continue
 
                             if not date_obj:
-                                # Si aucune date valide n'est trouvée, on prend l'heure actuelle (naïve)
+                                match = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", url_article)
+                                if match:
+                                    date_obj = datetime(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+
+                            if not date_obj:
                                 date_obj = datetime.now()
                                 discord_date = date_str if date_str else "Récemment"
                             else:
                                 discord_date = f"<t:{int(date_obj.timestamp())}:D>"
 
                             img_elem = post.find("img")
-                            img_url = img_elem["src"] if img_elem else None
-                            if img_url and "?" in img_url:
-                                img_url = img_url.split("?")[0]
+                            img_url = img_elem["src"].split("?")[0] if img_elem else None
 
                             classes = " ".join(post.get("class", [])).lower()
                             is_alert = "alert" in classes or "alert" in url_article.lower()
                             article_type = "alerts" if is_alert else "news"
 
-                            article_id = hashlib.md5((url_article + title + game_type).encode()).hexdigest()
+                            article_id = hashlib.md5((url_article + title).encode()).hexdigest()
 
-                            # Sécurité anti-doublon (si l'article est en Hero ET dans la grille)
-                            if not any(a["id"] == article_id for a in articles):
-                                date_obj = None
-                                # 1. On essaye d'abord de lire le texte normal de la date
-                                try:
-                                    clean_date_str = date_str.replace(".", "").strip()
-                                    date_obj = datetime.strptime(clean_date_str, "%d %B %Y")
-                                except Exception:
-                                    pass
-
-                                # 2. Si ça échoue, on extrait la date directement de l'URL !
-                                if not date_obj:
-                                    match = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", url_article)
-                                    if match:
-                                        date_obj = datetime(
-                                            int(match.group(1)), int(match.group(2)), int(match.group(3))
-                                        )
-
-                                # 3. Si vraiment tout échoue (impossible sauf si l'URL n'a pas de date)
-                                if date_obj:
-                                    discord_date = f"<t:{int(date_obj.timestamp())}:D>"
-                                else:
-                                    date_obj = datetime.now()
-                                    discord_date = date_str if date_str else "Récemment"
-
-                                # --- NETTOYAGE DU TITRE ---
-                                title = re.sub(
-                                    r"(?i)\[TODO\]\s*(Missing Text|Texte manquant|Fehlender Text)?\s*", "", title
-                                ).strip()
-
-                                articles.append(
-                                    {
-                                        "id": article_id,
-                                        "title": title,
-                                        "url": url_article,
-                                        "date_discord": discord_date,
-                                        "date_obj": date_obj,
-                                        "image": img_url,
-                                        "type": article_type,
-                                        "resume_content": "",
-                                        "game": game_type,
-                                    }
-                                )
+                            articles.append(
+                                {
+                                    "id": article_id,
+                                    "title": title,
+                                    "url": url_article,
+                                    "date_discord": discord_date,
+                                    "date_obj": date_obj,
+                                    "image": img_url,
+                                    "type": article_type,
+                                    "resume_content": "",
+                                    "game": game_type,
+                                }
+                            )
             except Exception as e:
                 logger.error(f"❌ [Hub] Erreur de parsing HTML ({game_type}) : {e}")
 
-        # 2. PARSING DE LA PAGE DES PATCHNOTES
         try:
             async with self.bot.session.get(self.changelog_url, headers=self.headers, timeout=15) as r2:
                 if r2.status == 200:
@@ -557,67 +556,93 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                         texte_resume, texte_full_md = "", ""
 
                         if content_div:
+                            for br in content_div.find_all("br"):
+                                br.replace_with("\n")
+                            for li in content_div.find_all("li"):
+                                li.insert(0, "\n- ")
+                            for strong in content_div.find_all(["b", "strong"]):
+                                strong.insert(0, "**")
+                                strong.append("**")
+
+                            texte_brut = content_div.get_text(separator="\n", strip=True)
+
                             lignes_resume = []
                             lignes_full = []
                             in_bug_section = False
                             bug_count = 0
 
-                            for element in content_div.find_all(["h2", "h3", "h4", "li", "p"]):
-                                if element.name in ["h2", "h3", "h4"]:
+                            for ligne in texte_brut.split("\n"):
+                                ligne = ligne.strip()
+                                ligne = ligne.replace("****", "")
+
+                                if not ligne:
+                                    continue
+
+                                if (
+                                    ligne.startswith("- ")
+                                    or ligne.startswith("– ")
+                                    or ligne.startswith("— ")
+                                    or ligne.startswith("• ")
+                                ):
+                                    ligne = f"- {ligne[2:].strip()}"
+                                elif (
+                                    ligne.startswith("-")
+                                    or ligne.startswith("–")
+                                    or ligne.startswith("—")
+                                    or ligne.startswith("•")
+                                ):
+                                    ligne = f"- {ligne[1:].strip()}"
+
+                                is_header = ligne.startswith("**") or (
+                                    len(ligne) < 40 and not ligne.endswith(".") and not ligne.startswith("-")
+                                )
+
+                                if is_header:
+                                    clean_header = ligne.replace("**", "").strip()
+                                    if not clean_header:
+                                        continue
+
                                     if in_bug_section and bug_count > 0:
-                                        lignes_resume.append(f"• {bug_count} bug fixes and optimizations.")
+                                        lignes_resume.append(f"- {bug_count} bug fixes and optimizations.")
                                         bug_count = 0
 
-                                    header_text = element.get_text(strip=True)
-                                    if lignes_resume:
-                                        lignes_resume.append("")
-                                    lignes_resume.append(f"**{header_text}**")
-
-                                    if lignes_full:
-                                        lignes_full.append("")
-                                    lignes_full.append(f"### {header_text}")
-
-                                    if "bug" in header_text.lower() or "fix" in header_text.lower():
+                                    if (
+                                        "bug" in clean_header.lower()
+                                        or "fix" in clean_header.lower()
+                                        or "correction" in clean_header.lower()
+                                    ):
                                         in_bug_section = True
                                     else:
                                         in_bug_section = False
 
-                                elif element.name == "p":
-                                    text_brut = element.get_text(separator=" ", strip=True)
-                                    lignes_full.append(text_brut)
-                                    if not in_bug_section:
-                                        lignes_resume.append(text_brut)
+                                    if lignes_full:
+                                        lignes_full.append("")
+                                    lignes_full.append(f"**{clean_header}**")
 
-                                elif element.name == "li":
-                                    strong_tag = element.find("strong")
-                                    full_text_brut = element.get_text(separator=" ", strip=True)
-                                    if strong_tag:
-                                        strong_text = strong_tag.get_text(strip=True)
-                                        full_text_md = full_text_brut.replace(strong_text, f"**{strong_text}**", 1)
-                                        lignes_full.append(f"- {full_text_md}")
-                                    else:
-                                        lignes_full.append(f"- {full_text_brut}")
-
+                                    if lignes_resume:
+                                        lignes_resume.append("")
+                                    lignes_resume.append(f"**{clean_header}**")
+                                else:
+                                    lignes_full.append(ligne)
                                     if in_bug_section:
                                         bug_count += 1
-                                        continue
-
-                                    first_sentence = full_text_brut.split(". ")[0]
-                                    if len(first_sentence) > 85:
-                                        short_text = first_sentence[:85]
-                                        if " " in short_text:
-                                            short_text = short_text.rsplit(" ", 1)[0]
-                                        lignes_resume.append(f"• {short_text}...")
                                     else:
-                                        lignes_resume.append(
-                                            f"• {first_sentence}{'.' if not first_sentence.endswith('.') else ''}"
-                                        )
+                                        first_sentence = ligne.split(". ")[0]
+                                        if len(first_sentence) > 90:
+                                            short_text = first_sentence[:90]
+                                            if " " in short_text:
+                                                short_text = short_text.rsplit(" ", 1)[0]
+                                            lignes_resume.append(f"- {short_text}...")
+                                        else:
+                                            lignes_resume.append(
+                                                f"- {first_sentence}{'.' if not first_sentence.endswith('.') else ''}"
+                                            )
 
                             if in_bug_section and bug_count > 0:
-                                lignes_resume.append(f"• {bug_count} bug fixes and optimizations.")
+                                lignes_resume.append(f"- {bug_count} bug fixes and optimizations.")
 
-                            texte_resume = "\n".join(lignes_resume).strip()
                             texte_full_md = "\n".join(lignes_full).strip()
+                            texte_resume = "\n".join(lignes_resume).strip()
 
                         article_id = hashlib.md5(f"patchnote_{date_str}".encode()).hexdigest()
 
@@ -664,29 +689,43 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
             # 🛡️ GESTION DU DÉMARRAGE ET BOUCLIER ANTI-SPAM
             # ==========================================
             if not posted_news:
-                logger.info("📡 [Hub] Initialisation. Mémorisation de l'historique et envoi du tout dernier article.")
-                # S'il y a des articles, on archive tout sauf le dernier
-                for art in nouveaux_articles[:-1]:
-                    posted_news.append(art["id"])
+                logger.info(
+                    "📡 [Hub] Initialisation. Mémorisation de l'historique et envoi du dernier article de chaque catégorie."
+                )
+
+                derniers_par_type = {}
+                for art in nouveaux_articles:
+                    derniers_par_type[art["type"]] = art
+
+                ids_a_garder = {art["id"] for art in derniers_par_type.values()}
+
+                for art in nouveaux_articles:
+                    if art["id"] not in ids_a_garder:
+                        posted_news.append(art["id"])
 
                 data["posted_news"] = posted_news[-100:]
                 await save_hub_config(data)
 
-                articles_a_publier = [nouveaux_articles[-1]]
+                articles_a_publier = sorted(derniers_par_type.values(), key=lambda x: x["date_obj"])
             else:
                 articles_a_publier = [art for art in nouveaux_articles if art["id"] not in posted_news]
 
-                if len(articles_a_publier) > 3:
+                if len(articles_a_publier) > 6:
                     logger.warning(
-                        f"🛡️ [Hub] Bouclier activé ({len(articles_a_publier)} articles détectés). Envoi uniquement du dernier au cas où."
+                        f"🛡️ [Hub] Bouclier activé ({len(articles_a_publier)} articles détectés). Envoi uniquement du dernier de chaque catégorie."
                     )
 
-                    # On archive tout en silence dans la base de données... SAUF le dernier !
-                    for art in articles_a_publier[:-1]:
-                        posted_news.append(art["id"])
+                    derniers_par_type = {}
+                    for art in articles_a_publier:
+                        derniers_par_type[art["type"]] = art
 
-                    # On ne laisse que le tout dernier article pour la suite du processus d'envoi
-                    articles_a_publier = [articles_a_publier[-1]]
+                    ids_a_garder = {art["id"] for art in derniers_par_type.values()}
+
+                    for art in articles_a_publier:
+                        if art["id"] not in ids_a_garder:
+                            posted_news.append(art["id"])
+
+                    articles_a_publier = sorted(derniers_par_type.values(), key=lambda x: x["date_obj"])
 
             if articles_a_publier:
                 langues_cibles = set(config.get("langue", "fr") for config in guilds_config.values())
@@ -699,6 +738,16 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             async with self.bot.session.get(article["url"], headers=self.headers, timeout=10) as r:
                                 if r.status == 200:
                                     html_article = await r.text()
+
+                                    if not article.get("image"):
+                                        match_img = re.search(r'"featuredImage":"([^"]+)"', html_article)
+                                        if match_img:
+                                            article["image"] = match_img.group(1).replace("\\/", "/")
+                                        else:
+                                            match_poster = re.search(r'<video[^>]+poster="([^"]+)"', html_article)
+                                            if match_poster:
+                                                article["image"] = match_poster.group(1)
+
                                     soup_art = await asyncio.to_thread(BeautifulSoup, html_article, "html.parser")
                                     content_div = soup_art.find("div", class_="elementor-widget-theme-post-content")
                                     if content_div:
@@ -744,7 +793,6 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                         serveur_cible = config.get("gge_server", "E4K_FR1")
                         guild_game = "e4k" if serveur_cible.startswith("E4K_") else "empire"
 
-                        # 🎯 On ignore cette annonce si elle ne correspond pas au jeu de ce serveur
                         if article["game"] not in [guild_game, "both"]:
                             continue
 
@@ -754,6 +802,17 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                         final_titre = traductions.get(langue, {}).get("title", article["title"])
                         final_resume = traductions.get(langue, {}).get("resume", "")
                         final_full_md = traductions.get(langue, {}).get("full", "")
+
+                        def clean_md(texte):
+                            if not texte:
+                                return ""
+                            texte = texte.replace("- -", "-").replace("- •", "-").replace("•", "-").replace("-  -", "-")
+                            texte = re.sub(r"^[0-9]+\.\s*\*\*", "**", texte, flags=re.MULTILINE)
+                            texte = texte.replace(".- ", ".\n- ")
+                            return texte.strip()
+
+                        final_resume = clean_md(final_resume)
+                        final_full_md = clean_md(final_full_md)
 
                         channel = self.bot.get_channel(channel_id)
                         if not channel:
