@@ -23,6 +23,7 @@ from utils import (
     BOT_VERSION,
     CACHE,
     CONFIG_DIR,
+    DICT_EMOJIS,
     JOUEURS_DIR,
     MON_ID_DISCORD,
     TOKEN,
@@ -83,33 +84,35 @@ class WelcomeView(discord.ui.View):
         super().__init__(timeout=None)
 
     def get_welcome_embed(self, lang="fr"):
-        title = t(lang, "welcome_title", defaut="{e_guides} Welcome to GGE Assistant!")
-        desc = t(lang, "welcome_desc", defaut="Here is how to get started:")
+        title = t(lang, "welcome_title", defaut="{e_guides} Welcome to GGE Assistant!").format(**DICT_EMOJIS)
+        desc = t(lang, "welcome_desc", defaut="Here is how to get started:").format(**DICT_EMOJIS)
 
         embed = discord.Embed(title=title, description=desc, color=0x0B1D51)
 
         embed.add_field(
-            name=t(lang, "welcome_step1_title", defaut="{e_one} Configuration"),
-            value=t(lang, "welcome_step1_desc", defaut="Use </setup:0> to configure your profile."),
+            name=t(lang, "welcome_step1_title", defaut="{e_one} Configuration").format(**DICT_EMOJIS),
+            value=t(lang, "welcome_step1_desc", defaut="Use </setup:0> to configure your profile.").format(
+                **DICT_EMOJIS
+            ),
             inline=False,
         )
         embed.add_field(
-            name=t(lang, "welcome_step2_title", defaut="{e_two} Tools"),
-            value=t(lang, "welcome_step2_desc", defaut="Type </help:0> to see all commands."),
+            name=t(lang, "welcome_step2_title", defaut="{e_two} Tools").format(**DICT_EMOJIS),
+            value=t(lang, "welcome_step2_desc", defaut="Type </help:0> to see all commands.").format(**DICT_EMOJIS),
             inline=False,
         )
         embed.add_field(
-            name=t(lang, "welcome_step3_title", defaut="{e_three} Calendar"),
-            value=t(lang, "welcome_step3_desc", defaut="Use </calendar setup:0> to get alerts."),
+            name=t(lang, "welcome_step3_title", defaut="{e_three} Calendar").format(**DICT_EMOJIS),
+            value=t(lang, "welcome_step3_desc", defaut="Use </calendar setup:0> to get alerts.").format(**DICT_EMOJIS),
             inline=False,
         )
 
-        embed.set_footer(text=t(lang, "welcome_footer", defaut="Select your language below."))
+        embed.set_footer(text=t(lang, "welcome_footer", defaut="Select your language below.").format(**DICT_EMOJIS))
         return embed
 
     @discord.ui.button(
         label="Français",
-        emoji="{e_flagfrench}",
+        emoji=DICT_EMOJIS.get("e_flagfrench", "🇫🇷"),
         style=discord.ButtonStyle.secondary,
         custom_id="welc_fr",
     )
@@ -118,7 +121,7 @@ class WelcomeView(discord.ui.View):
 
     @discord.ui.button(
         label="English",
-        emoji="{e_flagunitedkingdom}",
+        emoji=DICT_EMOJIS.get("e_flagunitedkingdom", "🇬🇧"),
         style=discord.ButtonStyle.secondary,
         custom_id="welc_en",
     )
@@ -127,7 +130,7 @@ class WelcomeView(discord.ui.View):
 
     @discord.ui.button(
         label="Deutsch",
-        emoji="{e_flaggermany}",
+        emoji=DICT_EMOJIS.get("e_flaggermany", "🇩🇪"),
         style=discord.ButtonStyle.secondary,
         custom_id="welc_de",
     )
