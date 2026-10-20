@@ -4,8 +4,9 @@ import logging
 import os
 import shutil
 import traceback
-from datetime import datetime
+from datetime import datetime, time
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import aiohttp
 from discord.ext import commands, tasks
@@ -14,6 +15,16 @@ import observability as obs
 from utils import CONFIG_DIR, get_api_headers
 
 logger = logging.getLogger("GGE_Bot")
+
+tz_str = os.getenv("TZ", "Europe/Paris")
+tz_env = ZoneInfo(tz_str)
+
+heures_de_scan = [
+    time(hour=0, minute=0, tzinfo=tz_env),
+    time(hour=6, minute=0, tzinfo=tz_env),
+    time(hour=12, minute=0, tzinfo=tz_env),
+    time(hour=18, minute=0, tzinfo=tz_env),
+]
 
 
 class ScanCog(commands.Cog):
@@ -274,15 +285,13 @@ class ScanCog(commands.Cog):
         finally:
             self._scan_kind = "daily"
 
-    # Lancement toutes les 3 heures
-    @tasks.loop(hours=3)
+    @tasks.loop(time=heures_de_scan)
     async def daily_scan(self):
         self._scan_kind = "daily"
         obs.set_task_name("daily_scan")
         logger.info("======================================================")
         logger.info("🌍 DÉMARRAGE DE LA ROUTINE MULTI-SERVEURS (ASYNC)")
         logger.info("======================================================")
-
         try:
             servers_to_scan = self.get_active_servers()
             total_serveurs = len(servers_to_scan)

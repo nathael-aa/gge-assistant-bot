@@ -226,6 +226,7 @@ class GGEAssistantBot(commands.Bot):
         # =======================================
         # INITIALISATION DES TASKS
         # =======================================
+        await asyncio.sleep(5)
         if not self.flag_watcher_task.is_running():
             self.flag_watcher_task.start()
             logger.info("🛰️ [Tasks] flag_watcher_task initialisée dans le setup_hook.")

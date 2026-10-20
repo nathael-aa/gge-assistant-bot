@@ -421,18 +421,26 @@ async def get_cached_data(serveur="E4K_FR1"):
         CACHE[serveur] = {"players": [], "players_data": {}, "alliances": [], "alliance_members": {}, "last_refresh": 0}
 
     def _lecture_lourde():
+        dossier_serveur = BASE_DATA_PATH / "server_scans" / serveur
+        if not dossier_serveur.exists():
+            return {}
+
+        player_files = list(dossier_serveur.rglob("server_*.json"))
+        if not player_files:
+            return {}
+
+        latest = max(player_files, key=lambda p: p.stat().st_mtime)
+
         try:
-            dossier_serveur = BASE_DATA_PATH / "server_scans" / serveur
-            if not dossier_serveur.exists():
-                return {}
-
-            player_files = list(dossier_serveur.rglob("server_*.json"))
-            if not player_files:
-                return {}
-
-            latest = max(player_files, key=lambda p: p.stat().st_mtime)
             with open(latest, encoding="utf-8") as f:
                 return json.load(f).get("players", {})
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ [Cache] Fichier corrompu détecté pour {serveur} : {e}. Suppression du fichier...")
+            try:
+                latest.unlink()
+            except OSError as err:
+                logger.error(f"Impossible de supprimer le fichier corrompu : {err}")
+            return {}
         except Exception as e:
             logger.error(f"❌ [Cache] Erreur lors de la lecture lourde de {serveur} : {e}")
             obs.record_error(source="utils", scope="cache_load", exception=e, cog="utils")
