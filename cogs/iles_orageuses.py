@@ -40,16 +40,20 @@ async def load_storm_config():
     if not os.path.exists(STORM_CONFIG_PATH):
         return {"guilds": {}, "notified": []}
     try:
-        with open(STORM_CONFIG_PATH, encoding="utf-8") as f:
-            return json.load(f)
+        def _read():
+            with open(STORM_CONFIG_PATH, encoding="utf-8") as f:
+                return json.load(f)
+        return await asyncio.to_thread(_read)
     except Exception:
         return {"guilds": {}, "notified": []}
 
 
 async def save_storm_config(data):
-    os.makedirs(os.path.dirname(STORM_CONFIG_PATH), exist_ok=True)
-    with open(STORM_CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+    def _write():
+        os.makedirs(os.path.dirname(STORM_CONFIG_PATH), exist_ok=True)
+        with open(STORM_CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    await asyncio.to_thread(_write)
 
 
 # ===========================================

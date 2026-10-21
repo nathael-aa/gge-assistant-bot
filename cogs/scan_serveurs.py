@@ -59,13 +59,15 @@ class ScanServeursCog(commands.Cog):
         except Exception as e:
             logger.error(f"❌ Impossible d'envoyer l'alerte Discord : {e}")
 
-    def get_active_servers(self):
+    async def get_active_servers(self):
         """Récupère la liste des serveurs ACTIFS depuis le fichier de config unifié"""
         active_servers = set()
         if self.configuration_path.exists():
             try:
-                with open(self.configuration_path, encoding="utf-8") as f:
-                    config_data = json.load(f)
+                def _read_config():
+                    with open(self.configuration_path, encoding="utf-8") as f:
+                        return json.load(f)
+                config_data = await asyncio.to_thread(_read_config)
 
                 servers_info = config_data.get("servers_info", {})
                 for srv_name, data in servers_info.items():
@@ -313,7 +315,7 @@ class ScanServeursCog(commands.Cog):
         logger.info("🌍 DÉMARRAGE DE LA ROUTINE MULTI-SERVEURS (ASYNC)")
         logger.info("======================================================")
         try:
-            servers_to_scan = self.get_active_servers()
+            servers_to_scan = await self.get_active_servers()
             total_serveurs = len(servers_to_scan)
 
             async with aiohttp.ClientSession() as session:

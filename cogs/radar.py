@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -457,17 +458,18 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
 
         p_id, p_might = None, 0
         try:
-            player_files = list((BASE_DATA_PATH / "server_scans" / serveur).rglob("server_*.json"))
-            if player_files:
-                latest = max(player_files, key=lambda p: p.stat().st_mtime)
+            def _search_player_cache():
+                files = list((BASE_DATA_PATH / "server_scans" / serveur).rglob("server_*.json"))
+                if not files:
+                    return None, 0, player
+                latest = max(files, key=lambda p: p.stat().st_mtime)
                 with open(latest, encoding="utf-8") as f:
                     for p_name, p_info in json.load(f).get("players", {}).items():
                         if p_name.lower() == player.lower():
-                            p_id = str(p_info.get("player_id", p_info.get("id", "")))
-                            p_might = int(p_info.get("main_points", 0))
-                            player = p_name
-                            break
-        except:
+                            return str(p_info.get("player_id", p_info.get("id", ""))), int(p_info.get("main_points", 0)), p_name
+                return None, 0, player
+            p_id, p_might, player = await asyncio.to_thread(_search_player_cache)
+        except Exception:
             pass
 
         e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
@@ -867,18 +869,18 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
 
         p_id, p_might = None, 0
         try:
-            player_files = list((BASE_DATA_PATH / "server_scans" / serveur).rglob("server_*.json"))
-            if player_files:
-                latest = max(player_files, key=lambda p: p.stat().st_mtime)
+            def _search_player_cache_priv():
+                files = list((BASE_DATA_PATH / "server_scans" / serveur).rglob("server_*.json"))
+                if not files:
+                    return None, 0, player
+                latest = max(files, key=lambda p: p.stat().st_mtime)
                 with open(latest, encoding="utf-8") as f:
-                    local_data = json.load(f).get("players", {})
-                    for p_name, p_info in local_data.items():
+                    for p_name, p_info in json.load(f).get("players", {}).items():
                         if p_name.lower() == player.lower():
-                            p_id = str(p_info.get("player_id", p_info.get("id", "")))
-                            p_might = int(p_info.get("main_points", 0))
-                            player = p_name
-                            break
-        except:
+                            return str(p_info.get("player_id", p_info.get("id", ""))), int(p_info.get("main_points", 0)), p_name
+                return None, 0, player
+            p_id, p_might, player = await asyncio.to_thread(_search_player_cache_priv)
+        except Exception:
             pass
 
         e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
@@ -1334,11 +1336,13 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 mtime = os.path.getmtime(path_users)
                 if mtime > self.users_cache_mtime:
                     try:
-                        with open(path_users, encoding="utf-8") as f:
-                            users_data = json.load(f)
-                            self.users_lang_cache = {uid: info.get("langue", "fr") for uid, info in users_data.items()}
+                        def _read_users_json():
+                            with open(path_users, encoding="utf-8") as f:
+                                return json.load(f)
+                        users_data = await asyncio.to_thread(_read_users_json)
+                        self.users_lang_cache = {uid: info.get("langue", "fr") for uid, info in users_data.items()}
                         self.users_cache_mtime = mtime
-                    except:
+                    except Exception:
                         pass
             users_lang = self.users_lang_cache
 

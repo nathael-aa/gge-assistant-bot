@@ -502,7 +502,12 @@ class GGEAssistantBot(commands.Bot):
     # WEBHOOK TOPGG
     # ==========================================
     async def vote_handler(self, request):
-        secret = os.getenv("TOPGG_WEBHOOK_SECRET", "faux_secret")
+        secret = os.getenv("TOPGG_WEBHOOK_SECRET")
+
+        if not secret:
+            logger.error("❌ [Webhook] TOPGG_WEBHOOK_SECRET non configuré — requête refusée.")
+            obs.record_vote(accepted=False, reject_reason="secret_not_configured", signature_version="none")
+            return web.Response(status=503, text="Webhook not configured")
 
         signature_header = request.headers.get("x-topgg-signature")
         auth_header = request.headers.get("Authorization")
@@ -517,7 +522,7 @@ class GGEAssistantBot(commands.Bot):
             try:
                 parts = dict(part.split("=") for part in signature_header.split(","))
                 message = f"{parts.get('t')}.{raw_body}".encode()
-                expected_sig = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
+                expected_sig = hmac.HMAC(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
                 if not hmac.compare_digest(expected_sig, parts.get("v1")):
                     logger.warning("❌ [Webhook] Signature v1 invalide.")
                     obs.record_vote(accepted=False, reject_reason="bad_signature_v1", signature_version="v1")

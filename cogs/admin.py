@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import io
 import json
@@ -462,8 +463,10 @@ class AdminCog(commands.Cog):
                     await msg_wait.edit(content="❌ Fichier `configuration.json` introuvable.")
                     return
 
-                with open(config_file, encoding="utf-8") as f:
-                    config_data = json.load(f)
+                def _read_config():
+                    with open(config_file, encoding="utf-8") as f:
+                        return json.load(f)
+                config_data = await asyncio.to_thread(_read_config)
 
                 anciennes_infos = config_data.get("servers_info", {})
                 vieux_scan_minutes = config_data.get("scan_minutes", {})
@@ -518,8 +521,10 @@ class AdminCog(commands.Cog):
                     config_data.pop("scan_minutes", None)
                     config_data.pop("servers", None)
 
-                    with open(config_file, "w", encoding="utf-8") as f:
-                        json.dump(config_data, f, indent=4, ensure_ascii=False)
+                    def _write_config():
+                        with open(config_file, "w", encoding="utf-8") as f:
+                            json.dump(config_data, f, indent=4, ensure_ascii=False)
+                    await asyncio.to_thread(_write_config)
 
                     msg = f"✅ **Synchronisation réussie !**\nLa base de données a été unifiée et mise à jour avec **{len(nouveau_servers_info)} serveurs**."
                 else:

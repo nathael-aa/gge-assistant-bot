@@ -18,17 +18,21 @@ async def load_users_config():
     path = CONFIG_DIR / "users.json"
     if os.path.exists(path):
         try:
-            with open(path, encoding="utf-8") as f:
-                return json.load(f)
-        except:
+            def _read():
+                with open(path, encoding="utf-8") as f:
+                    return json.load(f)
+            return await asyncio.to_thread(_read)
+        except Exception:
             pass
     return {}
 
 
 async def save_users_config(data):
     path = CONFIG_DIR / "users.json"
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    def _write():
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    await asyncio.to_thread(_write)
 
 
 class ConfigurationCog(commands.Cog):
