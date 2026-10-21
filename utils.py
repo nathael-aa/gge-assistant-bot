@@ -1,4 +1,5 @@
 import asyncio
+import gc
 import json
 import logging
 import os
@@ -14,7 +15,7 @@ from discord import app_commands
 import observability as obs
 
 logger = logging.getLogger("GGE_Bot")
-BOT_VERSION = "GGE Assistant • Version 1.3.5"
+BOT_VERSION = "GGE Assistant • Version 1.3.6"
 
 # ========================================
 # ⚙️ GESTION DES CHEMINS & DOSSIER
@@ -417,6 +418,12 @@ def get_discord_timestamp(iso_str, style="R", langue="fr"):
 async def get_cached_data(serveur="E4K_FR1"):
     global CACHE
 
+    # 🚨 SÉCURITÉ ANTI-OOM : On ne garde qu'un seul gros serveur en RAM à la fois
+    if len(CACHE) >= 1 and serveur not in CACHE:
+        logger.info(f"🧹 [Anti-OOM] Vidage du cache mémoire complet pour charger {serveur}.")
+        CACHE.clear()
+        gc.collect()
+
     if serveur not in CACHE:
         CACHE[serveur] = {"players": [], "players_data": {}, "alliances": [], "alliance_members": {}, "last_refresh": 0}
 
@@ -471,26 +478,57 @@ async def get_cached_data(serveur="E4K_FR1"):
 
 
 # ========================================
+# LECTURE DES INDEX ULTRA-LÉGERS
+# ========================================
+
+
+async def get_autocomplete_list(serveur: str, type_liste: str):
+    """Charge uniquement la liste demandée ('players' ou 'alliances') depuis le cache le plus récent."""
+
+    def _lecture_index():
+        try:
+            dossier_serveur = BASE_DATA_PATH / "server_scans" / serveur
+            if not dossier_serveur.exists():
+                return []
+
+            date_dirs = sorted([d for d in dossier_serveur.iterdir() if d.is_dir()], reverse=True)
+            if not date_dirs:
+                return []
+
+            index_file = date_dirs[0] / f"{type_liste}_autocomplete.json"
+            if index_file.exists():
+                with open(index_file, encoding="utf-8") as f:
+                    return json.load(f)
+            return []
+        except Exception:
+            return []
+
+    return await asyncio.to_thread(_lecture_index)
+
+
+# ========================================
 # FONCTIONS AUTOCOMPLETE DISCORD
 # ========================================
 
 
 async def joueur_autocomplete(interaction: discord.Interaction, current: str):
     _, serveur = await get_server_config(interaction)
-    data = await get_cached_data(serveur)
+    joueurs = await get_autocomplete_list(serveur, "players")
+
     return [
         app_commands.Choice(name=str(n)[:100], value=str(n)[:100])
-        for n in data.get("players", [])
+        for n in joueurs
         if current.lower() in str(n).lower() and str(n).strip()
     ][:25]
 
 
 async def alliance_autocomplete(interaction: discord.Interaction, current: str):
     _, serveur = await get_server_config(interaction)
-    data = await get_cached_data(serveur)
+    alliances = await get_autocomplete_list(serveur, "alliances")
+
     return [
         app_commands.Choice(name=str(n)[:100], value=str(n)[:100])
-        for n in data.get("alliances", [])
+        for n in alliances
         if current.lower() in str(n).lower() and str(n).strip()
     ][:25]
 
@@ -501,7 +539,6 @@ async def event_autocomplete(interaction: discord.Interaction, current: str):
         "Samurai Invasion",
         "Bloodcrow Invasion",
         "War of the Realms",
-        "Storm Islands",
         "Battle of Berimond",
     ]
     return [app_commands.Choice(name=e, value=e) for e in events_en if current.lower() in e.lower()][:25]

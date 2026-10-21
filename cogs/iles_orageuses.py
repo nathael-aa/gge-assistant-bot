@@ -6,6 +6,7 @@ import traceback
 import urllib.parse
 from datetime import datetime
 
+import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -14,8 +15,12 @@ import observability as obs
 from utils import (
     DICT_EMOJIS,
     SERVEURS_DIR,
+    PaginationView,
+    _get_api_timestamp,
     format_num,
     get_api_headers,
+    get_cached_data,
+    get_discord_timestamp,
     get_server_config,
     joueur_autocomplete,
     prompt_vote_if_lucky,
@@ -77,6 +82,10 @@ def get_isle_name(isle_id, langue):
         return t(langue, "storm_res_unknown", defaut="Unknown Island")
     name = t(langue, res_data["key"], defaut=res_data["def"])
     return f"{name} ({res_data['qty']})"
+
+
+def get_month_name(month_num_str, langue="fr"):
+    return t(langue, f"month_{month_num_str}", defaut=month_num_str)
 
 
 # ===========================================
@@ -144,10 +153,170 @@ class LocalPaginationView(discord.ui.View):
         await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
 
 
+class AquamarineSelectView(discord.ui.View):
+    def __init__(
+        self,
+        interaction,
+        player,
+        alliance_name,
+        actualisation_dt,
+        langue,
+        clr,
+        sorted_months,
+        monthly_finals,
+        gt_cargo,
+        gt_am,
+    ):
+        super().__init__(timeout=3600)
+        self.interaction = interaction
+        self.player = player
+        self.alliance_name = alliance_name
+        self.actualisation_dt = actualisation_dt
+        self.langue = langue
+        self.clr = clr
+        self.sorted_months = sorted_months
+        self.monthly_finals = monthly_finals
+        self.gt_cargo = gt_cargo
+        self.gt_am = gt_am
+        self.message = None
+
+        options = []
+        for i, m_key in enumerate(sorted_months[:25]):
+            annee, mois_num = m_key.split("-")
+            nom_mois = f"{get_month_name(mois_num, langue)} {annee}"
+
+            options.append(discord.SelectOption(label=nom_mois, value=m_key, default=(i == 0), emoji="📅"))
+
+        placeholder_txt = t(langue, "ev_aqua_select_placeholder", defaut="Sélectionnez un mois...")
+        self.select = discord.ui.Select(placeholder=placeholder_txt, options=options)
+        self.select.callback = self.on_select
+        self.add_item(self.select)
+
+        self.current_month = sorted_months[0]
+
+    async def on_select(self, interaction: discord.Interaction):
+        self.current_month = self.select.values[0]
+
+        for opt in self.select.options:
+            opt.default = opt.value == self.current_month
+
+        if not self.message:
+            self.message = interaction.message
+
+        embed = await self.generate_embed(self.current_month)
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if hasattr(self, "message") and self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
+
+    async def generate_embed(self, month_key):
+        annee, mois_num = month_key.split("-")
+        nom_mois = f"{get_month_name(mois_num, self.langue)} {annee}"
+
+        final_sn = self.monthly_finals[month_key]
+        m_metrics = final_sn["metrics"]
+
+        gt_c = f"{self.gt_cargo:,}".replace(",", " ")
+        gt_a = f"{self.gt_am:,}".replace(",", " ")
+
+        p_f = f"{m_metrics.get(100, 0):,}".replace(",", " ")
+        a_f = f"{m_metrics.get(15, 0):,}".replace(",", " ")
+        i_f = f"{m_metrics.get(16, 0):,}".replace(",", " ")
+        f_f = f"{m_metrics.get(17, 0):,}".replace(",", " ")
+        w_f = f"{m_metrics.get(18, 0):,}".replace(",", " ")
+        d_f = f"{m_metrics.get(19, 0):,}".replace(",", " ")
+
+        lbl_date = t(self.langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
+
+        profil_desc = t(
+            self.langue,
+            "ev_prof_desc",
+            p=self.player,
+            a=self.alliance_name,
+            defaut=f"**Joueur :** {self.player}\n**Alliance :** {self.alliance_name}",
+        )
+
+        embed = discord.Embed(
+            title=t(
+                self.langue,
+                "ev_aqua_cumul_title",
+                player=self.player,
+                defaut=f"{{e_stats}} Historique Îles Orageuses de {self.player}",
+            ),
+            description=f"{lbl_date} <t:{int(self.actualisation_dt.timestamp())}:F> (<t:{int(self.actualisation_dt.timestamp())}:R>)\n\n{profil_desc}\n",
+            color=self.clr,
+        )
+
+        stats_globales = t(
+            self.langue,
+            "ev_aqua_cumul_stats",
+            gtc=gt_c,
+            gta=gt_a,
+            pf=p_f,
+            defaut=(
+                f"🏆 **Total Historique Cargo :** `{gt_c}` {{e_aquamarinedepenser}}\n"
+                f"📈 **Total Historique Aigue-Marine :** `{gt_a}` {{e_aquamarinetotalcollectee}}"
+            ),
+        )
+
+        if "`" not in stats_globales:
+            stats_globales = stats_globales.replace(gt_c, f"`{gt_c}`").replace(gt_a, f"`{gt_a}`")
+
+        embed.add_field(
+            name=t(
+                self.langue,
+                "ev_aqua_cumul_overview",
+                defaut="{e_icon_world} **Vue d'ensemble historique**",
+            ),
+            value=stats_globales,
+            inline=False,
+        )
+
+        details_txt = t(
+            self.langue,
+            "ev_aqua_cumul_details",
+            pf=p_f,
+            af=a_f,
+            i_f=i_f,
+            f_f=f_f,
+            wf=w_f,
+            df=d_f,
+            defaut=(
+                f"**Score Final Cargo :** `{p_f}` {{e_pointscargo}}\n\n"
+                f"{{e_aquamarinetotalcollectee}} **Aigue-marine collectées :** `{a_f}`\n"
+                f" ↳ {{e_aquamarineiles}} *Dans les îles à ressources :* `{i_f}`\n"
+                f" ↳ {{e_aquamarineforts}} *Dans les forts orageux :* `{f_f}`\n"
+                f" ↳ {{e_aquamarinegagnerjcj}} *Gagné en JcJ :* `{w_f}`\n\n"
+                f"{{e_aquamarinedepenser}} **Dépensé en points cargo :** `{d_f}`"
+            ),
+        )
+
+        for val in [p_f, a_f, i_f, f_f, w_f, d_f]:
+            if val and f"`{val}`" not in details_txt:
+                details_txt = details_txt.replace(val, f"`{val}`")
+
+        embed.add_field(
+            name=t(
+                self.langue, "ev_aqua_cumul_archive", m=nom_mois, defaut=f"**📜 Archives de l'édition ({nom_mois})**"
+            ),
+            value=details_txt,
+            inline=False,
+        )
+
+        await setup_embed_footer(embed, self.interaction, self.langue)
+        return embed
+
+
 # ===========================================
 # 🚀 MODULE PRINCIPAL
 # ===========================================
-class StormsCog(commands.Cog):
+class IlesOrageusesCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.clr_forts = discord.Color.from_rgb(230, 126, 34)  # Orange
@@ -155,13 +324,16 @@ class StormsCog(commands.Cog):
         self.clr_occupier = discord.Color.from_rgb(137, 196, 199)
         self.clr_status = discord.Color.from_rgb(132, 206, 209)
         self.clr_setup = discord.Color.from_rgb(144, 232, 219)
+        self.clr_aqua = discord.Color.from_rgb(226, 235, 252)
+        self.clr_joueur_cumul = discord.Color.from_rgb(172, 192, 205)
+        self.clr_joueur_dernier = discord.Color.from_rgb(192, 214, 228)
         self.api_base = "https://api.gge-tracker.com/api/v1/"
         self.active_alerts = []
 
     storm_group = app_commands.Group(name="storm", description="Commands for the Storm Islands event")
 
     # -------------------------------------------
-    # 🔍 COMMANDES DE RECHERCHE
+    # 🔍 COMMANDES DE RECHERCHE ET CLASSEMENT
     # -------------------------------------------
     @storm_group.command(name="forts", description="Search for storm forts based on your criteria")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
@@ -223,7 +395,7 @@ class StormsCog(commands.Cog):
             if availability != 0:
                 params["filterByAvailability"] = availability
 
-            url = f"{self.api_base}/storms/forts"
+            url = f"{self.api_base}storms/forts"
             async with self.bot.session.get(url, headers=headers, params=params, timeout=15) as r:
                 if r.status != 200:
                     msg = t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
@@ -336,7 +508,7 @@ class StormsCog(commands.Cog):
             if status.value != 0:
                 params["filterByState"] = status.value
 
-            url = f"{self.api_base}/storms/isles"
+            url = f"{self.api_base}storms/isles"
             async with self.bot.session.get(url, headers=headers, params=params, timeout=15) as r:
                 if r.status != 200:
                     msg = t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
@@ -454,7 +626,7 @@ class StormsCog(commands.Cog):
         safe_joueur = urllib.parse.quote(player)
 
         async def fetch_and_build_view(current_inter: discord.Interaction, is_refresh: bool):
-            url = f"{self.api_base}/storms/isles?filterByOccupierName={safe_joueur}&size=4000"
+            url = f"{self.api_base}storms/isles?filterByOccupierName={safe_joueur}&size=4000"
             async with self.bot.session.get(url, headers=headers, timeout=15) as r:
                 if r.status != 200:
                     msg = t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
@@ -526,7 +698,7 @@ class StormsCog(commands.Cog):
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
 
-        url = f"{self.api_base}/storms/meta"
+        url = f"{self.api_base}storms/meta"
         async with self.bot.session.get(url, headers=headers, timeout=10) as r:
             if r.status != 200:
                 return await interaction.followup.send(
@@ -566,6 +738,392 @@ class StormsCog(commands.Cog):
         )
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed)
+
+    @storm_group.command(name="player", description="View a player's Aquamarine performance (Latest or History)")
+    @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
+    @app_commands.autocomplete(player=joueur_autocomplete)
+    @app_commands.choices(
+        mode=[
+            app_commands.Choice(name="Latest score", value="latest"),
+            app_commands.Choice(name="History", value="history"),
+        ]
+    )
+    async def storm_player(self, interaction: discord.Interaction, player: str, mode: app_commands.Choice[str]):
+        await interaction.followup.defer(
+            thinking=True
+        ) if interaction.response.is_done() else await interaction.response.defer(thinking=True)
+
+        langue, serveur = await get_server_config(interaction)
+        lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
+
+        player_id = None
+        alliance_name = "Sans alliance"
+        cache = await get_cached_data(serveur)
+        local_data = cache.get("players_data", {})
+
+        for p_name, p_info in local_data.items():
+            if p_name.lower() == player.lower():
+                player_id = str(p_info.get("player_id", p_info.get("id", "")))
+                player = p_name
+                alli_raw = p_info.get("allianceName", p_info.get("alliance_id", "Sans alliance"))
+                if isinstance(alli_raw, dict):
+                    alli_raw = alli_raw.get("name", "Sans alliance")
+                if alli_raw and alli_raw not in ["", "None"]:
+                    alliance_name = alli_raw
+                break
+
+        if not player_id:
+            return await interaction.followup.send(
+                t(
+                    langue,
+                    "ev_err_player_local",
+                    player=player,
+                    defaut=f"{{e_error}} Joueur **{player}** introuvable dans le cache local.",
+                )
+            )
+
+        headers = await get_api_headers(interaction)
+
+        try:
+            async with self.bot.session.get(
+                f"{self.api_base}aquamarine/player/{player_id}", headers=headers, timeout=10
+            ) as resp:
+                if resp.status != 200:
+                    return await interaction.followup.send(
+                        t(
+                            langue,
+                            "ev_err_aqua_hist",
+                            player=player,
+                            defaut=f"{{e_error}} Aucun historique Aquamarine trouvé pour **{player}**.",
+                        )
+                    )
+                snapshots = (await resp.json()).get("snapshots", [])
+        except Exception as e:
+            logger.error(f"❌ ERREUR API Aquamarine : {str(e)}")
+            obs.record_error(source="command", scope="storm_player", exception=e, cog="storms")
+            return await interaction.followup.send(
+                t(
+                    langue,
+                    "ev_err_aqua_tech",
+                    type=type(e).__name__,
+                    defaut=f"{{e_error}} Erreur technique Aquamarine : {type(e).__name__}",
+                )
+            )
+
+        if not snapshots:
+            return await interaction.followup.send(
+                t(
+                    langue,
+                    "ev_err_aqua_no_snap",
+                    player=player,
+                    defaut=f"{{e_error}} **{player}** ne possède aucun snapshot enregistré pour l'Aquamarine.",
+                )
+            )
+
+        snapshots.sort(key=lambda x: x.get("collected_at", ""), reverse=True)
+
+        if alliance_name.isdigit():
+            target_aid = alliance_name
+            for _, info in local_data.items():
+                curr_aid = str(info.get("allianceId", info.get("alliance_id", "")))
+                if curr_aid == target_aid:
+                    a_name = info.get("allianceName", info.get("alliance", ""))
+                    if isinstance(a_name, dict):
+                        a_name = a_name.get("name", "")
+                    if a_name and not a_name.isdigit():
+                        alliance_name = a_name
+                        break
+
+        if mode.value == "latest":
+            live = snapshots[0]
+            actualisation_dt = _get_api_timestamp(live)
+            live_metrics = {m["metric_id"]: int(m["value"]) for m in live.get("metrics", [])}
+
+            pts_cargo_str = f"{live_metrics.get(100, 0):,}".replace(",", " ")
+            total_am_str = f"{live_metrics.get(15, 0):,}".replace(",", " ")
+            cargo_iles_str = f"{live_metrics.get(16, 0):,}".replace(",", " ")
+            cargo_forts_str = f"{live_metrics.get(17, 0):,}".replace(",", " ")
+            cargo_pvp_win_str = f"{live_metrics.get(18, 0):,}".replace(",", " ")
+            cargo_depense_str = f"{live_metrics.get(19, 0):,}".replace(",", " ")
+            cargo_pvp_loss_str = f"{live_metrics.get(20, 0):,}".replace(",", " ")
+
+            status_txt = t(
+                langue,
+                "ev_aqua_live_stats",
+                pts=pts_cargo_str,
+                am=total_am_str,
+                iles=cargo_iles_str,
+                forts=cargo_forts_str,
+                win=cargo_pvp_win_str,
+                loss=cargo_pvp_loss_str,
+                dep=cargo_depense_str,
+                defaut=(
+                    f"{{e_pointscargo}} **Points cargo (Classement) :** {pts_cargo_str} pts\n\n"
+                    f"{{e_aquamarinetotalcollectee}} **Total aigue-marine collectées :** {total_am_str}\n"
+                    f" ↳ {{e_aquamarineiles}} *Dans les îles à ressources :* {cargo_iles_str}\n"
+                    f" ↳ {{e_aquamarineforts}} *Dans les forts orageux :* {cargo_forts_str}\n"
+                    f" ↳ {{e_aquamarinegagnerjcj}} *Gagné en JcJ :* {cargo_pvp_win_str}\n"
+                    f" ↳ {{e_aquamarineperdujcj}} *Perdu en JcJ :* {cargo_pvp_loss_str}\n\n"
+                    f"{{e_aquamarinedepenser}} **Dépensé en points cargo :** {cargo_depense_str}"
+                ),
+            )
+
+            maintenant_str = discord.utils.utcnow().strftime("%Y-%m")
+            snapshot_month = live.get("collected_at", "")[:7]
+            event_trad = t(langue, "cal_ev_storm", defaut="Îles Orageuses")
+
+            title_txt = t(
+                langue,
+                "ev_aqua_title_live",
+                player=player,
+                event=event_trad,
+                defaut=f"{{e_podium}} Score en direct de {player} pour : {event_trad}",
+            )
+            warning_desc = ""
+            couleur_embed = self.clr_aqua
+
+            if snapshot_month != maintenant_str:
+                try:
+                    annee_s, mois_s = snapshot_month.split("-")
+                    nom_mois_s = f"{get_month_name(mois_s, langue)} {annee_s}"
+                    title_txt = t(
+                        langue,
+                        "ev_aqua_title_archive",
+                        player=player,
+                        defaut=f"⚓ Score Final Édition Précédente : {player}",
+                    )
+                    warning_desc = t(
+                        langue,
+                        "ev_aqua_warning_archive",
+                        mois=nom_mois_s,
+                        defaut=f"{{e_error}} **Attention :** Ce joueur n'a pas encore lancé l'édition actuelle. Affichage des archives de l'édition de **{nom_mois_s}**.\n\n",
+                    )
+                    couleur_embed = discord.Color.orange()
+                except:
+                    pass
+
+            embed = discord.Embed(title=title_txt, color=couleur_embed)
+            embed.description = (
+                f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)"
+            )
+
+            embed.add_field(
+                name=t(langue, "ev_prof_title", defaut="{e_players} Profil"),
+                value=t(
+                    langue,
+                    "ev_prof_desc",
+                    p=player,
+                    a=alliance_name,
+                    defaut=f"**Joueur :** {player}\n**Alliance :** [{alliance_name}]",
+                ),
+                inline=True,
+            )
+            embed.add_field(
+                name=t(
+                    langue,
+                    "ev_aqua_reserves_title",
+                    defaut="{e_stats} État des Réserves Live\n\n",
+                ),
+                value=f"{warning_desc}{status_txt}",
+                inline=False,
+            )
+
+            latest_date = live.get("collected_at", "")
+            if latest_date:
+                ts_r = get_discord_timestamp(latest_date, "R", langue)
+                ts_t = get_discord_timestamp(latest_date, "t", langue)
+                embed.add_field(
+                    name=t(langue, "ev_aqua_last_hit_title", defaut="⏱️ Dernière Frappe"),
+                    value=t(
+                        langue,
+                        "ev_aqua_last_hit_desc",
+                        r=ts_r,
+                        t=ts_t,
+                        defaut=f"Relevée par l'API {ts_r} (*{ts_t}*)",
+                    ),
+                    inline=False,
+                )
+
+            await setup_embed_footer(embed, interaction, langue)
+            await interaction.followup.send(embed=embed)
+            await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
+
+        elif mode.value == "history":
+            from collections import defaultdict
+
+            months_dict = defaultdict(list)
+
+            for sn in snapshots:
+                try:
+                    dt = datetime.fromisoformat(sn["collected_at"].replace("Z", "+00:00"))
+                    month_key = dt.strftime("%Y-%m")
+                    months_dict[month_key].append(
+                        {
+                            "dt": dt,
+                            "collected_at": sn["collected_at"],
+                            "metrics": {m["metric_id"]: int(m["value"]) for m in sn.get("metrics", [])},
+                        }
+                    )
+                except:
+                    continue
+
+            if not months_dict:
+                return await interaction.followup.send(
+                    t(
+                        langue,
+                        "ev_err_monthly_hist",
+                        defaut="{e_error} Impossible d'analyser l'historique mensuel.",
+                    )
+                )
+
+            sorted_months = sorted(months_dict.keys(), reverse=True)
+            actualisation_dt = _get_api_timestamp(snapshots)
+
+            grand_total_cargo = 0
+            grand_total_am = 0
+            monthly_finals = {}
+
+            for m_key in sorted_months:
+                final_sn = max(months_dict[m_key], key=lambda x: x["metrics"].get(100, 0))
+                grand_total_cargo += final_sn["metrics"].get(100, 0)
+                grand_total_am += final_sn["metrics"].get(15, 0)
+                monthly_finals[m_key] = final_sn
+
+            view = AquamarineSelectView(
+                interaction=interaction,
+                player=player,
+                alliance_name=alliance_name,
+                actualisation_dt=actualisation_dt,
+                langue=langue,
+                clr=self.clr_joueur_cumul,
+                sorted_months=sorted_months,
+                monthly_finals=monthly_finals,
+                gt_cargo=grand_total_cargo,
+                gt_am=grand_total_am,
+            )
+
+            embed = await view.generate_embed(sorted_months[0])
+            view.message = await interaction.followup.send(embed=embed, view=view, wait=True)
+            await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
+
+    @storm_group.command(name="leaderboard", description="Displays the Top 100 looters of Aquamarine")
+    @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
+    async def classement_iles(self, interaction: discord.Interaction):
+        try:
+            await interaction.response.defer(thinking=True)
+        except:
+            return
+        langue, _ = await get_server_config(interaction)
+        lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
+
+        headers = await get_api_headers(interaction)
+        session = self.bot.session
+        try:
+            async with session.get(
+                f"{self.api_base}aquamarine?page=1&order_by=100&order_dir=DESC", headers=headers, timeout=8
+            ) as r:
+                if r.status != 200:
+                    return await interaction.followup.send(
+                        t(langue, "ev_err_api_unavail", defaut="{e_error} API indisponible.")
+                    )
+                data_rank = await r.json()
+                players = data_rank.get("players", [])
+                total_pages = data_rank.get("pagination", {}).get("total_pages", 1)
+                total_items = data_rank.get("pagination", {}).get("total_items_count", "?")
+
+            pages_to_fetch = min(total_pages, 15)
+            if pages_to_fetch > 1:
+                fetch_tasks = [
+                    session.get(
+                        f"{self.api_base}aquamarine?page={p}&order_by=100&order_dir=DESC", headers=headers, timeout=8
+                    )
+                    for p in range(2, pages_to_fetch + 1)
+                ]
+                responses = await asyncio.gather(*fetch_tasks, return_exceptions=True)
+                for resp in responses:
+                    if isinstance(resp, aiohttp.ClientResponse) and resp.status == 200:
+                        players.extend((await resp.json()).get("players", []))
+
+            if not players:
+                return await interaction.followup.send(
+                    t(langue, "ev_err_no_players", defaut="{e_error} Aucun joueur trouvé.")
+                )
+
+            mois_actif = ""
+            for p in players:
+                date_p = p.get("last_collected_at", "")
+                if date_p and date_p[:7] > mois_actif:
+                    mois_actif = date_p[:7]
+
+            players_filtres = []
+            for p in players:
+                date_p = p.get("last_collected_at", "")
+                if date_p and date_p.startswith(mois_actif):
+                    players_filtres.append(p)
+
+            players = players_filtres[:100]
+
+            if not players:
+                return await interaction.followup.send(
+                    t(
+                        langue,
+                        "ev_err_aqua_not_started",
+                        defaut="{e_error} Aucun joueur n'a encore débuté l'édition de ce mois-ci.",
+                    )
+                )
+
+            lignes = []
+            e_cargo = DICT_EMOJIS.get("e_pointscargo", "")
+
+            for r_idx, p in enumerate(players):
+                rang = r_idx + 1
+                nom = p.get("player_name", "???")
+                metrics = p.get("metrics", {})
+                pts = f"{int(metrics.get('100', 0)):,}".replace(",", " ")
+                medal = "🥇" if rang == 1 else "🥈" if rang == 2 else "🥉" if rang == 3 else f"**{rang}.**"
+
+                lignes.append(f"{medal} **{nom}** ➔ **{pts} {e_cargo}**")
+
+            actualisation_dt = _get_api_timestamp(players)
+
+            embeds = []
+            annee_actuelle, mois_num_actuel = mois_actif.split("-")
+            nom_mois_actif = f"{get_month_name(mois_num_actuel, langue)} {annee_actuelle}"
+
+            titre = t(
+                langue,
+                "ev_class_aqua_title",
+                m=nom_mois_actif,
+                defaut=f"Top 100 Serveur - Îles Orageuses ({nom_mois_actif})",
+            )
+            desc = t(
+                langue,
+                "ev_class_aqua_desc",
+                t=total_items,
+                defaut=f"Classement basé sur les points cargo de l'édition en cours.\n*Total recensé sur le serveur : {total_items} joueurs*",
+            )
+
+            for i in range(0, len(lignes), 10):
+                embed = discord.Embed(
+                    title=titre,
+                    description=f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{desc}",
+                    color=self.clr_aqua,
+                )
+                embed.add_field(
+                    name=t(langue, "ev_class_global_field", defaut="Classement global"),
+                    value="\n".join(lignes[i : i + 10]),
+                    inline=False,
+                )
+                await setup_embed_footer(embed, interaction, langue)
+                embeds.append(embed)
+            view = PaginationView(embeds)
+            view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
+            await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
+        except Exception as e:
+            obs.record_error(source="command", scope="leaderboard_storm_islands", exception=e, cog="storms")
+            await interaction.followup.send(
+                t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur technique : {e}")
+            )
 
     # -------------------------------------------
     # 🔔 CONFIGURATION ALERTES ÎLES
@@ -1229,11 +1787,6 @@ class StormsCog(commands.Cog):
                 data["notified"] = notified
                 await save_storm_config(data)
 
-            if total_annoncailles > 0:
-                logger.info(
-                    f"📝 [Storm Alerts] {total_annoncailles} alertes envoyées au total ce cycle (Îles + Forts) !"
-                )
-
         except Exception as e:
             logger.error(f"❌ [Storm Alerts CRASH FATAL] : {traceback.format_exc()}")
             obs.record_error(source="task", scope="storm_alert_loop", exception=e, cog="storms", severity="critical")
@@ -1251,4 +1804,4 @@ class StormsCog(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(StormsCog(bot))
+    await bot.add_cog(IlesOrageusesCog(bot))

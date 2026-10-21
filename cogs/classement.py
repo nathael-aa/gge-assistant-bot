@@ -2368,8 +2368,8 @@ class ClassementCog(commands.Cog):
             alliance_found = False
 
             if search_mode and not loc_rank:
-                start_sv = 1
-                max_sv_limit = 1000
+                start_sv = None
+                max_sv_limit = None
             elif loc_rank:
                 start_sv = max(1, loc_rank - (loc_rank % 10))
                 if start_sv == 0:
@@ -2384,16 +2384,17 @@ class ClassementCog(commands.Cog):
             BATCH_SIZE = 3
 
             async def fetch_chunk(sv_val):
-                url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22SV%22:%22{sv_val}%22"
+                sv_encoded = urllib.parse.quote(str(sv_val))
+                url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22SV%22:%22{sv_encoded}%22"
+
                 for attempt in range(3):
                     try:
-                        # Augmentation du timeout de 5 à 10 secondes pour laisser l'API répondre
                         async with self.bot.session.get(url, timeout=10) as r:
                             if r.status == 200:
                                 return await r.json()
                             else:
                                 self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                if r.status == 429:  # L'API limite le rythme (Too Many Requests)
+                                if r.status in [429, 500, 502, 503, 504]:
                                     await asyncio.sleep(2)
                     except TimeoutError:
                         self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
@@ -2404,36 +2405,50 @@ class ClassementCog(commands.Cog):
                 return None
 
             try:
-                while current_sv <= max_sv_limit and not alliance_found:
-                    tasks = [
-                        fetch_chunk(current_sv + (i * PLAYERS_PER_PAGE))
-                        for i in range(BATCH_SIZE)
-                        if current_sv + (i * PLAYERS_PER_PAGE) <= max_sv_limit
-                    ]
-                    if not tasks:
-                        break
+                if search_mode and not loc_rank:
+                    res = await fetch_chunk(loc_alliance)
 
-                    responses = await asyncio.gather(*tasks)
-                    batch_empty = True
+                    if res and str(res.get("return_code")) == "0":
+                        l_chunk = res.get("content", {}).get("L", [])
+                        if l_chunk:
+                            all_alliances_raw.extend(l_chunk)
+                            for p in l_chunk:
+                                api_name = extract_p_name(p).lower()
+                                if api_name == loc_alliance.lower() or api_name.startswith(f"{loc_alliance.lower()}_"):
+                                    alliance_found = True
+                                    break
+                else:
+                    while current_sv <= max_sv_limit and not alliance_found:
+                        tasks = [
+                            fetch_chunk(current_sv + (i * PLAYERS_PER_PAGE))
+                            for i in range(BATCH_SIZE)
+                            if current_sv + (i * PLAYERS_PER_PAGE) <= max_sv_limit
+                        ]
+                        if not tasks:
+                            break
 
-                    for jsonData in responses:
-                        if jsonData and str(jsonData.get("return_code")) == "0":
-                            l_chunk = jsonData.get("content", {}).get("L", [])
-                            if l_chunk:
-                                all_alliances_raw.extend(l_chunk)
-                                batch_empty = False
+                        responses = await asyncio.gather(*tasks)
+                        batch_empty = True
 
-                                if search_mode and not loc_rank:
-                                    for p in l_chunk:
-                                        api_name = extract_p_name(p).lower()
-                                        if api_name == loc_alliance.lower() or api_name.startswith(
-                                            f"{loc_alliance.lower()}_"
-                                        ):
-                                            alliance_found = True
-                                            break
-                    if batch_empty:
-                        break
-                    current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
+                        for jsonData in responses:
+                            if jsonData and str(jsonData.get("return_code")) == "0":
+                                l_chunk = jsonData.get("content", {}).get("L", [])
+                                if l_chunk:
+                                    all_alliances_raw.extend(l_chunk)
+                                    batch_empty = False
+
+                                    if search_mode and loc_rank and not alliance_found:
+                                        for p in l_chunk:
+                                            api_name = extract_p_name(p).lower()
+                                            if api_name == loc_alliance.lower() or api_name.startswith(
+                                                f"{loc_alliance.lower()}_"
+                                            ):
+                                                alliance_found = True
+                                                break
+
+                        if batch_empty:
+                            break
+                        current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
             except Exception as e:
                 self.logger.error(f"❌ Erreur lors du fetch de alliance : {e}")
                 obs.record_error(source="command", scope="rank_alliance", exception=e, cog="classement")

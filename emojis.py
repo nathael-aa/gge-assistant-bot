@@ -245,7 +245,6 @@ async def sync_and_load_emojis(bot: discord.Client, auto_upload: bool = False):
         for code_key, target_name in EMOJI_ALIASES.items():
             if target_name.lower() in discord_map:
                 DICT_EMOJIS[code_key] = discord_map[target_name.lower()]
-
         logger.info(f"🎨 [Emojis] {len(app_emojis)} émojis d'application synchronisés en mémoire.")
 
     except Exception as e:

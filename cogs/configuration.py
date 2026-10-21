@@ -31,7 +31,7 @@ async def save_users_config(data):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-class ConfigCog(commands.Cog):
+class ConfigurationCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
@@ -198,4 +198,4 @@ class ConfigCog(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(ConfigCog(bot))
+    await bot.add_cog(ConfigurationCog(bot))

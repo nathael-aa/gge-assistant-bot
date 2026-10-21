@@ -27,7 +27,7 @@ heures_de_scan = [
 ]
 
 
-class ScanCog(commands.Cog):
+class ScanServeursCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.api_url = "https://api.gge-tracker.com/api/v1"
@@ -212,7 +212,6 @@ class ScanCog(commands.Cog):
             **obs_stats,
         )
 
-        # Tri local par puissance (might_current -> main_points) pour rétrocompatibilité
         all_players_sorted = dict(sorted(all_players.items(), key=lambda item: item[1]["main_points"], reverse=True))
 
         return all_players_sorted, duration
@@ -238,8 +237,29 @@ class ScanCog(commands.Cog):
             "players": players_data,
         }
 
+        # Sauvegarde du scan complet lourd
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(output_data, f, indent=2, ensure_ascii=False)
+
+        # ==========================================
+        # CRÉATION DES INDEX LÉGERS (AUTOCOMPLÉTION)
+        # ==========================================
+        try:
+            noms_joueurs = list(players_data.keys())
+            noms_alliances = list(alliances)
+
+            # 1. Index des Joueurs
+            players_file = daily_dir / "players_autocomplete.json"
+            with open(players_file, "w", encoding="utf-8") as f:
+                json.dump(noms_joueurs, f, ensure_ascii=False)
+
+            # 2. Index des Alliances
+            alliances_file = daily_dir / "alliances_autocomplete.json"
+            with open(alliances_file, "w", encoding="utf-8") as f:
+                json.dump(noms_alliances, f, ensure_ascii=False)
+
+        except Exception as e:
+            logger.error(f"❌ Erreur lors de la création des index d'autocomplétion pour {serveur} : {e}")
 
         # ==========================================
         # SYSTÈME DE NETTOYAGE DES ANCIENS FICHIERS
@@ -329,4 +349,4 @@ class ScanCog(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(ScanCog(bot))
+    await bot.add_cog(ScanServeursCog(bot))

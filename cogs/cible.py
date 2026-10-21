@@ -462,7 +462,6 @@ class TargetWizard(discord.ui.View):
                 json.dump(data, f, indent=2, ensure_ascii=False)
             utils.clear_config_cache()
 
-            # Enregistrement Télémétrie : Un utilisateur a mis à jour ses filtres
             if interaction and interaction.guild:
                 obs.record_guild_event(
                     "target_setup",
@@ -605,7 +604,7 @@ class CiblePaginationView(discord.ui.View):
         )
 
 
-class TargetCog(commands.Cog):
+class CibleCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.clr_cible = discord.Color.from_rgb(183, 0, 0)
@@ -1123,4 +1122,4 @@ class TargetCog(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(TargetCog(bot))
+    await bot.add_cog(CibleCog(bot))

@@ -595,6 +595,8 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                     logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT DÉBUT de {meta['name_default']}")
                     ts_fin = int(ev["end"].timestamp())
 
+                    guilds_to_remove = []
+
                     for guild_id, g_info in data.get("guilds", {}).items():
                         channel_id = g_info.get("channel_id")
                         if channel_id:
@@ -602,8 +604,14 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                             if not channel:
                                 try:
                                     channel = await self.bot.fetch_channel(channel_id)
-                                except:
-                                    pass
+                                except discord.NotFound:
+                                    guilds_to_remove.append(guild_id)
+                                    continue
+                                except discord.Forbidden:
+                                    guilds_to_remove.append(guild_id)
+                                    continue
+                                except Exception:
+                                    continue
 
                             if channel:
                                 langue = g_info.get("langue", "fr")
@@ -647,6 +655,21 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                         failed=0,
                                         dm_blocked=0,
                                     )
+                                except (discord.Forbidden, discord.NotFound) as e:
+                                    logger.warning(
+                                        f"⚠️ [Calendrier] Permissions insuffisantes ou salon introuvable sur {guild_id} ({e}). Suppression de l'abonnement."
+                                    )
+                                    guilds_to_remove.append(guild_id)
+                                    obs.record_alert(
+                                        source="calendar",
+                                        alert_type="start",
+                                        gge_server=serveur_cible,
+                                        channel="guild",
+                                        recipients=1,
+                                        delivered=0,
+                                        failed=1,
+                                        dm_blocked=0,
+                                    )
                                 except Exception as e:
                                     logger.error(f"Erreur d'envoi alerte début calendrier : {e}")
                                     obs.record_alert(
@@ -660,12 +683,19 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                         dm_blocked=0,
                                     )
 
+                    for gid in guilds_to_remove:
+                        if gid in data["guilds"]:
+                            del data["guilds"][gid]
+                            modifie = True
+
                 notified.append(uid_start)
                 modifie = True
 
             if maintenant >= ev["end"] and uid_end not in notified:
                 if ev["end"].date() == maintenant.date():
                     logger.info(f"🔎 [Calendrier] DÉCLENCHEMENT FIN de {meta['name_default']}")
+
+                    guilds_to_remove = []
 
                     for guild_id, g_info in data.get("guilds", {}).items():
                         channel_id = g_info.get("channel_id")
@@ -674,8 +704,14 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                             if not channel:
                                 try:
                                     channel = await self.bot.fetch_channel(channel_id)
-                                except:
-                                    pass
+                                except discord.NotFound:
+                                    guilds_to_remove.append(guild_id)
+                                    continue
+                                except discord.Forbidden:
+                                    guilds_to_remove.append(guild_id)
+                                    continue
+                                except Exception:
+                                    continue
 
                             if channel:
                                 langue = g_info.get("langue", "fr")
@@ -697,6 +733,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
 
                                 embed_end = discord.Embed(title=titre_end, description=desc_end, color=0x2E4045)
                                 await setup_embed_footer(embed_end, None, langue)
+
                                 try:
                                     await channel.send(embed=embed_end)
                                     obs.record_alert(
@@ -707,6 +744,21 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                         recipients=1,
                                         delivered=1,
                                         failed=0,
+                                        dm_blocked=0,
+                                    )
+                                except (discord.Forbidden, discord.NotFound) as e:
+                                    logger.warning(
+                                        f"⚠️ [Calendrier] Permissions insuffisantes ou salon introuvable sur {guild_id} ({e}). Suppression de l'abonnement."
+                                    )
+                                    guilds_to_remove.append(guild_id)
+                                    obs.record_alert(
+                                        source="calendar",
+                                        alert_type="end",
+                                        gge_server=serveur_cible,
+                                        channel="guild",
+                                        recipients=1,
+                                        delivered=0,
+                                        failed=1,
                                         dm_blocked=0,
                                     )
                                 except Exception as e:
@@ -739,7 +791,9 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                                 await setup_embed_footer(embed_rapport, None, langue)
                                                 try:
                                                     await channel.send(embed=embed_rapport)
-                                                except:
+                                                except (discord.Forbidden, discord.NotFound):
+                                                    pass
+                                                except Exception:
                                                     pass
                                             else:
                                                 err_msg = t(
@@ -751,8 +805,15 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                                 )
                                                 try:
                                                     await channel.send(err_msg)
-                                                except:
+                                                except (discord.Forbidden, discord.NotFound):
                                                     pass
+                                                except Exception:
+                                                    pass
+
+                    for gid in guilds_to_remove:
+                        if gid in data["guilds"]:
+                            del data["guilds"][gid]
+                            modifie = True
 
                 notified.append(uid_end)
                 modifie = True

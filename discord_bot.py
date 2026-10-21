@@ -73,7 +73,6 @@ print(
     "\n" + "█" * 60 + "\n" + "█" + " " * 18 + "NOUVEAU DÉMARRAGE DU BOT" + " " * 16 + "█\n" + "█" * 60 + "\n",
     flush=True,
 )
-logger.info("🟢 Démarrage du système de logs...")
 
 
 # =======================================
@@ -186,30 +185,27 @@ class GGEAssistantBot(commands.Bot):
         self.session = aiohttp.ClientSession(connector=connecteur_ipv4)
 
         # =======================================
-        # Upload emojis
-        # =======================================
-        await sync_and_load_emojis(self, auto_upload=True)
-
-        # =======================================
         # CHARGEMENT DES COGS
         # =======================================
         logger.info("🔌 Chargement des modules ...")
         extensions = [
             "cogs.admin",
             "cogs.aide",
+            "cogs.alliances",
             "cogs.calendrier",
+            "cogs.cible",
             "cogs.classement",
-            "cogs.config",
-            "cogs.events",
+            "cogs.configuration",
+            "cogs.evenements",
+            "cogs.faille",
             "cogs.forteresses",
             "cogs.gge_hub_community",
-            "cogs.profils",
+            "cogs.grand_tournoi",
+            "cogs.iles_orageuses",
+            "cogs.joueurs",
             "cogs.radar",
-            "cogs.rift",
-            "cogs.scan_server",
-            "cogs.storms",
-            "cogs.target",
-            "cogs.tournaments",
+            "cogs.roue_richesses",
+            "cogs.scan_serveurs",
         ]
         for ext in extensions:
             try:
@@ -258,12 +254,18 @@ class GGEAssistantBot(commands.Bot):
         await self.web_site.start()
         logger.info("🌐 [Webhook] Serveur web en écoute sur le port 5011.")
 
+        # =======================================
+        # Upload emojis
+        # =======================================
+        await sync_and_load_emojis(self, auto_upload=True)
+
     # =======================================
     # BOT PRÊT
     # =======================================
     async def on_ready(self):
         charger_langues()
         logger.info(f"✅ Bot connecté en tant que {self.user} (ID: {self.user.id})")
+        logger.info("🟢 Démarrage du système de logs...")
 
         # ==========================================
         # WEBHOOK START NOTIFICATION
