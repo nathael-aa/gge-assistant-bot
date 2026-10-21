@@ -159,11 +159,12 @@ class RadarSettingsView(discord.ui.View):
             if self.entity_type == "guild"
             else t(self.langue, "rad_target_user", defaut="Le radar personnel")
         )
+        e_check = DICT_EMOJIS.get("e_check", "✅")
         msg = t(
             self.langue,
             "rad_prefs_saved",
             target=target,
-            defaut=f"{{e_check}} **Préférences enregistrées !** {target} est actif.",
+            defaut=f"{e_check} **Préférences enregistrées !** {target} est actif.",
         )
         await interaction.response.edit_message(content=msg, view=None)
 
@@ -238,11 +239,12 @@ class RadarAllianceSettingsView(discord.ui.View):
             if self.entity_type == "guild"
             else t(self.langue, "rad_target_global", defaut="Le radar global")
         )
+        e_check = DICT_EMOJIS.get("e_check", "✅")
         msg = t(
             self.langue,
             "rad_prefs_saved",
             target=target,
-            defaut=f"{{e_check}} **Préférences enregistrées !** {target} est actif.",
+            defaut=f"{e_check} **Préférences enregistrées !** {target} est actif.",
         )
         await interaction.response.edit_message(content=msg, view=None)
 
@@ -422,11 +424,13 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             "serveur": serveur,
         }
         await save_surveillance_async(data)
+
+        e_check = DICT_EMOJIS.get("e_check", "✅")
         msg_success = t(
             langue,
             "rad_srv_setup_success",
             channel=channel.mention,
-            defaut=f"{{e_check}} **Radar Serveur configuré !** Les alertes arriveront dans {channel.mention}.",
+            defaut=f"{e_check} **Radar Serveur configuré !** Les alertes arriveront dans {channel.mention}.",
         )
         await interaction.followup.send(msg_success)
 
@@ -466,12 +470,17 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         except:
             pass
 
+        e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
+        e_nocheck = DICT_EMOJIS.get("e_nocheck", "❌")
+        e_bullseye = DICT_EMOJIS.get("e_std_bullseye", "🎯")
+        e_wink = DICT_EMOJIS.get("e_std_winking_face", "😉")
+
         if not p_id:
             msg_not_found = t(
                 langue,
                 "rad_err_not_found_cache",
                 p=player,
-                defaut=f"{{e_warning}} Joueur **{player}** introuvable dans le cache local.",
+                defaut=f"{e_warning} Joueur **{player}** introuvable dans le cache local.",
             )
             return await interaction.followup.send(msg_not_found)
 
@@ -486,7 +495,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     langue,
                     "rad_err_srv_limit_player",
                     cnt=count_tracked,
-                    defaut=f"{{e_nocheck}} **Limite atteinte** : Le serveur surveille déjà le maximum autorisé (`{count_tracked}/15` joueurs).",
+                    defaut=f"{e_nocheck} **Limite atteinte** : Le serveur surveille déjà le maximum autorisé (`{count_tracked}/15` joueurs).",
                 )
                 return await interaction.followup.send(msg_limite)
 
@@ -521,7 +530,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             await save_surveillance_async(data)
 
             title_str = t(
-                langue, "rad_srv_add_p_title", p=player, defaut=f"{{e_std_bullseye}} Cible Serveur : {player}"
+                langue, "rad_srv_add_p_title", p=player, defaut=f"{e_bullseye} Cible Serveur : {player}"
             )
             desc_str = t(
                 langue,
@@ -536,7 +545,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             await interaction.followup.send(embed=embed, view=view)
         else:
             msg_already = t(
-                langue, "rad_err_srv_already_track", p=player, defaut=f"Le serveur surveille DÉJÀ **{player}** !"
+                langue, "rad_err_srv_already_track", p=player, defaut=f"Le serveur surveille DÉJÀ **{player}** ! {e_wink}"
             )
             await interaction.followup.send(msg_already)
 
@@ -566,6 +575,11 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         headers = await get_api_headers(interaction)
         a_id, a_name_real, members_dict = None, alliance_name, {}
 
+        e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
+        e_nocheck = DICT_EMOJIS.get("e_nocheck", "❌")
+        e_alli = DICT_EMOJIS.get("e_alliance_icon", "🛡️")
+        e_wink = DICT_EMOJIS.get("e_std_winking_face", "😉")
+
         try:
             url_search = f"https://api.gge-tracker.com/api/v1/alliances/name/{urllib.parse.quote(alliance_name)}"
             async with self.bot.session.get(url_search, headers=headers, timeout=10) as r:
@@ -594,7 +608,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             msg_api_err = t(
                 langue,
                 "rad_err_api_join",
-                defaut="{e_nocheck} Impossible de joindre GGE-Tracker pour trouver cette alliance.",
+                defaut=f"{e_nocheck} Impossible de joindre GGE-Tracker pour trouver cette alliance.",
             )
             return await interaction.followup.send(msg_api_err)
 
@@ -603,7 +617,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_err_alli_not_found",
                 a=alliance_name,
-                defaut=f"{{e_warning}} Alliance **{alliance_name}** introuvable.",
+                defaut=f"{e_warning} Alliance **{alliance_name}** introuvable.",
             )
             return await interaction.followup.send(msg_not_found)
 
@@ -618,7 +632,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     langue,
                     "rad_err_srv_limit_alli",
                     cnt=count_tracked,
-                    defaut=f"{{e_nocheck}} **Limite atteinte** : Le serveur surveille déjà le maximum autorisé (`{count_tracked}/3` alliances).",
+                    defaut=f"{e_nocheck} **Limite atteinte** : Le serveur surveille déjà le maximum autorisé (`{count_tracked}/3` alliances).",
                 )
                 return await interaction.followup.send(msg_limite)
 
@@ -649,7 +663,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_srv_add_a_title",
                 a=a_name_real,
-                defaut=f"{{e_alliance_icon}} Cible Serveur : {a_name_real}",
+                defaut=f"{e_alli} Cible Serveur : {a_name_real}",
             )
             desc_str = t(
                 langue,
@@ -667,7 +681,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_err_srv_already_track_alli",
                 a=a_name_real,
-                defaut=f"Le serveur surveille DÉJÀ **{a_name_real}** !",
+                defaut=f"Le serveur surveille DÉJÀ **{a_name_real}** ! {e_wink}",
             )
             await interaction.followup.send(msg_already)
 
@@ -697,10 +711,13 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     del data["players"][pid]
                 break
 
+        e_check = DICT_EMOJIS.get("e_check", "✅")
+        e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
+
         if cible_trouvee:
             await save_surveillance_async(data)
             msg_succ = t(
-                langue, "rad_srv_rem_p_succ", p=player, defaut=f"{{e_check}} **{player}** retiré du radar du serveur."
+                langue, "rad_srv_rem_p_succ", p=player, defaut=f"{e_check} **{player}** retiré du radar du serveur."
             )
             await interaction.followup.send(msg_succ)
         else:
@@ -708,7 +725,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_srv_rem_p_fail",
                 p=player,
-                defaut=f"{{e_warning}} **{player}** n'est pas surveillé par le serveur.",
+                defaut=f"{e_warning} **{player}** n'est pas surveillé par le serveur.",
             )
             await interaction.followup.send(msg_fail)
 
@@ -740,13 +757,16 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     del data["alliances"][aid]
                 break
 
+        e_check = DICT_EMOJIS.get("e_check", "✅")
+        e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
+
         if cible_trouvee:
             await save_surveillance_async(data)
             msg_succ = t(
                 langue,
                 "rad_srv_rem_a_succ",
                 a=alliance_name,
-                defaut=f"{{e_check}} L'alliance **{alliance_name}** a été retirée du radar du serveur.",
+                defaut=f"{e_check} L'alliance **{alliance_name}** a été retirée du radar du serveur.",
             )
             await interaction.followup.send(msg_succ)
         else:
@@ -754,7 +774,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_srv_rem_a_fail",
                 a=alliance_name,
-                defaut=f"{{e_warning}} **{alliance_name}** n'est pas surveillée par le serveur.",
+                defaut=f"{e_warning} **{alliance_name}** n'est pas surveillée par le serveur.",
             )
             await interaction.followup.send(msg_fail)
 
@@ -789,23 +809,25 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             if guild_id in info.get("guild_abonnes", {}):
                 prefs = info["guild_abonnes"][guild_id]
                 filtres_actifs = [k.capitalize() for k, v in prefs.items() if v and k != "raison"]
-                str_f = f"{e_check} {', '.join(filtres_actifs)}" if filtres_actifs else f"{e_nocheck} Aucun filtre"
+                str_f = f"{e_check} {', '.join(filtres_actifs)}" if filtres_actifs else f"{e_nocheck} Aucun filtre actif"
                 mes_joueurs.append(f"{e_bullseye} **{info['name']}** ➔ *{prefs.get('raison', lbl_sr)}*\n└ {str_f}")
 
         for aid, info in data.get("alliances", {}).items():
             if guild_id in info.get("guild_abonnes", {}):
                 prefs = info["guild_abonnes"][guild_id]
                 filtres_actifs = [k.capitalize() for k, v in prefs.items() if v and k != "raison"]
-                str_f = f"{e_check} {', '.join(filtres_actifs)}" if filtres_actifs else f"{e_nocheck} Aucun filtre"
+                str_f = f"{e_check} {', '.join(filtres_actifs)}" if filtres_actifs else f"{e_nocheck} Aucun filtre actif"
                 mes_alliances.append(f"{e_alli} **{info['name']}** ➔ *{prefs.get('raison', lbl_sr)}*\n└ {str_f}")
 
         if not mes_joueurs and not mes_alliances:
-            msg_empty = t(langue, "rad_srv_list_empty", defaut="{e_information} Le radar de ce serveur est vide !")
+            e_info = DICT_EMOJIS.get("e_information", "ℹ️")
+            msg_empty = t(langue, "rad_srv_list_empty", defaut=f"{e_info} Le radar de ce serveur est vide !")
             return await interaction.followup.send(msg_empty)
 
+        e_detective = DICT_EMOJIS.get("e_std_man_detective", "🕵️‍♂️")
         embeds = []
         if mes_alliances:
-            title_alli = t(langue, "rad_srv_list_title_alli", defaut="📡 Radar Serveur - Alliances")
+            title_alli = t(langue, "rad_srv_list_title_alli", defaut=f"{e_detective} Radar Serveur - Alliances")
             embed = discord.Embed(
                 title=title_alli, description="\n\n".join(mes_alliances), color=self.clr_list_alliances
             )
@@ -813,7 +835,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             embeds.append(embed)
 
         if mes_joueurs:
-            title_play = t(langue, "rad_srv_list_title_player", defaut="📡 Radar Serveur - Joueurs")
+            title_play = t(langue, "rad_srv_list_title_player", defaut=f"{e_detective} Radar Serveur - Joueurs")
             for i in range(0, len(mes_joueurs), 10):
                 embed = discord.Embed(
                     title=title_play, description="\n\n".join(mes_joueurs[i : i + 10]), color=self.clr_list_joueurs
@@ -859,12 +881,18 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         except:
             pass
 
+        e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
+        e_nocheck = DICT_EMOJIS.get("e_nocheck", "❌")
+        e_bullseye = DICT_EMOJIS.get("e_std_bullseye", "🎯")
+        e_wink = DICT_EMOJIS.get("e_std_winking_face", "😉")
+        e_down = DICT_EMOJIS.get("e_std_backhand_index_pointing_down", "👇")
+
         if not p_id:
             msg = t(
                 langue,
                 "rad_err_not_found_cache",
                 p=player,
-                defaut=f"{{e_warning}} Joueur **{player}** introuvable dans le cache local.",
+                defaut=f"{e_warning} Joueur **{player}** introuvable dans le cache local.",
             )
             return await interaction.followup.send(msg)
 
@@ -882,7 +910,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     langue,
                     "rad_err_limit_player",
                     cnt=count_tracked,
-                    defaut=f"{{e_nocheck}} **Limite atteinte** : Suivi maximal `{count_tracked}/25` joueurs.",
+                    defaut=f"{e_nocheck} **Limite atteinte** : Suivi maximal `{count_tracked}/25` joueurs.",
                 )
                 return await interaction.followup.send(msg)
 
@@ -919,20 +947,20 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_err_already_track",
                 p=player,
-                defaut=f"Tu surveilles DÉJÀ **{player}** ! {{e_std_winking_face}}",
+                defaut=f"Tu surveilles DÉJÀ **{player}** ! {e_wink}",
             )
             return await interaction.followup.send(msg)
 
         await save_surveillance_async(data)
 
         embed = discord.Embed(
-            title=t(langue, "rad_add_title", j=player, defaut=f"{{e_std_bullseye}} Cible verrouillée : {player}"),
+            title=t(langue, "rad_add_title", j=player, defaut=f"{e_bullseye} Cible verrouillée : {player}"),
             description=t(
                 langue,
                 "rad_add_desc",
                 j=player,
                 r=reason,
-                defaut=f"**{player}** a bien été ajouté à ton radar personnel.\n*(Raison: {reason})*\n\n{{e_std_backhand_index_pointing_down}} **Configure tes alertes (Rouge = OFF, Vert = ON) :**",
+                defaut=f"**{player}** a bien été ajouté à ton radar personnel.\n*(Raison: {reason})*\n\n{e_down} **Configure tes alertes (Rouge = OFF, Vert = ON) :**",
             ),
             color=self.clr_add_joueur,
         )
@@ -957,6 +985,12 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         headers = await get_api_headers(interaction)
 
         a_id, a_name_real, members_dict = None, alliance_name, {}
+
+        e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
+        e_nocheck = DICT_EMOJIS.get("e_nocheck", "❌")
+        e_alli = DICT_EMOJIS.get("e_alliance_icon", "🛡️")
+        e_wink = DICT_EMOJIS.get("e_std_winking_face", "😉")
+        e_down = DICT_EMOJIS.get("e_std_backhand_index_pointing_down", "👇")
 
         try:
             url_search = f"https://api.gge-tracker.com/api/v1/alliances/name/{urllib.parse.quote(alliance_name)}"
@@ -988,7 +1022,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             msg = t(
                 langue,
                 "rad_err_api_join",
-                defaut="{e_nocheck} Impossible de joindre GGE-Tracker pour trouver cette alliance.",
+                defaut=f"{e_nocheck} Impossible de joindre GGE-Tracker pour trouver cette alliance.",
             )
             return await interaction.followup.send(msg)
 
@@ -997,7 +1031,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_err_alli_not_found",
                 a=alliance_name,
-                defaut=f"{{e_warning}} Alliance **{alliance_name}** introuvable.",
+                defaut=f"{e_warning} Alliance **{alliance_name}** introuvable.",
             )
             return await interaction.followup.send(msg)
 
@@ -1014,7 +1048,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                     langue,
                     "rad_err_limit_alli",
                     cnt=count_tracked,
-                    defaut=f"{{e_nocheck}} **Limite atteinte** : Surveillance maximale `{count_tracked}/3` alliances.",
+                    defaut=f"{e_nocheck} **Limite atteinte** : Surveillance maximale `{count_tracked}/3` alliances.",
                 )
                 return await interaction.followup.send(msg)
 
@@ -1044,7 +1078,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_err_already_track_alli",
                 a=a_name_real,
-                defaut=f"Tu surveilles DÉJÀ l'alliance **{a_name_real}** ! {{e_std_winking_face}}",
+                defaut=f"Tu surveilles DÉJÀ l'alliance **{a_name_real}** ! {e_wink}",
             )
             return await interaction.followup.send(msg)
 
@@ -1055,7 +1089,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_alli_add_title",
                 a=a_name_real,
-                defaut=f"{{e_alliance_icon}} Alliance verrouillée : {a_name_real}",
+                defaut=f"{e_alli} Alliance verrouillée : {a_name_real}",
             ),
             description=t(
                 langue,
@@ -1063,7 +1097,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 a=a_name_real,
                 cnt=len(members_dict),
                 r=reason,
-                defaut=f"Le radar personnel est activé sur **{a_name_real}** ({len(members_dict)} membres).\n*(Raison: {reason})*\n\n{{e_std_backhand_index_pointing_down}} **Configure tes alertes d'alliance (Rouge = OFF, Vert = ON) :**",
+                defaut=f"Le radar personnel est activé sur **{a_name_real}** ({len(members_dict)} membres).\n*(Raison: {reason})*\n\n{e_down} **Configure tes alertes d'alliance (Rouge = OFF, Vert = ON) :**",
             ),
             color=self.clr_add_alliance,
         )
@@ -1099,17 +1133,20 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                         del data["players"][pid]
                     break
 
+        e_check = DICT_EMOJIS.get("e_check", "✅")
+        e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
+
         if cible_trouvee:
             await save_surveillance_async(data)
             msg = t(
                 langue,
                 "rad_rem_succ",
                 j=player,
-                defaut=f"{{e_check}} **{player}** a bien été retiré de ton radar personnel.",
+                defaut=f"{e_check} **{player}** a bien été retiré de ton radar personnel.",
             )
             await interaction.followup.send(msg)
         else:
-            msg = t(langue, "rad_rem_fail", j=player, defaut=f"{{e_warning}} **{player}** n'est pas dans ton radar.")
+            msg = t(langue, "rad_rem_fail", j=player, defaut=f"{e_warning} **{player}** n'est pas dans ton radar.")
             await interaction.followup.send(msg)
 
     @private_group.command(name="remove_alliance", description="Remove an alliance from your personal radar")
@@ -1137,13 +1174,16 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                         del data["alliances"][aid]
                     break
 
+        e_check = DICT_EMOJIS.get("e_check", "✅")
+        e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
+
         if cible_trouvee:
             await save_surveillance_async(data)
             msg = t(
                 langue,
                 "rad_alli_rem_succ",
                 a=alliance_name,
-                defaut=f"{{e_check}} L'alliance **{alliance_name}** a bien été retirée de ton radar.",
+                defaut=f"{e_check} L'alliance **{alliance_name}** a bien été retirée de ton radar.",
             )
             await interaction.followup.send(msg)
         else:
@@ -1151,7 +1191,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 langue,
                 "rad_alli_rem_fail",
                 a=alliance_name,
-                defaut=f"{{e_warning}} L'alliance **{alliance_name}** n'est pas dans ton radar.",
+                defaut=f"{e_warning} L'alliance **{alliance_name}** n'est pas dans ton radar.",
             )
             await interaction.followup.send(msg)
 
@@ -1168,6 +1208,10 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
         user_id = str(interaction.user.id)
 
         lbl_sr = t(langue, "rad_list_no_reason", defaut="Sans raison")
+        e_bullseye = DICT_EMOJIS.get("e_std_bullseye", "🎯")
+        e_alli = DICT_EMOJIS.get("e_alliance_icon", "🛡️")
+        e_check = DICT_EMOJIS.get("e_check", "✅")
+        e_nocheck = DICT_EMOJIS.get("e_nocheck", "❌")
 
         mes_joueurs = []
         for pid, info in data.get("players", {}).items():
@@ -1194,12 +1238,12 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                         langue,
                         "rad_list_filter_active",
                         f=", ".join(filtres_actifs),
-                        defaut=f"{{e_check}} {', '.join(filtres_actifs)}",
+                        defaut=f"{e_check} {', '.join(filtres_actifs)}",
                     )
                     if filtres_actifs
-                    else t(langue, "rad_list_no_filter", defaut="{e_nocheck} Aucun filtre actif")
+                    else t(langue, "rad_list_no_filter", defaut=f"{e_nocheck} Aucun filtre actif")
                 )
-                mes_joueurs.append(f"{{e_std_bullseye}} **{nom}** ➔ *{raison}*\n└ {str_filtres}")
+                mes_joueurs.append(f"{e_bullseye} **{nom}** ➔ *{raison}*\n└ {str_filtres}")
 
         mes_alliances = []
         for aid, info in data.get("alliances", {}).items():
@@ -1222,25 +1266,27 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                         langue,
                         "rad_list_filter_active",
                         f=", ".join(filtres_actifs),
-                        defaut=f"{{e_check}} {', '.join(filtres_actifs)}",
+                        defaut=f"{e_check} {', '.join(filtres_actifs)}",
                     )
                     if filtres_actifs
-                    else t(langue, "rad_list_no_filter", defaut="{e_nocheck} Aucun filtre actif")
+                    else t(langue, "rad_list_no_filter", defaut=f"{e_nocheck} Aucun filtre actif")
                 )
-                mes_alliances.append(f"{{e_alliance_icon}} **{nom}** ➔ *{raison}*\n└ {str_filtres}")
+                mes_alliances.append(f"{e_alli} **{nom}** ➔ *{raison}*\n└ {str_filtres}")
 
         if not mes_joueurs and not mes_alliances:
+            e_info = DICT_EMOJIS.get("e_information", "ℹ️")
             msg = t(
                 langue,
                 "rad_list_empty",
-                defaut="{e_information} Ton radar est vide ! Utilise `/radar private add_player` ou `/radar private add_alliance`.",
+                defaut=f"{e_info} Ton radar est vide ! Utilise `/radar private add_player` ou `/radar private add_alliance`.",
             )
             return await interaction.followup.send(msg)
 
+        e_detective = DICT_EMOJIS.get("e_std_man_detective", "🕵️‍♂️")
         embeds = []
         if mes_alliances:
             embed = discord.Embed(
-                title=t(langue, "rad_list_title_alli", defaut="{e_std_man_detective} Mon Radar - Alliances"),
+                title=t(langue, "rad_list_title_alli", defaut=f"{e_detective} Mon Radar - Alliances"),
                 color=self.clr_list_alliances,
             )
             embed.description = "\n\n".join(mes_alliances)
@@ -1252,7 +1298,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             for i in range(0, len(mes_joueurs), lignes_par_page):
                 chunk = mes_joueurs[i : i + lignes_par_page]
                 embed = discord.Embed(
-                    title=t(langue, "rad_list_title_player", defaut="{e_std_man_detective} Mon Radar - Joueurs"),
+                    title=t(langue, "rad_list_title_player", defaut=f"{e_detective} Mon Radar - Joueurs"),
                     color=self.clr_list_joueurs,
                 )
                 embed.description = "\n\n".join(chunk)
@@ -1311,6 +1357,21 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 if srv not in targets_by_server:
                     targets_by_server[srv] = {"alliances": [], "players": []}
                 targets_by_server[srv]["players"].append((p_id, p_info))
+
+            # Chargement de tous les emojis nécessaires pour la boucle
+            e_alli = DICT_EMOJIS.get("e_alliance_icon", "🛡️")
+            e_crown = DICT_EMOJIS.get("e_std_crown", "👑")
+            e_door = DICT_EMOJIS.get("e_std_door", "🚪")
+            e_green = DICT_EMOJIS.get("e_std_green_circle", "🟢")
+            e_red = DICT_EMOJIS.get("e_std_red_circle", "🔴")
+            e_inc = DICT_EMOJIS.get("e_std_chart_increasing", "📈")
+            e_dec = DICT_EMOJIS.get("e_std_chart_decreasing", "📉")
+            e_honor = DICT_EMOJIS.get("e_honor", "🎖️")
+            e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
+            e_time = DICT_EMOJIS.get("e_time", "⏱️")
+            e_dove = DICT_EMOJIS.get("e_std_dove", "🕊️")
+            e_swords = DICT_EMOJIS.get("e_std_crossed_swords", "⚔️")
+            e_refresh = DICT_EMOJIS.get("e_refresh", "🔄")
 
             for serveur, targets in targets_by_server.items():
                 self._serveur_courant = serveur
@@ -1390,7 +1451,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                             title=t(
                                                 lg,
                                                 "rad_spy_alli_name_title",
-                                                defaut="{e_alliance_icon} ALERTE ALLIANCE : NOUVEAU NOM",
+                                                defaut=f"{e_alli} ALERTE ALLIANCE : NOUVEAU NOM",
                                             ),
                                             color=discord.Color.purple(),
                                         )
@@ -1443,7 +1504,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                             title=t(
                                                 lg,
                                                 "rad_spy_alli_lead_title",
-                                                defaut="{e_std_crown} ALERTE ALLIANCE : NOUVEAU CHEF",
+                                                defaut=f"{e_crown} ALERTE ALLIANCE : NOUVEAU CHEF",
                                             ),
                                             description=t(
                                                 lg,
@@ -1484,7 +1545,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                     lg,
                                                     "rad_spy_alli_join",
                                                     p=m["name"],
-                                                    defaut=f"{{e_std_green_circle}} **{m['name']}** a rejoint l'alliance.",
+                                                    defaut=f"{e_green} **{m['name']}** a rejoint l'alliance.",
                                                 )
                                             )
                                         for m in sorties:
@@ -1493,7 +1554,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                     lg,
                                                     "rad_spy_alli_leave",
                                                     p=m["name"],
-                                                    defaut=f"{{e_std_red_circle}} **{m['name']}** a quitté l'alliance.",
+                                                    defaut=f"{e_red} **{m['name']}** a quitté l'alliance.",
                                                 )
                                             )
 
@@ -1501,7 +1562,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                             title=t(
                                                 lg,
                                                 "rad_spy_alli_mouv_title",
-                                                defaut="{e_std_door} ALERTE ALLIANCE : MOUVEMENTS",
+                                                defaut=f"{e_door} ALERTE ALLIANCE : MOUVEMENTS",
                                             ),
                                             description=t(
                                                 lg,
@@ -1552,7 +1613,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                         p=r["info"]["name"],
                                                         r1=old_l,
                                                         r2=new_l,
-                                                        defaut=f"{{e_std_chart_increasing}} **{r['info']['name']}** a été promu ({old_l} ➔ {new_l})",
+                                                        defaut=f"{e_inc} **{r['info']['name']}** a été promu ({old_l} ➔ {new_l})",
                                                     )
                                                 )
                                             else:
@@ -1563,14 +1624,14 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                         p=r["info"]["name"],
                                                         r1=old_l,
                                                         r2=new_l,
-                                                        defaut=f"{{e_std_chart_decreasing}} **{r['info']['name']}** a été rétrogradé ({old_l} ➔ {new_l})",
+                                                        defaut=f"{e_dec} **{r['info']['name']}** a été rétrogradé ({old_l} ➔ {new_l})",
                                                     )
                                                 )
                                         embed = discord.Embed(
                                             title=t(
                                                 lg,
                                                 "rad_spy_alli_rank_title",
-                                                defaut="{e_honor} ALERTE ALLIANCE : GRADES",
+                                                defaut=f"{e_honor} ALERTE ALLIANCE : GRADES",
                                             ),
                                             description=t(
                                                 lg,
@@ -1649,7 +1710,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                 title=t(
                                                     lg,
                                                     "rad_spy_p_name_title",
-                                                    defaut="{e_warning} ALERTE PSEUDO",
+                                                    defaut=f"{e_warning} ALERTE PSEUDO",
                                                 ),
                                                 color=discord.Color.orange(),
                                             )
@@ -1661,7 +1722,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                     old=old_t,
                                                     new=new_t,
                                                     time=get_discord_time(maintenant.isoformat(), lg),
-                                                    defaut=f"~~{old_t}~~ ➔ **{new_t}**\n{{e_time}} *Fait {get_discord_time(maintenant.isoformat(), lg)}*",
+                                                    defaut=f"~~{old_t}~~ ➔ **{new_t}**\n{e_time} *Fait {get_discord_time(maintenant.isoformat(), lg)}*",
                                                 ),
                                             )
                                             embeds_locales[lg] = embed
@@ -1706,7 +1767,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                 title=t(
                                                     lg,
                                                     "rad_spy_p_alli_title",
-                                                    defaut="{e_warning} ALERTE ALLIANCE",
+                                                    defaut=f"{e_warning} ALERTE ALLIANCE",
                                                 ),
                                                 color=discord.Color.brand_red(),
                                             )
@@ -1719,7 +1780,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                     old=old_t,
                                                     new=new_t,
                                                     time=get_discord_time(maintenant.isoformat(), lg),
-                                                    defaut=f"**{player}**\n*{old_t}* ➔ **{new_t}**\n{{e_time}} *Fait {get_discord_time(maintenant.isoformat(), lg)}*",
+                                                    defaut=f"**{player}**\n*{old_t}* ➔ **{new_t}**\n{e_time} *Fait {get_discord_time(maintenant.isoformat(), lg)}*",
                                                 ),
                                             )
                                             embeds_locales[lg] = embed
@@ -1744,9 +1805,9 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                     diff = current_might - info.get("last_might", current_might)
                                     if abs(diff) >= 500_000:
                                         emoji_str, color = (
-                                            ("{e_std_chart_increasing}", discord.Color.green())
+                                            (e_inc, discord.Color.green())
                                             if diff > 0
-                                            else ("{e_std_chart_decreasing}", discord.Color.brand_red())
+                                            else (e_dec, discord.Color.brand_red())
                                         )
                                         sign = "+" if diff > 0 else ""
                                         embeds_locales = {}
@@ -1756,7 +1817,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                     lg,
                                                     "rad_spy_p_pp_title",
                                                     emoji=emoji_str,
-                                                    defaut=f"{{e_warning}} ALERTE PUISSANCE {emoji_str}",
+                                                    defaut=f"{e_warning} ALERTE PUISSANCE {emoji_str}",
                                                 ),
                                                 color=color,
                                             )
@@ -1845,14 +1906,14 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                         title=t(
                                                             lg,
                                                             "rad_spy_p_dove_on_title",
-                                                            defaut="{e_std_dove} ALERTE COLOMBE : ACTIVÉE",
+                                                            defaut=f"{e_dove} ALERTE COLOMBE : ACTIVÉE",
                                                         ),
                                                         description=t(
                                                             lg,
                                                             "rad_spy_p_dove_on_desc",
                                                             j=player,
                                                             ts=ts,
-                                                            defaut=f"**{player}** est sous protection !\n{{e_time}} Fin : <t:{ts}:f> (<t:{ts}:R>)",
+                                                            defaut=f"**{player}** est sous protection !\n{e_time} Fin : <t:{ts}:f> (<t:{ts}:R>)",
                                                         ),
                                                         color=discord.Color.light_grey(),
                                                     )
@@ -1861,14 +1922,14 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                         title=t(
                                                             lg,
                                                             "rad_spy_p_dove_mod_title",
-                                                            defaut="{e_refresh} ALERTE COLOMBE : MODIFIÉE",
+                                                            defaut=f"{e_refresh} ALERTE COLOMBE : MODIFIÉE",
                                                         ),
                                                         description=t(
                                                             lg,
                                                             "rad_spy_p_dove_mod_desc",
                                                             j=player,
                                                             ts=ts,
-                                                            defaut=f"**{player}** a modifié sa protection !\n{{e_time}} Fin : <t:{ts}:f> (<t:{ts}:R>)",
+                                                            defaut=f"**{player}** a modifié sa protection !\n{e_time} Fin : <t:{ts}:f> (<t:{ts}:R>)",
                                                         ),
                                                         color=discord.Color.blue(),
                                                     )
@@ -1877,7 +1938,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                         title=t(
                                                             lg,
                                                             "rad_spy_p_dove_off_title",
-                                                            defaut="{e_std_crossed_swords} CONFIRMATION : SANS COLOMBE",
+                                                            defaut=f"{e_swords} CONFIRMATION : SANS COLOMBE",
                                                         ),
                                                         description=t(
                                                             lg,
@@ -1892,7 +1953,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                         title=t(
                                                             lg,
                                                             "rad_spy_p_dove_end_title",
-                                                            defaut="{e_std_crossed_swords} ALERTE COLOMBE : TERMINÉE",
+                                                            defaut=f"{e_swords} ALERTE COLOMBE : TERMINÉE",
                                                         ),
                                                         description=t(
                                                             lg,
@@ -1961,7 +2022,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                 title=t(
                                                     lg,
                                                     "rad_spy_p_pos_title",
-                                                    defaut="{e_warning} ALERTE DÉMÉNAGEMENT",
+                                                    defaut=f"{e_warning} ALERTE DÉMÉNAGEMENT",
                                                 ),
                                                 color=discord.Color.dark_purple(),
                                             )
@@ -1976,7 +2037,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                     xn=x_new,
                                                     yn=y_new,
                                                     time=get_discord_time(m["created_at"], lg),
-                                                    defaut=f"**{m_name}**\n`{x_old}:{y_old}` ➔ `{x_new}:{y_new}`\n{{e_time}} *Fait {get_discord_time(m['created_at'], lg)}*",
+                                                    defaut=f"**{m_name}**\n`{x_old}:{y_old}` ➔ `{x_new}:{y_new}`\n{e_time} *Fait {get_discord_time(m['created_at'], lg)}*",
                                                 ),
                                             )
                                             embeds_locales[lg] = embed
