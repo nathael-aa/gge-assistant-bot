@@ -537,10 +537,10 @@ class AdminCog(commands.Cog):
         """[CACHÉE] !scan_manuel [ALL/Serveur] : Lance manuellement le scanner (Tous ou un seul)."""
 
         cible = cible.upper()
-        scan_server = self.bot.get_cog("ScanCog")
+        scan_server = self.bot.get_cog("ScanServeursCog")
 
         if scan_server is None:
-            return await ctx.send("❌ **Erreur :** Le module `ScanCog` n'est pas chargé dans le bot.")
+            return await ctx.send("❌ **Erreur :** Le module `ScanServeursCog` n'est pas chargé dans le bot.")
 
         if cible == "ALL":
             await ctx.send("⏳ **Lancement manuel du scanner GLOBAL...** (Tous les serveurs)")
@@ -566,7 +566,7 @@ class AdminCog(commands.Cog):
                         )
                 else:
                     await ctx.send(
-                        "⚠️ **Attention :** La fonction `scan_specific_server` est introuvable dans `ScanCog`."
+                        "⚠️ **Attention :** La fonction `scan_specific_server` est introuvable dans `ScanServeursCog`."
                     )
             except Exception as e:
                 logger.error(f"❌ Erreur critique scan manuel ({cible}) : {e}")
