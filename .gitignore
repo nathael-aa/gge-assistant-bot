@@ -21,6 +21,7 @@ production/
 *.py[cod]
 *$py.class
 .DS_Store
+.vscode
 
 # ----------------------------------
 # ⚙️ AUTRES FICHIERS GÉNÉRÉS

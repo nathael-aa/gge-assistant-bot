@@ -217,7 +217,9 @@ class GGEAssistantBot(commands.Bot):
         # =======================================
         # SYNCHRONISATION COMMANDES DISCORD
         # =======================================
-        await self.tree.sync()
+        # ⚠️ tree.sync() retiré du setup_hook (risque de ban Discord en cas de crash loop).
+        # Utiliser la commande admin !sync pour synchroniser manuellement.
+        logger.info("ℹ️ [Setup] tree.sync() désactivé au démarrage. Utilisez !sync pour synchroniser.")
 
         # =======================================
         # INITIALISATION DES TASKS
@@ -597,8 +599,8 @@ class GGEAssistantBot(commands.Bot):
                 }
                 try:
                     self.loop.create_task(self.session.post(webhook_votes, json=payload))
-                except:
-                    pass
+                except Exception as e:
+                    logger.warning(f"⚠️ [Webhook] Impossible d'envoyer la notification de vote : {e}")
 
         VOTES_FILE = JOUEURS_DIR / "votes.json"
         votes_data = {}

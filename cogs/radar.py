@@ -64,7 +64,7 @@ def get_discord_time(iso_str, langue="fr"):
     try:
         dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
         return f"<t:{int(dt.timestamp())}:R>"
-    except:
+    except Exception:
         return t(langue, "rad_time_recent", defaut="Récemment")
 
 
@@ -399,7 +399,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
     ):
         try:
             await interaction.response.defer(ephemeral=True)
-        except:
+        except Exception:
             return
         langue, serveur = await get_server_config(interaction)
 
@@ -1866,7 +1866,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                             new_dt = datetime.fromisoformat(new_peace.replace("Z", "+00:00"))
                                             if new_dt > discord.utils.utcnow():
                                                 is_protected = True
-                                        except:
+                                        except Exception:
                                             pass
 
                                     msgs_trigger = []
@@ -1889,7 +1889,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                                                         < 60
                                                     ):
                                                         send_update = False
-                                                except:
+                                                except Exception:
                                                     pass
                                             if send_update:
                                                 msgs_trigger.append("mod")
