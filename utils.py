@@ -15,7 +15,7 @@ from discord import app_commands
 import observability as obs
 
 logger = logging.getLogger("GGE_Bot")
-BOT_VERSION = "GGE Assistant • Version 1.3.6"
+BOT_VERSION = "GGE Assistant • Version 1.3.7"
 
 # ========================================
 # ⚙️ GESTION DES CHEMINS & DOSSIER
@@ -69,8 +69,12 @@ async def get_server_config(interaction: discord.Interaction):
         path_users = CONFIG_DIR / "users.json"
         if path_users.exists():
             try:
-                with open(path_users, encoding="utf-8") as f:
-                    USERS_CONFIG_CACHE = json.load(f)
+
+                def _read_users():
+                    with open(path_users, encoding="utf-8") as f:
+                        return json.load(f)
+
+                USERS_CONFIG_CACHE = await asyncio.to_thread(_read_users)
             except Exception as e:
                 obs.record_error(source="utils", scope="load_users_config", exception=e, cog="utils")
                 USERS_CONFIG_CACHE = {}
@@ -88,8 +92,12 @@ async def get_server_config(interaction: discord.Interaction):
             path_guilds = CONFIG_DIR / "serveurs.json"
             if path_guilds.exists():
                 try:
-                    with open(path_guilds, encoding="utf-8") as f:
-                        GUILDS_CONFIG_CACHE = json.load(f)
+
+                    def _read_guilds():
+                        with open(path_guilds, encoding="utf-8") as f:
+                            return json.load(f)
+
+                    GUILDS_CONFIG_CACHE = await asyncio.to_thread(_read_guilds)
                 except Exception as e:
                     obs.record_error(source="utils", scope="load_guilds_config", exception=e, cog="utils")
                     GUILDS_CONFIG_CACHE = {}
@@ -281,8 +289,12 @@ async def prompt_vote_if_lucky(interaction: discord.Interaction, probability_per
 
     if VOTES_FILE.exists():
         try:
-            with open(VOTES_FILE, encoding="utf-8") as f:
-                votes_data = json.load(f)
+
+            def _read_votes():
+                with open(VOTES_FILE, encoding="utf-8") as f:
+                    return json.load(f)
+
+            votes_data = await asyncio.to_thread(_read_votes)
 
             if user_id_str in votes_data:
                 deadline = datetime.fromisoformat(votes_data[user_id_str])
@@ -475,6 +487,26 @@ async def get_cached_data(serveur="E4K_FR1"):
         CACHE[serveur]["last_refresh"] = time.time()
 
     return CACHE[serveur]
+
+
+# ========================================
+# RECUPERATION JOUEUR EN CACHE
+# ========================================
+
+
+async def find_player_in_cache(serveur: str, player_name: str):
+    """
+    Cherche un joueur (insensible à la casse) via le cache RAM ultra-rapide.
+    Retourne (vrai_nom, dict_infos) ou (nom_origine, None) si introuvable.
+    """
+    cache = await get_cached_data(serveur)
+    players_data = cache.get("players_data", {})
+
+    for p_name, p_info in players_data.items():
+        if p_name.lower() == player_name.lower():
+            return p_name, p_info
+
+    return player_name, None
 
 
 # ========================================
@@ -726,7 +758,7 @@ async def generer_rapport_alliance_embed(
     )
 
     embed = discord.Embed(
-        title=f"{DICT_EMOJIS.get('e_alliance_icon', '🛡️')} {alliance_name} - {event_name}",
+        title=f"{DICT_EMOJIS.get('e_alliance_icon', '🛡️')} {alliance_name} | {event_name}",
         color=clr_alliance,
         timestamp=discord.utils.utcnow(),
     )
@@ -1086,6 +1118,36 @@ def get_file_lock(filepath):
 
 
 # ==========================================
+# HELPERS JSON NON-BLOQUANTS
+# ==========================================
+
+
+def _json_read_sync(path):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _text_write_sync(path, payload: str):
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(payload)
+
+
+async def async_json_load(path):
+    """Lit un fichier JSON dans un thread pour ne pas bloquer l'event loop."""
+    return await asyncio.to_thread(_json_read_sync, path)
+
+
+async def async_json_dump(path, data, indent=4, ensure_ascii=False):
+    """Écrit un fichier JSON sans bloquer l'event loop.
+
+    La sérialisation est faite dans l'event loop (rapide, et évite qu'une autre coroutine
+    ne modifie `data` pendant l'itération), seule l'écriture disque part dans un thread.
+    """
+    payload = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii)
+    await asyncio.to_thread(_text_write_sync, path, payload)
+
+
+# ==========================================
 # LOAD / SAVE
 # ==========================================
 
@@ -1099,9 +1161,8 @@ async def load_blocks_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, encoding="utf-8") as f:
-                    BLOCKS_CACHE = json.load(f)
-                    return BLOCKS_CACHE
+                BLOCKS_CACHE = await async_json_load(path)
+                return BLOCKS_CACHE
             except Exception as e:
                 logger.error(f"❌ Fichier blocks.json corrompu ou illisible : {e}")
                 obs.record_error(source="utils", scope="load_blocks", exception=e, cog="utils")
@@ -1115,8 +1176,7 @@ async def save_blocks_async(data):
     BLOCKS_CACHE = data
     path = ADMINS_DIR / "blocks.json"
     async with get_file_lock(path):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
+        await async_json_dump(path, data, indent=4, ensure_ascii=False)
 
 
 async def load_configuration_async():
@@ -1124,8 +1184,7 @@ async def load_configuration_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, encoding="utf-8") as f:
-                    return json.load(f)
+                return await async_json_load(path)
             except Exception as e:
                 logger.error(f"❌ Erreur lecture servers_cache.json : {e}")
                 obs.record_error(source="utils", scope="load_configuration", exception=e, cog="utils")
@@ -1135,8 +1194,7 @@ async def load_configuration_async():
 async def save_configuration_async(data):
     path = CONFIG_DIR / "servers_cache.json"
     async with get_file_lock(path):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
+        await async_json_dump(path, data, indent=4, ensure_ascii=False)
 
 
 async def load_pseudos_async():
@@ -1144,8 +1202,7 @@ async def load_pseudos_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, encoding="utf-8") as f:
-                    return json.load(f)
+                return await async_json_load(path)
             except Exception as e:
                 logger.error(f"❌ Erreur discord_pseudos.json : {e}")
                 obs.record_error(source="utils", scope="load_pseudos", exception=e, cog="utils")
@@ -1155,8 +1212,7 @@ async def load_pseudos_async():
 async def save_pseudos_async(data):
     path = JOUEURS_DIR / "discord_pseudos.json"
     async with get_file_lock(path):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
+        await async_json_dump(path, data, indent=4, ensure_ascii=True)
 
 
 async def load_rivals_async():
@@ -1164,8 +1220,7 @@ async def load_rivals_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, encoding="utf-8") as f:
-                    return json.load(f)
+                return await async_json_load(path)
             except Exception as e:
                 logger.error(f"❌ Erreur rival_radar.json : {e}")
                 obs.record_error(source="utils", scope="load_rivals", exception=e, cog="utils")
@@ -1175,8 +1230,7 @@ async def load_rivals_async():
 async def save_rivals_async(data):
     path = JOUEURS_DIR / "rival_radar.json"
     async with get_file_lock(path):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
+        await async_json_dump(path, data, indent=4, ensure_ascii=True)
 
 
 async def load_dungeons_async():
@@ -1184,8 +1238,7 @@ async def load_dungeons_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, encoding="utf-8") as f:
-                    return json.load(f)
+                return await async_json_load(path)
             except Exception as e:
                 logger.error(f"❌ Erreur forteresses_sessions.json : {e}")
                 obs.record_error(source="utils", scope="load_dungeons", exception=e, cog="utils")
@@ -1195,8 +1248,7 @@ async def load_dungeons_async():
 async def save_dungeons_async(data):
     path = JOUEURS_DIR / "forteresses_sessions.json"
     async with get_file_lock(path):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
+        await async_json_dump(path, data, indent=4, ensure_ascii=True)
 
 
 def load_maintenance():
@@ -1216,8 +1268,7 @@ async def load_maintenance_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, encoding="utf-8") as f:
-                    return json.load(f).get("maintenance_mode", False)
+                return (await async_json_load(path)).get("maintenance_mode", False)
             except Exception as e:
                 logger.error(f"❌ Erreur maintenance.json : {e}")
                 obs.record_error(source="utils", scope="load_maintenance_async", exception=e, cog="utils")
@@ -1227,8 +1278,7 @@ async def load_maintenance_async():
 async def save_maintenance_async(etat):
     path = ADMINS_DIR / "maintenance.json"
     async with get_file_lock(path):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump({"maintenance_mode": etat}, f)
+        await async_json_dump(path, {"maintenance_mode": etat}, indent=None, ensure_ascii=True)
 
 
 async def load_surveillance_async():
@@ -1236,11 +1286,10 @@ async def load_surveillance_async():
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                with open(path, encoding="utf-8") as f:
-                    data = json.load(f)
-                    if "alliances" not in data:
-                        data["alliances"] = {}
-                    return data
+                data = await async_json_load(path)
+                if "alliances" not in data:
+                    data["alliances"] = {}
+                return data
             except Exception as e:
                 logger.error(f"❌ Erreur surveillance.json : {e}")
                 obs.record_error(source="utils", scope="load_surveillance", exception=e, cog="utils")
@@ -1250,5 +1299,4 @@ async def load_surveillance_async():
 async def save_surveillance_async(data):
     path = JOUEURS_DIR / "surveillance.json"
     async with get_file_lock(path):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
+        await async_json_dump(path, data, indent=4, ensure_ascii=True)

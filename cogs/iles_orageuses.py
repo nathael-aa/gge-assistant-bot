@@ -17,6 +17,7 @@ from utils import (
     SERVEURS_DIR,
     PaginationView,
     _get_api_timestamp,
+    find_player_in_cache,
     format_num,
     get_api_headers,
     get_cached_data,
@@ -37,15 +38,16 @@ STORM_CONFIG_PATH = SERVEURS_DIR / "storm_alerts.json"
 # 💾 GESTION DE LA SAUVEGARDE
 # ===========================================
 async def load_storm_config():
-    if not os.path.exists(STORM_CONFIG_PATH):
-        return {"guilds": {}, "notified": []}
-    try:
-        def _read():
+    def _read():
+        if not os.path.exists(STORM_CONFIG_PATH):
+            return {"guilds": {}, "notified": []}
+        try:
             with open(STORM_CONFIG_PATH, encoding="utf-8") as f:
                 return json.load(f)
-        return await asyncio.to_thread(_read)
-    except Exception:
-        return {"guilds": {}, "notified": []}
+        except Exception:
+            return {"guilds": {}, "notified": []}
+
+    return await asyncio.to_thread(_read)
 
 
 async def save_storm_config(data):
@@ -53,6 +55,7 @@ async def save_storm_config(data):
         os.makedirs(os.path.dirname(STORM_CONFIG_PATH), exist_ok=True)
         with open(STORM_CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
+
     await asyncio.to_thread(_write)
 
 
@@ -762,19 +765,16 @@ class IlesOrageusesCog(commands.Cog):
 
         player_id = None
         alliance_name = "Sans alliance"
-        cache = await get_cached_data(serveur)
-        local_data = cache.get("players_data", {})
 
-        for p_name, p_info in local_data.items():
-            if p_name.lower() == player.lower():
-                player_id = str(p_info.get("player_id", p_info.get("id", "")))
-                player = p_name
-                alli_raw = p_info.get("allianceName", p_info.get("alliance_id", "Sans alliance"))
-                if isinstance(alli_raw, dict):
-                    alli_raw = alli_raw.get("name", "Sans alliance")
-                if alli_raw and alli_raw not in ["", "None"]:
-                    alliance_name = alli_raw
-                break
+        p_name_exact, p_info = await find_player_in_cache(serveur, player)
+        if p_info:
+            player_id = str(p_info.get("player_id", p_info.get("id", "")))
+            player = p_name_exact
+            alli_raw = p_info.get("allianceName", p_info.get("alliance_id", "Sans alliance"))
+            if isinstance(alli_raw, dict):
+                alli_raw = alli_raw.get("name", "Sans alliance")
+            if alli_raw and alli_raw not in ["", "None"]:
+                alliance_name = alli_raw
 
         if not player_id:
             return await interaction.followup.send(
@@ -828,6 +828,8 @@ class IlesOrageusesCog(commands.Cog):
 
         if alliance_name.isdigit():
             target_aid = alliance_name
+            cache = await get_cached_data(serveur)
+            local_data = cache.get("players_data", {})
             for _, info in local_data.items():
                 curr_aid = str(info.get("allianceId", info.get("alliance_id", "")))
                 if curr_aid == target_aid:
@@ -1455,7 +1457,7 @@ class IlesOrageusesCog(commands.Cog):
                 # 🏝️ SCAN DES ÎLES
                 # ==========================================
                 isles_respawning = []
-                if gge_server in needs_isles:  # 👈 AJOUT DU IF
+                if gge_server in needs_isles:
                     params_respawning = {"size": 4000, "filterByState": 3}
                     try:
                         url_respawning = f"{self.api_base}storms/isles"

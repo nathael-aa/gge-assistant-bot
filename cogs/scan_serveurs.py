@@ -9,10 +9,11 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import aiohttp
+import discord
 from discord.ext import commands, tasks
 
 import observability as obs
-from utils import CONFIG_DIR, get_api_headers
+from utils import BASE_DATA_PATH, CONFIG_DIR, get_api_headers, load_configuration_async
 
 logger = logging.getLogger("GGE_Bot")
 
@@ -31,8 +32,8 @@ class ScanServeursCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.api_url = "https://api.gge-tracker.com/api/v1"
-        data_path = os.getenv("DATA_PATH", "/app/data")
-        self.base_output_dir = Path(data_path) / "server_scans"
+        data_path = os.getenv("DATA_PATH")
+        self.base_output_dir = Path(data_path) / "server_scans" if data_path else BASE_DATA_PATH / "server_scans"
         self.configuration_path = CONFIG_DIR / "servers_cache.json"
 
         self.webhook_url = os.getenv("WEBHOOK_SCAN")
@@ -44,38 +45,37 @@ class ScanServeursCog(commands.Cog):
         self.daily_scan.cancel()
 
     async def send_discord_alert(self, title, description, color=16711680):
-        """Envoie une notification sur Discord de manière asynchrone"""
+        """Envoie une notification sur Discord de manière asynchrone."""
         if not self.webhook_url or not self.webhook_url.startswith("http"):
             return
 
         payload = {
             "embeds": [
-                {"title": title, "description": description, "color": color, "timestamp": datetime.utcnow().isoformat()}
+                {
+                    "title": title,
+                    "description": description,
+                    "color": color,
+                    "timestamp": discord.utils.utcnow().isoformat(),
+                }
             ]
         }
         try:
             async with aiohttp.ClientSession() as session:
-                await session.post(self.webhook_url, json=payload)
+                await session.post(self.webhook_url, json=payload, timeout=aiohttp.ClientTimeout(total=10))
         except Exception as e:
             logger.error(f"❌ Impossible d'envoyer l'alerte Discord : {e}")
 
     async def get_active_servers(self):
-        """Récupère la liste des serveurs ACTIFS depuis le fichier de config unifié"""
+        """Récupère la liste des serveurs ACTIFS depuis le fichier de config unifié."""
         active_servers = set()
-        if self.configuration_path.exists():
-            try:
-                def _read_config():
-                    with open(self.configuration_path, encoding="utf-8") as f:
-                        return json.load(f)
-                config_data = await asyncio.to_thread(_read_config)
-
-                servers_info = config_data.get("servers_info", {})
-                for srv_name, data in servers_info.items():
-                    if isinstance(data, dict) and data.get("enabled") is True:
-                        active_servers.add(srv_name.upper())
-
-            except Exception as e:
-                logger.error(f"❌ Erreur lecture configuration.json : {e}")
+        try:
+            config_data = await load_configuration_async()
+            servers_info = config_data.get("servers_info", {})
+            for srv_name, data in servers_info.items():
+                if isinstance(data, dict) and data.get("enabled") is True:
+                    active_servers.add(srv_name.upper())
+        except Exception as e:
+            logger.error(f"❌ Erreur lecture servers_cache.json : {e}")
 
         if not active_servers:
             logger.warning("⚠️ Aucun serveur actif trouvé. Fallback sur E4K_FR1.")
@@ -126,7 +126,7 @@ class ScanServeursCog(commands.Cog):
         return None
 
     async def scan_server(self, session, server, index_actuel, total_serveurs):
-        """Scanne un serveur complet en utilisant les curseurs (Pagination Keyset)"""
+        """Scanne un serveur complet en utilisant les curseurs (Pagination Keyset)."""
         logger.info(f"🔍 DÉMARRAGE [{index_actuel}/{total_serveurs}] : {server}")
         start_time = asyncio.get_event_loop().time()
 
@@ -196,7 +196,8 @@ class ScanServeursCog(commands.Cog):
 
         duration = round(asyncio.get_event_loop().time() - start_time, 2)
         logger.info(
-            f"✅ FINI [{index_actuel}/{total_serveurs}] : {server} - {len(all_players)} joueurs récupérés en {duration}s ({pages_count} reqs)"
+            f"✅ FINI [{index_actuel}/{total_serveurs}] : {server} | "
+            f"{len(all_players)} joueurs récupérés en {duration}s ({pages_count} reqs)"
         )
 
         alliances_uniques = {p["alliance"] for p in all_players.values() if p.get("alliance") != "Sans alliance"}
@@ -219,7 +220,7 @@ class ScanServeursCog(commands.Cog):
         return all_players_sorted, duration
 
     def save_results(self, players_data, duration, serveur):
-        """Sauvegarde les résultats en JSON (Fonction bloquante isolée) et nettoie les anciens"""
+        """Sauvegarde les résultats en JSON (Fonction bloquante isolée) et nettoie les anciens."""
         today = datetime.now().strftime("%Y-%m-%d")
         server_dir = self.base_output_dir / serveur
         daily_dir = server_dir / today
@@ -289,13 +290,12 @@ class ScanServeursCog(commands.Cog):
         logger.info("======================================================")
 
         try:
-            async with aiohttp.ClientSession() as session:
-                result = await self.scan_server(session, server_name, 1, 1)
+            result = await self.scan_server(self.bot.session, server_name, 1, 1)
 
-                if result:
-                    players, duration = result
-                    await asyncio.to_thread(self.save_results, players, duration, server_name)
-                    return True
+            if result:
+                players, duration = result
+                await asyncio.to_thread(self.save_results, players, duration, server_name)
+                return True
             return False
         except Exception as e:
             logger.error(f"❌ Erreur lors du scan spécifique de {server_name} : {e}")
@@ -318,15 +318,14 @@ class ScanServeursCog(commands.Cog):
             servers_to_scan = await self.get_active_servers()
             total_serveurs = len(servers_to_scan)
 
-            async with aiohttp.ClientSession() as session:
-                for index_actuel, srv in enumerate(servers_to_scan, start=1):
-                    result = await self.scan_server(session, srv, index_actuel, total_serveurs)
+            for index_actuel, srv in enumerate(servers_to_scan, start=1):
+                result = await self.scan_server(self.bot.session, srv, index_actuel, total_serveurs)
 
-                    if result:
-                        players, duration = result
-                        await asyncio.to_thread(self.save_results, players, duration, srv)
+                if result:
+                    players, duration = result
+                    await asyncio.to_thread(self.save_results, players, duration, srv)
 
-                    await asyncio.sleep(1)
+                await asyncio.sleep(1)
 
             await self.send_discord_alert(
                 "✅ Multi-Scan Terminé",
@@ -346,7 +345,7 @@ class ScanServeursCog(commands.Cog):
 
     @daily_scan.before_loop
     async def before_daily_scan(self):
-        """Attend que le bot soit connecté avant de lancer les crons"""
+        """Attend que le bot soit connecté avant de lancer les crons."""
         await self.bot.wait_until_ready()
 
 

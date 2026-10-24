@@ -20,6 +20,8 @@ from utils import (
     LOCALES_DIR,
     MON_ID_DISCORD,
     SERVEURS_DIR,
+    async_json_dump,
+    async_json_load,
     charger_langues,
     load_blocks_async,
     save_blocks_async,
@@ -30,6 +32,11 @@ from utils import (
 logger = logging.getLogger("GGE_Bot")
 
 EMOJI_REGEX = re.compile(r"<(a?):([a-zA-Z0-9_]+):([0-9]+)>")
+
+
+def _read_bytes_sync(path):
+    with open(path, "rb") as f:
+        return f.read()
 
 
 class AdminCog(commands.Cog):
@@ -331,8 +338,7 @@ class AdminCog(commands.Cog):
             return await ctx.send(msg)
 
         try:
-            with open(file_path, "rb") as f:
-                log_data = f.read()
+            log_data = await asyncio.to_thread(_read_bytes_sync, file_path)
 
             fichier_virtuel = io.BytesIO(log_data)
             fichier_discord = discord.File(fp=fichier_virtuel, filename=f"GGE_Logs_{target_date}.txt")
@@ -466,6 +472,7 @@ class AdminCog(commands.Cog):
                 def _read_config():
                     with open(config_file, encoding="utf-8") as f:
                         return json.load(f)
+
                 config_data = await asyncio.to_thread(_read_config)
 
                 anciennes_infos = config_data.get("servers_info", {})
@@ -524,6 +531,7 @@ class AdminCog(commands.Cog):
                     def _write_config():
                         with open(config_file, "w", encoding="utf-8") as f:
                             json.dump(config_data, f, indent=4, ensure_ascii=False)
+
                     await asyncio.to_thread(_write_config)
 
                     msg = f"✅ **Synchronisation réussie !**\nLa base de données a été unifiée et mise à jour avec **{len(nouveau_servers_info)} serveurs**."
@@ -582,7 +590,6 @@ class AdminCog(commands.Cog):
     @commands.is_owner()
     async def broadcast_news(self, ctx: commands.Context):
         import asyncio
-        import json
 
         lien_support = "https://discord.com/invite/zrrhxp6wDj"
         path_users = CONFIG_DIR / "users.json"
@@ -590,12 +597,30 @@ class AdminCog(commands.Cog):
         if not path_users.exists():
             return await ctx.send("❌ Fichier users.json introuvable.")
 
-        with open(path_users, encoding="utf-8") as f:
-            users_data = json.load(f)
+        users_data = await async_json_load(path_users)
 
         total_users = len(users_data)
+
+        # AJOUT DE LA CONFIRMATION SEC-07
+        msg_confirm = await ctx.send(
+            f"⚠️ **ATTENTION** : Vous allez envoyer un message privé à **{total_users} utilisateurs**.\n"
+            f"Confirmez-vous cette action en cliquant sur ✅ ? (Le bot attendra 30 secondes)."
+        )
+
+        await msg_confirm.add_reaction("✅")
+
+        def check(reaction, user):
+            return user == ctx.author and str(reaction.emoji) == "✅" and reaction.message.id == msg_confirm.id
+
+        try:
+            await self.bot.wait_for("reaction_add", timeout=30.0, check=check)
+        except TimeoutError:
+            await msg_confirm.clear_reactions()
+            return await ctx.send("❌ Délai expiré. Broadcast annulé par sécurité.")
+
+        await msg_confirm.clear_reactions()
         await ctx.send(
-            f"⏳ Démarrage de l'envoi à {total_users} utilisateurs. Temps estimé : ~{total_users * 3} secondes. Regarde la console."
+            f"✅ Confirmation reçue. Démarrage de l'envoi à {total_users} utilisateurs. Temps estimé : ~{total_users * 3} secondes. Regarde la console."
         )
 
         succes = 0
@@ -682,15 +707,12 @@ class AdminCog(commands.Cog):
     async def cal_keys(self, ctx):
         """[CACHÉE] Liste toutes les clés valides pour ajouter/modifier un événement."""
 
-        import json
-
         mapping_file = CONFIG_DIR / "event_mapping.json"
 
         if not mapping_file.exists():
             return await ctx.send("❌ Fichier `event_mapping.json` introuvable.")
 
-        with open(mapping_file, encoding="utf-8") as f:
-            mapping = json.load(f)
+        mapping = await async_json_load(mapping_file)
 
         embed = discord.Embed(
             title="🔑 Clés d'Événements GGE",
@@ -715,10 +737,7 @@ class AdminCog(commands.Cog):
         if not cal_file.exists():
             return await ctx.send("❌ Fichier calendrier.json introuvable.")
 
-        import json
-
-        with open(cal_file, encoding="utf-8") as f:
-            data = json.load(f)
+        data = await async_json_load(cal_file)
 
         events = data.get("cached_events", [])
         if not events:
@@ -748,19 +767,15 @@ class AdminCog(commands.Cog):
         except ValueError:
             return await ctx.send('❌ Format de date invalide. Utilise : `"JJ/MM/AAAA HH:MM"`')
 
-        import json
-
         mapping_file = CONFIG_DIR / "event_mapping.json"
-        with open(mapping_file, encoding="utf-8") as f:
-            mapping = json.load(f)
+        mapping = await async_json_load(mapping_file)
 
         if event_key.lower() not in mapping:
             cles = ", ".join(f"`{k}`" for k in mapping.keys())
             return await ctx.send(f"❌ La clé `{event_key}` n'existe pas. Clés valides : {cles}")
 
         cal_file = SERVEURS_DIR / "calendrier.json"
-        with open(cal_file, encoding="utf-8") as f:
-            data = json.load(f)
+        data = await async_json_load(cal_file)
 
         uid = f"{event_key.lower()}_{int(dt_start.timestamp())}"
         new_id = hashlib.md5(uid.encode()).hexdigest()[:5]
@@ -769,8 +784,7 @@ class AdminCog(commands.Cog):
             {"id": new_id, "key": event_key.lower(), "start": dt_start.isoformat(), "end": dt_end.isoformat()}
         )
 
-        with open(cal_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        await async_json_dump(cal_file, data, indent=2, ensure_ascii=False)
 
         await ctx.send(f"✅ Événement `{event_key}` ajouté avec l'ID `{new_id}`.")
         await self._reload_calendar_cache(ctx)
@@ -786,10 +800,8 @@ class AdminCog(commands.Cog):
             return await ctx.send('❌ Format de date invalide. Utilise : `"JJ/MM/AAAA HH:MM"`')
 
         cal_file = SERVEURS_DIR / "calendrier.json"
-        import json
 
-        with open(cal_file, encoding="utf-8") as f:
-            data = json.load(f)
+        data = await async_json_load(cal_file)
 
         trouve = False
         for ev in data.get("cached_events", []):
@@ -802,8 +814,7 @@ class AdminCog(commands.Cog):
         if not trouve:
             return await ctx.send(f"❌ Aucun événement trouvé avec l'ID `{event_id}`.")
 
-        with open(cal_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        await async_json_dump(cal_file, data, indent=2, ensure_ascii=False)
 
         await ctx.send(f"✅ Événement `{event_id}` mis à jour :\n**Début:** {start}\n**Fin:** {end}")
         await self._reload_calendar_cache(ctx)
@@ -813,10 +824,8 @@ class AdminCog(commands.Cog):
         """[CACHÉE] Supprime un événement du calendrier. Ex: !cal_del 1a2b3"""
 
         cal_file = SERVEURS_DIR / "calendrier.json"
-        import json
 
-        with open(cal_file, encoding="utf-8") as f:
-            data = json.load(f)
+        data = await async_json_load(cal_file)
 
         events = data.get("cached_events", [])
         events_filtres = [ev for ev in events if ev.get("id") != event_id]
@@ -831,8 +840,7 @@ class AdminCog(commands.Cog):
         if event_id not in data["deleted_events"]:
             data["deleted_events"].append(event_id)
 
-        with open(cal_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        await async_json_dump(cal_file, data, indent=2, ensure_ascii=False)
 
         await ctx.send(
             f"🗑️ Événement `{event_id}` supprimé et ajouté à la **liste noire** (il sera ignoré par les futurs scans)."
@@ -849,12 +857,9 @@ class AdminCog(commands.Cog):
         if not re.match(r"^\d{2}:\d{2}$", heure):
             return await ctx.send("❌ L'heure doit être au format `HH:MM` (ex: 11:00).")
 
-        import json
-
         mapping_file = CONFIG_DIR / "event_mapping.json"
 
-        with open(mapping_file, encoding="utf-8") as f:
-            mapping = json.load(f)
+        mapping = await async_json_load(mapping_file)
 
         if event_key.lower() not in mapping:
             cles = ", ".join(f"`{k}`" for k in mapping.keys())
@@ -862,8 +867,7 @@ class AdminCog(commands.Cog):
 
         mapping[event_key.lower()][cible.lower()] = heure
 
-        with open(mapping_file, "w", encoding="utf-8") as f:
-            json.dump(mapping, f, indent=2, ensure_ascii=False)
+        await async_json_dump(mapping_file, mapping, indent=2, ensure_ascii=False)
 
         await ctx.send(f"⚙️ Mapping de `{event_key}` mis à jour : **{cible.lower()}** ➔ `{heure}`.")
         await self._reload_calendar_cache(ctx)
@@ -1014,14 +1018,12 @@ class AdminCog(commands.Cog):
                 continue
 
             try:
-                with open(chemin, encoding="utf-8") as f:
-                    data = json.load(f)
+                data = await async_json_load(chemin)
 
                 a_ete_modifie = purger_donnees(data)
 
                 if a_ete_modifie:
-                    with open(chemin, "w", encoding="utf-8") as f:
-                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    await async_json_dump(chemin, data, indent=2, ensure_ascii=False)
                     fichiers_purges.append(chemin.name)
             except Exception as e:
                 logger.error(f"❌ Erreur lors de la purge de {chemin.name} : {e}")
@@ -1152,19 +1154,22 @@ class AdminCog(commands.Cog):
     @commands.command(name="i18n_sync", aliases=["sortlang", "sort_locales"], hidden=True)
     async def i18n_sync(self, ctx):
         """[CACHÉE] !i18n_sync : Scanne, Trie et Synchronise les fichiers JSON avec sécurité."""
-        import json
         import re
 
         pattern = re.compile(r'\bt\s*\(\s*[^,]+,\s*["\']([a-zA-Z0-9_]+)["\']')
-        cles_utilisees = set()
 
-        for root, dirs, files in os.walk(BASE_DIR):
-            if ".git" in root or "__pycache__" in root:
-                continue
-            for file in files:
-                if file.endswith(".py"):
-                    with open(os.path.join(root, file), encoding="utf-8") as f:
-                        cles_utilisees.update(pattern.findall(f.read()))
+        def _scan_used_keys():
+            trouvees = set()
+            for root, dirs, files in os.walk(BASE_DIR):
+                if ".git" in root or "__pycache__" in root:
+                    continue
+                for file in files:
+                    if file.endswith(".py"):
+                        with open(os.path.join(root, file), encoding="utf-8") as f:
+                            trouvees.update(pattern.findall(f.read()))
+            return trouvees
+
+        cles_utilisees = await asyncio.to_thread(_scan_used_keys)
 
         for i in range(1, 13):
             cles_utilisees.add(f"month_{i:02d}")
@@ -1189,8 +1194,7 @@ class AdminCog(commands.Cog):
 
         locales_data = {}
         for fichier in LOCALES_DIR.glob("*.json"):
-            with open(fichier, encoding="utf-8") as f:
-                locales_data[fichier.stem] = json.load(f)
+            locales_data[fichier.stem] = await async_json_load(fichier)
 
         fr_data = locales_data.get("fr", {})
         cles_existantes_fr = set(fr_data.keys())
@@ -1251,8 +1255,7 @@ class AdminCog(commands.Cog):
 
         for lang, data in locales_data.items():
             fichier = LOCALES_DIR / f"{lang}.json"
-            with open(fichier, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
+            await async_json_dump(fichier, data, indent=4, ensure_ascii=False)
 
         charger_langues()
 
@@ -1278,7 +1281,6 @@ class AdminCog(commands.Cog):
     async def i18n_export(self, ctx, langue_cible: str = "en"):
         """[CACHÉE] !i18n_export [langue] : Génère un CSV pour les traducteurs communautaires."""
         import csv
-        import json
         import re
 
         fr_file = LOCALES_DIR / "fr.json"
@@ -1287,10 +1289,8 @@ class AdminCog(commands.Cog):
         if not fr_file.exists() or not cible_file.exists():
             return await ctx.send(f"❌ Impossible de trouver `fr.json` ou `{langue_cible}.json`.")
 
-        with open(fr_file, encoding="utf-8") as f:
-            fr_data = json.load(f)
-        with open(cible_file, encoding="utf-8") as f:
-            cible_data = json.load(f)
+        fr_data = await async_json_load(fr_file)
+        cible_data = await async_json_load(cible_file)
 
         output = io.StringIO()
         writer = csv.writer(output, delimiter=";")
@@ -1328,26 +1328,30 @@ class AdminCog(commands.Cog):
         """[CACHÉE] !emojis_list : Scan le code pour trouver tous les émojis utilisés."""
 
         msg_wait = await ctx.send("⏳ **Scan du code en cours...**")
-        emojis_found = {}
         exclude_dirs = [".git", "__pycache__", "venv", "logs", "data"]
 
-        for root, dirs, files in os.walk(BASE_DIR):
-            dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
-            for file in files:
-                if file.endswith((".py", ".json", ".sh")):
-                    filepath = os.path.join(root, file)
-                    try:
-                        with open(filepath, encoding="utf-8") as f:
-                            matches = EMOJI_REGEX.findall(f.read())
-                            for match in matches:
-                                animated, name, emoji_id = match
-                                full_emoji = f"<{animated}:{name}:{emoji_id}>"
-                                rel_path = os.path.relpath(filepath, BASE_DIR)
-                                if full_emoji not in emojis_found:
-                                    emojis_found[full_emoji] = set()
-                                emojis_found[full_emoji].add(rel_path)
-                    except Exception:
-                        pass
+        def _scan_emojis():
+            found = {}
+            for root, dirs, files in os.walk(BASE_DIR):
+                dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
+                for file in files:
+                    if file.endswith((".py", ".json", ".sh")):
+                        filepath = os.path.join(root, file)
+                        try:
+                            with open(filepath, encoding="utf-8") as f:
+                                matches = EMOJI_REGEX.findall(f.read())
+                                for match in matches:
+                                    animated, name, emoji_id = match
+                                    full_emoji = f"<{animated}:{name}:{emoji_id}>"
+                                    rel_path = os.path.relpath(filepath, BASE_DIR)
+                                    if full_emoji not in found:
+                                        found[full_emoji] = set()
+                                    found[full_emoji].add(rel_path)
+                        except Exception:
+                            pass
+            return found
+
+        emojis_found = await asyncio.to_thread(_scan_emojis)
 
         if not emojis_found:
             return await msg_wait.edit(
@@ -1380,25 +1384,29 @@ class AdminCog(commands.Cog):
         msg_wait = await ctx.send(f"⏳ **Remplacement strict en cours...**\nRecherche de `{old_text}` ➔ `{new_text}`")
 
         exclude_dirs = [".git", "__pycache__", "venv", "logs", "data"]
-        occurrences, fichiers_modifies = 0, []
 
-        for root, dirs, files in os.walk(BASE_DIR):
-            dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
-            for file in files:
-                if file.endswith((".py", ".json", ".sh")):
-                    filepath = os.path.join(root, file)
-                    try:
-                        with open(filepath, encoding="utf-8") as f:
-                            content = f.read()
-                        if old_text in content:
-                            count = content.count(old_text)
-                            new_content = content.replace(old_text, new_text)
-                            with open(filepath, "w", encoding="utf-8") as f:
-                                f.write(new_content)
-                            occurrences += count
-                            fichiers_modifies.append(os.path.relpath(filepath, BASE_DIR))
-                    except Exception:
-                        pass
+        def _replace_in_files():
+            total, modifies = 0, []
+            for root, dirs, files in os.walk(BASE_DIR):
+                dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
+                for file in files:
+                    if file.endswith((".py", ".json", ".sh")):
+                        filepath = os.path.join(root, file)
+                        try:
+                            with open(filepath, encoding="utf-8") as f:
+                                content = f.read()
+                            if old_text in content:
+                                count = content.count(old_text)
+                                new_content = content.replace(old_text, new_text)
+                                with open(filepath, "w", encoding="utf-8") as f:
+                                    f.write(new_content)
+                                total += count
+                                modifies.append(os.path.relpath(filepath, BASE_DIR))
+                        except Exception:
+                            pass
+            return total, modifies
+
+        occurrences, fichiers_modifies = await asyncio.to_thread(_replace_in_files)
 
         if occurrences == 0:
             return await msg_wait.edit(
@@ -1434,25 +1442,29 @@ class AdminCog(commands.Cog):
         except Exception as e:
             print(f"Impossible de récupérer les émojis d'application : {e}")
 
-        missing_emojis = {}
         exclude_dirs = [".git", "__pycache__", "venv", "logs", "data"]
 
-        for root, dirs, files in os.walk(BASE_DIR):
-            dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
-            for file in files:
-                if file.endswith((".py", ".json")):
-                    filepath = os.path.join(root, file)
-                    try:
-                        with open(filepath, encoding="utf-8") as f:
-                            matches = re.compile(r"<(a?):([a-zA-Z0-9_]+):(\d+)>").findall(f.read())
-                        for animated, name, emoji_id in matches:
-                            if emoji_id not in bot_emoji_ids:
-                                full_tag = f"<{animated}:{name}:{emoji_id}>"
-                                if full_tag not in missing_emojis:
-                                    missing_emojis[full_tag] = set()
-                                missing_emojis[full_tag].add(file)
-                    except Exception:
-                        pass
+        def _scan_missing_emojis():
+            missing = {}
+            for root, dirs, files in os.walk(BASE_DIR):
+                dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
+                for file in files:
+                    if file.endswith((".py", ".json")):
+                        filepath = os.path.join(root, file)
+                        try:
+                            with open(filepath, encoding="utf-8") as f:
+                                matches = re.compile(r"<(a?):([a-zA-Z0-9_]+):(\d+)>").findall(f.read())
+                            for animated, name, emoji_id in matches:
+                                if emoji_id not in bot_emoji_ids:
+                                    full_tag = f"<{animated}:{name}:{emoji_id}>"
+                                    if full_tag not in missing:
+                                        missing[full_tag] = set()
+                                    missing[full_tag].add(file)
+                        except Exception:
+                            pass
+            return missing
+
+        missing_emojis = await asyncio.to_thread(_scan_missing_emojis)
 
         if not missing_emojis:
             return await msg_wait.edit(
@@ -1498,7 +1510,6 @@ class AdminCog(commands.Cog):
     @commands.command(name="i18n_emojis", hidden=True)
     async def i18n_emojis(self, ctx):
         """[CACHÉE] !i18n_emojis : Vérifie et corrige les émojis dans les traductions."""
-        import json
         import re
 
         msg_wait = await ctx.send("⏳ **Analyse de la cohérence des émojis entre les langues...**")
@@ -1508,8 +1519,7 @@ class AdminCog(commands.Cog):
 
         locales_data = {}
         for fichier in LOCALES_DIR.glob("*.json"):
-            with open(fichier, encoding="utf-8") as f:
-                locales_data[fichier.stem] = json.load(f)
+            locales_data[fichier.stem] = await async_json_load(fichier)
 
         fr_data = locales_data.get("fr", {})
         if not fr_data:
@@ -1556,8 +1566,7 @@ class AdminCog(commands.Cog):
             # Sauvegarde du fichier si des modifications ont été faites
             if modifie:
                 fichier = LOCALES_DIR / f"{lang}.json"
-                with open(fichier, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
+                await async_json_dump(fichier, data, indent=4, ensure_ascii=False)
 
         # On recharge les langues en RAM pour appliquer les modifs
         charger_langues()
@@ -1571,7 +1580,7 @@ class AdminCog(commands.Cog):
             title="🔄 Synchronisation des Émojis (i18n)",
             description=(
                 f"✅ **Corrections automatiques :** `{corrections_auto}`\n"
-                f"*(Les émojis ont été remplacés car le nombre correspondait à la FR)*\n\n"
+                f"*(Les émojis haben été remplacés car le nombre correspondait à la FR)*\n\n"
                 f"⚠️ **Interventions manuelles requises :** `{erreurs_manuelles}`\n"
                 f"*(Le nombre d'émojis est différent de la version FR)*"
             ),
@@ -1594,26 +1603,30 @@ class AdminCog(commands.Cog):
 
         msg_wait = await ctx.send("🔍 **Recherche des émojis malformés en cours...**")
         regexes = [re.compile(p) for p in [r"<<a?:[a-zA-Z0-9_]+:\d+>", r">\d+>", r"<a?:[a-zA-Z0-9_]+:\d+>>"]]
-        erreurs_trouvees = {}
         exclude_dirs = [".git", "__pycache__", "venv", "logs", "data"]
 
-        for root, dirs, files in os.walk(BASE_DIR):
-            dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
-            for file in files:
-                if file.endswith((".py", ".json")):
-                    filepath = os.path.join(root, file)
-                    try:
-                        with open(filepath, encoding="utf-8") as f:
-                            lines = f.readlines()
-                        for i, line in enumerate(lines):
-                            for regex in regexes:
-                                matches = regex.findall(line)
-                                if matches:
-                                    if file not in erreurs_trouvees:
-                                        erreurs_trouvees[file] = []
-                                    erreurs_trouvees[file].append(f"Ligne {i + 1} : `{matches[0]}`")
-                    except Exception:
-                        pass
+        def _scan_bad_emojis():
+            trouvees = {}
+            for root, dirs, files in os.walk(BASE_DIR):
+                dirs[:] = [d for d in dirs if not any(excl in os.path.join(root, d) for excl in exclude_dirs)]
+                for file in files:
+                    if file.endswith((".py", ".json")):
+                        filepath = os.path.join(root, file)
+                        try:
+                            with open(filepath, encoding="utf-8") as f:
+                                lines = f.readlines()
+                            for i, line in enumerate(lines):
+                                for regex in regexes:
+                                    matches = regex.findall(line)
+                                    if matches:
+                                        if file not in trouvees:
+                                            trouvees[file] = []
+                                        trouvees[file].append(f"Ligne {i + 1} : `{matches[0]}`")
+                        except Exception:
+                            pass
+            return trouvees
+
+        erreurs_trouvees = await asyncio.to_thread(_scan_bad_emojis)
 
         if not erreurs_trouvees:
             return await msg_wait.edit(
@@ -1639,7 +1652,7 @@ class AdminCog(commands.Cog):
         await ctx.send("📥 Récupération des émojis d'application depuis le portail développeur...")
 
         dossier_destination = "assets/emojis"
-        os.makedirs(dossier_destination, exist_ok=True)
+        await asyncio.to_thread(os.makedirs, dossier_destination, exist_ok=True)
 
         try:
             # Récupère tous les émojis attachés à l'application du bot
@@ -1680,19 +1693,18 @@ class AdminCog(commands.Cog):
         vigi_file = ADMINS_DIR / "vigilance.json"
         cibles = []
         if vigi_file.exists():
-            with open(vigi_file, encoding="utf-8") as f:
-                try:
-                    cibles = json.load(f)
-                    if isinstance(cibles, dict):
-                        cibles = cibles.get("cibles", [])
-                except:
-                    cibles = []
+            try:
+                cibles = await async_json_load(vigi_file)
+                if isinstance(cibles, dict):
+                    cibles = cibles.get("cibles", [])
+            except Exception:
+                cibles = []
 
         cible_clean = cible.lower().strip()
         if cible_clean not in cibles:
             cibles.append(cible_clean)
-            with open(vigi_file, "w", encoding="utf-8") as f:
-                json.dump(cibles, f, indent=2)
+            await async_json_dump(vigi_file, cibles, indent=2, ensure_ascii=True)
+
             await ctx.send(
                 f"🕵️ **Surveillance activée.** Si quelqu'un utilise le bot avec `{cible}`, tu seras alerté en secret."
             )
@@ -1707,14 +1719,13 @@ class AdminCog(commands.Cog):
         if not vigi_file.exists():
             return await ctx.send("❌ Aucun fichier de vigilance.")
 
-        with open(vigi_file, encoding="utf-8") as f:
-            cibles = json.load(f)
+        cibles = await async_json_load(vigi_file)
 
         cible_clean = cible.lower().strip()
         if cible_clean in cibles:
             cibles.remove(cible_clean)
-            with open(vigi_file, "w", encoding="utf-8") as f:
-                json.dump(cibles, f, indent=2)
+            await async_json_dump(vigi_file, cibles, indent=2, ensure_ascii=True)
+
             await ctx.send(f"🗑️ `{cible}` a été retiré de la liste de vigilance.")
         else:
             await ctx.send(f"❌ `{cible}` n'était pas surveillé.")
@@ -1727,8 +1738,7 @@ class AdminCog(commands.Cog):
         if not vigi_file.exists():
             return await ctx.send("ℹ️ Liste vide.")
 
-        with open(vigi_file, encoding="utf-8") as f:
-            cibles = json.load(f)
+        cibles = await async_json_load(vigi_file)
 
         if not cibles:
             return await ctx.send("ℹ️ Liste vide.")
@@ -1747,8 +1757,6 @@ class AdminCog(commands.Cog):
         if interaction.type != discord.InteractionType.application_command:
             return
 
-        import json
-
         from utils import ADMINS_DIR
 
         webhook_url = os.getenv("WEBHOOK_VIGILANCE")
@@ -1761,8 +1769,7 @@ class AdminCog(commands.Cog):
             return
 
         try:
-            with open(vigi_file, encoding="utf-8") as f:
-                cibles = json.load(f)
+            cibles = await async_json_load(vigi_file)
         except Exception as e:
             obs.record_error(source="background", scope="vigilance_load", exception=e, cog="admin")
             return

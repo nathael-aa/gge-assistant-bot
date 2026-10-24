@@ -36,6 +36,22 @@ from utils import (
     t,
 )
 
+
+class RateLimitedSession(aiohttp.ClientSession):
+    """Wrapper global pour limiter la cadence des requêtes HTTP (Anti-Ban / SEC-04)."""
+
+    def __init__(self, limit=5, delay=0.3, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._semaphore = asyncio.Semaphore(limit)
+        self._delay = delay
+
+    async def _request(self, *args, **kwargs):
+        async with self._semaphore:
+            if self._delay > 0:
+                await asyncio.sleep(self._delay)
+            return await super()._request(*args, **kwargs)
+
+
 # =======================================
 # INITIALISATION DU BOT, OBS ET DES LOGS
 # =======================================
@@ -179,10 +195,10 @@ class GGEAssistantBot(commands.Bot):
         await obs.start(self)
 
         # =======================================
-        # CONNEXION IPV4
+        # CONNEXION IPV4 ET RATE-LIMIT GLOBALE
         # =======================================
         connecteur_ipv4 = aiohttp.TCPConnector(family=socket.AF_INET)
-        self.session = aiohttp.ClientSession(connector=connecteur_ipv4)
+        self.session = RateLimitedSession(limit=20, delay=0.05, connector=connecteur_ipv4)
 
         # =======================================
         # CHARGEMENT DES COGS
@@ -213,13 +229,6 @@ class GGEAssistantBot(commands.Bot):
                 logger.info(f"✅ Module {ext} chargé.")
             except Exception as e:
                 logger.error(f"❌ Erreur {ext} : {e}")
-
-        # =======================================
-        # SYNCHRONISATION COMMANDES DISCORD
-        # =======================================
-        # ⚠️ tree.sync() retiré du setup_hook (risque de ban Discord en cas de crash loop).
-        # Utiliser la commande admin !sync pour synchroniser manuellement.
-        logger.info("ℹ️ [Setup] tree.sync() désactivé au démarrage. Utilisez !sync pour synchroniser.")
 
         # =======================================
         # INITIALISATION DES TASKS
@@ -341,7 +350,8 @@ class GGEAssistantBot(commands.Bot):
             activity = discord.Activity(type=discord.ActivityType.watching, name="/setup ➔ /help")
             target_status = discord.Status.online
 
-        await self.change_presence(activity=activity, status=target_status)
+        if not self.is_closed():
+            await self.change_presence(activity=activity, status=target_status)
         logger.info(f"📡 Statut mis à jour : {activity.name} | Pastille : {target_status}")
 
     # ==========================================
@@ -462,7 +472,8 @@ class GGEAssistantBot(commands.Bot):
             if self.maintenance_mode:
                 statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
                 activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
-                await self.change_presence(activity=activity, status=discord.Status.dnd)
+                if not self.is_closed():
+                    await self.change_presence(activity=activity, status=discord.Status.dnd)
                 return
 
             nb_serveurs = len(self.guilds)
@@ -492,7 +503,8 @@ class GGEAssistantBot(commands.Bot):
             activity = statuts[self.status_index % len(statuts)]
             self.status_index += 1
 
-            await self.change_presence(activity=activity, status=discord.Status.online)
+            if not self.is_closed():
+                await self.change_presence(activity=activity, status=discord.Status.online)
         except Exception as e:
             obs.record_error(source="task", scope="status_task", exception=e, cog="core")
 
@@ -512,7 +524,6 @@ class GGEAssistantBot(commands.Bot):
             return web.Response(status=503, text="Webhook not configured")
 
         signature_header = request.headers.get("x-topgg-signature")
-        auth_header = request.headers.get("Authorization")
 
         try:
             raw_body = await request.text()
@@ -523,8 +534,8 @@ class GGEAssistantBot(commands.Bot):
         if signature_header:
             try:
                 parts = dict(part.split("=") for part in signature_header.split(","))
-                message = f"{parts.get('t')}.{raw_body}".encode()
-                expected_sig = hmac.HMAC(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
+                message = f"{parts.get('t')}.{raw_body}".encode("")
+                expected_sig = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
                 if not hmac.compare_digest(expected_sig, parts.get("v1")):
                     logger.warning("❌ [Webhook] Signature v1 invalide.")
                     obs.record_vote(accepted=False, reject_reason="bad_signature_v1", signature_version="v1")
@@ -534,14 +545,8 @@ class GGEAssistantBot(commands.Bot):
                 obs.record_vote(accepted=False, reject_reason="invalid_signature_format", signature_version="v1")
                 return web.Response(status=400, text="Erreur de calcul v1")
 
-        elif auth_header:
-            if auth_header != secret:
-                logger.warning("❌ [Webhook] Mot de passe v0 invalide.")
-                obs.record_vote(accepted=False, reject_reason="bad_password_v0", signature_version="v0")
-                return web.Response(status=401, text="Mauvais mot de passe v0")
-
         else:
-            logger.warning(f"❌ [Webhook] Requête refusée (ni v0, ni v1). Headers : {request.headers}")
+            logger.warning(f"❌ [Webhook] Requête refusée (absence de signature v1). Headers : {request.headers}")
             obs.record_vote(accepted=False, reject_reason="missing_auth", signature_version="none")
             return web.Response(status=401, text="Missing auth")
 

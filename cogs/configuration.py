@@ -1,14 +1,22 @@
 import asyncio
-import json
-import os
-from pathlib import Path
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 import observability as obs
-from utils import CONFIG_DIR, clear_config_cache, get_server_config, load_configuration_async, t
+from utils import (
+    BASE_DATA_PATH,
+    BASE_DIR,
+    CONFIG_DIR,
+    async_json_dump,
+    async_json_load,
+    clear_config_cache,
+    get_file_lock,
+    get_server_config,
+    load_configuration_async,
+    t,
+)
 
 
 # ===========================================
@@ -16,23 +24,19 @@ from utils import CONFIG_DIR, clear_config_cache, get_server_config, load_config
 # ===========================================
 async def load_users_config():
     path = CONFIG_DIR / "users.json"
-    if os.path.exists(path):
-        try:
-            def _read():
-                with open(path, encoding="utf-8") as f:
-                    return json.load(f)
-            return await asyncio.to_thread(_read)
-        except Exception:
-            pass
+    async with get_file_lock(path):
+        if path.exists():
+            try:
+                return await async_json_load(path)
+            except Exception:
+                pass
     return {}
 
 
 async def save_users_config(data):
     path = CONFIG_DIR / "users.json"
-    def _write():
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-    await asyncio.to_thread(_write)
+    async with get_file_lock(path):
+        await async_json_dump(path, data, indent=2, ensure_ascii=False)
 
 
 class ConfigurationCog(commands.Cog):
@@ -53,7 +57,7 @@ class ConfigurationCog(commands.Cog):
         choix_valides = []
         choix_invalides = []
 
-        # 🔄 Lecture depuis la nouvelle structure unifiée
+        # 🔄 Lecture depuis la structure unifiée
         config_data = await load_configuration_async()
         servers_info = config_data.get("servers_info", {})
 
@@ -72,11 +76,9 @@ class ConfigurationCog(commands.Cog):
                     full_name = f"🔴 {srv} ({lbl_ko})"[:100]
                     choix_invalides.append(app_commands.Choice(name=full_name, value=srv))
 
-        # On trie alphabétiquement pour que ce soit propre
         choix_valides.sort(key=lambda x: x.name)
         choix_invalides.sort(key=lambda x: x.name)
 
-        # Les serveurs valides apparaissent d'abord, puis les rouges (non supportés)
         choix = (choix_valides + choix_invalides)[:25]
 
         if not choix and current:
@@ -91,23 +93,34 @@ class ConfigurationCog(commands.Cog):
     # ==========================================
     def trigger_emergency_scan(self, serveur_upper: str) -> bool:
         """Déclenche un scan asynchrone si le dossier du serveur n'existe pas encore. Retourne True si déclenché."""
-        dossier_serveur = Path(f"/app/data/server_scans/{serveur_upper}")
+        dossier_serveur = BASE_DATA_PATH / "server_scans" / serveur_upper
         if dossier_serveur.exists():
             return False
 
         async def scan_urgence_background(srv):
-            flag = Path("/app/data/scan.flag")
-            flag.touch(exist_ok=True)
+            flag = BASE_DATA_PATH / "scan.flag"
+
+            def _create_flag():
+                flag.touch(exist_ok=True)
+
+            def _remove_flag():
+                if flag.exists():
+                    flag.unlink()
+
+            await asyncio.to_thread(_create_flag)
             try:
-                proc1 = await asyncio.create_subprocess_exec("python3", "scanners/server_scanner.py", srv, cwd="/app")
+                proc1 = await asyncio.create_subprocess_exec(
+                    "python3", "scanners/server_scanner.py", srv, cwd=str(BASE_DIR)
+                )
                 await proc1.wait()
-                proc2 = await asyncio.create_subprocess_exec("python3", "scanners/murs_scanner.py", srv, cwd="/app")
+                proc2 = await asyncio.create_subprocess_exec(
+                    "python3", "scanners/murs_scanner.py", srv, cwd=str(BASE_DIR)
+                )
                 await proc2.wait()
             except Exception as e:
                 print(f"❌ Erreur lors du scan d'urgence : {e}")
             finally:
-                if flag.exists():
-                    flag.unlink()
+                await asyncio.to_thread(_remove_flag)
 
         self.bot.loop.create_task(scan_urgence_background(serveur_upper))
         return True
@@ -131,7 +144,7 @@ class ConfigurationCog(commands.Cog):
 
         serveur_upper = server.upper()
 
-        # 🔄 Lecture depuis la nouvelle structure unifiée
+        # 🔄 Lecture depuis la structure unifiée
         config_data = await load_configuration_async()
         servers_info = config_data.get("servers_info", {})
         srv_data = servers_info.get(serveur_upper, {})
@@ -155,7 +168,7 @@ class ConfigurationCog(commands.Cog):
         await save_users_config(data)
         clear_config_cache()
 
-        # Record the profile change and refresh the user dimension
+        # Enregistrement de l'événement et mise à jour de la dimension utilisateur
         obs.record_guild_event(
             "setup",
             guild=interaction.guild,

@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 import traceback
 import urllib.parse
 from datetime import datetime
@@ -12,11 +11,11 @@ from discord.ext import commands, tasks
 
 import observability as obs
 from utils import (
-    BASE_DATA_PATH,
     CONFIG_DIR,
     DICT_EMOJIS,
     PaginationView,
     alliance_autocomplete,
+    find_player_in_cache,
     format_num,
     get_api_headers,
     get_server_config,
@@ -456,21 +455,13 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             msg_err = t(langue, "rad_err_srv_not_setup", defaut="❌ Utilisez d'abord `/radar server setup`.")
             return await interaction.followup.send(msg_err)
 
-        p_id, p_might = None, 0
-        try:
-            def _search_player_cache():
-                files = list((BASE_DATA_PATH / "server_scans" / serveur).rglob("server_*.json"))
-                if not files:
-                    return None, 0, player
-                latest = max(files, key=lambda p: p.stat().st_mtime)
-                with open(latest, encoding="utf-8") as f:
-                    for p_name, p_info in json.load(f).get("players", {}).items():
-                        if p_name.lower() == player.lower():
-                            return str(p_info.get("player_id", p_info.get("id", ""))), int(p_info.get("main_points", 0)), p_name
-                return None, 0, player
-            p_id, p_might, player = await asyncio.to_thread(_search_player_cache)
-        except Exception:
-            pass
+        p_name_exact, p_info = await find_player_in_cache(serveur, player)
+        if p_info:
+            p_id = str(p_info.get("player_id", p_info.get("id", "")))
+            p_might = int(p_info.get("main_points", 0))
+            player = p_name_exact
+        else:
+            p_id, p_might = None, 0
 
         e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
         e_nocheck = DICT_EMOJIS.get("e_nocheck", "❌")
@@ -531,9 +522,7 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             }
             await save_surveillance_async(data)
 
-            title_str = t(
-                langue, "rad_srv_add_p_title", p=player, defaut=f"{e_bullseye} Cible Serveur : {player}"
-            )
+            title_str = t(langue, "rad_srv_add_p_title", p=player, defaut=f"{e_bullseye} Cible Serveur : {player}")
             desc_str = t(
                 langue,
                 "rad_srv_add_p_desc",
@@ -547,7 +536,10 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             await interaction.followup.send(embed=embed, view=view)
         else:
             msg_already = t(
-                langue, "rad_err_srv_already_track", p=player, defaut=f"Le serveur surveille DÉJÀ **{player}** ! {e_wink}"
+                langue,
+                "rad_err_srv_already_track",
+                p=player,
+                defaut=f"Le serveur surveille DÉJÀ **{player}** ! {e_wink}",
             )
             await interaction.followup.send(msg_already)
 
@@ -811,14 +803,18 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
             if guild_id in info.get("guild_abonnes", {}):
                 prefs = info["guild_abonnes"][guild_id]
                 filtres_actifs = [k.capitalize() for k, v in prefs.items() if v and k != "raison"]
-                str_f = f"{e_check} {', '.join(filtres_actifs)}" if filtres_actifs else f"{e_nocheck} Aucun filtre actif"
+                str_f = (
+                    f"{e_check} {', '.join(filtres_actifs)}" if filtres_actifs else f"{e_nocheck} Aucun filtre actif"
+                )
                 mes_joueurs.append(f"{e_bullseye} **{info['name']}** ➔ *{prefs.get('raison', lbl_sr)}*\n└ {str_f}")
 
         for aid, info in data.get("alliances", {}).items():
             if guild_id in info.get("guild_abonnes", {}):
                 prefs = info["guild_abonnes"][guild_id]
                 filtres_actifs = [k.capitalize() for k, v in prefs.items() if v and k != "raison"]
-                str_f = f"{e_check} {', '.join(filtres_actifs)}" if filtres_actifs else f"{e_nocheck} Aucun filtre actif"
+                str_f = (
+                    f"{e_check} {', '.join(filtres_actifs)}" if filtres_actifs else f"{e_nocheck} Aucun filtre actif"
+                )
                 mes_alliances.append(f"{e_alli} **{info['name']}** ➔ *{prefs.get('raison', lbl_sr)}*\n└ {str_f}")
 
         if not mes_joueurs and not mes_alliances:
@@ -867,21 +863,13 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
 
         langue, serveur = await get_server_config(interaction)
 
-        p_id, p_might = None, 0
-        try:
-            def _search_player_cache_priv():
-                files = list((BASE_DATA_PATH / "server_scans" / serveur).rglob("server_*.json"))
-                if not files:
-                    return None, 0, player
-                latest = max(files, key=lambda p: p.stat().st_mtime)
-                with open(latest, encoding="utf-8") as f:
-                    for p_name, p_info in json.load(f).get("players", {}).items():
-                        if p_name.lower() == player.lower():
-                            return str(p_info.get("player_id", p_info.get("id", ""))), int(p_info.get("main_points", 0)), p_name
-                return None, 0, player
-            p_id, p_might, player = await asyncio.to_thread(_search_player_cache_priv)
-        except Exception:
-            pass
+        p_name_exact, p_info = await find_player_in_cache(serveur, player)
+        if p_info:
+            p_id = str(p_info.get("player_id", p_info.get("id", "")))
+            p_might = int(p_info.get("main_points", 0))
+            player = p_name_exact
+        else:
+            p_id, p_might = None, 0
 
         e_warning = DICT_EMOJIS.get("e_warning", "⚠️")
         e_nocheck = DICT_EMOJIS.get("e_nocheck", "❌")
@@ -1332,20 +1320,24 @@ class RadarCog(commands.GroupCog, group_name="radar", group_description="Persona
                 return
 
             path_users = CONFIG_DIR / "users.json"
-            if os.path.exists(path_users):
-                mtime = os.path.getmtime(path_users)
-                if mtime > self.users_cache_mtime:
-                    try:
-                        def _read_users_json():
-                            with open(path_users, encoding="utf-8") as f:
-                                return json.load(f)
-                        users_data = await asyncio.to_thread(_read_users_json)
-                        self.users_lang_cache = {uid: info.get("langue", "fr") for uid, info in users_data.items()}
-                        self.users_cache_mtime = mtime
-                    except Exception:
-                        pass
-            users_lang = self.users_lang_cache
 
+            def _check_and_read_users(cache_mtime):
+                if path_users.exists():
+                    current_mtime = path_users.stat().st_mtime
+                    if current_mtime > cache_mtime:
+                        with open(path_users, encoding="utf-8") as f:
+                            return current_mtime, json.load(f)
+                return None, None
+
+            try:
+                new_mtime, users_data = await asyncio.to_thread(_check_and_read_users, self.users_cache_mtime)
+                if users_data is not None:
+                    self.users_lang_cache = {uid: info.get("langue", "fr") for uid, info in users_data.items()}
+                    self.users_cache_mtime = new_mtime
+            except Exception as e:
+                logger.error(f"❌ [Radar Spy] Erreur lecture users.json : {e}")
+
+            users_lang = self.users_lang_cache
             changes_detected = False
             session = self.bot.session
 
