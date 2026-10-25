@@ -117,8 +117,12 @@ class WelcomeView(discord.ui.View):
             inline=False,
         )
         embed.add_field(
-            name=t(lang, "welcome_step3_title", defaut="{e_three} Calendar").format(**DICT_EMOJIS),
-            value=t(lang, "welcome_step3_desc", defaut="Use </calendar setup:0> to get alerts.").format(**DICT_EMOJIS),
+            name=t(lang, "welcome_step3_title", defaut="{e_three} Server Setup").format(**DICT_EMOJIS),
+            value=t(
+                lang,
+                "welcome_step3_desc",
+                defaut="Use </server-setup:0> to interactively configure all your server alerts, channels, and pings in one place (Admins only).",
+            ).format(**DICT_EMOJIS),
             inline=False,
         )
 
@@ -219,6 +223,7 @@ class GGEAssistantBot(commands.Bot):
             "cogs.grand_tournoi",
             "cogs.iles_orageuses",
             "cogs.joueurs",
+            "cogs.offres",
             "cogs.radar",
             "cogs.roue_richesses",
             "cogs.scan_serveurs",
@@ -367,7 +372,21 @@ class GGEAssistantBot(commands.Bot):
 
         webhook_servers = os.getenv("WEBHOOK_JOIN")
         if webhook_servers and webhook_servers.startswith("http"):
-            proprio = guild.owner.name if guild.owner else "Inconnu"
+            # --- CORRECTION ICI ---
+            if guild.owner:
+                proprio = guild.owner.name
+            elif guild.owner_id:
+                try:
+                    # Si le cache est vide, on force la récupération via l'API Discord
+                    # (Note: Utilise self.bot.fetch_user si ce code est dans un Cog)
+                    owner_user = await self.fetch_user(guild.owner_id)
+                    proprio = owner_user.name
+                except Exception:
+                    proprio = f"ID: {guild.owner_id}"
+            else:
+                proprio = "Inconnu"
+            # ----------------------
+
             embed = discord.Embed(
                 title="🎉 Nouveau Serveur Rejoint !",
                 description=f"**Nom :** `{guild.name}`\n**ID :** `{guild.id}`\n**Membres :** `{guild.member_count}`\n**Propriétaire :** `{proprio}`",
