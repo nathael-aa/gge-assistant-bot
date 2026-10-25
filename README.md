@@ -50,46 +50,47 @@
 │   ├── github_bannieres
 │   └── profile_pictures
 ├── cogs
-│   ├── admin
-│   │   ├── __init__.py
-│   │   ├── calendar.py
-│   │   ├── i18n.py
-│   │   ├── moderation.py
-│   │   └── system.py
-│   ├── radar
-│   │   ├── __init__.py
-│   │   ├── spy.py
-│   │   └── views.py
-│   ├── aide.py
-│   ├── alliances.py
-│   ├── calendrier.py
-│   ├── cible.py
-│   ├── classement.py
-│   ├── configuration.py
-│   ├── evenements.py
-│   ├── faille.py
-│   ├── forteresses.py
-│   ├── gge_hub_community.py
-│   ├── grand_tournoi.py
-│   ├── iles_orageuses.py
-│   ├── joueurs.py
-│   ├── roue_richesses.py
-│   └── scan_serveurs.py
+│   ├── admin
+│   │   ├── __init__.py
+│   │   ├── calendar.py
+│   │   ├── i18n.py
+│   │   ├── moderation.py
+│   │   └── system.py
+│   ├── radar
+│   │   ├── __init__.py
+│   │   ├── spy.py
+│   │   └── views.py
+│   ├── aide.py
+│   ├── alliances.py
+│   ├── calendrier.py
+│   ├── cible.py
+│   ├── classement.py
+│   ├── configuration.py
+│   ├── evenements.py
+│   ├── faille.py
+│   ├── forteresses.py
+│   ├── gge_hub_community.py
+│   ├── grand_tournoi.py
+│   ├── iles_orageuses.py
+│   ├── joueurs.py
+│   ├── offres.py
+│   ├── roue_richesses.py
+│   └── scan_serveurs.py
 ├── database
-│   └── schema.sql
+│   └── schema.sql
 ├── locales
-│   ├── de.json
-│   ├── en.json
-│   └── fr.json
+│   ├── de.json
+│   ├── en.json
+│   └── fr.json
 ├── observability
-│   ├── __init__.py
-│   ├── client.py
-│   ├── config.py
-│   ├── context.py
-│   ├── handler.py
-│   ├── http_tracing.py
-│   ├── recorders.py
-│   └── runtime.py
+│   ├── __init__.py
+│   ├── client.py
+│   ├── config.py
+│   ├── context.py
+│   ├── handler.py
+│   ├── http_tracing.py
+│   ├── recorders.py
+│   └── runtime.py
 ├── Dockerfile
 ├── LICENSE
 ├── README.md
@@ -101,7 +102,7 @@
 ├── ruff.toml
 └── utils.py
 
-11 directories, 55 files
+11 directories, 46 files
 ```
 <!-- TREE-END -->
 *(This section is auto-updated via GitHub Actions)*
