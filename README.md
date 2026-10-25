@@ -45,6 +45,10 @@
 <!-- TREE-START -->
 ```text
 .
+├── assets
+│   ├── emojis
+│   ├── github_bannieres
+│   └── profile_pictures
 ├── cogs
 │   ├── admin
 │   │   ├── __init__.py
@@ -96,6 +100,8 @@
 ├── requirements.txt
 ├── ruff.toml
 └── utils.py
+
+11 directories, 55 files
 ```
 <!-- TREE-END -->
 *(This section is auto-updated via GitHub Actions)*
