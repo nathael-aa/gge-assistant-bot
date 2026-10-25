@@ -1266,7 +1266,11 @@ class AideCog(commands.Cog):
     @app_commands.command(name="support", description="Get the invite link to the official support server")
     @app_commands.checks.cooldown(1, 1.0, key=lambda i: i.user.id)
     async def support(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception as e:
+            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            return
         langue, _ = await get_server_config(interaction)
 
         embed = discord.Embed(

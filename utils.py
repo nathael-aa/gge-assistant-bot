@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import random
+import re
 import time
 import urllib.parse
 from datetime import datetime, timedelta
@@ -41,18 +42,34 @@ MON_ID_DISCORD = int(os.getenv("MON_ID_DISCORD", 0))
 TOKEN = os.getenv("DISCORD_TOKEN")
 TOPGG_TOKEN = os.getenv("TOPGG_TOKEN")
 
-CACHE = {}
+
+# ========================================
+# 📦 CACHE MANAGER (BPA-06)
+# ========================================
+
+
+class CacheManager:
+    """Gestionnaire centralisé pour remplacer les variables globales mutables."""
+
+    def __init__(self):
+        self.server_data = {}
+        self.users_config = None
+        self.guilds_config = None
+        self.blocks = None
+        self.file_locks = {}
+        self.translations = {}
+
+    def clear_configs(self):
+        self.users_config = None
+        self.guilds_config = None
+
+
+cache_mngr = CacheManager()
 
 
 def clear_config_cache():
-    global USERS_CONFIG_CACHE, GUILDS_CONFIG_CACHE
-    USERS_CONFIG_CACHE = None
-    GUILDS_CONFIG_CACHE = None
+    cache_mngr.clear_configs()
 
-
-USERS_CONFIG_CACHE = None
-GUILDS_CONFIG_CACHE = None
-BLOCKS_CACHE = None
 
 # ========================================
 # CONFIGURATION UTILISATEUR
@@ -60,12 +77,10 @@ BLOCKS_CACHE = None
 
 
 async def get_server_config(interaction: discord.Interaction):
-    global USERS_CONFIG_CACHE, GUILDS_CONFIG_CACHE
-
     default_lang = "fr"
     default_server = "E4K_FR1"
 
-    if USERS_CONFIG_CACHE is None:
+    if cache_mngr.users_config is None:
         path_users = CONFIG_DIR / "users.json"
         if path_users.exists():
             try:
@@ -74,21 +89,21 @@ async def get_server_config(interaction: discord.Interaction):
                     with open(path_users, encoding="utf-8") as f:
                         return json.load(f)
 
-                USERS_CONFIG_CACHE = await asyncio.to_thread(_read_users)
+                cache_mngr.users_config = await asyncio.to_thread(_read_users)
             except Exception as e:
                 obs.record_error(source="utils", scope="load_users_config", exception=e, cog="utils")
-                USERS_CONFIG_CACHE = {}
+                cache_mngr.users_config = {}
         else:
-            USERS_CONFIG_CACHE = {}
+            cache_mngr.users_config = {}
 
     user_id = str(interaction.user.id)
-    if user_id in USERS_CONFIG_CACHE:
-        u_lang = USERS_CONFIG_CACHE[user_id].get("langue", default_lang)
-        u_srv = USERS_CONFIG_CACHE[user_id].get("gge_server", default_server)
+    if user_id in cache_mngr.users_config:
+        u_lang = cache_mngr.users_config[user_id].get("langue", default_lang)
+        u_srv = cache_mngr.users_config[user_id].get("gge_server", default_server)
         return u_lang, u_srv
 
     if interaction.guild:
-        if GUILDS_CONFIG_CACHE is None:
+        if cache_mngr.guilds_config is None:
             path_guilds = CONFIG_DIR / "serveurs.json"
             if path_guilds.exists():
                 try:
@@ -97,17 +112,17 @@ async def get_server_config(interaction: discord.Interaction):
                         with open(path_guilds, encoding="utf-8") as f:
                             return json.load(f)
 
-                    GUILDS_CONFIG_CACHE = await asyncio.to_thread(_read_guilds)
+                    cache_mngr.guilds_config = await asyncio.to_thread(_read_guilds)
                 except Exception as e:
                     obs.record_error(source="utils", scope="load_guilds_config", exception=e, cog="utils")
-                    GUILDS_CONFIG_CACHE = {}
+                    cache_mngr.guilds_config = {}
             else:
-                GUILDS_CONFIG_CACHE = {}
+                cache_mngr.guilds_config = {}
 
         guild_id = str(interaction.guild.id)
-        if guild_id in GUILDS_CONFIG_CACHE:
-            g_lang = GUILDS_CONFIG_CACHE[guild_id].get("langue", default_lang)
-            g_srv = GUILDS_CONFIG_CACHE[guild_id].get("gge_server", default_server)
+        if guild_id in cache_mngr.guilds_config:
+            g_lang = cache_mngr.guilds_config[guild_id].get("langue", default_lang)
+            g_srv = cache_mngr.guilds_config[guild_id].get("gge_server", default_server)
             return g_lang, g_srv
 
     return default_lang, default_server
@@ -149,16 +164,9 @@ except ImportError as e:
     obs.record_error(source="utils", scope="import_emojis", exception=e, cog="utils")
     DICT_EMOJIS = {}
 
-_translations = {}
-
-
-class SafeDict(dict):
-    def __missing__(self, key):
-        return f"{{{key}}}"
-
 
 def charger_langues():
-    _translations.clear()
+    cache_mngr.translations.clear()
     if not LOCALES_DIR.exists():
         logger.warning(f"⚠️ Le dossier des langues n'existe pas : {LOCALES_DIR}")
         return
@@ -167,21 +175,29 @@ def charger_langues():
         langue = fichier.stem
         try:
             with open(fichier, encoding="utf-8") as f:
-                _translations[langue] = json.load(f)
-            logger.info(f"📚 Langue chargée : {langue.upper()} ({len(_translations[langue])} clés)")
+                cache_mngr.translations[langue] = json.load(f)
+            logger.info(f"📚 Langue chargée : {langue.upper()} ({len(cache_mngr.translations[langue])} clés)")
         except Exception as e:
             logger.error(f"❌ Erreur lors du chargement de {fichier.name} : {e}")
             obs.record_error(source="utils", scope="load_locales", exception=e, cog="utils")
 
 
 def t(langue: str, cle: str, defaut: str = None, **kwargs) -> str:
-    dico = _translations.get(langue, _translations.get("fr", {}))
-    texte = dico.get(cle, defaut if defaut else f"[{cle}_MANQUANT]")
+    dico_lang = cache_mngr.translations.get(langue, {})
+    dico_en = cache_mngr.translations.get("en", {})
+    dico_fr = cache_mngr.translations.get("fr", {})
+
+    texte = dico_lang.get(cle)
+    if texte is None:
+        texte = dico_en.get(cle)
+    if texte is None:
+        texte = dico_fr.get(cle)
+    if texte is None:
+        texte = defaut if defaut is not None else f"[{cle}_MANQUANT]"
 
     variables_fusionnees = {**DICT_EMOJIS, **kwargs}
-
     if variables_fusionnees:
-        return texte.format_map(SafeDict(**variables_fusionnees))
+        texte = re.sub(r"\{(\w+)\}", lambda m: str(variables_fusionnees.get(m.group(1), m.group(0))), str(texte))
 
     return texte
 
@@ -213,7 +229,6 @@ class PaginationView(discord.ui.View):
         self.update_buttons()
 
     async def on_timeout(self):
-        """Grise tous les boutons de la vue à l'expiration du timeout."""
         for child in self.children:
             child.disabled = True
 
@@ -245,8 +260,6 @@ class PaginationView(discord.ui.View):
 
 
 class RefreshOnlyView(discord.ui.View):
-    """Une vue avec uniquement un bouton Refresh qui se désactive aussi après un timeout."""
-
     def __init__(self, callback_func, langue="fr", timeout=3600):
         super().__init__(timeout=timeout)
         self.message = None
@@ -261,7 +274,6 @@ class RefreshOnlyView(discord.ui.View):
         self.add_item(self.refresh_btn)
 
     async def cb_refresh(self, interaction: discord.Interaction):
-
         if not self.message:
             self.message = interaction.message
         await self.callback_func(interaction)
@@ -284,7 +296,6 @@ VOTES_FILE = JOUEURS_DIR / "votes.json"
 
 
 async def prompt_vote_if_lucky(interaction: discord.Interaction, probability_percent: int, langue: str = "fr"):
-    """Vérifie si le joueur est protégé par les 7 jours. Sinon, lance le dé."""
     user_id_str = str(interaction.user.id)
 
     if VOTES_FILE.exists():
@@ -343,10 +354,6 @@ async def prompt_vote_if_lucky(interaction: discord.Interaction, probability_per
 
 
 def _get_api_timestamp(*sources):
-    """
-    Explore de manière récursive et profonde les structures de données renvoyées par l'API.
-    Traque TOUTES les dates trouvées pour s'assurer d'extraire la plus récente.
-    """
     dates_trouvees = []
 
     def search_ts(obj):
@@ -428,16 +435,19 @@ def get_discord_timestamp(iso_str, style="R", langue="fr"):
 
 
 async def get_cached_data(serveur="E4K_FR1"):
-    global CACHE
-
-    # 🚨 SÉCURITÉ ANTI-OOM : On ne garde qu'un seul gros serveur en RAM à la fois
-    if len(CACHE) >= 1 and serveur not in CACHE:
+    if len(cache_mngr.server_data) >= 1 and serveur not in cache_mngr.server_data:
         logger.info(f"🧹 [Anti-OOM] Vidage du cache mémoire complet pour charger {serveur}.")
-        CACHE.clear()
+        cache_mngr.server_data.clear()
         gc.collect()
 
-    if serveur not in CACHE:
-        CACHE[serveur] = {"players": [], "players_data": {}, "alliances": [], "alliance_members": {}, "last_refresh": 0}
+    if serveur not in cache_mngr.server_data:
+        cache_mngr.server_data[serveur] = {
+            "players": [],
+            "players_data": {},
+            "alliances": [],
+            "alliance_members": {},
+            "last_refresh": 0,
+        }
 
     def _lecture_lourde():
         dossier_serveur = BASE_DATA_PATH / "server_scans" / serveur
@@ -465,10 +475,10 @@ async def get_cached_data(serveur="E4K_FR1"):
             obs.record_error(source="utils", scope="cache_load", exception=e, cog="utils")
             return {}
 
-    if time.time() - CACHE[serveur]["last_refresh"] > 300:
+    if time.time() - cache_mngr.server_data[serveur]["last_refresh"] > 300:
         players_data = await asyncio.to_thread(_lecture_lourde)
-        CACHE[serveur]["players_data"] = players_data
-        CACHE[serveur]["players"] = list(players_data.keys())
+        cache_mngr.server_data[serveur]["players_data"] = players_data
+        cache_mngr.server_data[serveur]["players"] = list(players_data.keys())
 
         alliances_set = set()
         alliance_members = {}
@@ -482,23 +492,14 @@ async def get_cached_data(serveur="E4K_FR1"):
                     alliance_members[a_name] = []
                 alliance_members[a_name].append(p_name)
 
-        CACHE[serveur]["alliances"] = list(alliances_set)
-        CACHE[serveur]["alliance_members"] = alliance_members
-        CACHE[serveur]["last_refresh"] = time.time()
+        cache_mngr.server_data[serveur]["alliances"] = list(alliances_set)
+        cache_mngr.server_data[serveur]["alliance_members"] = alliance_members
+        cache_mngr.server_data[serveur]["last_refresh"] = time.time()
 
-    return CACHE[serveur]
-
-
-# ========================================
-# RECUPERATION JOUEUR EN CACHE
-# ========================================
+    return cache_mngr.server_data[serveur]
 
 
 async def find_player_in_cache(serveur: str, player_name: str):
-    """
-    Cherche un joueur (insensible à la casse) via le cache RAM ultra-rapide.
-    Retourne (vrai_nom, dict_infos) ou (nom_origine, None) si introuvable.
-    """
     cache = await get_cached_data(serveur)
     players_data = cache.get("players_data", {})
 
@@ -515,8 +516,6 @@ async def find_player_in_cache(serveur: str, player_name: str):
 
 
 async def get_autocomplete_list(serveur: str, type_liste: str):
-    """Charge uniquement la liste demandée ('players' ou 'alliances') depuis le cache le plus récent."""
-
     def _lecture_index():
         try:
             dossier_serveur = BASE_DATA_PATH / "server_scans" / serveur
@@ -1107,14 +1106,12 @@ async def setup_embed_footer(
 # FILELOCK
 # ==========================================
 
-FILE_LOCKS = {}
-
 
 def get_file_lock(filepath):
     path_key = str(Path(filepath).resolve())
-    if path_key not in FILE_LOCKS:
-        FILE_LOCKS[path_key] = asyncio.Lock()
-    return FILE_LOCKS[path_key]
+    if path_key not in cache_mngr.file_locks:
+        cache_mngr.file_locks[path_key] = asyncio.Lock()
+    return cache_mngr.file_locks[path_key]
 
 
 # ==========================================
@@ -1133,16 +1130,10 @@ def _text_write_sync(path, payload: str):
 
 
 async def async_json_load(path):
-    """Lit un fichier JSON dans un thread pour ne pas bloquer l'event loop."""
     return await asyncio.to_thread(_json_read_sync, path)
 
 
 async def async_json_dump(path, data, indent=4, ensure_ascii=False):
-    """Écrit un fichier JSON sans bloquer l'event loop.
-
-    La sérialisation est faite dans l'event loop (rapide, et évite qu'une autre coroutine
-    ne modifie `data` pendant l'itération), seule l'écriture disque part dans un thread.
-    """
     payload = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii)
     await asyncio.to_thread(_text_write_sync, path, payload)
 
@@ -1153,27 +1144,25 @@ async def async_json_dump(path, data, indent=4, ensure_ascii=False):
 
 
 async def load_blocks_async():
-    global BLOCKS_CACHE
-    if BLOCKS_CACHE is not None:
-        return BLOCKS_CACHE
+    if cache_mngr.blocks is not None:
+        return cache_mngr.blocks
 
     path = ADMINS_DIR / "blocks.json"
     async with get_file_lock(path):
         if os.path.exists(path):
             try:
-                BLOCKS_CACHE = await async_json_load(path)
-                return BLOCKS_CACHE
+                cache_mngr.blocks = await async_json_load(path)
+                return cache_mngr.blocks
             except Exception as e:
                 logger.error(f"❌ Fichier blocks.json corrompu ou illisible : {e}")
                 obs.record_error(source="utils", scope="load_blocks", exception=e, cog="utils")
 
-    BLOCKS_CACHE = {"global_commands": {}, "blocked_users": {}}
-    return BLOCKS_CACHE
+    cache_mngr.blocks = {"global_commands": {}, "blocked_users": {}}
+    return cache_mngr.blocks
 
 
 async def save_blocks_async(data):
-    global BLOCKS_CACHE
-    BLOCKS_CACHE = data
+    cache_mngr.blocks = data
     path = ADMINS_DIR / "blocks.json"
     async with get_file_lock(path):
         await async_json_dump(path, data, indent=4, ensure_ascii=False)

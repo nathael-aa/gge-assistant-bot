@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import discord
 from discord import app_commands
@@ -17,6 +18,8 @@ from utils import (
     load_configuration_async,
     t,
 )
+
+logger = logging.getLogger("GGE_Bot")
 
 
 # ===========================================
@@ -140,7 +143,11 @@ class ConfigurationCog(commands.Cog):
     @app_commands.autocomplete(server=server_autocomplete)
     async def c_setup(self, interaction: discord.Interaction, language: app_commands.Choice[str], server: str):
 
-        await interaction.response.defer(ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception as e:
+            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            return
 
         serveur_upper = server.upper()
 

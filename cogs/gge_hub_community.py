@@ -231,7 +231,11 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
     async def hub_setup(
         self, interaction: discord.Interaction, categorie: str, channel: discord.TextChannel, role: discord.Role = None
     ):
-        await interaction.response.defer(ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception as e:
+            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            return
         langue, serveur = await get_server_config(interaction)
 
         bot_permissions = channel.permissions_for(interaction.guild.me)
@@ -367,7 +371,11 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
     async def hub_stop(self, interaction: discord.Interaction, categorie: str):
-        await interaction.response.defer(ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception as e:
+            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            return
         langue, serveur = await get_server_config(interaction)
 
         data = await load_hub_config()

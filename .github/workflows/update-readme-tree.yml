@@ -21,8 +21,9 @@ jobs:
       - name: Generate tree and update README
         run: |
           sudo apt-get install -y tree
-          echo '```bash' > tree_tmp.txt
-          tree -L 3 -I '.git|.github|node_modules|dist|__pycache__|.env|tmp|logs|tree_tmp.txt|emojis|github_bannieres|profile_pictures' >> tree_tmp.txt
+          echo '```text' > tree_tmp.txt
+          # Profondeur 4, dossiers en premier, nettoyage des ignorés
+          tree -L 4 --dirsfirst -I '.git|.github|__pycache__|.env|logs|data|tmp|tree_tmp.txt' >> tree_tmp.txt
           echo '```' >> tree_tmp.txt
           sed -i '/<!-- TREE-START -->/,/<!-- TREE-END -->/!b;//!d;/<!-- TREE-START -->/r tree_tmp.txt' README.md
           rm tree_tmp.txt

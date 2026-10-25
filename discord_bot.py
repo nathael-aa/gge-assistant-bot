@@ -21,13 +21,13 @@ import observability as obs
 from emojis import sync_and_load_emojis
 from utils import (
     BOT_VERSION,
-    CACHE,
     CONFIG_DIR,
     DICT_EMOJIS,
     JOUEURS_DIR,
     MON_ID_DISCORD,
     TOKEN,
     TOPGG_TOKEN,
+    cache_mngr,
     charger_langues,
     get_api_headers,
     get_server_config,
@@ -454,8 +454,8 @@ class GGEAssistantBot(commands.Bot):
                     )
                     self.scan_flag_detected = False
                     try:
-                        for srv in CACHE:
-                            CACHE[srv]["last_refresh"] = 0
+                        for srv in cache_mngr.server_data:
+                            cache_mngr.server_data[srv]["last_refresh"] = 0
                         logger.info("✅ [Watcher] Le cache mémoire sera réactualisé à la prochaine commande.")
                     except Exception as e:
                         logger.error(f"❌ [Watcher] Échec : {e}")
@@ -534,7 +534,7 @@ class GGEAssistantBot(commands.Bot):
         if signature_header:
             try:
                 parts = dict(part.split("=") for part in signature_header.split(","))
-                message = f"{parts.get('t')}.{raw_body}".encode("")
+                message = f"{parts.get('t')}.{raw_body}".encode()
                 expected_sig = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
                 if not hmac.compare_digest(expected_sig, parts.get("v1")):
                     logger.warning("❌ [Webhook] Signature v1 invalide.")
@@ -629,11 +629,14 @@ class GGEAssistantBot(commands.Bot):
         try:
             user = self.get_user(int(user_id)) or await self.fetch_user(int(user_id))
             if user:
-                from utils import USERS_CONFIG_CACHE
+                from utils import cache_mngr
 
                 langue = "en"
 
-                user_data = USERS_CONFIG_CACHE.get(str(user_id))
+                user_data = None
+                if cache_mngr.users_config is not None:
+                    user_data = cache_mngr.users_config.get(str(user_id))
+
                 if user_data and isinstance(user_data, dict):
                     langue = user_data.get("lang", user_data.get("langue", "en"))
 
@@ -1267,9 +1270,9 @@ class GGEAssistantBot(commands.Bot):
         if cmd_name not in commandes_libres:
             config_ok = False
 
-            from utils import USERS_CONFIG_CACHE
+            from utils import cache_mngr
 
-            if USERS_CONFIG_CACHE and str(interaction.user.id) in USERS_CONFIG_CACHE:
+            if cache_mngr.users_config and str(interaction.user.id) in cache_mngr.users_config:
                 config_ok = True
 
             if not config_ok:

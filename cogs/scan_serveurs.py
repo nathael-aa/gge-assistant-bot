@@ -60,8 +60,7 @@ class ScanServeursCog(commands.Cog):
             ]
         }
         try:
-            async with aiohttp.ClientSession() as session:
-                await session.post(self.webhook_url, json=payload, timeout=aiohttp.ClientTimeout(total=10))
+            await self.bot.session.post(self.webhook_url, json=payload, timeout=aiohttp.ClientTimeout(total=10))
         except Exception as e:
             logger.error(f"❌ Impossible d'envoyer l'alerte Discord : {e}")
 
@@ -82,7 +81,14 @@ class ScanServeursCog(commands.Cog):
             active_servers.add("E4K_FR1")
         return list(active_servers)
 
-    async def fetch_export_page(self, session, server, cursor=None, max_retries=4, obs_stats=None):
+    async def fetch_export_page(
+        self,
+        session: aiohttp.ClientSession,
+        server: str,
+        cursor: str | None = None,
+        max_retries: int = 4,
+        obs_stats: dict | None = None,
+    ) -> dict | None:
         """Télécharge une page de 5000 joueurs via le nouvel endpoint d'export."""
         url = f"{self.api_url}/export/players"
 
@@ -125,7 +131,9 @@ class ScanServeursCog(commands.Cog):
             obs_stats["pages_failed"] += 1
         return None
 
-    async def scan_server(self, session, server, index_actuel, total_serveurs):
+    async def scan_server(
+        self, session: aiohttp.ClientSession, server: str, index_actuel: int, total_serveurs: int
+    ) -> tuple[dict, float] | None:
         """Scanne un serveur complet en utilisant les curseurs (Pagination Keyset)."""
         logger.info(f"🔍 DÉMARRAGE [{index_actuel}/{total_serveurs}] : {server}")
         start_time = asyncio.get_event_loop().time()
@@ -215,11 +223,17 @@ class ScanServeursCog(commands.Cog):
             **obs_stats,
         )
 
-        all_players_sorted = dict(sorted(all_players.items(), key=lambda item: item[1]["main_points"], reverse=True))
+        def safe_sort_key(item):
+            try:
+                return int(item[1]["main_points"])
+            except (ValueError, TypeError):
+                return 0
+
+        all_players_sorted = dict(sorted(all_players.items(), key=safe_sort_key, reverse=True))
 
         return all_players_sorted, duration
 
-    def save_results(self, players_data, duration, serveur):
+    def save_results(self, players_data: dict, duration: float, serveur: str) -> Path:
         """Sauvegarde les résultats en JSON (Fonction bloquante isolée) et nettoie les anciens."""
         today = datetime.now().strftime("%Y-%m-%d")
         server_dir = self.base_output_dir / serveur

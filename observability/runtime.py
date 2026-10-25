@@ -126,7 +126,7 @@ def get_settings() -> ClickHouseSettings | None:
 
 def collect_status(bot) -> dict:
     """Collect the bot_status gauges from the live bot state"""
-    from utils import CACHE
+    from utils import cache_mngr  # Remplacement de CACHE par cache_mngr
 
     try:
         latency = bot.latency
@@ -152,7 +152,8 @@ def collect_status(bot) -> dict:
     maintenance = bool(getattr(bot, "maintenance_mode", False))
     cached_players = 0
     try:
-        cached_players = sum(len(v.get("players", [])) for v in CACHE.values())
+        # Adaptation pour utiliser cache_mngr.server_data
+        cached_players = sum(len(v.get("players", [])) for v in cache_mngr.server_data.values())
     except Exception:
         pass
 
@@ -169,7 +170,7 @@ def collect_status(bot) -> dict:
         "cpu_pct": _metrics.cpu_pct(),
         "cogs_loaded": len(bot.cogs),
         "tasks_running": tasks,
-        "cache_servers": len(CACHE),
+        "cache_servers": len(cache_mngr.server_data),
         "cache_players": cached_players,
         "scan_flag_active": int(bool(getattr(bot, "scan_flag_detected", False))),
     }
@@ -183,7 +184,7 @@ async def _heartbeat_loop(bot) -> None:
             await asyncio.sleep(_settings.heartbeat_s)
             gauges = collect_status(bot)
             gauges["event_loop_lag_ms"] = await _event_loop_lag_ms()
-            gauges.update(_data_gauges())
+            gauges.update(await _data_gauges())  # Rendu awaitable pour appeler les fonctions asynchrones
             recorders.record_bot_status(**gauges)
             recorders.sweep_pending()
         except asyncio.CancelledError:
@@ -193,35 +194,34 @@ async def _heartbeat_loop(bot) -> None:
             pass
 
 
-def _data_gauges() -> dict:
+async def _data_gauges() -> dict:
     """Gauges taken from the JSON files: radar, fortresses, votes"""
-    import json
     from datetime import datetime
 
-    from utils import JOUEURS_DIR
+    # Import des fonctions asynchrones depuis utils
+    from utils import JOUEURS_DIR, async_json_load, load_dungeons_async, load_surveillance_async
 
     gauges = {}
     try:
-        path = JOUEURS_DIR / "surveillance.json"
-        if path.exists():
-            with open(path, encoding="utf-8") as handle:
-                data = json.load(handle)
-            gauges["radar_players"] = len(data.get("players", {}))
-            gauges["radar_alliances"] = len(data.get("alliances", {}))
+        # Utilisation de la nouvelle fonction asynchrone non-bloquante
+        data = await load_surveillance_async()
+        gauges["radar_players"] = len(data.get("players", {}))
+        gauges["radar_alliances"] = len(data.get("alliances", {}))
     except Exception:
         pass
+
     try:
-        path = JOUEURS_DIR / "forteresses_sessions.json"
-        if path.exists():
-            with open(path, encoding="utf-8") as handle:
-                gauges["fortress_sessions"] = len(json.load(handle).get("sessions", {}))
+        # Utilisation de la nouvelle fonction asynchrone non-bloquante
+        data = await load_dungeons_async()
+        gauges["fortress_sessions"] = len(data.get("sessions", {}))
     except Exception:
         pass
+
     try:
         path = JOUEURS_DIR / "votes.json"
         if path.exists():
-            with open(path, encoding="utf-8") as handle:
-                votes = json.load(handle)
+            # Utilisation de async_json_load générique
+            votes = await async_json_load(path)
             now = datetime.now()
             active = 0
             for expiry in votes.values():
@@ -233,4 +233,5 @@ def _data_gauges() -> dict:
             gauges["active_shields"] = active
     except Exception:
         pass
+
     return gauges

@@ -190,7 +190,11 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.guild_id)
     async def c_setup(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        await interaction.response.defer(ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception as e:
+            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            return
 
         langue, serveur = await get_server_config(interaction)
 
@@ -229,7 +233,11 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
     @app_commands.guild_only()
     @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.guild_id)
     async def c_track(self, interaction: discord.Interaction, alliance_name: str):
-        await interaction.response.defer(ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception as e:
+            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            return
         langue, serveur = await get_server_config(interaction)
 
         data = await load_calendrier_async()
@@ -273,7 +281,11 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
     @app_commands.guild_only()
     @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.guild_id)
     async def c_untrack(self, interaction: discord.Interaction, alliance_name: str):
-        await interaction.response.defer(ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception as e:
+            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            return
         langue, serveur = await get_server_config(interaction)
 
         data = await load_calendrier_async()
@@ -313,7 +325,11 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.guild_id)
     async def c_stop(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception as e:
+            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            return
         langue, serveur = await get_server_config(interaction)
 
         data = await load_calendrier_async()
