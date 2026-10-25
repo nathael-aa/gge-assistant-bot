@@ -36,18 +36,8 @@ A comprehensive Discord bot designed to assist "Goodgame Empire" (GGE) and "Empi
 .
 ├── assets
 │   ├── emojis
-│   │   └── pinkhearts.gif
 │   ├── github_bannieres
-│   │   └── Github_GGE-Assistant_bannière.jpg
 │   └── profile_pictures
-│       ├── GGE-Assistant-WH_Scan.jpg
-│       ├── GGE-Assistant-WH_Sync.jpg
-│       ├── GGE-Assistant-WH_Vigi.jpg
-│       ├── GGE-Assistant_WH_Alert.jpg
-│       ├── GGE-Assistant_WH_SJoin.jpg
-│       ├── GGE-Assistant_WH_SLeft.jpg
-│       ├── GGE-Assistant_WH_Start.jpg
-│       └── GGE-Assistant_WH_Vote.jpg
 ├── cogs
 │   ├── admin
 │   │   ├── __init__.py
@@ -100,7 +90,7 @@ A comprehensive Discord bot designed to assist "Goodgame Empire" (GGE) and "Empi
 ├── ruff.toml
 └── utils.py
 
-11 directories, 55 files
+11 directories, 45 files
 ```
 <!-- TREE-END -->
 *(This section is auto-updated via GitHub Actions)*
