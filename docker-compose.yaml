@@ -1,6 +1,5 @@
 services:
   discord-bot:
-    build: .
     image: ghcr.io/nathael-aa/gge-assistant-bot:latest
     container_name: gge-assistant
     restart: unless-stopped
@@ -14,7 +13,7 @@ services:
     environment:
       - DATA_PATH=/app/data
       - TZ=Europe/Paris
-    user: "root"
+    user: "1001:1001"
     mem_limit: 512m
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5011/')\""]
