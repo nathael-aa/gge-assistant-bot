@@ -709,19 +709,21 @@ class ServerSetupWizard(discord.ui.View):
             elif self.data["isle"]["channel_id"]:
                 storm_data["guilds"][guild_id]["isle_channel_id"] = self.data["isle"]["channel_id"]
                 storm_data["guilds"][guild_id]["isle_ping_role"] = self.data["isle"]["ping_role"]
-                storm_data["guilds"][guild_id]["ping_small"] = self.data["isle"]["ping_small"]
-                storm_data["guilds"][guild_id]["ping_big"] = self.data["isle"]["ping_big"]
+                storm_data["guilds"][guild_id]["isle_ping_small"] = self.data["isle"]["ping_small"]
+                storm_data["guilds"][guild_id]["isle_ping_big"] = self.data["isle"]["ping_big"]
+
                 c_isle = self.guild.get_channel(self.data["isle"]["channel_id"])
                 recap.append(f"• **Storm Isles:** {c_isle.mention if c_isle else 'Set'}")
 
             # Forts
             if self.data["forts"]["disabled"]:
-                storm_data["guilds"][guild_id].pop("forts_channel_id", None)
+                storm_data["guilds"][guild_id].pop("fort_channel_id", None)
                 recap.append("• **Storm Fortresses:** *Désactivé*")
             elif self.data["forts"]["channel_id"]:
-                storm_data["guilds"][guild_id]["forts_channel_id"] = self.data["forts"]["channel_id"]
-                storm_data["guilds"][guild_id]["forts_ping_role"] = self.data["forts"]["ping_role"]
-                storm_data["guilds"][guild_id]["forts_min_level"] = self.data["forts"]["min_level"]
+                storm_data["guilds"][guild_id]["fort_channel_id"] = self.data["forts"]["channel_id"]
+                storm_data["guilds"][guild_id]["fort_ping_role"] = self.data["forts"]["ping_role"]
+                storm_data["guilds"][guild_id]["fort_min_level"] = self.data["forts"]["min_level"]
+
                 c_forts = self.guild.get_channel(self.data["forts"]["channel_id"])
                 recap.append(
                     f"• **Storm Fortresses:** {c_forts.mention if c_forts else 'Set'} (Lvl: `{self.data['forts']['min_level']}+`)"

@@ -160,13 +160,18 @@ class OffersCog(commands.Cog):
 
         default_cats = data["guilds"].get(guild_id, {}).get("categories", ["promos"])
 
+        # Conversion du ping en string pour harmoniser avec le Wizard
+        ping_val = None
+        if ping_role:
+            ping_val = "@everyone" if ping_role.is_default() else ping_role.mention
+
         data["guilds"][guild_id] = {
             "gge_server": gge_server,
             "channel_id": channel.id,
             "lang": langue,
             "legendary": legendary_level,
             "categories": default_cats,
-            "ping_role": ping_role.id if ping_role else None,
+            "ping_role": ping_val,
         }
         await async_json_dump(self.alerts_file, data, indent=4)
 
@@ -180,8 +185,8 @@ class OffersCog(commands.Cog):
             defaut=f"New offers for profile `{prof_str}` will be sent to {channel.mention} (Prices in EUR).",
         )
 
-        if ping_role:
-            base_desc += f"\n🔔 **Ping:** {ping_role.mention}"
+        if ping_val:
+            base_desc += f"\n🔔 **Ping:** {ping_val}"
 
         prompt_desc = t(langue, "offres_setup_prompt", defaut="\n\n👇 **Select the categories you want to monitor:**")
 
@@ -293,31 +298,38 @@ class OffersCog(commands.Cog):
         return embed
 
     async def send_offers_to_channel(
-        self, channel: discord.TextChannel, embeds: list, cat_key: str, ping_role_id: int = None
+        self, channel: discord.TextChannel, embeds: list, cat_key: str, ping_role_val=None
     ):
         """Helper factorisé pour créer un Thread, envoyer les embeds et identifier le rôle si nécessaire."""
         langue = "EN"
         cat_emoji, cat_name_en = CAT_MAPPING.get(cat_key, ("🛒", "Offers"))
         cat_name = t(langue, f"offres_cat_{cat_key}", defaut=cat_name_en)
 
+        # Ajout de cat_emoji=cat_emoji pour que le format le trouve !
         msg_text = t(
             langue,
             "offres_thread_msg",
             count=len(embeds),
             cat=cat_name,
+            cat_emoji=cat_emoji,
             defaut=f"{cat_emoji} **{len(embeds)} new offers** are available in the **{cat_name}** category!",
         )
 
         allowed_mentions = discord.AllowedMentions.none()
 
-        if ping_role_id:
-            role = channel.guild.get_role(ping_role_id)
-            if ping_role_id == channel.guild.id or (role and role.name in ("@everyone", "@here")):
-                tag = role.name if role else "@everyone"
-                msg_text = f"{tag} {msg_text}"
+        if ping_role_val:
+            # Rétrocompatibilité : si l'ID est toujours sous forme de chiffre dans l'ancien JSON
+            if isinstance(ping_role_val, int) or (isinstance(ping_role_val, str) and ping_role_val.isdigit()):
+                role = channel.guild.get_role(int(ping_role_val))
+                if str(ping_role_val) == str(channel.guild.id) or (role and role.name in ("@everyone", "@here")):
+                    ping_role_val = "@everyone"
+                else:
+                    ping_role_val = f"<@&{ping_role_val}>"
+
+            msg_text = f"{ping_role_val} {msg_text}"
+            if ping_role_val in ["@everyone", "@here"]:
                 allowed_mentions = discord.AllowedMentions(everyone=True)
             else:
-                msg_text = f"<@&{ping_role_id}> {msg_text}"
                 allowed_mentions = discord.AllowedMentions(roles=True)
 
         try:
