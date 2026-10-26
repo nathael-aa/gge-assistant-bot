@@ -22,6 +22,20 @@ from utils import (
 
 logger = logging.getLogger("GGE_Bot")
 
+# ===========================================
+# 🛒 OFFERS CATEGORIES (Pour le Wizard)
+# ===========================================
+CAT_MAPPING = {
+    "promos": ("🎁", "Gifts & Promos (Free)"),
+    "supersale": ("🛍️", "Super Sales"),
+    "eventoffers": ("⚔️", "Event Offers"),
+    "dailybundles": ("📅", "Daily Bundles"),
+    "hcbundles": ("💰", "Ruby Bundles"),
+    "hardCurrency": ("💎", "Direct Ruby Purchases"),
+    "cashoffers": ("🛒", "Classic Offers"),
+    "subscriptions": ("📜", "Subscriptions"),
+}
+
 
 # ===========================================
 # 💾 USER CONFIGURATION (DMs)
@@ -64,7 +78,13 @@ class ServerSetupWizard(discord.ui.View):
             "isle": {"channel_id": None, "ping_role": None, "ping_small": False, "ping_big": False, "disabled": False},
             "forts": {"channel_id": None, "min_level": 70, "ping_role": None, "disabled": False},
             "radar": {"channel_id": None, "ping_role": None, "disabled": False},
-            "shop": {"channel_id": None, "profile": 950, "ping_role": None, "disabled": False},
+            "shop": {
+                "channel_id": None,
+                "profile": 950,
+                "ping_role": None,
+                "categories": ["promos"],
+                "disabled": False,
+            },
         }
 
         self.step_keys = ["intro", "news", "patchnotes", "hub_alerts", "calendar", "isle", "forts", "radar", "shop"]
@@ -82,14 +102,23 @@ class ServerSetupWizard(discord.ui.View):
 
         self.setup_current_step()
 
+    def format_ping(self, r_id):
+        """Transforme l'ID brut du rôle en format mention Discord compréhensible par l'API."""
+        if not r_id:
+            return ""
+        role = self.guild.get_role(r_id)
+        if role:
+            return "@everyone" if role.is_default() else role.mention
+        return f"<@&{r_id}>"
+
     def setup_current_step(self):
         self.clear_items()
         self.steps[self.step_idx]()
 
-    def add_controls(self, is_last: bool = False, extra_buttons: list = None):
+    def add_controls(self, is_last: bool = False, extra_buttons: list = None, ctrl_row: int = 3):
         """Standardise l'ordre des boutons: Cancel -> Extras -> Disable -> Skip -> Next"""
         btn_cancel = discord.ui.Button(
-            label=t(self.lang, "wizard_btn_cancel", defaut="Cancel ✖️"), style=discord.ButtonStyle.danger, row=3
+            label=t(self.lang, "wizard_btn_cancel", defaut="Cancel ✖️"), style=discord.ButtonStyle.danger, row=ctrl_row
         )
         btn_cancel.callback = self.cancel_wizard
         self.add_item(btn_cancel)
@@ -100,25 +129,31 @@ class ServerSetupWizard(discord.ui.View):
                 self.add_item(btn)
 
         btn_disable = discord.ui.Button(
-            label=t(self.lang, "wizard_btn_disable", defaut="Disable 🚫"), style=discord.ButtonStyle.secondary, row=3
+            label=t(self.lang, "wizard_btn_disable", defaut="Disable 🚫"),
+            style=discord.ButtonStyle.secondary,
+            row=ctrl_row,
         )
         btn_disable.callback = self.disable_step
         self.add_item(btn_disable)
 
         if not is_last:
             btn_skip = discord.ui.Button(
-                label=t(self.lang, "wizard_btn_skip", defaut="Skip ⏭️"), style=discord.ButtonStyle.secondary, row=3
+                label=t(self.lang, "wizard_btn_skip", defaut="Skip ⏭️"),
+                style=discord.ButtonStyle.secondary,
+                row=ctrl_row,
             )
             btn_skip.callback = self.skip_step
             self.add_item(btn_skip)
 
         if is_last:
             btn_next = discord.ui.Button(
-                label=t(self.lang, "wizard_btn_finish", defaut="Finish ✅"), style=discord.ButtonStyle.success, row=3
+                label=t(self.lang, "wizard_btn_finish", defaut="Finish ✅"),
+                style=discord.ButtonStyle.success,
+                row=ctrl_row,
             )
         else:
             btn_next = discord.ui.Button(
-                label=t(self.lang, "wizard_btn_next", defaut="Next ➡️"), style=discord.ButtonStyle.primary, row=3
+                label=t(self.lang, "wizard_btn_next", defaut="Next ➡️"), style=discord.ButtonStyle.primary, row=ctrl_row
             )
         btn_next.callback = self.advance
         self.add_item(btn_next)
@@ -472,7 +507,33 @@ class ServerSetupWizard(discord.ui.View):
         r_sel.callback = r_callback
         self.add_item(r_sel)
 
-        self.add_controls(is_last=True)
+        # Ajout du sélecteur de catégories de la boutique
+        options_cats = []
+        for key, (emoji, name_en) in CAT_MAPPING.items():
+            name_local = t(self.lang, f"offres_cat_{key}", defaut=name_en)
+            options_cats.append(
+                discord.SelectOption(
+                    label=name_local, value=key, emoji=emoji, default=(key in self.data["shop"]["categories"])
+                )
+            )
+
+        cat_sel = discord.ui.Select(
+            placeholder=t(self.lang, "wizard_sel_shop_cat", defaut="Select categories to track..."),
+            min_values=1,
+            max_values=len(options_cats),
+            options=options_cats,
+            row=3,
+        )
+
+        async def cat_cb(interaction: discord.Interaction):
+            self.data["shop"]["categories"] = cat_sel.values
+            await interaction.response.defer()
+
+        cat_sel.callback = cat_cb
+        self.add_item(cat_sel)
+
+        # On décale les boutons de contrôle à la ligne 4 car la ligne 3 est occupée par les catégories
+        self.add_controls(is_last=True, ctrl_row=4)
 
     # -------------------------------------------------------------
     # EMBED GENERATION
@@ -560,7 +621,7 @@ class ServerSetupWizard(discord.ui.View):
                 t(
                     self.lang,
                     "wizard_shop_desc",
-                    defaut="Select the channel, player profile, and ping role for shop alerts.",
+                    defaut="Select the channel, player profile, ping role, and categories for shop alerts.",
                 ),
             ),
         ]
@@ -607,7 +668,6 @@ class ServerSetupWizard(discord.ui.View):
             hub_data["guilds"][guild_id]["gge_server"] = self.gge_server
             hub_data["guilds"][guild_id]["langue"] = self.lang
 
-            # Nettoyage des anciennes clés plates si elles existent
             for old_key in ["news_channel_id", "news_ping_role", "patchnotes_channel_id", "patchnotes_ping_role"]:
                 hub_data["guilds"][guild_id].pop(old_key, None)
 
@@ -616,10 +676,9 @@ class ServerSetupWizard(discord.ui.View):
                 hub_data["guilds"][guild_id].pop("news", None)
                 recap.append("• **News:** *Désactivé*")
             elif self.data["news"]["channel_id"]:
-                r_id = self.data["news"]["ping_role"]
                 hub_data["guilds"][guild_id]["news"] = {
                     "channel_id": self.data["news"]["channel_id"],
-                    "role": r_id if r_id else "",
+                    "role": self.format_ping(self.data["news"]["ping_role"]),
                 }
                 c = self.guild.get_channel(self.data["news"]["channel_id"])
                 recap.append(f"• **News:** {c.mention if c else 'Set'}")
@@ -629,10 +688,9 @@ class ServerSetupWizard(discord.ui.View):
                 hub_data["guilds"][guild_id].pop("patchnotes", None)
                 recap.append("• **Patchnotes:** *Désactivé*")
             elif self.data["patchnotes"]["channel_id"]:
-                r_id = self.data["patchnotes"]["ping_role"]
                 hub_data["guilds"][guild_id]["patchnotes"] = {
                     "channel_id": self.data["patchnotes"]["channel_id"],
-                    "role": r_id if r_id else "",
+                    "role": self.format_ping(self.data["patchnotes"]["ping_role"]),
                 }
                 c = self.guild.get_channel(self.data["patchnotes"]["channel_id"])
                 recap.append(f"• **Patchnotes:** {c.mention if c else 'Set'}")
@@ -642,10 +700,9 @@ class ServerSetupWizard(discord.ui.View):
                 hub_data["guilds"][guild_id].pop("alerts", None)
                 recap.append("• **Hub Alerts:** *Désactivé*")
             elif self.data["hub_alerts"]["channel_id"]:
-                r_id = self.data["hub_alerts"]["ping_role"]
                 hub_data["guilds"][guild_id]["alerts"] = {
                     "channel_id": self.data["hub_alerts"]["channel_id"],
-                    "role": r_id if r_id else "",
+                    "role": self.format_ping(self.data["hub_alerts"]["ping_role"]),
                 }
                 c = self.guild.get_channel(self.data["hub_alerts"]["channel_id"])
                 recap.append(f"• **Hub Alerts:** {c.mention if c else 'Set'}")
@@ -677,8 +734,7 @@ class ServerSetupWizard(discord.ui.View):
                 recap.append("• **Calendar:** *Désactivé*")
             elif self.data["calendar"]["channel_id"]:
                 cal_data["guilds"][guild_id]["channel_id"] = self.data["calendar"]["channel_id"]
-                r_id = self.data["calendar"]["ping_role"]
-                cal_data["guilds"][guild_id]["ping_role"] = r_id if r_id else ""
+                cal_data["guilds"][guild_id].pop("ping_role", None)
                 c = self.guild.get_channel(self.data["calendar"]["channel_id"])
                 recap.append(f"• **Calendar:** {c.mention if c else 'Set'}")
 
@@ -708,7 +764,7 @@ class ServerSetupWizard(discord.ui.View):
                 recap.append("• **Storm Isles:** *Désactivé*")
             elif self.data["isle"]["channel_id"]:
                 storm_data["guilds"][guild_id]["isle_channel_id"] = self.data["isle"]["channel_id"]
-                storm_data["guilds"][guild_id]["isle_ping_role"] = self.data["isle"]["ping_role"]
+                storm_data["guilds"][guild_id]["isle_ping_role"] = self.format_ping(self.data["isle"]["ping_role"])
                 storm_data["guilds"][guild_id]["isle_ping_small"] = self.data["isle"]["ping_small"]
                 storm_data["guilds"][guild_id]["isle_ping_big"] = self.data["isle"]["ping_big"]
 
@@ -721,7 +777,7 @@ class ServerSetupWizard(discord.ui.View):
                 recap.append("• **Storm Fortresses:** *Désactivé*")
             elif self.data["forts"]["channel_id"]:
                 storm_data["guilds"][guild_id]["fort_channel_id"] = self.data["forts"]["channel_id"]
-                storm_data["guilds"][guild_id]["fort_ping_role"] = self.data["forts"]["ping_role"]
+                storm_data["guilds"][guild_id]["fort_ping_role"] = self.format_ping(self.data["forts"]["ping_role"])
                 storm_data["guilds"][guild_id]["fort_min_level"] = self.data["forts"]["min_level"]
 
                 c_forts = self.guild.get_channel(self.data["forts"]["channel_id"])
@@ -762,15 +818,7 @@ class ServerSetupWizard(discord.ui.View):
                 recap.append("• **Radar:** *Désactivé*")
             elif self.data["radar"]["channel_id"]:
                 radar_data["guild_configs"][guild_id]["channel_id"] = self.data["radar"]["channel_id"]
-
-                ping_val = None
-                if self.data["radar"]["ping_role"]:
-                    r_id = self.data["radar"]["ping_role"]
-                    role = self.guild.get_role(r_id)
-                    if role:
-                        ping_val = "@everyone" if role.is_default() else role.mention
-
-                radar_data["guild_configs"][guild_id]["ping_role"] = ping_val
+                radar_data["guild_configs"][guild_id]["ping_role"] = self.format_ping(self.data["radar"]["ping_role"])
 
                 c = self.guild.get_channel(self.data["radar"]["channel_id"])
                 recap.append(f"• **Radar:** {c.mention if c else 'Set'}")
@@ -792,8 +840,6 @@ class ServerSetupWizard(discord.ui.View):
             if guild_id not in alerts_data["guilds"]:
                 alerts_data["guilds"][guild_id] = {}
 
-            prev_cats = alerts_data["guilds"].get(guild_id, {}).get("categories", ["promos"])
-
             alerts_data["guilds"][guild_id]["gge_server"] = self.gge_server
             alerts_data["guilds"][guild_id]["lang"] = "EN"
 
@@ -803,8 +849,8 @@ class ServerSetupWizard(discord.ui.View):
             elif self.data["shop"]["channel_id"]:
                 alerts_data["guilds"][guild_id]["channel_id"] = self.data["shop"]["channel_id"]
                 alerts_data["guilds"][guild_id]["legendary"] = self.data["shop"]["profile"]
-                alerts_data["guilds"][guild_id]["categories"] = prev_cats
-                alerts_data["guilds"][guild_id]["ping_role"] = self.data["shop"]["ping_role"]
+                alerts_data["guilds"][guild_id]["categories"] = self.data["shop"]["categories"]
+                alerts_data["guilds"][guild_id]["ping_role"] = self.format_ping(self.data["shop"]["ping_role"])
 
                 c = self.guild.get_channel(self.data["shop"]["channel_id"])
                 prof_label = "LL 950+" if self.data["shop"]["profile"] == 950 else "Normal (LL 0)"
