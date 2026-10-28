@@ -470,7 +470,7 @@ class TargetWizard(discord.ui.View):
                     new_value=f"lvl:{self.config.get('lvl_min', -1)}-{self.config.get('lvl_max', -1)}|pp:{self.config.get('pp_min', -1)}-{self.config.get('pp_max', -1)}",
                 )
         except Exception as e:
-            logger.error(f"Error saving user config : {e}")
+            logger.error(f"❌ [Cible] Error saving user config : {e}")
 
     def generate_summary_embed(self):
         titre = t(self.langue, "wizard_sum_title", defaut="{e_check} Search Engine Ready!")
@@ -498,25 +498,28 @@ class TargetWizard(discord.ui.View):
         l_lvl = t(self.langue, "wizard_lbl_lvl", defaut="Levels")
         l_pp = t(self.langue, "wizard_lbl_pp", defaut="Might")
         l_dist = t(self.langue, "wizard_lbl_dist", defaut="Distance")
+
         f1_val = (
-            f"**{l_lvl}** : {fmt_val(self.config.get('lvl_min', -1))} - {fmt_val(self.config.get('lvl_max', -1))}\n"
-            f"**{l_pp}** : {fmt_val(self.config.get('pp_min', -1))} - {fmt_val(self.config.get('pp_max', -1))}\n"
-            f"**{l_dist}** : {fmt_val(self.config.get('dist_min', -1))} - {fmt_val(self.config.get('dist_max', -1))}"
+            f"**{l_lvl}** : {fmt_val(self.config.get('lvl_min', -1))} ➔ {fmt_val(self.config.get('lvl_max', -1))}\n"
+            f"**{l_pp}** : {fmt_val(self.config.get('pp_min', -1))} ➔ {fmt_val(self.config.get('pp_max', -1))}\n"
+            f"**{l_dist}** : {fmt_val(self.config.get('dist_min', -1))} ➔ {fmt_val(self.config.get('dist_max', -1))}"
         )
 
         l_hon = t(self.langue, "wizard_lbl_honor", defaut="Honor")
         l_glo = t(self.langue, "wizard_lbl_glory", defaut="Glory")
         l_loo = t(self.langue, "wizard_lbl_loot", defaut="Loot")
+
         f2_val = (
-            f"**{l_hon}** : {fmt_val(self.config.get('honor_min', -1))} - {fmt_val(self.config.get('honor_max', -1))}\n"
-            f"**{l_glo}** : {fmt_val(self.config.get('glory_min', -1))} - {fmt_val(self.config.get('glory_max', -1))}\n"
-            f"**{l_loo}** : {fmt_val(self.config.get('loot_min', -1))} - {fmt_val(self.config.get('loot_max', -1))}"
+            f"**{l_hon}** : {fmt_val(self.config.get('honor_min', -1))} ➔ {fmt_val(self.config.get('honor_max', -1))}\n"
+            f"**{l_glo}** : {fmt_val(self.config.get('glory_min', -1))} ➔ {fmt_val(self.config.get('glory_max', -1))}\n"
+            f"**{l_loo}** : {fmt_val(self.config.get('loot_min', -1))} ➔ {fmt_val(self.config.get('loot_max', -1))}"
         )
 
         l_col = t(self.langue, "wizard_lbl_dove", defaut="Include Doves")
         l_for = t(self.langue, "wizard_lbl_for", defaut="Force Alliance")
         l_act = t(self.langue, "wizard_lbl_act", defaut="Activity")
         l_excl = t(self.langue, "wizard_lbl_excl", defaut="Exclusions")
+
         f3_val = (
             f"**{l_col}** : {txt_doves}\n**{l_for}** : {txt_alli}\n**{l_act}** : {txt_act}\n**{l_excl}** : {txt_excl}"
         )
@@ -616,7 +619,7 @@ class CibleCog(commands.Cog):
                 with open(path_users, encoding="utf-8") as f:
                     data = json.load(f)
                     return data.get(str(user_id), {}).get("custom_rules", None)
-            except:
+            except Exception:
                 pass
         return None
 
@@ -653,7 +656,7 @@ class CibleCog(commands.Cog):
 
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
         await self._execute_cible(interaction, origin_player, "aleatoire", target_alliance)
 
@@ -733,7 +736,8 @@ class CibleCog(commands.Cog):
                                 a_coords["x"] = c.get("positionX") or c.get("position_x") or c.get("x")
                                 a_coords["y"] = c.get("positionY") or c.get("position_y") or c.get("y")
                                 break
-        except:
+        except Exception as e:
+            logger.error(f"❌ [Cible] Erreur lors de la récupération des coordonnées pour {origin_player} : {e}")
             pass
 
         if a_coords["x"] is None or a_coords["y"] is None:
@@ -806,7 +810,7 @@ class CibleCog(commands.Cog):
                     for aname_json, desc in json.load(f).items():
                         if any(mot in str(desc).lower() for mot in mots_interdits_mur):
                             alliances_mur_alerte.append("".join(c for c in str(aname_json).lower() if c.isalnum()))
-        except:
+        except Exception:
             pass
 
         total_pages = 10
@@ -822,7 +826,8 @@ class CibleCog(commands.Cog):
                         total_pages = data.get("totalPages", data.get("total_pages", data.get("last_page", 10)))
                         if "total" in data and isinstance(data["total"], int):
                             total_pages = max(1, math.ceil(data["total"] / 50))
-        except:
+        except Exception as e:
+            logger.error(f"❌ [Cible] Erreur d'initialisation de la pagination API : {e}")
             pass
 
         total_pages = max(1, min(total_pages, 200))
@@ -918,7 +923,7 @@ class CibleCog(commands.Cog):
                                                     + (float(ty) - float(a_coords["y"])) ** 2
                                                 )
                                             break
-                        except:
+                        except Exception:
                             pass
 
                         if (
@@ -958,7 +963,7 @@ class CibleCog(commands.Cog):
                             final_targets.append(res)
 
             except Exception as e:
-                logger.error(f"Error API _execute_cible : {e}")
+                logger.error(f"❌ [Cible] Error API _execute_cible : {e}")
                 continue
 
         if not final_targets:
@@ -1049,7 +1054,7 @@ class CibleCog(commands.Cog):
                         dt_peace = datetime.fromisoformat(t_cnd["peace_disabled_at"].replace("Z", "+00:00"))
                         if dt_peace > discord.utils.utcnow():
                             is_under_colombe = True
-                    except:
+                    except Exception:
                         pass
 
                 target_icon = e_peace if is_under_colombe else e_players

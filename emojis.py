@@ -236,7 +236,7 @@ async def sync_and_load_emojis(bot: discord.Client, auto_upload: bool = False):
                             discord_map[new_emo.name.lower()] = str(new_emo)
                             logger.info(f"✨ [Emojis] Nouvel émoji uploadé : {new_emo.name}")
                         except Exception as e:
-                            logger.warning(f"⚠️ [Emojis] Impossible d'uploader {img_path.name} : {e}")
+                            logger.error(f"❌ [Emojis] Impossible d'uploader {img_path.name} : {e}")
 
         for emo in app_emojis:
             DICT_EMOJIS[f"e_{emo.name}"] = str(emo)

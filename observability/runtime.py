@@ -207,15 +207,15 @@ async def _data_gauges() -> dict:
         data = await load_surveillance_async()
         gauges["radar_players"] = len(data.get("players", {}))
         gauges["radar_alliances"] = len(data.get("alliances", {}))
-    except Exception:
-        pass
+    except Exception as e:
+        _log.error(f"❌ [Metrics] Erreur load_surveillance_async : {e}")
 
     try:
         # Utilisation de la nouvelle fonction asynchrone non-bloquante
         data = await load_dungeons_async()
         gauges["fortress_sessions"] = len(data.get("sessions", {}))
-    except Exception:
-        pass
+    except Exception as e:
+        _log.error(f"❌ [Metrics] Erreur load_dungeons_async : {e}")
 
     try:
         path = JOUEURS_DIR / "votes.json"
@@ -231,7 +231,7 @@ async def _data_gauges() -> dict:
                 except Exception:
                     pass
             gauges["active_shields"] = active
-    except Exception:
-        pass
+    except Exception as e:
+        _log.error(f"❌ [Metrics] Erreur lecture des votes : {e}")
 
     return gauges

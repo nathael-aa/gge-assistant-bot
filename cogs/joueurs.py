@@ -132,7 +132,10 @@ class JoueursCog(commands.Cog):
     @app_commands.command(name="server", description="Affiche les statistiques globales de ton serveur")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def server_stats(self, interaction: discord.Interaction):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception:
+            return
 
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(custom_server=serveur)
@@ -147,8 +150,8 @@ class JoueursCog(commands.Cog):
                     latest_file = max(fichiers, key=lambda p: p.stat().st_mtime)
                     with open(latest_file, encoding="utf-8") as f:
                         local_data = json.load(f)
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"❌ [Stats] Erreur lecture fichier scan local : {e}")
 
         api_current = {}
         api_previous = {}
@@ -163,8 +166,10 @@ class JoueursCog(commands.Cog):
                             api_previous = data[-2]
                     elif isinstance(data, dict):
                         api_current = data
+                else:
+                    logger.warning(f"⚠️ [Stats] L'API a renvoyé un statut {r.status} lors de l'appel à {url}")
         except Exception as e:
-            logger.error(f"Erreur API /server/statistics : {e}")
+            logger.error(f"❌ [Stats] Erreur API /server/statistics : {e}")
 
         if not api_current and not local_data:
             err_msg = t(
@@ -240,7 +245,7 @@ class JoueursCog(commands.Cog):
             try:
                 dt = datetime.fromisoformat(str(created_at_raw).replace("Z", "+00:00"))
                 timestamp_str = f"<t:{int(dt.timestamp())}:R>"
-            except:
+            except Exception:
                 pass
 
         titre = t(
@@ -319,7 +324,7 @@ class JoueursCog(commands.Cog):
     async def player_info(self, interaction: discord.Interaction, player: str):
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
 
         langue, serveur = await get_server_config(interaction)
@@ -359,7 +364,7 @@ class JoueursCog(commands.Cog):
                         txt_colombe = (
                             f"\n{DICT_EMOJIS.get('e_peace', '🕊️')} **Colombe** : <t:{int(dt_peace.timestamp())}:R>"
                         )
-                except:
+                except Exception:
                     pass
 
             alliance_info = data.get("alliance", {})
@@ -435,7 +440,7 @@ class JoueursCog(commands.Cog):
                             tp=ts_peace,
                             defaut="{e_peace} **Colombe :** Jusqu'au <t:{tp}:R> (<t:{tp}:t>)",
                         )
-                except:
+                except Exception:
                     pass
 
             info_val = t(
@@ -552,13 +557,13 @@ class JoueursCog(commands.Cog):
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
         except Exception as e:
-            logger.error(f"❌ [Profils - Joueur] Erreur fatale : {traceback.format_exc()}")
+            logger.error(f"❌ [Profils] Erreur fatale : {traceback.format_exc()}")
             obs.record_error(source="command", scope="player_profile", exception=e, cog="joueurs")
             try:
                 await interaction.followup.send(
                     t(langue, "prof_err_internal", defaut="{e_error} Erreur système interne.")
                 )
-            except:
+            except Exception:
                 pass
 
     async def _get_player_full_data(
@@ -671,7 +676,7 @@ class JoueursCog(commands.Cog):
                                         castle_names_map[coords] = name
 
             except Exception as e:
-                logger.warning(f"⚠️ [API] Impossible de lier les noms de châteaux pour {player_name}: {e}")
+                logger.warning(f"⚠️ [Profils] Impossible de lier les noms de châteaux pour {player_name}: {e}")
 
             outposts = []
             vassal_villages = []
@@ -763,7 +768,7 @@ class JoueursCog(commands.Cog):
             }
 
         except Exception as e:
-            logger.error(f"❌ Erreur API Joueur pour {player_name}: {e}")
+            logger.error(f"❌ [Profils] Erreur API Joueur pour {player_name}: {e}")
             return None
 
     @player_group.command(name="history", description="Displays a player's complete history")
@@ -772,7 +777,7 @@ class JoueursCog(commands.Cog):
     async def history(self, interaction: discord.Interaction, player: str):
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
 
         langue, serveur = await get_server_config(interaction)
@@ -785,7 +790,8 @@ class JoueursCog(commands.Cog):
                 data = full_json.get("parsed_data", {})
                 p_id = str(data.get("player_id", ""))
                 actualisation_dt = full_json.get("collected_at", actualisation_dt)
-        except:
+        except Exception as e:
+            logger.error(f"❌ [Historique] Erreur lors de la récupération des données profil de {player} : {e}")
             pass
 
         if not p_id:
@@ -809,7 +815,10 @@ class JoueursCog(commands.Cog):
                     async with session.get(url, headers=headers, timeout=10) as resp:
                         if resp.status == 200:
                             results[name] = await resp.json()
-                except:
+                        else:
+                            logger.warning(f"⚠️ [Historique] L'API a retourné le code {resp.status} pour l'url {url}")
+                except Exception as req_err:
+                    logger.error(f"❌ [Historique] Erreur réseau lors de la récupération de {name} : {req_err}")
                     pass
 
             tasks = [fetch_url(name, url) for name, url in urls_to_fetch.items()]
@@ -851,7 +860,7 @@ class JoueursCog(commands.Cog):
         if isinstance(actualisation_dt, str):
             try:
                 actualisation_dt = datetime.fromisoformat(actualisation_dt.replace("Z", "+00:00"))
-            except:
+            except Exception:
                 actualisation_dt = discord.utils.utcnow()
 
         ts_act = int(actualisation_dt.timestamp())
@@ -1005,7 +1014,7 @@ class JoueursCog(commands.Cog):
     async def compare(self, interaction: discord.Interaction, player1: str, player2: str):
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
 
         langue, _ = await get_server_config(interaction)
@@ -1067,7 +1076,7 @@ class JoueursCog(commands.Cog):
                             if datetime.fromisoformat(peace.replace("Z", "+00:00")) > discord.utils.utcnow():
                                 profil["colombe_txt"] = t(langue, "guerre_comp_protected", defaut="Protégé")
                                 profil["malus_colombe"] = -1.0
-                        except:
+                        except Exception:
                             pass
 
                 if not profil["id"]:
@@ -1115,7 +1124,7 @@ class JoueursCog(commands.Cog):
                                     try:
                                         dt = datetime.fromisoformat(d_str.replace("Z", "+00:00"))
                                         valid_entries.append((dt, int(pt_str)))
-                                    except:
+                                    except Exception:
                                         pass
 
                             if not valid_entries:
@@ -1184,11 +1193,11 @@ class JoueursCog(commands.Cog):
                                 if isinstance(da, list) and da:
                                     da = da[0]
                                 profil["alli_might"] = int(da.get("might_current", da.get("total_might", 0)))
-                    except:
+                    except Exception:
                         pass
 
             except Exception as e:
-                logger.error(f"❌ Erreur sur {nom_joueur} : {e}")
+                logger.error(f"❌ [Comparaison] Erreur sur {nom_joueur} : {e}")
             return profil
 
         p1, p2 = await asyncio.gather(scruter_profil_tactique(player1), scruter_profil_tactique(player2))

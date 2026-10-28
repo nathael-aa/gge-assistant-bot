@@ -43,7 +43,7 @@ class RoueRichessesCog(commands.Cog):
     async def woa_historique(self, interaction: discord.Interaction, player: str):
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
         langue, _ = await get_server_config(interaction)
         lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
@@ -97,7 +97,7 @@ class RoueRichessesCog(commands.Cog):
                             "rank": str(ev.get("rank", "?")),
                         }
                     )
-                except:
+                except Exception:
                     continue
 
             embeds = []
@@ -174,6 +174,7 @@ class RoueRichessesCog(commands.Cog):
             view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
         except Exception as e:
+            logger.error(f"❌ [RoueRichesses] Erreur lors de l'affichage de l'historique pour {player} : {e}")
             obs.record_error(source="command", scope="woa_history", exception=e, cog="woa")
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur : {e}"))
 
@@ -182,7 +183,7 @@ class RoueRichessesCog(commands.Cog):
     async def woa_bilan(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
 
         langue, _ = await get_server_config(interaction)
@@ -231,8 +232,8 @@ class RoueRichessesCog(commands.Cog):
                     f"{{e_woa_points}} **Tickets :** {t_tickets:,}\n"
                     f"{{e_members}} **Participants :** {t_parts:,}\n"
                     f"⚖️ **Moyenne :** {moy_tickets:,} {{e_woa_points}} / {moy_parts:,} {{e_members}}"
-                ).replace(",", " "),
-            )
+                ),
+            ).replace(",", " ")
 
             e_players = DICT_EMOJIS.get("e_players", "👤")
             e_woa_points = DICT_EMOJIS.get("e_woa_points", "🎟️")
@@ -241,7 +242,7 @@ class RoueRichessesCog(commands.Cog):
             for ev in all_events:
                 try:
                     d_str = datetime.fromisoformat(ev["date"].replace("Z", "+00:00")).strftime("%d/%m/%Y")
-                except:
+                except Exception:
                     continue
                 if len(j_vus) >= 31 and d_str not in j_vus:
                     break
@@ -271,6 +272,7 @@ class RoueRichessesCog(commands.Cog):
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
         except Exception as e:
+            logger.error(f"❌ [RoueRichesses] Erreur lors de l'affichage du bilan WoA : {e}")
             obs.record_error(source="command", scope="woa_summary", exception=e, cog="woa")
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur : {e}"))
 
@@ -279,7 +281,7 @@ class RoueRichessesCog(commands.Cog):
     async def classement_woa(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
         langue, _ = await get_server_config(interaction)
         lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
@@ -357,6 +359,7 @@ class RoueRichessesCog(commands.Cog):
             view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=10, langue=langue)
         except Exception as e:
+            logger.error(f"❌ [RoueRichesses] Erreur lors de l'affichage du leaderboard WoA : {e}")
             obs.record_error(source="command", scope="leaderboard_woa", exception=e, cog="woa")
             await interaction.followup.send(t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur : {e}"))
 

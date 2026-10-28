@@ -79,7 +79,12 @@ class RankingPaginationView(PaginationView):
             msg_err = t(langue, "err_not_author", defaut="❌ Only the command author can refresh it.")
             return await interaction.response.send_message(msg_err, ephemeral=True)
 
-        await interaction.response.defer()
+        try:
+            await interaction.response.defer()
+        except Exception as e:
+            logging.getLogger("GGE_Bot").error(f"❌ [Classement] Erreur defer : {e}")
+            return
+
         new_embeds, new_page = await self.refresh_callback(interaction)
 
         if new_embeds:
@@ -93,7 +98,10 @@ class RankingPaginationView(PaginationView):
 
             if not self.message:
                 self.message = interaction.message
-            await interaction.edit_original_response(embed=self.embeds[new_page], view=self)
+            try:
+                await interaction.edit_original_response(embed=self.embeds[new_page], view=self)
+            except Exception as e:
+                logging.getLogger("GGE_Bot").error(f"❌ [Classement] Erreur edition message refresh : {e}")
 
     async def on_timeout(self):
         for item in self.children:
@@ -108,7 +116,7 @@ class RankingPaginationView(PaginationView):
 class ClassementCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.logger = logging.getLogger("GGEAssistant")
+        self.logger = logging.getLogger("GGE_Bot")
         self.ranking_api_url = "https://empire-api.fly.dev"
 
     def get_serveur_api(self, serveur_local: str) -> str:
@@ -129,7 +137,7 @@ class ClassementCog(commands.Cog):
                         if srv_name.lower() == serveur_lower:
                             return srv_data.get("api_name", serveur_local)
             except Exception as e:
-                self.logger.error(f"❌ Erreur lecture servers_cache.json : {e}")
+                self.logger.error(f"❌ [Classement] Erreur lecture servers_cache.json : {e}")
 
         return serveur_local
 
@@ -370,7 +378,11 @@ class ClassementCog(commands.Cog):
         rank: int = None,
         tranche: int = None,
     ):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception as e:
+            self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
+            return
 
         async def fetch_and_build(ctx_int):
             loc_player = player
@@ -556,7 +568,7 @@ class ClassementCog(commands.Cog):
                         break
                     current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
             except Exception as e:
-                self.logger.error(f"❌ Erreur lors du fetch de statistics : {e}")
+                self.logger.error(f"❌ [Classement] Erreur lors du fetch de statistics : {e}")
                 obs.record_error(source="command", scope="rank_statistics", exception=e, cog="classement")
 
             has_any_data = any(len(data) > 0 for data in accumulated_data.values())
@@ -709,7 +721,11 @@ class ClassementCog(commands.Cog):
         rank: int = None,
         tranche: int = None,
     ):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception as e:
+            self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
+            return
 
         async def fetch_and_build(ctx_int):
             loc_player = player
@@ -893,7 +909,7 @@ class ClassementCog(commands.Cog):
                         break
                     current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
             except Exception as e:
-                self.logger.error(f"❌ Erreur lors du fetch de event : {e}")
+                self.logger.error(f"❌ [Classement] Erreur lors du fetch de event : {e}")
                 obs.record_error(source="command", scope="rank_event", exception=e, cog="classement")
 
             has_any_data = any(len(data) > 0 for data in accumulated_data.values())
@@ -1051,7 +1067,11 @@ class ClassementCog(commands.Cog):
     async def classement_gacha(
         self, interaction: discord.Interaction, evenement: str, player: str = None, rank: int = None
     ):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception as e:
+            self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
+            return
 
         async def fetch_and_build(ctx_int):
             loc_player = player
@@ -1200,7 +1220,7 @@ class ClassementCog(commands.Cog):
                         break
                     current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
             except Exception as e:
-                self.logger.error(f"❌ Erreur lors du fetch de gacha : {e}")
+                self.logger.error(f"❌ [Classement] Erreur lors du fetch de gacha : {e}")
                 obs.record_error(source="command", scope="rank_gacha", exception=e, cog="classement")
 
             has_any_data = any(len(data) > 0 for data in accumulated_data.values())
@@ -1332,7 +1352,11 @@ class ClassementCog(commands.Cog):
     async def classement_realms(
         self, interaction: discord.Interaction, evenement: str, player: str = None, rank: int = None
     ):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception as e:
+            self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
+            return
 
         async def fetch_and_build(ctx_int):
             loc_player = player
@@ -1482,7 +1506,7 @@ class ClassementCog(commands.Cog):
                         break
                     current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
             except Exception as e:
-                self.logger.error(f"❌ Erreur lors du fetch de realms : {e}")
+                self.logger.error(f"❌ [Classement] Erreur lors du fetch de realms : {e}")
                 obs.record_error(source="command", scope="rank_realms", exception=e, cog="classement")
 
             has_any_data = any(len(data) > 0 for data in accumulated_data.values())
@@ -1614,7 +1638,11 @@ class ClassementCog(commands.Cog):
         rank: int = None,
         tranche: int = None,
     ):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception as e:
+            self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
+            return
 
         async def fetch_and_build(ctx_int):
             loc_player = player
@@ -1804,7 +1832,7 @@ class ClassementCog(commands.Cog):
                         break
                     current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
             except Exception as e:
-                self.logger.error(f"❌ Erreur lors du fetch de league : {e}")
+                self.logger.error(f"❌ [Classement] Erreur lors du fetch de league : {e}")
                 obs.record_error(source="command", scope="rank_league", exception=e, cog="classement")
 
             has_any_data = any(len(data) > 0 for data in accumulated_data.values())
@@ -1952,7 +1980,11 @@ class ClassementCog(commands.Cog):
         rank: int = None,
         tranche: int = None,
     ):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception as e:
+            self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
+            return
 
         async def fetch_and_build(ctx_int):
             loc_player = player
@@ -2150,7 +2182,7 @@ class ClassementCog(commands.Cog):
                         break
                     current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
             except Exception as e:
-                self.logger.error(f"❌ Erreur lors du fetch de contests : {e}")
+                self.logger.error(f"❌ [Classement] Erreur lors du fetch de contests : {e}")
                 obs.record_error(source="command", scope="rank_contests", exception=e, cog="classement")
 
             has_any_data = any(len(data) > 0 for data in accumulated_data.values())
@@ -2287,7 +2319,11 @@ class ClassementCog(commands.Cog):
     async def classement_alliance(
         self, interaction: discord.Interaction, categorie: str, alliance_name: str = None, rank: int = None
     ):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception as e:
+            self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
+            return
 
         async def fetch_and_build(ctx_int):
             loc_alliance = alliance_name
@@ -2450,7 +2486,7 @@ class ClassementCog(commands.Cog):
                             break
                         current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
             except Exception as e:
-                self.logger.error(f"❌ Erreur lors du fetch de alliance : {e}")
+                self.logger.error(f"❌ [Classement] Erreur lors du fetch de alliance : {e}")
                 obs.record_error(source="command", scope="rank_alliance", exception=e, cog="classement")
 
             if not all_alliances_raw:

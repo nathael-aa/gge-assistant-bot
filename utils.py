@@ -16,7 +16,7 @@ from discord import app_commands
 import observability as obs
 
 logger = logging.getLogger("GGE_Bot")
-BOT_VERSION = "GGE Assistant • Version 1.3.9"
+BOT_VERSION = "GGE Assistant • Version 1.4.0"
 
 # ========================================
 # ⚙️ GESTION DES CHEMINS & DOSSIER
@@ -91,6 +91,7 @@ async def get_server_config(interaction: discord.Interaction):
 
                 cache_mngr.users_config = await asyncio.to_thread(_read_users)
             except Exception as e:
+                logger.error(f"❌ [Utils] Erreur lors du chargement de users.json : {e}")
                 obs.record_error(source="utils", scope="load_users_config", exception=e, cog="utils")
                 cache_mngr.users_config = {}
         else:
@@ -114,6 +115,7 @@ async def get_server_config(interaction: discord.Interaction):
 
                     cache_mngr.guilds_config = await asyncio.to_thread(_read_guilds)
                 except Exception as e:
+                    logger.error(f"❌ [Utils] Erreur lors du chargement de serveurs.json : {e}")
                     obs.record_error(source="utils", scope="load_guilds_config", exception=e, cog="utils")
                     cache_mngr.guilds_config = {}
             else:
@@ -160,7 +162,7 @@ async def get_api_headers(interaction: discord.Interaction = None, custom_server
 try:
     from emojis import DICT_EMOJIS
 except ImportError as e:
-    logger.error(f"❌ Impossible de charger les émojis suivants : {e}")
+    logger.error(f"❌ [Utils] Impossible de charger les émojis suivants : {e}")
     obs.record_error(source="utils", scope="import_emojis", exception=e, cog="utils")
     DICT_EMOJIS = {}
 
@@ -168,7 +170,7 @@ except ImportError as e:
 def charger_langues():
     cache_mngr.translations.clear()
     if not LOCALES_DIR.exists():
-        logger.warning(f"⚠️ Le dossier des langues n'existe pas : {LOCALES_DIR}")
+        logger.warning(f"⚠️ [i18n] Le dossier des langues n'existe pas : {LOCALES_DIR}")
         return
 
     for fichier in LOCALES_DIR.glob("*.json"):
@@ -176,9 +178,9 @@ def charger_langues():
         try:
             with open(fichier, encoding="utf-8") as f:
                 cache_mngr.translations[langue] = json.load(f)
-            logger.info(f"📚 Langue chargée : {langue.upper()} ({len(cache_mngr.translations[langue])} clés)")
+            logger.info(f"📚 [i18n] Langue chargée : {langue.upper()} ({len(cache_mngr.translations[langue])} clés)")
         except Exception as e:
-            logger.error(f"❌ Erreur lors du chargement de {fichier.name} : {e}")
+            logger.error(f"❌ [i18n] Erreur lors du chargement de {fichier.name} : {e}")
             obs.record_error(source="utils", scope="load_locales", exception=e, cog="utils")
 
 
@@ -238,7 +240,7 @@ class PaginationView(discord.ui.View):
             except discord.HTTPException:
                 pass
             except Exception as e:
-                logger.error(f"❌ Erreur désactivation boutons PaginationView : {e}")
+                logger.error(f"❌ [UI] Erreur désactivation boutons PaginationView : {e}")
 
     def update_buttons(self):
         self.btn_prev.disabled = self.current_page == 0
@@ -313,7 +315,7 @@ async def prompt_vote_if_lucky(interaction: discord.Interaction, probability_per
                     return
 
         except Exception as e:
-            print(f"❌ [DEBUG VOTE] Erreur lors de la lecture du bouclier : {e}")
+            logger.error(f"❌ [Vote] Erreur lors de la lecture de votes.json : {e}")
             obs.record_error(source="utils", scope="vote_shield", exception=e, cog="utils")
 
     if random.randint(1, 100) > probability_percent:
@@ -436,7 +438,7 @@ def get_discord_timestamp(iso_str, style="R", langue="fr"):
 
 async def get_cached_data(serveur="E4K_FR1"):
     if len(cache_mngr.server_data) >= 1 and serveur not in cache_mngr.server_data:
-        logger.info(f"🧹 [Anti-OOM] Vidage du cache mémoire complet pour charger {serveur}.")
+        logger.info(f"🧹 [Cache] Anti-OOM : Vidage du cache mémoire complet pour charger {serveur}.")
         cache_mngr.server_data.clear()
         gc.collect()
 
@@ -468,7 +470,7 @@ async def get_cached_data(serveur="E4K_FR1"):
             try:
                 latest.unlink()
             except OSError as err:
-                logger.error(f"Impossible de supprimer le fichier corrompu : {err}")
+                logger.error(f"❌ [Cache] Impossible de supprimer le fichier corrompu : {err}")
             return {}
         except Exception as e:
             logger.error(f"❌ [Cache] Erreur lors de la lecture lourde de {serveur} : {e}")
@@ -1154,7 +1156,7 @@ async def load_blocks_async():
                 cache_mngr.blocks = await async_json_load(path)
                 return cache_mngr.blocks
             except Exception as e:
-                logger.error(f"❌ Fichier blocks.json corrompu ou illisible : {e}")
+                logger.error(f"❌ [Admin] Fichier blocks.json corrompu ou illisible : {e}")
                 obs.record_error(source="utils", scope="load_blocks", exception=e, cog="utils")
 
     cache_mngr.blocks = {"global_commands": {}, "blocked_users": {}}
@@ -1175,7 +1177,7 @@ async def load_configuration_async():
             try:
                 return await async_json_load(path)
             except Exception as e:
-                logger.error(f"❌ Erreur lecture servers_cache.json : {e}")
+                logger.error(f"❌ [Config] Erreur lecture servers_cache.json : {e}")
                 obs.record_error(source="utils", scope="load_configuration", exception=e, cog="utils")
         return {"servers_info": {}}
 
@@ -1193,7 +1195,7 @@ async def load_pseudos_async():
             try:
                 return await async_json_load(path)
             except Exception as e:
-                logger.error(f"❌ Erreur discord_pseudos.json : {e}")
+                logger.error(f"❌ [Pseudos] Erreur discord_pseudos.json : {e}")
                 obs.record_error(source="utils", scope="load_pseudos", exception=e, cog="utils")
     return {}
 
@@ -1211,7 +1213,7 @@ async def load_rivals_async():
             try:
                 return await async_json_load(path)
             except Exception as e:
-                logger.error(f"❌ Erreur rival_radar.json : {e}")
+                logger.error(f"❌ [Radar] Erreur rival_radar.json : {e}")
                 obs.record_error(source="utils", scope="load_rivals", exception=e, cog="utils")
     return {}
 
@@ -1229,7 +1231,7 @@ async def load_dungeons_async():
             try:
                 return await async_json_load(path)
             except Exception as e:
-                logger.error(f"❌ Erreur forteresses_sessions.json : {e}")
+                logger.error(f"❌ [Forts] Erreur forteresses_sessions.json : {e}")
                 obs.record_error(source="utils", scope="load_dungeons", exception=e, cog="utils")
     return {"sessions": {}}
 
@@ -1247,7 +1249,7 @@ def load_maintenance():
             with open(path, encoding="utf-8") as f:
                 return json.load(f).get("maintenance_mode", False)
         except Exception as e:
-            logger.error(f"❌ Impossible de lire maintenance.json : {e}")
+            logger.error(f"❌ [Admin] Impossible de lire maintenance.json : {e}")
             obs.record_error(source="utils", scope="load_maintenance", exception=e, cog="utils")
     return False
 
@@ -1259,7 +1261,7 @@ async def load_maintenance_async():
             try:
                 return (await async_json_load(path)).get("maintenance_mode", False)
             except Exception as e:
-                logger.error(f"❌ Erreur maintenance.json : {e}")
+                logger.error(f"❌ [Admin] Erreur maintenance.json : {e}")
                 obs.record_error(source="utils", scope="load_maintenance_async", exception=e, cog="utils")
     return False
 
@@ -1280,7 +1282,7 @@ async def load_surveillance_async():
                     data["alliances"] = {}
                 return data
             except Exception as e:
-                logger.error(f"❌ Erreur surveillance.json : {e}")
+                logger.error(f"❌ [Radar] Erreur surveillance.json : {e}")
                 obs.record_error(source="utils", scope="load_surveillance", exception=e, cog="utils")
     return {"players": {}, "alliances": {}}
 

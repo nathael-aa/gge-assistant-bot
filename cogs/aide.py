@@ -1012,7 +1012,7 @@ class AideCog(commands.Cog):
     async def aide_commande(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=False)
-        except:
+        except Exception:
             return
 
         langue, _ = await get_server_config(interaction)
@@ -1041,7 +1041,7 @@ class AideCog(commands.Cog):
     async def statut_commande(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
 
         langue, serveur = await get_server_config(interaction)
@@ -1112,6 +1112,7 @@ class AideCog(commands.Cog):
                 error=str(e),
                 defaut=f"🔴 Erreur de lecture de l'espace de stockage : {e}",
             )
+            logger.error(f"❌ [Statut] Erreur de lecture de l'espace disque : {e}")
             obs.record_error(source="command", scope="status_disk", exception=e, cog="aide")
 
         embed.add_field(
@@ -1127,7 +1128,7 @@ class AideCog(commands.Cog):
             try:
                 dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
                 return f"<t:{int(dt.timestamp())}:R>"
-            except:
+            except Exception:
                 return t(langue, "statut_api_unknown", defaut="Date inconnue")
 
         session = self.bot.session if hasattr(self.bot, "session") and self.bot.session else aiohttp.ClientSession()
@@ -1184,6 +1185,7 @@ class AideCog(commands.Cog):
                         inline=False,
                     )
                 else:
+                    logger.warning(f"⚠️ [Statut] L'API GGE Tracker répond de manière instable : Code {r.status}.")
                     embed.add_field(
                         name=api_title,
                         value=t(
@@ -1195,6 +1197,7 @@ class AideCog(commands.Cog):
                         inline=False,
                     )
         except Exception as e:
+            logger.error(f"❌ [Statut] API GGE Tracker Hors ligne : {e}")
             embed.add_field(
                 name=api_title,
                 value=t(
@@ -1299,7 +1302,7 @@ class AideCog(commands.Cog):
         try:
             await interaction.response.defer(ephemeral=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Aide] Defer failed sur /{interaction.command.name} : {e}")
             return
         langue, _ = await get_server_config(interaction)
 

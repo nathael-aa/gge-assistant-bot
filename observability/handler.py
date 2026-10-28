@@ -8,6 +8,9 @@ import re
 from .client import INTERNAL_LOGGER_NAME, ch_datetime64
 from .context import get_command_context, get_trace_id
 
+# Création d'une instance sécurisée du logger interne
+_log = logging.getLogger(INTERNAL_LOGGER_NAME)
+
 # Project messages already carry a tag such as [COMMANDE] or [Radar Spy]
 # So, it is reused as-is to fill the category column and filter on it
 _RE_CATEGORY = re.compile(r"\[([^\]\[]{1,40})\]")
@@ -63,9 +66,9 @@ class ClickHouseLogHandler(logging.Handler):
                 row["extra"]["exc_type"] = record.exc_info[0].__name__
 
             self.client.enqueue("logs", row)
-        except Exception:
-            # A logging handler must never break its caller
-            pass
+        except Exception as e:
+            # A logging handler must never break its caller, but we should track failures
+            _log.error(f"❌ [Metrics] Échec d'écriture dans le LogHandler : {e}")
 
     @staticmethod
     def _extract_extra(record: logging.LogRecord) -> dict:

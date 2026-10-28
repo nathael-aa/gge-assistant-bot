@@ -202,7 +202,10 @@ async def _send_observability_webhook(titre: str, description: str):
             webhook = discord.Webhook.from_url(webhook_url, session=session)
             await webhook.send(embed=embed, username="GGE Crash Report 🐛")
     except Exception as e:
-        print(f"❌ Échec de l'envoi du webhook d'observabilité : {e}")
+        import logging
+
+        logger = logging.getLogger("GGE_Bot")
+        logger.error(f"❌ [Metrics] Échec de l'envoi du webhook d'observabilité : {e}")
 
 
 def record_error(

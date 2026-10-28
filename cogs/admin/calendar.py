@@ -1,5 +1,6 @@
 import hashlib
 import io
+import logging
 import re
 from datetime import datetime
 
@@ -8,6 +9,8 @@ from discord.ext import commands
 
 from utils import CONFIG_DIR, SERVEURS_DIR, async_json_dump, async_json_load
 
+logger = logging.getLogger("GGE_Bot")
+
 
 class AdminCalendar(commands.Cog):
     def __init__(self, bot):
@@ -15,14 +18,20 @@ class AdminCalendar(commands.Cog):
 
     async def _reload_calendar_cache(self, ctx):
         """Fonction interne pour forcer la mise à jour du CalendrierCog en mémoire"""
-        cog = self.bot.get_cog("CalendrierCog")
-        if cog:
-            await cog.load_cache_from_file()
-            if hasattr(cog, "load_event_mapping"):
-                cog.event_mapping = cog.load_event_mapping()
-            await ctx.send("♻️ *Le cache du calendrier a été mis à jour en mémoire.*")
-        else:
-            await ctx.send("⚠️ *Attention : Le module Calendrier n'est pas chargé. Redémarre le bot pour appliquer.*")
+        try:
+            cog = self.bot.get_cog("CalendrierCog")
+            if cog:
+                await cog.load_cache_from_file()
+                if hasattr(cog, "load_event_mapping"):
+                    cog.event_mapping = cog.load_event_mapping()
+                await ctx.send("♻️ *Le cache du calendrier a été mis à jour en mémoire.*")
+            else:
+                await ctx.send(
+                    "⚠️ *Attention : Le module Calendrier n'est pas chargé. Redémarre le bot pour appliquer.*"
+                )
+        except Exception as e:
+            logger.error(f"❌ [AdminCalendar] Erreur lors du rechargement du cache en mémoire : {e}")
+            await ctx.send("❌ *Une erreur est survenue lors du rechargement du cache.*")
 
     @commands.command(name="cal_keys", hidden=True)
     async def cal_keys(self, ctx):
@@ -33,7 +42,11 @@ class AdminCalendar(commands.Cog):
         if not mapping_file.exists():
             return await ctx.send("❌ Fichier `event_mapping.json` introuvable.")
 
-        mapping = await async_json_load(mapping_file)
+        try:
+            mapping = await async_json_load(mapping_file)
+        except Exception as e:
+            logger.error(f"❌ [AdminCalendar] Erreur lecture event_mapping.json : {e}")
+            return await ctx.send("❌ Erreur de lecture du fichier de mapping.")
 
         embed = discord.Embed(
             title="🔑 Clés d'Événements GGE",
@@ -58,7 +71,11 @@ class AdminCalendar(commands.Cog):
         if not cal_file.exists():
             return await ctx.send("❌ Fichier calendrier.json introuvable.")
 
-        data = await async_json_load(cal_file)
+        try:
+            data = await async_json_load(cal_file)
+        except Exception as e:
+            logger.error(f"❌ [AdminCalendar] Erreur lecture calendrier.json : {e}")
+            return await ctx.send("❌ Erreur de lecture du fichier calendrier.")
 
         events = data.get("cached_events", [])
         if not events:
@@ -87,14 +104,24 @@ class AdminCalendar(commands.Cog):
             return await ctx.send('❌ Format de date invalide. Utilise : `"JJ/MM/AAAA HH:MM"`')
 
         mapping_file = CONFIG_DIR / "event_mapping.json"
-        mapping = await async_json_load(mapping_file)
+
+        try:
+            mapping = await async_json_load(mapping_file)
+        except Exception as e:
+            logger.error(f"❌ [AdminCalendar] Erreur lecture event_mapping.json dans cal_add : {e}")
+            return await ctx.send("❌ Erreur interne lors de la lecture du mapping.")
 
         if event_key.lower() not in mapping:
             cles = ", ".join(f"`{k}`" for k in mapping.keys())
             return await ctx.send(f"❌ La clé `{event_key}` n'existe pas. Clés valides : {cles}")
 
         cal_file = SERVEURS_DIR / "calendrier.json"
-        data = await async_json_load(cal_file)
+
+        try:
+            data = await async_json_load(cal_file) or {}
+        except Exception as e:
+            logger.error(f"❌ [AdminCalendar] Erreur lecture calendrier.json dans cal_add : {e}")
+            data = {}
 
         uid = f"{event_key.lower()}_{int(dt_start.timestamp())}"
         new_id = hashlib.md5(uid.encode()).hexdigest()[:5]
@@ -103,7 +130,11 @@ class AdminCalendar(commands.Cog):
             {"id": new_id, "key": event_key.lower(), "start": dt_start.isoformat(), "end": dt_end.isoformat()}
         )
 
-        await async_json_dump(cal_file, data, indent=2, ensure_ascii=False)
+        try:
+            await async_json_dump(cal_file, data, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"❌ [AdminCalendar] Erreur écriture calendrier.json dans cal_add : {e}")
+            return await ctx.send("❌ Erreur lors de la sauvegarde de l'événement.")
 
         await ctx.send(f"✅ Événement `{event_key}` ajouté avec l'ID `{new_id}`.")
         await self._reload_calendar_cache(ctx)
@@ -120,7 +151,11 @@ class AdminCalendar(commands.Cog):
 
         cal_file = SERVEURS_DIR / "calendrier.json"
 
-        data = await async_json_load(cal_file)
+        try:
+            data = await async_json_load(cal_file)
+        except Exception as e:
+            logger.error(f"❌ [AdminCalendar] Erreur lecture calendrier.json dans cal_edit : {e}")
+            return await ctx.send("❌ Erreur de lecture du fichier calendrier.")
 
         trouve = False
         for ev in data.get("cached_events", []):
@@ -133,7 +168,11 @@ class AdminCalendar(commands.Cog):
         if not trouve:
             return await ctx.send(f"❌ Aucun événement trouvé avec l'ID `{event_id}`.")
 
-        await async_json_dump(cal_file, data, indent=2, ensure_ascii=False)
+        try:
+            await async_json_dump(cal_file, data, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"❌ [AdminCalendar] Erreur écriture calendrier.json dans cal_edit : {e}")
+            return await ctx.send("❌ Erreur lors de la sauvegarde des modifications.")
 
         await ctx.send(f"✅ Événement `{event_id}` mis à jour :\n**Début:** {start}\n**Fin:** {end}")
         await self._reload_calendar_cache(ctx)
@@ -144,7 +183,11 @@ class AdminCalendar(commands.Cog):
 
         cal_file = SERVEURS_DIR / "calendrier.json"
 
-        data = await async_json_load(cal_file)
+        try:
+            data = await async_json_load(cal_file)
+        except Exception as e:
+            logger.error(f"❌ [AdminCalendar] Erreur lecture calendrier.json dans cal_del : {e}")
+            return await ctx.send("❌ Erreur de lecture du calendrier.")
 
         events = data.get("cached_events", [])
         events_filtres = [ev for ev in events if ev.get("id") != event_id]
@@ -159,7 +202,11 @@ class AdminCalendar(commands.Cog):
         if event_id not in data["deleted_events"]:
             data["deleted_events"].append(event_id)
 
-        await async_json_dump(cal_file, data, indent=2, ensure_ascii=False)
+        try:
+            await async_json_dump(cal_file, data, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"❌ [AdminCalendar] Erreur écriture calendrier.json dans cal_del : {e}")
+            return await ctx.send("❌ Erreur lors de la sauvegarde de la suppression.")
 
         await ctx.send(
             f"🗑️ Événement `{event_id}` supprimé et ajouté à la **liste noire** (il sera ignoré par les futurs scans)."
@@ -178,7 +225,11 @@ class AdminCalendar(commands.Cog):
 
         mapping_file = CONFIG_DIR / "event_mapping.json"
 
-        mapping = await async_json_load(mapping_file)
+        try:
+            mapping = await async_json_load(mapping_file)
+        except Exception as e:
+            logger.error(f"❌ [AdminCalendar] Erreur lecture event_mapping.json dans cal_mapping : {e}")
+            return await ctx.send("❌ Erreur de lecture du fichier de mapping.")
 
         if event_key.lower() not in mapping:
             cles = ", ".join(f"`{k}`" for k in mapping.keys())
@@ -186,7 +237,15 @@ class AdminCalendar(commands.Cog):
 
         mapping[event_key.lower()][cible.lower()] = heure
 
-        await async_json_dump(mapping_file, mapping, indent=2, ensure_ascii=False)
+        try:
+            await async_json_dump(mapping_file, mapping, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"❌ [AdminCalendar] Erreur écriture event_mapping.json dans cal_mapping : {e}")
+            return await ctx.send("❌ Erreur lors de la sauvegarde du mapping.")
 
         await ctx.send(f"⚙️ Mapping de `{event_key}` mis à jour : **{cible.lower()}** ➔ `{heure}`.")
         await self._reload_calendar_cache(ctx)
+
+
+async def setup(bot):
+    await bot.add_cog(AdminCalendar(bot))

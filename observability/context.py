@@ -2,10 +2,15 @@
 Correlation context linking a command to everything it triggers
 """
 
+import logging
 import time
 import uuid
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+
+from .client import INTERNAL_LOGGER_NAME
+
+_log = logging.getLogger(INTERNAL_LOGGER_NAME)
 
 
 @dataclass
@@ -53,37 +58,62 @@ def new_trace_id() -> str:
 
 
 def set_command_context(context: CommandContext) -> None:
-    _trace_id.set(context.trace_id)
-    _command_ctx.set(context)
+    try:
+        _trace_id.set(context.trace_id)
+        _command_ctx.set(context)
+    except Exception as e:
+        _log.error(f"❌ [Metrics] Erreur dans set_command_context : {e}")
 
 
 def get_command_context() -> CommandContext | None:
-    return _command_ctx.get()
+    try:
+        return _command_ctx.get()
+    except Exception as e:
+        _log.error(f"❌ [Metrics] Erreur dans get_command_context : {e}")
+        return None
 
 
 def get_trace_id() -> str:
-    return _trace_id.get()
+    try:
+        return _trace_id.get()
+    except Exception as e:
+        _log.error(f"❌ [Metrics] Erreur dans get_trace_id : {e}")
+        return ""
 
 
 def set_trace_id(trace_id: str) -> None:
-    _trace_id.set(trace_id)
+    try:
+        _trace_id.set(trace_id)
+    except Exception as e:
+        _log.error(f"❌ [Metrics] Erreur dans set_trace_id : {e}")
 
 
 def set_task_name(name: str) -> str:
     """Name the current background task and give it a trace_id"""
-    _task_name.set(name)
-    trace_id = new_trace_id()
-    _trace_id.set(trace_id)
-    return trace_id
+    try:
+        _task_name.set(name)
+        trace_id = new_trace_id()
+        _trace_id.set(trace_id)
+        return trace_id
+    except Exception as e:
+        _log.error(f"❌ [Metrics] Erreur dans set_task_name : {e}")
+        return ""
 
 
 def get_task_name() -> str:
-    return _task_name.get()
+    try:
+        return _task_name.get()
+    except Exception as e:
+        _log.error(f"❌ [Metrics] Erreur dans get_task_name : {e}")
+        return ""
 
 
 def record_api_call(duration_ms: int) -> None:
     """Increment the API counters of the command currently running"""
-    context = _command_ctx.get()
-    if context is not None:
-        context.api_calls += 1
-        context.api_time_ms += max(0, duration_ms)
+    try:
+        context = _command_ctx.get()
+        if context is not None:
+            context.api_calls += 1
+            context.api_time_ms += max(0, duration_ms)
+    except Exception as e:
+        _log.error(f"❌ [Metrics] Erreur dans record_api_call : {e}")

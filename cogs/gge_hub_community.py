@@ -36,13 +36,17 @@ async def load_hub_config():
             if "posted_news" not in data:
                 data["posted_news"] = []
             return data
-    except Exception:
+    except Exception as e:
+        logger.error(f"❌ [Hub] Erreur lecture fichier config hub : {e}")
         return {"guilds": {}, "posted_news": []}
 
 
 async def save_hub_config(data):
-    with open(HUB_CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+    try:
+        with open(HUB_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"❌ [Hub] Erreur écriture fichier config hub : {e}")
 
 
 class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description="GGE Community Hub News"):
@@ -198,7 +202,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                         if chunk.strip():
                             await thread.send(chunk)
                 except Exception as e:
-                    logger.error(f"Erreur création thread patchnote : {e}")
+                    logger.error(f"❌ [Hub] Erreur création thread patchnote : {e}")
 
             obs.record_alert(
                 source="hub_news",
@@ -211,7 +215,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                 dm_blocked=0,
             )
         except Exception as e:
-            logger.error(f"Erreur d'envoi annonce HUB : {e}")
+            logger.error(f"❌ [Hub] Erreur d'envoi annonce HUB : {e}")
 
     @app_commands.command(name="setup", description="Configure the channel for GGE announcements")
     @app_commands.choices(
@@ -234,7 +238,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
         try:
             await interaction.response.defer(ephemeral=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Hub] Defer failed sur /{interaction.command.name} : {e}")
             return
         langue, serveur = await get_server_config(interaction)
 
@@ -332,7 +336,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                         texte_complet[:400] + "..." if len(texte_complet) > 400 else texte_complet
                                     )
                     except Exception as e:
-                        logger.error(f"Setup fetch error: {e}")
+                        logger.error(f"❌ [Hub] Setup fetch error: {e}")
 
                 if latest_article["type"] == "patchnotes":
                     final_titre = latest_article["title"]
@@ -374,7 +378,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
         try:
             await interaction.response.defer(ephemeral=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Hub] Defer failed sur /{interaction.command.name} : {e}")
             return
         langue, serveur = await get_server_config(interaction)
 
@@ -574,7 +578,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             for br in content_div.find_all("br"):
                                 br.replace_with("\n")
                             for li in content_div.find_all("li"):
-                                li.insert(0, "\n- ")
+                                li.insert(0, "\n")
                             for strong in content_div.find_all(["b", "strong"]):
                                 strong.insert(0, "**")
                                 strong.append("**")
@@ -781,7 +785,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                         else:
                                             texte_resume = texte_complet
                         except Exception as e:
-                            logger.error(f"Impossible de lire le contenu de {article['url']} : {e}")
+                            logger.error(f"❌ [Hub] Impossible de lire le contenu de {article['url']} : {e}")
 
                     traductions = {}
                     for lang in langues_cibles:
@@ -823,7 +827,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                 return ""
                             texte = texte.replace("- -", "-").replace("- •", "-").replace("•", "-").replace("-  -", "-")
                             texte = re.sub(r"^[0-9]+\.\s*\*\*", "**", texte, flags=re.MULTILINE)
-                            texte = texte.replace(".- ", ".\n- ")
+                            texte = texte.replace(".- ", ".\n")
                             return texte.strip()
 
                         final_resume = clean_md(final_resume)
@@ -833,7 +837,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                         if not channel:
                             try:
                                 channel = await self.bot.fetch_channel(channel_id)
-                            except:
+                            except Exception:
                                 continue
 
                         await self._build_and_send_embed(
@@ -854,7 +858,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                 logger.info(f"📰 [Hub] {len(articles_a_publier)} actualités envoyées et traduites.")
 
         except Exception as e:
-            logger.error(f"❌ [HUB CRASH] : {traceback.format_exc()}")
+            logger.error(f"❌ [Hub] CRASH FATAL : {traceback.format_exc()}")
             obs.record_error(source="task", scope="check_hub_news_task", exception=e, cog="hub")
 
     @check_hub_news_task.before_loop

@@ -170,9 +170,10 @@ class ClickHouseClient:
                 await self.flush()
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except Exception as e:
                 # The flusher must never die
                 self.flush_failures += 1
+                _log.error(f"❌ [Metrics] Erreur dans le flush_loop : {e}")
 
     async def flush(self) -> None:
         """Send the whole buffer. Silent when ClickHouse is unavailable"""

@@ -1,6 +1,10 @@
+import logging
+
 import discord
 
 from utils import DICT_EMOJIS, load_surveillance_async, save_surveillance_async, t
+
+logger = logging.getLogger("GGE_Bot")
 
 
 class RadarSettingsView(discord.ui.View):
@@ -26,15 +30,18 @@ class RadarSettingsView(discord.ui.View):
         self.update_buttons_state()
 
     async def toggle_pref(self, pref_key: str):
-        data = await load_surveillance_async()
-        dict_key = "abonnes" if self.entity_type == "user" else "guild_abonnes"
+        try:
+            data = await load_surveillance_async()
+            dict_key = "abonnes" if self.entity_type == "user" else "guild_abonnes"
 
-        if self.p_id in data.get("players", {}) and self.entity_id in data["players"][self.p_id].get(dict_key, {}):
-            current = data["players"][self.p_id][dict_key][self.entity_id].get(pref_key, False)
-            new_val = not current
-            data["players"][self.p_id][dict_key][self.entity_id][pref_key] = new_val
-            self.prefs[pref_key] = new_val
-            await save_surveillance_async(data)
+            if self.p_id in data.get("players", {}) and self.entity_id in data["players"][self.p_id].get(dict_key, {}):
+                current = data["players"][self.p_id][dict_key][self.entity_id].get(pref_key, False)
+                new_val = not current
+                data["players"][self.p_id][dict_key][self.entity_id][pref_key] = new_val
+                self.prefs[pref_key] = new_val
+                await save_surveillance_async(data)
+        except Exception as e:
+            logger.error(f"❌ [Views] Erreur toggle_pref ({pref_key}) : {e}")
 
     def update_buttons_state(self):
         self.btn_pseudo.style = discord.ButtonStyle.success if self.prefs.get("pseudo") else discord.ButtonStyle.danger
@@ -59,31 +66,46 @@ class RadarSettingsView(discord.ui.View):
     async def btn_pseudo(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.toggle_pref("pseudo")
         self.update_buttons_state()
-        await interaction.response.edit_message(view=self)
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
 
     @discord.ui.button(custom_id="pref_position", row=0)
     async def btn_position(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.toggle_pref("position")
         self.update_buttons_state()
-        await interaction.response.edit_message(view=self)
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
 
     @discord.ui.button(custom_id="pref_alliance", row=0)
     async def btn_alliance(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.toggle_pref("alliance")
         self.update_buttons_state()
-        await interaction.response.edit_message(view=self)
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
 
     @discord.ui.button(custom_id="pref_puissance", row=1)
     async def btn_puissance(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.toggle_pref("puissance")
         self.update_buttons_state()
-        await interaction.response.edit_message(view=self)
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
 
     @discord.ui.button(custom_id="pref_colombe", row=1)
     async def btn_colombe(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.toggle_pref("colombe")
         self.update_buttons_state()
-        await interaction.response.edit_message(view=self)
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
 
     @discord.ui.button(style=discord.ButtonStyle.secondary, row=2)
     async def btn_fermer(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -99,7 +121,10 @@ class RadarSettingsView(discord.ui.View):
             target=target,
             defaut=f"{e_check} **Préférences enregistrées !** {target} est actif.",
         )
-        await interaction.response.edit_message(content=msg, view=None)
+        try:
+            await interaction.response.edit_message(content=msg, view=None)
+        except Exception:
+            pass
 
 
 class RadarAllianceSettingsView(discord.ui.View):
@@ -123,15 +148,20 @@ class RadarAllianceSettingsView(discord.ui.View):
         self.update_buttons_state()
 
     async def toggle_pref(self, pref_key: str):
-        data = await load_surveillance_async()
-        dict_key = "abonnes" if self.entity_type == "user" else "guild_abonnes"
+        try:
+            data = await load_surveillance_async()
+            dict_key = "abonnes" if self.entity_type == "user" else "guild_abonnes"
 
-        if self.a_id in data.get("alliances", {}) and self.entity_id in data["alliances"][self.a_id].get(dict_key, {}):
-            current = data["alliances"][self.a_id][dict_key][self.entity_id].get(pref_key, False)
-            new_val = not current
-            data["alliances"][self.a_id][dict_key][self.entity_id][pref_key] = new_val
-            self.prefs[pref_key] = new_val
-            await save_surveillance_async(data)
+            if self.a_id in data.get("alliances", {}) and self.entity_id in data["alliances"][self.a_id].get(
+                dict_key, {}
+            ):
+                current = data["alliances"][self.a_id][dict_key][self.entity_id].get(pref_key, False)
+                new_val = not current
+                data["alliances"][self.a_id][dict_key][self.entity_id][pref_key] = new_val
+                self.prefs[pref_key] = new_val
+                await save_surveillance_async(data)
+        except Exception as e:
+            logger.error(f"❌ [Views] Erreur toggle_pref alli ({pref_key}) : {e}")
 
     def update_buttons_state(self):
         self.btn_mouvements.style = (
@@ -148,19 +178,28 @@ class RadarAllianceSettingsView(discord.ui.View):
     async def btn_mouvements(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.toggle_pref("mouvements")
         self.update_buttons_state()
-        await interaction.response.edit_message(view=self)
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
 
     @discord.ui.button(custom_id="pref_alli_rangs", row=0)
     async def btn_rangs(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.toggle_pref("rangs")
         self.update_buttons_state()
-        await interaction.response.edit_message(view=self)
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
 
     @discord.ui.button(custom_id="pref_alli_infos", row=0)
     async def btn_infos(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.toggle_pref("infos")
         self.update_buttons_state()
-        await interaction.response.edit_message(view=self)
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
 
     @discord.ui.button(style=discord.ButtonStyle.secondary, row=2)
     async def btn_fermer(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -176,4 +215,7 @@ class RadarAllianceSettingsView(discord.ui.View):
             target=target,
             defaut=f"{e_check} **Préférences enregistrées !** {target} est actif.",
         )
-        await interaction.response.edit_message(content=msg, view=None)
+        try:
+            await interaction.response.edit_message(content=msg, view=None)
+        except Exception:
+            pass

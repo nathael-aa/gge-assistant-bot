@@ -188,10 +188,10 @@ class GGEAssistantBot(commands.Bot):
         # =======================================
         if TOPGG_TOKEN and TOPGG_TOKEN != "FAUX_TOKEN":
             self.topgg_token = TOPGG_TOKEN
-            logger.info("🟢 Token Top.gg enregistré (utilisation via aiohttp v1).")
+            logger.info("🟢 [Bot] Token Top.gg enregistré (utilisation via aiohttp v1).")
         else:
             self.topgg_token = None
-            logger.warning("⚠️ Aucun token Top.gg détecté. Les requêtes de vote seront ignorées.")
+            logger.warning("⚠️ [Bot] Aucun token Top.gg détecté. Les requêtes de vote seront ignorées.")
 
         # =======================================
         # DEMMARAGE OBS
@@ -207,7 +207,7 @@ class GGEAssistantBot(commands.Bot):
         # =======================================
         # CHARGEMENT DES COGS
         # =======================================
-        logger.info("🔌 Chargement des modules ...")
+        logger.info("🔌 [Bot] Chargement des modules ...")
         extensions = [
             "cogs.admin",
             "cogs.aide",
@@ -231,9 +231,9 @@ class GGEAssistantBot(commands.Bot):
         for ext in extensions:
             try:
                 await self.load_extension(ext)
-                logger.info(f"✅ Module {ext} chargé.")
+                logger.info(f"✅ [Bot] Module {ext} chargé.")
             except Exception as e:
-                logger.error(f"❌ Erreur {ext} : {e}")
+                logger.error(f"❌ [Bot] Erreur chargement module {ext} : {e}")
 
         # =======================================
         # INITIALISATION DES TASKS
@@ -280,8 +280,8 @@ class GGEAssistantBot(commands.Bot):
     # =======================================
     async def on_ready(self):
         charger_langues()
-        logger.info(f"✅ Bot connecté en tant que {self.user} (ID: {self.user.id})")
-        logger.info("🟢 Démarrage du système de logs...")
+        logger.info(f"✅ [Bot] Bot connecté en tant que {self.user} (ID: {self.user.id})")
+        logger.info("🟢 [Bot] Démarrage du système de logs...")
 
         # ==========================================
         # WEBHOOK START NOTIFICATION
@@ -297,7 +297,7 @@ class GGEAssistantBot(commands.Bot):
                 webhook = discord.Webhook.from_url(webhook_start, session=self.session)
                 self.loop.create_task(webhook.send(embed=embed, username="GGE Console 🟢"))
             except Exception as e:
-                logger.error(f"❌ Impossible d'envoyer le webhook de démarrage : {e}")
+                logger.error(f"❌ [Bot] Impossible d'envoyer le webhook de démarrage : {e}")
 
         try:
             path_fort = JOUEURS_DIR / "forteresses_sessions.json"
@@ -342,7 +342,7 @@ class GGEAssistantBot(commands.Bot):
                             pass
 
         except Exception as e:
-            logger.error(f"❌ Erreur lors de l'envoi du préavis au démarrage : {e}")
+            logger.error(f"❌ [Bot] Erreur lors de l'envoi du préavis au démarrage : {e}")
 
         # ==========================================
         # VERIFICATION MAINTENANCE
@@ -357,7 +357,7 @@ class GGEAssistantBot(commands.Bot):
 
         if not self.is_closed():
             await self.change_presence(activity=activity, status=target_status)
-        logger.info(f"📡 Statut mis à jour : {activity.name} | Pastille : {target_status}")
+        logger.info(f"📡 [Bot] Statut mis à jour : {activity.name} | Pastille : {target_status}")
 
     # ==========================================
     # NOUVEAU SERVEUR
@@ -372,20 +372,16 @@ class GGEAssistantBot(commands.Bot):
 
         webhook_servers = os.getenv("WEBHOOK_JOIN")
         if webhook_servers and webhook_servers.startswith("http"):
-            # --- CORRECTION ICI ---
             if guild.owner:
                 proprio = guild.owner.name
             elif guild.owner_id:
                 try:
-                    # Si le cache est vide, on force la récupération via l'API Discord
-                    # (Note: Utilise self.bot.fetch_user si ce code est dans un Cog)
                     owner_user = await self.fetch_user(guild.owner_id)
                     proprio = owner_user.name
                 except Exception:
                     proprio = f"ID: {guild.owner_id}"
             else:
                 proprio = "Inconnu"
-            # ----------------------
 
             embed = discord.Embed(
                 title="🎉 Nouveau Serveur Rejoint !",
@@ -396,7 +392,7 @@ class GGEAssistantBot(commands.Bot):
                 webhook = discord.Webhook.from_url(webhook_servers, session=self.session)
                 await webhook.send(embed=embed, username="GGE Serveurs 📈")
             except Exception as e:
-                logger.error(f"❌ Erreur Webhook Join : {e}")
+                logger.error(f"❌ [Bot] Erreur Webhook Join : {e}")
 
         channel_to_send = guild.system_channel
 
@@ -419,9 +415,9 @@ class GGEAssistantBot(commands.Bot):
             try:
                 await channel_to_send.send(embed=embed_initial, view=view)
             except discord.Forbidden:
-                logger.warning(f"🔇 Message de bienvenue bloqué par les paramètres du serveur '{guild.name}'.")
+                logger.warning(f"🔇 [Bot] Message de bienvenue bloqué par les paramètres du serveur '{guild.name}'.")
             except Exception as e:
-                logger.error(f"❌ Erreur inattendue du message de bienvenue sur {guild.name} : {e}")
+                logger.error(f"❌ [Bot] Erreur inattendue du message de bienvenue sur {guild.name} : {e}")
                 self.loop.create_task(
                     self._send_background_error(
                         "🐛 Crash Inattendu (Bienvenue)",
@@ -433,7 +429,7 @@ class GGEAssistantBot(commands.Bot):
     # SERVEUR SUPPRIME
     # ==========================================
     async def on_guild_remove(self, guild: discord.Guild):
-        logger.warning(f"👋 [DÉPART SERVEUR] Le bot a été retiré de '{guild.name}' (ID: {guild.id})")
+        logger.info(f"👋 [DÉPART SERVEUR] Le bot a été retiré de '{guild.name}' (ID: {guild.id})")
 
         obs.record_guild_event("guild_leave", guild=guild, guild_total=len(self.guilds))
         obs.upsert_guild(guild=guild, is_active=0, left_at=obs.ch_datetime())
@@ -449,7 +445,7 @@ class GGEAssistantBot(commands.Bot):
                 webhook = discord.Webhook.from_url(webhook_servers, session=self.session)
                 await webhook.send(embed=embed, username="GGE Serveurs 📉")
             except Exception as e:
-                logger.error(f"❌ Erreur Webhook Leave : {e}")
+                logger.error(f"❌ [Bot] Erreur Webhook Leave : {e}")
 
     # ==========================================
     # VERIFICATION SI SCAN EN COURS
@@ -462,7 +458,7 @@ class GGEAssistantBot(commands.Bot):
 
             if flag_path.exists():
                 if not self.scan_flag_detected:
-                    logger.info(
+                    logger.debug(
                         "⚡ [Watcher] Fichier scan.flag détecté. Un scan global du serveur est en cours d'exécution..."
                     )
                     self.scan_flag_detected = True
@@ -475,10 +471,11 @@ class GGEAssistantBot(commands.Bot):
                     try:
                         for srv in cache_mngr.server_data:
                             cache_mngr.server_data[srv]["last_refresh"] = 0
-                        logger.info("✅ [Watcher] Le cache mémoire sera réactualisé à la prochaine commande.")
+                        logger.debug("✅ [Watcher] Le cache mémoire sera réactualisé à la prochaine commande.")
                     except Exception as e:
-                        logger.error(f"❌ [Watcher] Échec : {e}")
+                        logger.error(f"❌ [Watcher] Échec actualisation RAM : {e}")
         except Exception as e:
+            logger.error(f"❌ [Watcher] Erreur globale flag watcher : {e}")
             obs.record_error(source="task", scope="flag_watcher_task", exception=e, cog="core")
 
     # ==========================================
@@ -525,6 +522,7 @@ class GGEAssistantBot(commands.Bot):
             if not self.is_closed():
                 await self.change_presence(activity=activity, status=discord.Status.online)
         except Exception as e:
+            logger.error(f"❌ [Bot] Erreur status_task : {e}")
             obs.record_error(source="task", scope="status_task", exception=e, cog="core")
 
     @status_task.before_loop
@@ -547,6 +545,7 @@ class GGEAssistantBot(commands.Bot):
         try:
             raw_body = await request.text()
         except Exception as e:
+            logger.error(f"❌ [Webhook] Impossible de lire le payload : {e}")
             obs.record_error(source="webhook", scope="topgg_body", exception=e, cog="core")
             return web.Response(status=400, text="Unreadable body")
 
@@ -560,6 +559,7 @@ class GGEAssistantBot(commands.Bot):
                     obs.record_vote(accepted=False, reject_reason="bad_signature_v1", signature_version="v1")
                     return web.Response(status=401, text="Signature invalide")
             except Exception as e:
+                logger.error(f"❌ [Webhook] Erreur calcul signature v1 : {e}")
                 obs.record_error(source="webhook", scope="topgg_sig", exception=e, cog="core")
                 obs.record_vote(accepted=False, reject_reason="invalid_signature_format", signature_version="v1")
                 return web.Response(status=400, text="Erreur de calcul v1")
@@ -572,6 +572,7 @@ class GGEAssistantBot(commands.Bot):
         try:
             payload = json.loads(raw_body)
         except Exception:
+            logger.error("❌ [Webhook] JSON invalide.")
             obs.record_vote(
                 accepted=False, reject_reason="invalid_json", signature_version="v1" if signature_header else "v0"
             )
@@ -624,7 +625,7 @@ class GGEAssistantBot(commands.Bot):
                 try:
                     self.loop.create_task(self.session.post(webhook_votes, json=payload))
                 except Exception as e:
-                    logger.warning(f"⚠️ [Webhook] Impossible d'envoyer la notification de vote : {e}")
+                    logger.warning(f"⚠️ [Webhook] Impossible d'envoyer la notification de vote admin : {e}")
 
         VOTES_FILE = JOUEURS_DIR / "votes.json"
         votes_data = {}
@@ -672,7 +673,8 @@ class GGEAssistantBot(commands.Bot):
 
                 embed = discord.Embed(title=titre, description=description, color=discord.Color.brand_green())
                 await user.send(embed=embed)
-        except Exception:
+        except Exception as e:
+            logger.error(f"❌ [Webhook] Erreur envoi DM remerciement : {e}")
             pass
 
         return web.Response(status=200, text="OK")
@@ -748,8 +750,9 @@ class GGEAssistantBot(commands.Bot):
                         json.dump(votes_data, f, indent=4)
                     logger.info("✅ [Top.gg] Base des votes mise à jour via API v1 (Boucliers 7j attribués/nettoyés).")
                 except Exception as e:
-                    logger.error(f"❌ Impossible de sauvegarder votes.json : {e}")
+                    logger.error(f"❌ [Top.gg] Impossible de sauvegarder votes.json : {e}")
         except Exception as e:
+            logger.error(f"❌ [Top.gg] Erreur globale sync_topgg_votes_task : {e}")
             obs.record_error(source="task", scope="sync_topgg_votes_task", exception=e, cog="core")
 
     @sync_topgg_votes_task.before_loop
@@ -836,129 +839,129 @@ class GGEAssistantBot(commands.Bot):
                         else:
                             old_data = anciennes_infos[name]
 
-                            changed_flags = []
-                            if old_data.get("storm", False) != new_data["storm"]:
-                                etat = "✅ Activé" if new_data["storm"] else "❌ Désactivé"
-                                changed_flags.append(f"Storm: {etat}")
+                        changed_flags = []
+                        if old_data.get("storm", False) != new_data["storm"]:
+                            etat = "✅ Activé" if new_data["storm"] else "❌ Désactivé"
+                            changed_flags.append(f"Storm: {etat}")
 
-                            if old_data.get("fortress", False) != new_data["fortress"]:
-                                etat = "✅ Activé" if new_data["fortress"] else "❌ Désactivé"
-                                changed_flags.append(f"Fortress: {etat}")
+                        if old_data.get("fortress", False) != new_data["fortress"]:
+                            etat = "✅ Activé" if new_data["fortress"] else "❌ Désactivé"
+                            changed_flags.append(f"Fortress: {etat}")
 
-                            if old_data.get("advanced_castle", False) != new_data["advanced_castle"]:
-                                etat = "✅ Activé" if new_data["advanced_castle"] else "❌ Désactivé"
-                                changed_flags.append(f"Advanced Castle: {etat}")
+                        if old_data.get("advanced_castle", False) != new_data["advanced_castle"]:
+                            etat = "✅ Activé" if new_data["advanced_castle"] else "❌ Désactivé"
+                            changed_flags.append(f"Advanced Castle: {etat}")
 
-                            if changed_flags:
-                                changements_features.append(f"• **{name}** ➔ " + " | ".join(changed_flags))
+                        if changed_flags:
+                            changements_features.append(f"• **{name}** ➔ " + " | ".join(changed_flags))
 
-                                # ==========================================
-                                # 🧹 NETTOYAGE DES ABONNEMENTS TEMPÊTES
-                                # ==========================================
-                                if old_data.get("storm", False) and not new_data["storm"]:
-                                    try:
-                                        storm_file = Path("data/serveurs/storm_alerts.json")
-                                        if storm_file.exists():
-                                            with open(storm_file, encoding="utf-8") as fs:
-                                                storm_data = json.load(fs)
+                            # ==========================================
+                            # 🧹 NETTOYAGE DES ABONNEMENTS TEMPÊTES
+                            # ==========================================
+                            if old_data.get("storm", False) and not new_data["storm"]:
+                                try:
+                                    storm_file = Path("data/serveurs/storm_alerts.json")
+                                    if storm_file.exists():
+                                        with open(storm_file, encoding="utf-8") as fs:
+                                            storm_data = json.load(fs)
 
-                                            guilds_modified = False
-                                            guilds_to_remove = []
+                                        guilds_modified = False
+                                        guilds_to_remove = []
 
-                                            for gid, config in storm_data.get("guilds", {}).items():
-                                                if config.get("gge_server") == name:
-                                                    guilds_to_remove.append((gid, config))
+                                        for gid, config in storm_data.get("guilds", {}).items():
+                                            if config.get("gge_server") == name:
+                                                guilds_to_remove.append((gid, config))
 
-                                            for gid, config in guilds_to_remove:
-                                                channel_id = config.get("channel_id")
-                                                langue_serveur = config.get("langue", "fr")
+                                        for gid, config in guilds_to_remove:
+                                            channel_id = config.get("channel_id")
+                                            langue_serveur = config.get("langue", "fr")
 
-                                                try:
-                                                    channel = self.get_channel(channel_id) or await self.fetch_channel(
-                                                        channel_id
+                                            try:
+                                                channel = self.get_channel(channel_id) or await self.fetch_channel(
+                                                    channel_id
+                                                )
+                                                if channel:
+                                                    titre = t(
+                                                        langue_serveur,
+                                                        "bot_alert_module_disabled_title",
+                                                        defaut="⚠️ Fin des alertes Tempêtes",
                                                     )
-                                                    if channel:
-                                                        titre = t(
-                                                            langue_serveur,
-                                                            "bot_alert_module_disabled_title",
-                                                            defaut="⚠️ Fin des alertes Tempêtes",
-                                                        )
-                                                        desc = t(
-                                                            langue_serveur,
-                                                            "bot_alert_module_disabled_desc",
-                                                            server=name,
-                                                            defaut=f"Le serveur de jeu **{name}** ne gère plus les îles orageuses (ou a été désactivé par GGE-Tracker). Les alertes automatiques ont été désactivées pour ce salon.",
-                                                        )
-                                                        embed = discord.Embed(
-                                                            title=titre, description=desc, color=discord.Color.red()
-                                                        )
-                                                        self.loop.create_task(channel.send(embed=embed))
-                                                except Exception:
-                                                    pass
+                                                    desc = t(
+                                                        langue_serveur,
+                                                        "bot_alert_module_disabled_desc",
+                                                        server=name,
+                                                        defaut=f"Le serveur de jeu **{name}** ne gère plus les îles orageuses (ou a été désactivé par GGE-Tracker). Les alertes automatiques ont été désactivées pour ce salon.",
+                                                    )
+                                                    embed = discord.Embed(
+                                                        title=titre, description=desc, color=discord.Color.red()
+                                                    )
+                                                    self.loop.create_task(channel.send(embed=embed))
+                                            except Exception:
+                                                pass
 
-                                                del storm_data["guilds"][gid]
-                                                guilds_modified = True
+                                            del storm_data["guilds"][gid]
+                                            guilds_modified = True
 
-                                            if guilds_modified:
-                                                with open(storm_file, "w", encoding="utf-8") as fs:
-                                                    json.dump(storm_data, fs, indent=4, ensure_ascii=False)
-                                                logger.info(
-                                                    f"🧹 [XML Sync] Nettoyage : {len(guilds_to_remove)} serveurs Discord désabonnés du radar tempête pour {name}."
-                                                )
-                                    except Exception as e:
-                                        logger.error(f"❌ [XML Sync] Erreur nettoyage tempêtes pour {name} : {e}")
+                                        if guilds_modified:
+                                            with open(storm_file, "w", encoding="utf-8") as fs:
+                                                json.dump(storm_data, fs, indent=4, ensure_ascii=False)
+                                            logger.info(
+                                                f"🧹 [XML Sync] Nettoyage : {len(guilds_to_remove)} serveurs Discord désabonnés du radar tempête pour {name}."
+                                            )
+                                except Exception as e:
+                                    logger.error(f"❌ [XML Sync] Erreur nettoyage tempêtes pour {name} : {e}")
 
-                                # ==========================================
-                                # 🧹 NETTOYAGE DES SESSIONS FORTERESSES
-                                # ==========================================
-                                if old_data.get("fortress", False) and not new_data["fortress"]:
-                                    try:
-                                        fortress_file = JOUEURS_DIR / "forteresses_sessions.json"
-                                        if fortress_file.exists():
-                                            with open(fortress_file, encoding="utf-8") as fs:
-                                                fort_data = json.load(fs)
+                            # ==========================================
+                            # 🧹 NETTOYAGE DES SESSIONS FORTERESSES
+                            # ==========================================
+                            if old_data.get("fortress", False) and not new_data["fortress"]:
+                                try:
+                                    fortress_file = JOUEURS_DIR / "forteresses_sessions.json"
+                                    if fortress_file.exists():
+                                        with open(fortress_file, encoding="utf-8") as fs:
+                                            fort_data = json.load(fs)
 
-                                            sessions_modified = False
-                                            users_to_remove = []
+                                        sessions_modified = False
+                                        users_to_remove = []
 
-                                            for uid, config in fort_data.get("sessions", {}).items():
-                                                srv = config.get("serveur") or config.get("gge_server")
-                                                if srv == name:
-                                                    users_to_remove.append(uid)
+                                        for uid, config in fort_data.get("sessions", {}).items():
+                                            srv = config.get("serveur") or config.get("gge_server")
+                                            if srv == name:
+                                                users_to_remove.append(uid)
 
-                                            for uid in users_to_remove:
-                                                try:
-                                                    user = self.get_user(int(uid)) or await self.fetch_user(int(uid))
-                                                    if user:
-                                                        titre = t(
-                                                            "fr",
-                                                            "bot_alert_fortress_disabled_title",
-                                                            defaut="⚠️ Fin du Radar Forteresses",
-                                                        )
-                                                        desc = t(
-                                                            "fr",
-                                                            "bot_alert_fortress_disabled_desc",
-                                                            server=name,
-                                                            defaut=f"Le serveur de jeu **{name}** ne gère plus les forteresses (ou a été désactivé par l'API).\nTon radar automatique vient d'être arrêté en arrière-plan.",
-                                                        )
-                                                        embed = discord.Embed(
-                                                            title=titre, description=desc, color=discord.Color.red()
-                                                        )
-                                                        self.loop.create_task(user.send(embed=embed))
-                                                except Exception:
-                                                    pass
+                                        for uid in users_to_remove:
+                                            try:
+                                                user = self.get_user(int(uid)) or await self.fetch_user(int(uid))
+                                                if user:
+                                                    titre = t(
+                                                        "fr",
+                                                        "bot_alert_fortress_disabled_title",
+                                                        defaut="⚠️ Fin du Radar Forteresses",
+                                                    )
+                                                    desc = t(
+                                                        "fr",
+                                                        "bot_alert_fortress_disabled_desc",
+                                                        server=name,
+                                                        defaut=f"Le serveur de jeu **{name}** ne gère plus les forteresses (ou a été désactivé par l'API).\nTon radar automatique vient d'être arrêté en arrière-plan.",
+                                                    )
+                                                    embed = discord.Embed(
+                                                        title=titre, description=desc, color=discord.Color.red()
+                                                    )
+                                                    self.loop.create_task(user.send(embed=embed))
+                                            except Exception:
+                                                pass
 
-                                                del fort_data["sessions"][uid]
-                                                sessions_modified = True
+                                            del fort_data["sessions"][uid]
+                                            sessions_modified = True
 
-                                            if sessions_modified:
-                                                with open(fortress_file, "w", encoding="utf-8") as fs:
-                                                    json.dump(fort_data, fs, indent=4, ensure_ascii=False)
-                                                logger.info(
-                                                    f"🧹 [XML Sync] Nettoyage : {len(users_to_remove)} sessions forteresses arrêtées pour {name}."
-                                                )
-                                    except Exception as e:
-                                        logger.error(f"❌ [XML Sync] Erreur nettoyage forteresses pour {name} : {e}")
+                                        if sessions_modified:
+                                            with open(fortress_file, "w", encoding="utf-8") as fs:
+                                                json.dump(fort_data, fs, indent=4, ensure_ascii=False)
+                                            logger.info(
+                                                f"🧹 [XML Sync] Nettoyage : {len(users_to_remove)} sessions forteresses arrêtées pour {name}."
+                                            )
+                                except Exception as e:
+                                    logger.error(f"❌ [XML Sync] Erreur nettoyage forteresses pour {name} : {e}")
 
                     with open(cache_file, "w", encoding="utf-8") as f:
                         json.dump({"servers_info": nouveau_servers_info}, f, indent=4, ensure_ascii=False)
@@ -994,7 +997,7 @@ class GGEAssistantBot(commands.Bot):
                                 async with self.session.post(webhook_url, json=payload) as resp:
                                     pass
                             except Exception as webhook_err:
-                                logger.error(f"❌ Erreur envoi webhook admin synchro : {webhook_err}")
+                                logger.error(f"❌ [XML Sync] Erreur envoi webhook admin synchro : {webhook_err}")
                 else:
                     err_txt = await r.text()
                     logger.warning(
@@ -1054,7 +1057,7 @@ class GGEAssistantBot(commands.Bot):
             webhook = discord.Webhook.from_url(webhook_url, session=self.session)
             await webhook.send(embed=embed, username="GGE Système 🚨")
         except Exception as e:
-            logger.error(f"❌ Erreur Webhook Système : {e}")
+            logger.error(f"❌ [Bot] Erreur Webhook Système : {e}")
             obs.record_error(source="background", scope="send_system_alert", exception=e, cog="core")
 
     async def _send_background_error(self, titre: str, description: str):
@@ -1075,7 +1078,7 @@ class GGEAssistantBot(commands.Bot):
                 webhook = discord.Webhook.from_url(webhook_url, session=self.session)
                 await webhook.send(embed=embed, username="GGE Crash Report 🐛")
         except Exception as e:
-            logger.error(f"❌ Erreur critique du Webhook de Crash Background : {e}")
+            logger.error(f"❌ [Bot] Erreur critique du Webhook de Crash Background : {e}")
 
     async def on_app_command_completion(self, interaction: discord.Interaction, command):
         """Close the command_logs row opened by global_interaction_check"""
@@ -1086,7 +1089,7 @@ class GGEAssistantBot(commands.Bot):
         exc_type, exc_value, exc_traceback = sys.exc_info()
         tb_str = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
 
-        logger.error(f"❌ Erreur globale dans l'événement '{event_method}':\n{tb_str}")
+        logger.error(f"❌ [Bot] Erreur globale dans l'événement '{event_method}':\n{tb_str}")
 
         obs.record_error(
             source="on_error",
@@ -1115,7 +1118,7 @@ class GGEAssistantBot(commands.Bot):
         tb_str = "".join(traceback.format_exception(type(error), error, error.__traceback__))
         tb_str_short = tb_str[-2000:] if len(tb_str) > 2000 else tb_str
 
-        logger.error(f"❌ Crash sur la commande admin '!{ctx.command}':\n{tb_str}")
+        logger.error(f"❌ [Bot] Crash sur la commande admin '!{ctx.command}':\n{tb_str}")
 
         obs.record_error(
             source="on_command_error",
@@ -1174,7 +1177,7 @@ class GGEAssistantBot(commands.Bot):
         cmd_name = interaction.command.name if interaction.command else "Inconnue"
         serveur = interaction.guild.name if interaction.guild else "Message Privé"
 
-        logger.error(f"❌ Crash sur la commande '/{cmd_name}':\n{tb_str}")
+        logger.error(f"❌ [Bot] Crash sur la commande '/{cmd_name}':\n{tb_str}")
 
         obs.record_error(
             source="on_tree_error",
@@ -1275,7 +1278,7 @@ class GGEAssistantBot(commands.Bot):
                 options_txt = f" | ⚙️ [{', '.join(params)}]" if params else ""
                 logger.info(f"📝 [COMMANDE] {interaction.user.name} a lancé `/{cmd_name}` sur [{lieu}]{options_txt}")
         except Exception as e:
-            logger.error(f"⚠️ Erreur lors de l'écriture du log : {e}")
+            logger.error(f"⚠️ [Bot] Erreur lors de l'écriture du log commande : {e}")
             self.loop.create_task(
                 self._send_system_alert(
                     interaction,
@@ -1329,7 +1332,7 @@ class GGEAssistantBot(commands.Bot):
                             required_module = cmd.get("required_module", None)
                             is_admin_only = cmd.get("admin_only", False)
         except Exception as e:
-            logger.error(f"❌ Erreur lors de la lecture de HELP_CONFIG : {e}")
+            logger.error(f"❌ [Bot] Erreur lors de la lecture de HELP_CONFIG : {e}")
 
         # 1. Vérification : Messages Privés Uniquement
         if interaction.guild and is_private_only:
@@ -1396,7 +1399,7 @@ class GGEAssistantBot(commands.Bot):
                     obs.deny_command(obs_ctx, f"missing_module_{required_module}")
                     return False
             except Exception as e:
-                logger.error(f"❌ Erreur lors de la vérification du module {required_module} : {e}")
+                logger.error(f"❌ [Bot] Erreur lors de la vérification du module {required_module} : {e}")
                 self.loop.create_task(
                     self._send_system_alert(
                         interaction,

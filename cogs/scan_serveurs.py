@@ -62,7 +62,7 @@ class ScanServeursCog(commands.Cog):
         try:
             await self.bot.session.post(self.webhook_url, json=payload, timeout=aiohttp.ClientTimeout(total=10))
         except Exception as e:
-            logger.error(f"❌ Impossible d'envoyer l'alerte Discord : {e}")
+            logger.error(f"❌ [Scanner] Impossible d'envoyer l'alerte Discord : {e}")
 
     async def get_active_servers(self):
         """Récupère la liste des serveurs ACTIFS depuis le fichier de config unifié."""
@@ -74,10 +74,10 @@ class ScanServeursCog(commands.Cog):
                 if isinstance(data, dict) and data.get("enabled") is True:
                     active_servers.add(srv_name.upper())
         except Exception as e:
-            logger.error(f"❌ Erreur lecture servers_cache.json : {e}")
+            logger.error(f"❌ [Scanner] Erreur lecture servers_cache.json : {e}")
 
         if not active_servers:
-            logger.warning("⚠️ Aucun serveur actif trouvé. Fallback sur E4K_FR1.")
+            logger.warning("⚠️ [Scanner] Aucun serveur actif trouvé. Fallback sur E4K_FR1.")
             active_servers.add("E4K_FR1")
         return list(active_servers)
 
@@ -114,17 +114,17 @@ class ScanServeursCog(commands.Cog):
                         if obs_stats is not None:
                             obs_stats["http_429"] += 1
                             obs_stats["backoff_total_s"] += wait_time
-                        logger.warning(f"⚠️ 429 sur {server} (Curseur {cursor}). Purge API de {wait_time}s...")
+                        logger.warning(f"⚠️ [Scanner] 429 sur {server} (Curseur {cursor}). Purge API de {wait_time}s...")
                         await asyncio.sleep(wait_time)
                     else:
                         if obs_stats is not None:
                             obs_stats["http_errors"] += 1
-                        logger.error(f"❌ Erreur {response.status} sur {server} (Curseur {cursor}).")
+                        logger.error(f"❌ [Scanner] Erreur {response.status} sur {server} (Curseur {cursor}).")
                         await asyncio.sleep(2)
             except Exception as e:
                 if obs_stats is not None:
                     obs_stats["http_errors"] += 1
-                logger.error(f"❌ Exception réseau sur {server} (Curseur {cursor}): {e}")
+                logger.error(f"❌ [Scanner] Exception réseau sur {server} (Curseur {cursor}): {e}")
                 await asyncio.sleep(2)
 
         if obs_stats is not None:
@@ -135,7 +135,7 @@ class ScanServeursCog(commands.Cog):
         self, session: aiohttp.ClientSession, server: str, index_actuel: int, total_serveurs: int
     ) -> tuple[dict, float] | None:
         """Scanne un serveur complet en utilisant les curseurs (Pagination Keyset)."""
-        logger.info(f"🔍 DÉMARRAGE [{index_actuel}/{total_serveurs}] : {server}")
+        logger.info(f"🔍 [Scanner] DÉMARRAGE [{index_actuel}/{total_serveurs}] : {server}")
         start_time = asyncio.get_event_loop().time()
 
         obs_stats = {"pages_ok": 0, "pages_failed": 0, "http_429": 0, "http_errors": 0, "backoff_total_s": 0}
@@ -174,7 +174,9 @@ class ScanServeursCog(commands.Cog):
 
             if not res or not res.get("players"):
                 if pages_count == 0:
-                    logger.error(f"❌ Aucun joueur trouvé ou erreur fatale pour {server} dès la première page.")
+                    logger.error(
+                        f"❌ [Scanner] Aucun joueur trouvé ou erreur fatale pour {server} dès la première page."
+                    )
                     obs.record_scan_run(
                         gge_server=server,
                         status="failed",
@@ -187,7 +189,7 @@ class ScanServeursCog(commands.Cog):
                     )
                     return None
                 else:
-                    logger.warning(f"⚠️ Scan partiel pour {server} (Interrompu à la page {pages_count + 1}).")
+                    logger.warning(f"⚠️ [Scanner] Scan partiel pour {server} (Interrompu à la page {pages_count + 1}).")
                 break
 
             parse_players(res)
@@ -204,7 +206,7 @@ class ScanServeursCog(commands.Cog):
 
         duration = round(asyncio.get_event_loop().time() - start_time, 2)
         logger.info(
-            f"✅ FINI [{index_actuel}/{total_serveurs}] : {server} | "
+            f"✅ [Scanner] FINI [{index_actuel}/{total_serveurs}] : {server} | "
             f"{len(all_players)} joueurs récupérés en {duration}s ({pages_count} reqs)"
         )
 
@@ -276,7 +278,7 @@ class ScanServeursCog(commands.Cog):
                 json.dump(noms_alliances, f, ensure_ascii=False)
 
         except Exception as e:
-            logger.error(f"❌ Erreur lors de la création des index d'autocomplétion pour {serveur} : {e}")
+            logger.error(f"❌ [Scanner] Erreur création index d'autocomplétion pour {serveur} : {e}")
 
         # ==========================================
         # SYSTÈME DE NETTOYAGE DES ANCIENS FICHIERS
@@ -288,9 +290,9 @@ class ScanServeursCog(commands.Cog):
                 dirs_to_remove = date_dirs[:-3]
                 for d in dirs_to_remove:
                     shutil.rmtree(d)
-                    logger.info(f"🧹 Nettoyage : dossier obsolète {d.name} supprimé pour {serveur}.")
+                    logger.info(f"🧹 [Scanner] Nettoyage : dossier obsolète {d.name} supprimé pour {serveur}.")
         except Exception as e:
-            logger.error(f"❌ Erreur lors du nettoyage des vieux scans pour {serveur} : {e}")
+            logger.error(f"❌ [Scanner] Erreur lors du nettoyage des vieux scans pour {serveur} : {e}")
 
         return filepath
 
@@ -300,7 +302,7 @@ class ScanServeursCog(commands.Cog):
         self._scan_kind = "targeted"
         obs.set_task_name("scan_specific_server")
         logger.info("======================================================")
-        logger.info(f"🌍 DÉMARRAGE DU SCAN MANUEL CIBLÉ : {server_name}")
+        logger.info(f"🌍 [Scanner] DÉMARRAGE DU SCAN MANUEL CIBLÉ : {server_name}")
         logger.info("======================================================")
 
         try:
@@ -312,7 +314,7 @@ class ScanServeursCog(commands.Cog):
                 return True
             return False
         except Exception as e:
-            logger.error(f"❌ Erreur lors du scan spécifique de {server_name} : {e}")
+            logger.error(f"❌ [Scanner] Erreur lors du scan spécifique de {server_name} : {e}")
             logger.error(traceback.format_exc())
             obs.record_error(
                 source="task", scope="scan_specific_server", exception=e, cog="scan_server", gge_server=server_name
@@ -326,7 +328,7 @@ class ScanServeursCog(commands.Cog):
         self._scan_kind = "daily"
         obs.set_task_name("daily_scan")
         logger.info("======================================================")
-        logger.info("🌍 DÉMARRAGE DE LA ROUTINE MULTI-SERVEURS (ASYNC)")
+        logger.info("🌍 [Scanner] DÉMARRAGE DE LA ROUTINE MULTI-SERVEURS (ASYNC)")
         logger.info("======================================================")
         try:
             servers_to_scan = await self.get_active_servers()
@@ -348,7 +350,7 @@ class ScanServeursCog(commands.Cog):
             )
 
         except Exception as e:
-            logger.error(f"❌ CRASH FATAL DU SCANNER : {e}")
+            logger.error(f"❌ [Scanner] CRASH FATAL DU SCANNER : {e}")
             logger.error(traceback.format_exc())
             obs.record_error(
                 source="task", scope="daily_scan", exception=e, cog="scan_server", severity="critical", notified=True

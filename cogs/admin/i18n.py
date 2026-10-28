@@ -1,5 +1,6 @@
 import asyncio
 import io
+import logging
 import os
 import re
 
@@ -8,6 +9,7 @@ from discord.ext import commands
 
 from utils import BASE_DIR, DICT_EMOJIS, LOCALES_DIR, async_json_dump, async_json_load, charger_langues
 
+logger = logging.getLogger("GGE_Bot")
 EMOJI_REGEX = re.compile(r"<(a?):([a-zA-Z0-9_]+):([0-9]+)>")
 
 
@@ -27,7 +29,10 @@ class I18nConfirmView(discord.ui.View):
         self.responded = True
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(view=self)
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
         self.stop()
 
     @discord.ui.button(
@@ -40,7 +45,10 @@ class I18nConfirmView(discord.ui.View):
         self.responded = True
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(view=self)
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
         self.stop()
 
     async def on_timeout(self):
@@ -60,8 +68,6 @@ class AdminI18n(commands.Cog):
     @commands.command(name="i18n_sync", aliases=["sortlang", "sort_locales"], hidden=True)
     async def i18n_sync(self, ctx):
         """[CACHÉE] !i18n_sync : Scanne, Trie et Synchronise les fichiers JSON avec sécurité."""
-        import re
-
         pattern = re.compile(r'\bt\s*\(\s*[^,]+,\s*["\']([a-zA-Z0-9_]+)["\']')
 
         def _scan_used_keys():
@@ -75,7 +81,11 @@ class AdminI18n(commands.Cog):
                             trouvees.update(pattern.findall(f.read()))
             return trouvees
 
-        cles_utilisees = await asyncio.to_thread(_scan_used_keys)
+        try:
+            cles_utilisees = await asyncio.to_thread(_scan_used_keys)
+        except Exception as e:
+            logger.error(f"❌ [AdminI18n] Erreur lors du scan des clés i18n : {e}")
+            return await ctx.send("❌ Erreur lors du scan des fichiers.")
 
         for i in range(1, 13):
             cles_utilisees.add(f"month_{i:02d}")
@@ -99,8 +109,12 @@ class AdminI18n(commands.Cog):
         )
 
         locales_data = {}
-        for fichier in LOCALES_DIR.glob("*.json"):
-            locales_data[fichier.stem] = await async_json_load(fichier)
+        try:
+            for fichier in LOCALES_DIR.glob("*.json"):
+                locales_data[fichier.stem] = await async_json_load(fichier)
+        except Exception as e:
+            logger.error(f"❌ [AdminI18n] Erreur de lecture des fichiers JSON : {e}")
+            return await ctx.send("❌ Erreur de chargement des JSON.")
 
         fr_data = locales_data.get("fr", {})
         cles_existantes_fr = set(fr_data.keys())
@@ -109,6 +123,7 @@ class AdminI18n(commands.Cog):
         inutiles_fr = cles_existantes_fr - cles_utilisees
 
         supprimer_cles = False
+        msg = None
 
         if inutiles_fr:
             liste_inutiles_txt = "\n".join(sorted(inutiles_fr))
@@ -159,9 +174,13 @@ class AdminI18n(commands.Cog):
                     data[c] = f"[TODO] {val}" if val != "[TODO] Texte manquant" else "[TODO] Texte manquant"
             locales_data[lang] = dict(sorted(data.items()))
 
-        for lang, data in locales_data.items():
-            fichier = LOCALES_DIR / f"{lang}.json"
-            await async_json_dump(fichier, data, indent=4, ensure_ascii=False)
+        try:
+            for lang, data in locales_data.items():
+                fichier = LOCALES_DIR / f"{lang}.json"
+                await async_json_dump(fichier, data, indent=4, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"❌ [AdminI18n] Erreur écriture JSON i18n_sync : {e}")
+            return await ctx.send("❌ Échec de la sauvegarde des modifications.")
 
         charger_langues()
 
@@ -179,7 +198,10 @@ class AdminI18n(commands.Cog):
         )
 
         if isinstance(msg, discord.Message):
-            await msg.edit(content=None, embed=embed_success, view=None)
+            try:
+                await msg.edit(content=None, embed=embed_success, view=None)
+            except Exception:
+                pass
         else:
             await ctx.send(embed=embed_success)
 
@@ -195,8 +217,12 @@ class AdminI18n(commands.Cog):
         if not fr_file.exists() or not cible_file.exists():
             return await ctx.send(f"❌ Impossible de trouver `fr.json` ou `{langue_cible}.json`.")
 
-        fr_data = await async_json_load(fr_file)
-        cible_data = await async_json_load(cible_file)
+        try:
+            fr_data = await async_json_load(fr_file)
+            cible_data = await async_json_load(cible_file)
+        except Exception as e:
+            logger.error(f"❌ [AdminI18n] Erreur lecture pour i18n_export : {e}")
+            return await ctx.send("❌ Erreur de chargement des fichiers de langue.")
 
         output = io.StringIO()
         writer = csv.writer(output, delimiter=";")
@@ -221,7 +247,13 @@ class AdminI18n(commands.Cog):
 
         embed = discord.Embed(
             title=f"📝 Fichier de traduction prêt ({langue_cible.upper()})",
-            description="Envoie ce fichier `.csv` à tes traducteurs.\nIls peuvent l'ouvrir avec **Excel** ou **Google Sheets**.\n\n⚠️ Dis-leur bien de :\n1. Ne pas modifier la colonne 1.\n2. Ne pas effacer les variables (colonne 4).",
+            description=(
+                "Envoie ce fichier `.csv` à tes traducteurs.\n"
+                "Ils peuvent l'ouvrir avec **Excel** ou **Google Sheets**.\n\n"
+                "⚠️ Dis-leur bien de :\n"
+                "1. Ne pas modifier la colonne 1.\n"
+                "2. Ne pas effacer les variables (colonne 4)."
+            ),
             color=discord.Color.blue(),
         )
         await ctx.send(embed=embed, file=discord_file)
@@ -254,7 +286,11 @@ class AdminI18n(commands.Cog):
                             pass
             return found
 
-        emojis_found = await asyncio.to_thread(_scan_emojis)
+        try:
+            emojis_found = await asyncio.to_thread(_scan_emojis)
+        except Exception as e:
+            logger.error(f"❌ [AdminI18n] Erreur scan des émojis : {e}")
+            return await msg_wait.edit(content="❌ Erreur pendant le scan des emojis.")
 
         if not emojis_found:
             return await msg_wait.edit(
@@ -271,7 +307,10 @@ class AdminI18n(commands.Cog):
         file_buffer = io.BytesIO("\n".join(report_lines).encode("utf-8"))
         discord_file = discord.File(fp=file_buffer, filename="emojis_report.txt")
 
-        await msg_wait.delete()
+        try:
+            await msg_wait.delete()
+        except Exception:
+            pass
         await ctx.send(
             f"✅ **Scan terminé !** J'ai trouvé **{len(emojis_found)}** émojis uniques dans le code source.",
             file=discord_file,
@@ -309,7 +348,11 @@ class AdminI18n(commands.Cog):
                             pass
             return total, modifies
 
-        occurrences, fichiers_modifies = await asyncio.to_thread(_replace_in_files)
+        try:
+            occurrences, fichiers_modifies = await asyncio.to_thread(_replace_in_files)
+        except Exception as e:
+            logger.error(f"❌ [AdminI18n] Erreur lors du remplacement brut : {e}")
+            return await msg_wait.edit(content="❌ Erreur lors du remplacement de texte.")
 
         if occurrences == 0:
             return await msg_wait.edit(
@@ -328,7 +371,10 @@ class AdminI18n(commands.Cog):
         embed.add_field(name="Fichiers modifiés", value=liste_fichiers, inline=False)
         embed.set_footer(text="⚠️ N'oublie pas de commit sur ton NAS et de relancer le bot !")
 
-        await msg_wait.delete()
+        try:
+            await msg_wait.delete()
+        except Exception:
+            pass
         await ctx.send(embed=embed)
 
     @commands.command(name="check_emojis", hidden=True)
@@ -343,7 +389,7 @@ class AdminI18n(commands.Cog):
             for e in app_emojis:
                 bot_emoji_ids.add(str(e.id))
         except Exception as e:
-            print(f"Impossible de récupérer les émojis d'application : {e}")
+            logger.warning(f"⚠️ [AdminI18n] Impossible de récupérer les émojis d'application : {e}")
 
         exclude_dirs = [".git", "__pycache__", "venv", "logs", "data"]
 
@@ -367,7 +413,11 @@ class AdminI18n(commands.Cog):
                             pass
             return missing
 
-        missing_emojis = await asyncio.to_thread(_scan_missing_emojis)
+        try:
+            missing_emojis = await asyncio.to_thread(_scan_missing_emojis)
+        except Exception as e:
+            logger.error(f"❌ [AdminI18n] Erreur scan_missing_emojis : {e}")
+            return await msg_wait.edit(content="❌ Erreur lors de l'analyse des émojis manquants.")
 
         if not missing_emojis:
             return await msg_wait.edit(
@@ -404,7 +454,10 @@ class AdminI18n(commands.Cog):
         else:
             embed.set_footer(text="Fin du rapport.")
 
-        await msg_wait.delete()
+        try:
+            await msg_wait.delete()
+        except Exception:
+            pass
         if fichier_joint:
             await ctx.send(embed=embed, file=fichier_joint)
         else:
@@ -417,12 +470,15 @@ class AdminI18n(commands.Cog):
 
         msg_wait = await ctx.send("⏳ **Analyse de la cohérence des émojis entre les langues...**")
 
-        # Regex pour capter tes nouvelles balises {e_nom}
         tag_pattern = re.compile(r"(\{e_[a-zA-Z0-9_]+\})")
 
         locales_data = {}
-        for fichier in LOCALES_DIR.glob("*.json"):
-            locales_data[fichier.stem] = await async_json_load(fichier)
+        try:
+            for fichier in LOCALES_DIR.glob("*.json"):
+                locales_data[fichier.stem] = await async_json_load(fichier)
+        except Exception as e:
+            logger.error(f"❌ [AdminI18n] Erreur de lecture des locales pour emojis i18n : {e}")
+            return await msg_wait.edit(content="❌ Impossible de lire les fichiers JSON.")
 
         fr_data = locales_data.get("fr", {})
         if not fr_data:
@@ -445,18 +501,14 @@ class AdminI18n(commands.Cog):
                 fr_emojis = tag_pattern.findall(texte_fr)
                 cible_emojis = tag_pattern.findall(texte_cible)
 
-                # Si les émojis diffèrent entre la FR et la langue cible
                 if fr_emojis != cible_emojis:
-                    # CAS 1 : Le même nombre d'émojis, mais ce ne sont pas les bons
                     if len(fr_emojis) == len(cible_emojis):
-                        # On remplace séquentiellement par ceux de la version FR
                         iter_emojis = iter(fr_emojis)
                         nouveau_texte = tag_pattern.sub(lambda m: next(iter_emojis), texte_cible)
                         data[cle] = nouveau_texte
                         corrections_auto += 1
                         modifie = True
 
-                    # CAS 2 : Nombre différent d'émojis (oubliés ou en trop dans la trad)
                     else:
                         if not texte_cible.startswith("[⚠️ EMOJIS]"):
                             data[cle] = f"[⚠️ EMOJIS] {texte_cible}"
@@ -466,12 +518,13 @@ class AdminI18n(commands.Cog):
                             f"• `{lang}.json` | Clé `{cle}` : FR a {len(fr_emojis)} émoji(s), {lang.upper()} en a {len(cible_emojis)}"
                         )
 
-            # Sauvegarde du fichier si des modifications ont été faites
             if modifie:
                 fichier = LOCALES_DIR / f"{lang}.json"
-                await async_json_dump(fichier, data, indent=4, ensure_ascii=False)
+                try:
+                    await async_json_dump(fichier, data, indent=4, ensure_ascii=False)
+                except Exception as e:
+                    logger.error(f"❌ [AdminI18n] Échec sauvegarde json {lang} : {e}")
 
-        # On recharge les langues en RAM pour appliquer les modifs
         charger_langues()
 
         if corrections_auto == 0 and erreurs_manuelles == 0:
@@ -483,7 +536,7 @@ class AdminI18n(commands.Cog):
             title="🔄 Synchronisation des Émojis (i18n)",
             description=(
                 f"✅ **Corrections automatiques :** `{corrections_auto}`\n"
-                f"*(Les émojis haben été remplacés car le nombre correspondait à la FR)*\n\n"
+                f"*(Les émojis ont été remplacés car le nombre correspondait à la FR)*\n\n"
                 f"⚠️ **Interventions manuelles requises :** `{erreurs_manuelles}`\n"
                 f"*(Le nombre d'émojis est différent de la version FR)*"
             ),
@@ -497,7 +550,10 @@ class AdminI18n(commands.Cog):
             embed.add_field(name="Détails des erreurs (Quantité différente)", value=lignes, inline=False)
             embed.set_footer(text="Les textes avec un problème ont été préfixés par [⚠️ EMOJIS] dans les JSON.")
 
-        await msg_wait.delete()
+        try:
+            await msg_wait.delete()
+        except Exception:
+            pass
         await ctx.send(embed=embed)
 
     @commands.command(name="check_bad_emojis", hidden=True)
@@ -529,7 +585,11 @@ class AdminI18n(commands.Cog):
                             pass
             return trouvees
 
-        erreurs_trouvees = await asyncio.to_thread(_scan_bad_emojis)
+        try:
+            erreurs_trouvees = await asyncio.to_thread(_scan_bad_emojis)
+        except Exception as e:
+            logger.error(f"❌ [AdminI18n] Erreur scan_bad_emojis : {e}")
+            return await msg_wait.edit(content="❌ Erreur lors de l'analyse.")
 
         if not erreurs_trouvees:
             return await msg_wait.edit(
@@ -547,7 +607,10 @@ class AdminI18n(commands.Cog):
                 valeur += f"\n*... et {len(erreurs) - 10} autres erreurs.*"
             embed.add_field(name=f"📁 `{file}`", value=valeur, inline=False)
 
-        await msg_wait.delete()
+        try:
+            await msg_wait.delete()
+        except Exception:
+            pass
         await ctx.send(embed=embed)
 
     @commands.command(name="export_app_emojis", hidden=True)
@@ -555,32 +618,40 @@ class AdminI18n(commands.Cog):
         await ctx.send("📥 Récupération des émojis d'application depuis le portail développeur...")
 
         dossier_destination = "assets/emojis"
-        await asyncio.to_thread(os.makedirs, dossier_destination, exist_ok=True)
+        try:
+            await asyncio.to_thread(os.makedirs, dossier_destination, exist_ok=True)
+        except Exception as e:
+            logger.error(f"❌ [AdminI18n] Impossible de créer le dossier d'export : {e}")
+            return await ctx.send("❌ Impossible de créer le dossier d'export.")
 
         try:
-            # Récupère tous les émojis attachés à l'application du bot
             app_emojis = await self.bot.fetch_application_emojis()
         except AttributeError:
             return await ctx.send(
                 "❌ Erreur : Ta version de discord.py est trop ancienne pour cette fonctionnalité (nécessite la version 2.4+)."
             )
+        except Exception as e:
+            logger.error(f"❌ [AdminI18n] Impossible de fetch l'API Discord emojis : {e}")
+            return await ctx.send("❌ Erreur lors de la récupération des émojis Discord.")
 
         if not app_emojis:
             return await ctx.send("⚠️ Aucun émoji d'application n'a été trouvé.")
 
         compteur = 0
         for emoji in app_emojis:
-            # Gère les extensions (GIF ou PNG)
             extension = "gif" if emoji.animated else "png"
             chemin_fichier = f"{dossier_destination}/{emoji.name}.{extension}"
 
             try:
-                # Sauvegarde l'image via la méthode native de l'Asset discord.py
                 await emoji.save(chemin_fichier)
                 compteur += 1
             except Exception as e:
-                print(f"Erreur avec l'émoji {emoji.name} : {e}")
+                logger.warning(f"⚠️ [AdminI18n] Erreur de sauvegarde avec l'émoji {emoji.name} : {e}")
 
         await ctx.send(
             f"✅ Exportation terminée ! `{compteur}` émojis d'application ont été sauvegardés dans `{dossier_destination}/`."
         )
+
+
+async def setup(bot):
+    await bot.add_cog(AdminI18n(bot))

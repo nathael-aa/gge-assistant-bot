@@ -45,8 +45,9 @@ class AdminSystem(commands.Cog):
                 defaut=f"✅ L'arbre a été synchronisé avec succès ! ({len(synced)} commandes disponibles)",
             )
             await msg.edit(content=msg_success)
-            logger.info(f"🔄 Commandes slash synchronisées par {ctx.author.name}")
+            logger.info(f"🔄 [AdminSystem] Commandes slash synchronisées par {ctx.author.name}")
         except Exception as e:
+            logger.error(f"❌ [AdminSystem] Erreur lors de la synchronisation : {e}")
             msg_err = t(self.admin_lang, "admin_sync_error", error=str(e), defaut=f"❌ Erreur : {e}")
             obs.record_error(source="admin", scope="sync", exception=e, cog="admin")
             await msg.edit(content=msg_err)
@@ -151,6 +152,7 @@ class AdminSystem(commands.Cog):
             await self.bot.reload_extension(extension)
             await ctx.send(f"✅ Module `{extension}` rechargé avec succès !")
         except Exception as e:
+            logger.error(f"❌ [AdminSystem] Erreur lors du rechargement de {extension} : {e}")
             obs.record_error(source="admin", scope="reload", exception=e, cog="admin")
             await ctx.send(f"❌ Erreur lors du rechargement :\n```py\n{e}\n```")
 
@@ -164,8 +166,13 @@ class AdminSystem(commands.Cog):
             defaut="🔄 **Redémarrage en cours...** Le bot se déconnecte et devrait revenir dans quelques secondes.",
         )
         await ctx.send(msg)
-        logger.warning(f"🔄 Redémarrage forcé déclenché par l'administrateur ({ctx.author.name})")
-        await self.bot.close()
+        logger.warning(f"🔄 [AdminSystem] Redémarrage forcé déclenché par l'administrateur ({ctx.author.name})")
+
+        try:
+            await self.bot.close()
+        except Exception as e:
+            logger.error(f"❌ [AdminSystem] Erreur critique pendant la fermeture du bot : {e}")
+            pass
 
     @commands.command(name="export_cmds", hidden=True)
     async def export_commands(self, ctx):
@@ -217,27 +224,30 @@ class AdminSystem(commands.Cog):
             await ctx.send(file=fichier_discord)
 
         except Exception as e:
-            logger.error(f"❌ Erreur lors de l'export JSON : {e}")
+            logger.error(f"❌ [AdminSystem] Erreur lors de l'export JSON : {e}")
             obs.record_error(source="admin", scope="export_commands", exception=e, cog="admin")
             await msg.edit(content=f"❌ Erreur lors de l'export : `{e}`")
 
     def serialize_options(self, options):
         """Transforme les options en format JSON pur."""
         serialized = []
-        for opt in options:
-            opt_data = {
-                "name": opt.name,
-                "description": opt.description,
-                "type": opt.type.value,
-                "required": opt.required,
-            }
-            if opt.autocomplete:
-                opt_data["autocomplete"] = True
-            if hasattr(opt, "choices") and opt.choices:
-                opt_data["choices"] = [{"name": c.name, "value": c.value} for c in opt.choices]
-            if hasattr(opt, "options") and opt.options:
-                opt_data["options"] = self.serialize_options(opt.options)
-            serialized.append(opt_data)
+        try:
+            for opt in options:
+                opt_data = {
+                    "name": opt.name,
+                    "description": opt.description,
+                    "type": opt.type.value,
+                    "required": opt.required,
+                }
+                if opt.autocomplete:
+                    opt_data["autocomplete"] = True
+                if hasattr(opt, "choices") and opt.choices:
+                    opt_data["choices"] = [{"name": c.name, "value": c.value} for c in opt.choices]
+                if hasattr(opt, "options") and opt.options:
+                    opt_data["options"] = self.serialize_options(opt.options)
+                serialized.append(opt_data)
+        except Exception as e:
+            logger.error(f"❌ [AdminSystem] Erreur dans serialize_options : {e}")
         return serialized
 
     @commands.command(name="m", hidden=True)
@@ -245,7 +255,13 @@ class AdminSystem(commands.Cog):
         """[CACHÉE] !m : Bascule le bot en mode maintenance."""
 
         self.bot.maintenance_mode = not getattr(self.bot, "maintenance_mode", False)
-        await save_maintenance_async(self.bot.maintenance_mode)
+
+        try:
+            await save_maintenance_async(self.bot.maintenance_mode)
+        except Exception as e:
+            logger.error(f"❌ [AdminSystem] Erreur sauvegarde mode maintenance : {e}")
+            await ctx.send("❌ Impossible de sauvegarder l'état de la maintenance de façon asynchrone.")
+            return
 
         langue = getattr(self, "admin_lang", "fr")
 
@@ -258,7 +274,11 @@ class AdminSystem(commands.Cog):
             await ctx.send(msg)
             statut_maint = t("en", "bot_activity_maintenance", defaut="🛠️ Under Maintenance 🛠️")
             activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
-            await self.bot.change_presence(activity=activity, status=discord.Status.dnd)
+            try:
+                await self.bot.change_presence(activity=activity, status=discord.Status.dnd)
+            except Exception as e:
+                logger.error(f"❌ [AdminSystem] Impossible de changer le statut Discord : {e}")
+                pass
         else:
             msg = t(
                 langue,
@@ -267,7 +287,11 @@ class AdminSystem(commands.Cog):
             )
             await ctx.send(msg)
             activity = discord.Activity(type=discord.ActivityType.watching, name="/setup ➔ /help")
-            await self.bot.change_presence(activity=activity, status=discord.Status.online)
+            try:
+                await self.bot.change_presence(activity=activity, status=discord.Status.online)
+            except Exception as e:
+                logger.error(f"❌ [AdminSystem] Impossible de changer le statut Discord : {e}")
+                pass
 
     @commands.command(name="setstatus")
     async def setstatus(self, ctx, *, message: str = None):
@@ -324,8 +348,9 @@ class AdminSystem(commands.Cog):
                 defaut=f"📜 **Extraction réussie.** Voici les journaux système du **{target_date}** :",
             )
             await ctx.send(content=msg, file=fichier_discord)
-            logger.info(f"📤 Export des logs ({target_date}) envoyé à {ctx.author.name}.")
+            logger.info(f"📤 [AdminSystem] Export des logs ({target_date}) envoyé à {ctx.author.name}.")
         except Exception as e:
+            logger.error(f"❌ [AdminSystem] Erreur lors de la lecture des logs : {e}")
             msg = t(
                 self.admin_lang, "admin_log_error", error=str(e), defaut=f"❌ Erreur lors de la lecture des logs : {e}"
             )
@@ -384,7 +409,12 @@ class AdminSystem(commands.Cog):
 
         embed = discord.Embed(title=embed_title, description=embed_desc, color=discord.Color.blue())
         embed.set_footer(text=f"Total : {nb_serveurs} serveurs | GGE Assistant Admin")
-        await ctx.send(embed=embed, file=fichier_discord)
+
+        try:
+            await ctx.send(embed=embed, file=fichier_discord)
+        except Exception as e:
+            logger.error(f"❌ [AdminSystem] Erreur envoi liste serveurs : {e}")
+            await ctx.send(f"❌ Impossible d'envoyer le fichier : `{e}`")
 
     @commands.command(name="bot_leave", hidden=True)
     async def admin_quitter(self, ctx, server_id: str):
@@ -411,8 +441,9 @@ class AdminSystem(commands.Cog):
                 defaut=f"✅ Succès : Le bot a quitté le serveur **{nom_serveur}**.",
             )
             await ctx.send(msg)
-            logger.info(f"🚪 Le bot a quitté le serveur {nom_serveur} via commande admin.")
+            logger.info(f"🚪 [AdminSystem] Le bot a quitté le serveur {nom_serveur} via commande admin.")
         except Exception as e:
+            logger.error(f"❌ [AdminSystem] Erreur bot_leave : {e}")
             msg = t(self.admin_lang, "admin_leave_error", error=str(e), defaut=f"❌ Erreur : {e}")
             await ctx.send(msg)
 
@@ -509,7 +540,7 @@ class AdminSystem(commands.Cog):
                 await msg_wait.edit(content=msg)
 
         except Exception as e:
-            logger.error(f"❌ [Admin] Erreur lors de la synchronisation forcée des serveurs : {e}")
+            logger.error(f"❌ [AdminSystem] Erreur lors de la synchronisation forcée des serveurs : {e}")
             obs.record_error(source="admin", scope="sync_servers", exception=e, cog="admin")
             await msg_wait.edit(content=f"❌ Erreur lors de la synchronisation : `{e}`")
 
@@ -526,17 +557,17 @@ class AdminSystem(commands.Cog):
         if cible == "ALL":
             await ctx.send("⏳ **Lancement manuel du scanner GLOBAL...** (Tous les serveurs)")
             try:
-                logger.info(f"🚀 Lancement manuel du ServerScanner GLOBAL par {ctx.author.name}")
+                logger.info(f"🚀 [AdminSystem] Lancement manuel du ServerScanner GLOBAL par {ctx.author.name}")
                 await scan_server.daily_scan.coro(scan_server)
                 await ctx.send("✅ **Scan global terminé avec succès !**")
             except Exception as e:
-                logger.error(f"❌ Erreur critique scan manuel (ALL) : {e}")
+                logger.error(f"❌ [AdminSystem] Erreur critique scan manuel (ALL) : {e}")
                 obs.record_error(source="admin", scope="scan_manuel_all", exception=e, cog="admin")
                 await ctx.send(f"⚠️ **Erreur lors de l'exécution (ALL) :**\n```py\n{e}\n```")
         else:
             await ctx.send(f"⏳ **Lancement du scanner ciblé sur le serveur : `{cible}`...**")
             try:
-                logger.info(f"🚀 Lancement manuel du ServerScanner ({cible}) par {ctx.author.name}")
+                logger.info(f"🚀 [AdminSystem] Lancement manuel du ServerScanner ({cible}) par {ctx.author.name}")
                 if hasattr(scan_server, "scan_specific_server"):
                     reussite = await scan_server.scan_specific_server(cible)
                     if reussite:
@@ -550,7 +581,7 @@ class AdminSystem(commands.Cog):
                         "⚠️ **Attention :** La fonction `scan_specific_server` est introuvable dans `ScanServeursCog`."
                     )
             except Exception as e:
-                logger.error(f"❌ Erreur critique scan manuel ({cible}) : {e}")
+                logger.error(f"❌ [AdminSystem] Erreur critique scan manuel ({cible}) : {e}")
                 obs.record_error(source="admin", scope="scan_manuel_specific", exception=e, cog="admin")
                 await ctx.send(f"⚠️ **Erreur lors de l'exécution ({cible}) :**\n```py\n{e}\n```")
 
@@ -565,7 +596,11 @@ class AdminSystem(commands.Cog):
         if not path_users.exists():
             return await ctx.send("❌ Fichier users.json introuvable.")
 
-        users_data = await async_json_load(path_users)
+        try:
+            users_data = await async_json_load(path_users)
+        except Exception as e:
+            logger.error(f"❌ [AdminSystem] Erreur broadcast_news JSON load : {e}")
+            return await ctx.send("❌ Impossible de charger users.json.")
 
         total_users = len(users_data)
 
@@ -575,7 +610,11 @@ class AdminSystem(commands.Cog):
             f"Confirmez-vous cette action en cliquant sur ✅ ? (Le bot attendra 30 secondes)."
         )
 
-        await msg_confirm.add_reaction("✅")
+        try:
+            await msg_confirm.add_reaction("✅")
+        except Exception as e:
+            logger.error(f"❌ [AdminSystem] Erreur add_reaction dans broadcast : {e}")
+            pass
 
         def check(reaction, user):
             return user == ctx.author and str(reaction.emoji) == "✅" and reaction.message.id == msg_confirm.id
@@ -583,10 +622,19 @@ class AdminSystem(commands.Cog):
         try:
             await self.bot.wait_for("reaction_add", timeout=30.0, check=check)
         except TimeoutError:
-            await msg_confirm.clear_reactions()
+            try:
+                await msg_confirm.clear_reactions()
+            except Exception:
+                pass
             return await ctx.send("❌ Délai expiré. Broadcast annulé par sécurité.")
+        except Exception as e:
+            logger.error(f"❌ [AdminSystem] Exception wait_for broadcast : {e}")
+            return await ctx.send("❌ Action interrompue à cause d'une erreur technique.")
 
-        await msg_confirm.clear_reactions()
+        try:
+            await msg_confirm.clear_reactions()
+        except Exception:
+            pass
         await ctx.send(
             f"✅ Confirmation reçue. Démarrage de l'envoi à {total_users} utilisateurs. Temps estimé : ~{total_users * 3} secondes. Regarde la console."
         )
@@ -650,9 +698,13 @@ class AdminSystem(commands.Cog):
                 print(f"❌ MP bloqué par l'utilisateur {user_id_str}")
             except Exception as e:
                 echecs += 1
-                print(f"⚠️ Erreur inattendue pour {user_id_str} : {e}")
+                logger.error(f"⚠️ [AdminSystem] Erreur inattendue pour {user_id_str} : {e}")
 
             # Pause pour éviter le Rate Limit
             await asyncio.sleep(3.0)
 
         await ctx.send(f"✅ **Broadcast terminé !**\nSuccès : `{succes}` | Échecs (MP fermés) : `{echecs}`")
+
+
+async def setup(bot):
+    await bot.add_cog(AdminSystem(bot))

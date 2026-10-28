@@ -64,12 +64,12 @@ class FortressActionView(discord.ui.View):
         self.add_item(self.btn_relaunch)
 
     async def callback_verify(self, interaction: discord.Interaction):
-        logger.info(f"🔎 [FORTERESSES] {interaction.user.name} a cliqué sur 'Vérifier' pour {self.joueur}.")
+        logger.info(f"🔎 [Forts] {interaction.user.name} a cliqué sur 'Vérifier' pour {self.joueur}.")
         await interaction.response.defer(thinking=True, ephemeral=False)
         await self.cog.verify_and_send(interaction, self.cibles, self.joueur, self.serveur, self.langue)
 
     async def callback_relaunch(self, interaction: discord.Interaction):
-        logger.info(f"🔄 [FORTERESSES] {interaction.user.name} a cliqué sur 'Relancer' pour {self.joueur}.")
+        logger.info(f"🔄 [Forts] {interaction.user.name} a cliqué sur 'Relancer' pour {self.joueur}.")
         await interaction.response.defer(thinking=True, ephemeral=False)
         await self.cog.relaunch_scan(interaction, self.user_id, self.langue)
 
@@ -111,7 +111,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                     if last_scan:
                         dt = datetime.fromisoformat(last_scan.replace("Z", "+00:00"))
                         return f"<t:{int(dt.timestamp())}:R>"
-        except:
+        except Exception:
             pass
         return "❓ Inconnu"
 
@@ -142,7 +142,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                                 ts_cd = int(datetime.fromisoformat(cd_until.replace("Z", "+00:00")).timestamp())
                                 if ts_cd > maintenant_ts:
                                     status = "feu"
-                            except:
+                            except Exception:
                                 pass
 
                         etats[f"{d['kid']}_{d['position_x']}_{d['position_y']}"] = {
@@ -151,7 +151,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                             "last_attack": d.get("last_attack", ""),
                         }
         except Exception as e:
-            logger.error(f"❌ [VERIFY] Erreur API lors de la vérification globale : {e}")
+            logger.error(f"❌ [Forts] Erreur API lors de la vérification globale : {e}")
             obs.record_error(source="background", scope="verify_and_send", exception=e, cog="forteresses")
 
         embed = discord.Embed(
@@ -190,7 +190,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                         ts=ts_cd,
                         defaut=f"🔥 **En feu** *(Dispo dans {minutes_restantes} min)*",
                     )
-                except:
+                except Exception:
                     status_txt = t(langue, "fort_verify_burning_unk", defaut="🔥 **En feu** *(Temps inconnu)*")
 
             embed.add_field(name=nom_f, value=status_txt, inline=False)
@@ -324,7 +324,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                         raw_dist = d.get("distance")
                         try:
                             dist = float(raw_dist)
-                        except:
+                        except Exception:
                             dist = -1.0
 
                         if dist != -1.0 and dist > dist_max:
@@ -338,7 +338,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                             try:
                                 ts_cd = int(datetime.fromisoformat(cd_until.replace("Z", "+00:00")).timestamp())
                                 cd_secondes = ts_cd - maintenant_ts
-                            except:
+                            except Exception:
                                 pass
 
                         if cd_secondes < 0:
@@ -368,7 +368,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                                 cibles_moins_1h.append(cible_data)
 
         except Exception as e:
-            logger.error(f"❌ [FORTERESSES] Erreur API Globale: {e}")
+            logger.error(f"❌ [Forts] Erreur API Globale fetch_cibles: {e}")
             obs.record_error(source="background", scope="fetch_cibles", exception=e, cog="forteresses")
 
         last_scan_str = await self.fetch_meta_scan(session, headers)
@@ -515,7 +515,10 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
     async def f_scan(
         self, interaction: discord.Interaction, player: str, ice: bool = False, sands: bool = False, peaks: bool = False
     ):
-        await interaction.response.defer(ephemeral=False, thinking=True)
+        try:
+            await interaction.response.defer(ephemeral=False, thinking=True)
+        except Exception:
+            return
 
         langue, serveur = await get_server_config(interaction)
 
@@ -549,7 +552,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             )
             try:
                 await interaction.followup.send(msg_warn, ephemeral=True)
-            except:
+            except Exception:
                 pass
 
         nb_sessions_actives = len(data.get("sessions", {}))
@@ -627,7 +630,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         await setup_embed_footer(embed_conf, interaction, langue)
         await interaction.followup.send(embed=embed_conf, ephemeral=False)
 
-        logger.info(f"🟢 [FORTERESSES] {interaction.user.name} a démarré un scan radar pour {nom_joueur}.")
+        logger.info(f"🟢 [Forts] {interaction.user.name} a démarré un scan radar pour {nom_joueur}.")
 
         if cibles_list:
             view = FortressActionView(self, user_id, cibles_list, nom_joueur, serveur, langue)
@@ -656,7 +659,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
     async def f_stop(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=False, thinking=True)
-        except:
+        except Exception:
             return
 
         langue, serveur = await get_server_config(interaction)
@@ -666,7 +669,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         if user_id in data["sessions"]:
             del data["sessions"][user_id]
             await save_dungeons_async(data)
-            logger.info(f"🛑 [FORTERESSES] {interaction.user.name} a stoppé son scan radar.")
+            logger.info(f"🛑 [Forts] {interaction.user.name} a stoppé son scan radar.")
 
             # Enregistrement Télémétrie
             if interaction.guild:
@@ -704,7 +707,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                 try:
                     with open(path_users, encoding="utf-8") as f:
                         users_data = json.load(f)
-                except:
+                except Exception:
                     pass
 
             maintenant = discord.utils.utcnow()
@@ -729,18 +732,18 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                                 defaut="{e_information} **Fin de session !** Ton radar pour **{joueur}** s'est éteint.",
                             )
                             await user.send(msg)
-                            logger.info(f"🏁 [FORTERESSES] Session terminée naturellement pour {user.name}.")
-                        except:
+                            logger.info(f"🏁 [Forts] Session terminée naturellement pour {user.name}.")
+                        except Exception:
                             pass
                         continue
-                except:
+                except Exception:
                     pass
 
                 try:
                     next_scan_dt = datetime.fromisoformat(info["next_scan"].replace("Z", "+00:00"))
                     if maintenant < next_scan_dt:
                         continue
-                except:
+                except Exception:
                     pass
 
                 kids = info.get("kids", [2])
@@ -761,7 +764,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                         user = self.bot.get_user(int(user_id)) or await self.bot.fetch_user(int(user_id))
                         view = FortressActionView(self, user_id, cibles_list, joueur, serveur, langue)
                         logger.info(
-                            f"📤 [FORTERESSES] Envoi automatique de nouvelles cibles à {user.name} ({user_id}) pour {joueur}."
+                            f"📤 [Forts] Envoi automatique de nouvelles cibles à {user.name} ({user_id}) pour {joueur}."
                         )
                         await user.send(embed=embed_cibles, view=view)
 
@@ -787,7 +790,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                             dm_blocked=1,
                         )
                     except Exception as e:
-                        logger.error(f"❌ [FORTERESSES] Erreur d'envoi MP à {user_id}: {e}")
+                        logger.error(f"❌ [Forts] Erreur d'envoi MP à {user_id}: {e}")
                         obs.record_alert(
                             source="fortress",
                             alert_type="spawned",
@@ -803,7 +806,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                 await save_dungeons_async(data)
 
         except Exception as e:
-            logger.error(f"❌ [FORTERESSES CRASH] : {traceback.format_exc()}")
+            logger.error(f"❌ [Forts CRASH FATAL] : {traceback.format_exc()}")
             obs.record_error(
                 source="task", scope="dungeon_spy_task", exception=e, cog="forteresses", severity="critical"
             )
@@ -815,7 +818,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
     async def f_history(self, interaction: discord.Interaction, player: str):
         try:
             await interaction.response.defer(ephemeral=False, thinking=True)
-        except:
+        except Exception:
             return
 
         langue, serveur = await get_server_config(interaction)
@@ -844,8 +847,8 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                             p_data = p_data[0]
                             player_id = str(p_data.get("player_id", p_data.get("id", "")))
                             vrai_nom = p_data.get("player_name", player)
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"❌ [Forts] Erreur recherche joueur API : {e}")
 
         if not player_id:
             return await interaction.followup.send(
@@ -871,7 +874,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                 data = await r.json()
                 dungeons = data.get("dungeons", [])
         except Exception as e:
-            logger.error(f"❌ Erreur API Fortress History : {e}")
+            logger.error(f"❌ [Forts] Erreur API Fortress History : {e}")
             return await interaction.followup.send(
                 t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur technique : {e}")
             )
@@ -893,7 +896,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             try:
                 latest_dt = datetime.fromisoformat(dungeons[0]["attacked_at"].replace("Z", "+00:00"))
                 latest_attack_ts = int(latest_dt.timestamp())
-            except:
+            except Exception:
                 pass
 
         total_hits = len(dungeons)
@@ -917,7 +920,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         try:
             best_date_obj = datetime.strptime(best_date_str, "%Y-%m-%d")
             jour_actif_str = best_date_obj.strftime("%d/%m/%Y")
-        except:
+        except Exception:
             jour_actif_str = best_date_str
 
         stats_desc = t(
@@ -960,7 +963,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             try:
                 day_obj = datetime.strptime(day_str, "%Y-%m-%d")
                 day_fmt = day_obj.strftime("%d/%m/%Y")
-            except:
+            except Exception:
                 day_fmt = day_str
 
             details_royaumes = []

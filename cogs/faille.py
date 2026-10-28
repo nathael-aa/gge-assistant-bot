@@ -33,26 +33,30 @@ class FailleCog(commands.Cog):
     async def get_latest_rift_snapshot(self, headers: dict):
         """Récupère l'ID du dernier événement et la date du tout dernier snapshot enregistré."""
         url = f"{self.api_base}/rift-raid/dates"
-        async with self.bot.session.get(url, headers=headers, timeout=10) as r:
-            if r.status != 200:
+        try:
+            async with self.bot.session.get(url, headers=headers, timeout=10) as r:
+                if r.status != 200:
+                    return None, None
+                data = await r.json()
+
+            events = data.get("events", [])
+            if not events:
                 return None, None
-            data = await r.json()
 
-        events = data.get("events", [])
-        if not events:
+            latest_event = max(events, key=lambda x: x["event_id"])
+            event_id = latest_event["event_id"]
+
+            dates_list = latest_event.get("dates", [])
+
+            if not dates_list:
+                return event_id, None
+
+            latest_date = dates_list[-1]
+
+            return event_id, latest_date
+        except Exception as e:
+            logger.error(f"❌ [Faille] Erreur get_latest_rift_snapshot : {e}")
             return None, None
-
-        latest_event = max(events, key=lambda x: x["event_id"])
-        event_id = latest_event["event_id"]
-
-        dates_list = latest_event.get("dates", [])
-
-        if not dates_list:
-            return event_id, None
-
-        latest_date = dates_list[-1]
-
-        return event_id, latest_date
 
     # ==========================================
     # 🏆 CLASSEMENT DU RIFT RAID
@@ -82,7 +86,11 @@ class FailleCog(commands.Cog):
         subdivision: app_commands.Range[int, 1, 100] = 1,
         alliance: str = None,
     ):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception:
+            return
+
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
 
@@ -101,34 +109,37 @@ class FailleCog(commands.Cog):
 
         if alliance:
             search_url = f"{self.api_base}/rift-raid/search"
-            async with self.bot.session.get(
-                search_url,
-                headers=headers,
-                params={"date": snapshot_date, "alliance_name": alliance, "page": 1},
-                timeout=15,
-            ) as r:
-                if r.status == 200:
-                    search_data = await r.json()
-                    results = search_data.get("alliances", [])
-                    if results:
-                        ali_data = results[0]
-                        highlight_ali = ali_data.get("alliance_name")
+            try:
+                async with self.bot.session.get(
+                    search_url,
+                    headers=headers,
+                    params={"date": snapshot_date, "alliance_name": alliance, "page": 1},
+                    timeout=15,
+                ) as r:
+                    if r.status == 200:
+                        search_data = await r.json()
+                        results = search_data.get("alliances", [])
+                        if results:
+                            ali_data = results[0]
+                            highlight_ali = ali_data.get("alliance_name")
 
-                        division = ali_data.get("division", division)
-                        subdivision = ali_data.get("subdivision", subdivision)
+                            division = ali_data.get("division", division)
+                            subdivision = ali_data.get("subdivision", subdivision)
 
-                        rank = ali_data.get("rank", 1)
-                        target_local_page = (rank - 1) // 20
-                    else:
-                        emo = DICT_EMOJIS.get("e_information", "ℹ️")
-                        return await interaction.followup.send(
-                            t(
-                                langue,
-                                "rift_search_none",
-                                ali=alliance,
-                                defaut=f"{emo} The alliance **{alliance}** was not found in the current Rift event.",
+                            rank = ali_data.get("rank", 1)
+                            target_local_page = (rank - 1) // 20
+                        else:
+                            emo = DICT_EMOJIS.get("e_information", "ℹ️")
+                            return await interaction.followup.send(
+                                t(
+                                    langue,
+                                    "rift_search_none",
+                                    ali=alliance,
+                                    defaut=f"{emo} The alliance **{alliance}** was not found in the current Rift event.",
+                                )
                             )
-                        )
+            except Exception as e:
+                logger.error(f"❌ [Faille] Erreur recherche alliance {alliance} : {e}")
 
         alliances = []
         current_api_page = 1
@@ -143,21 +154,31 @@ class FailleCog(commands.Cog):
             }
             url = f"{self.api_base}/rift-raid/alliances"
 
-            async with self.bot.session.get(url, headers=headers, params=params, timeout=15) as r:
-                if r.status != 200:
-                    err_text = (await r.text())[:150]
-                    logger.error(f"[RIFT RANK] Erreur {r.status} : {err_text}")
-                    if not alliances:
-                        emo = DICT_EMOJIS.get("e_error", "❌")
-                        return await interaction.followup.send(f"{emo} **API Error ({r.status})** : `{err_text}`")
-                    break
+            try:
+                async with self.bot.session.get(url, headers=headers, params=params, timeout=15) as r:
+                    if r.status != 200:
+                        err_text = (await r.text())[:150]
+                        logger.error(f"❌ [Faille] API Rank Erreur {r.status} : {err_text}")
+                        if not alliances:
+                            emo = DICT_EMOJIS.get("e_error", "❌")
+                            return await interaction.followup.send(f"{emo} **API Error ({r.status})** : `{err_text}`")
+                        break
 
-                data = await r.json()
-                alliances.extend(data.get("event", {}).get("alliances", []))
+                    data = await r.json()
+                    alliances.extend(data.get("event", {}).get("alliances", []))
 
-                pagination = data.get("pagination", {})
-                total_api_pages = pagination.get("total_pages", 1)
-                current_api_page += 1
+                    pagination = data.get("pagination", {})
+                    total_api_pages = pagination.get("total_pages", 1)
+                    current_api_page += 1
+            except Exception as e:
+                logger.error(f"❌ [Faille] Erreur lors de la pagination Rift : {e}")
+                if not alliances:
+                    return await interaction.followup.send(
+                        t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur technique : {e}").format(
+                            **DICT_EMOJIS
+                        )
+                    )
+                break
 
         if not alliances:
             return await interaction.followup.send(
@@ -168,7 +189,7 @@ class FailleCog(commands.Cog):
 
         try:
             dt_snap = datetime.fromisoformat(snapshot_date.replace("Z", "+00:00"))
-        except:
+        except Exception:
             dt_snap = datetime.now()
 
         e_div = DICT_EMOJIS.get(f"e_division{division}", "🏅")
@@ -178,7 +199,7 @@ class FailleCog(commands.Cog):
             e_div=e_div,
             div=division,
             sub=subdivision,
-            defaut=f"{e_div} Rift Raid | Div. {division} - Sub. {subdivision}",
+            defaut=f"{e_div} Rift Raid | Div. {division} Sub. {subdivision}",
         )
         desc_maj = t(
             langue,
@@ -229,7 +250,11 @@ class FailleCog(commands.Cog):
     @app_commands.autocomplete(alliance=alliance_autocomplete)
     @app_commands.describe(alliance="The exact name of the alliance")
     async def rift_alliance(self, interaction: discord.Interaction, alliance: str):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception:
+            return
+
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
 
@@ -248,27 +273,35 @@ class FailleCog(commands.Cog):
             params_search = {"date": snapshot_date, "alliance_name": alliance, "page": 1}
             url_search = f"{self.api_base}/rift-raid/search"
 
-            async with self.bot.session.get(url_search, headers=headers, params=params_search, timeout=15) as r:
-                if r.status != 200:
-                    err = (await r.text())[:150]
-                    logger.error(f"[RIFT ALLIANCE] Erreur Search API ({r.status}) : {err}")
-                    emo = DICT_EMOJIS.get("e_error", "❌")
-                    return await interaction.followup.send(f"{emo} **API Error (Search {r.status})** : `{err}`")
+            try:
+                async with self.bot.session.get(url_search, headers=headers, params=params_search, timeout=15) as r:
+                    if r.status != 200:
+                        err = (await r.text())[:150]
+                        logger.error(f"❌ [Faille] Erreur Search API ({r.status}) : {err}")
+                        emo = DICT_EMOJIS.get("e_error", "❌")
+                        return await interaction.followup.send(f"{emo} **API Error (Search {r.status})** : `{err}`")
 
-                data_search = await r.json()
-                results = data_search.get("alliances", [])
+                    data_search = await r.json()
+                    results = data_search.get("alliances", [])
 
-                if not results:
-                    return await interaction.followup.send(
-                        t(
-                            langue,
-                            "rift_search_none",
-                            ali=alliance,
-                            defaut=f"{{e_information}} The alliance **{alliance}** was not found in the current event.",
-                        ).format(**DICT_EMOJIS)
+                    if not results:
+                        return await interaction.followup.send(
+                            t(
+                                langue,
+                                "rift_search_none",
+                                ali=alliance,
+                                defaut=f"{{e_information}} The alliance **{alliance}** was not found in the current event.",
+                            ).format(**DICT_EMOJIS)
+                        )
+
+                    ali_id = results[0].get("alliance_id")
+            except Exception as e:
+                logger.error(f"❌ [Faille] Erreur recherche alliance : {e}")
+                return await interaction.followup.send(
+                    t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur technique : {e}").format(
+                        **DICT_EMOJIS
                     )
-
-                ali_id = results[0].get("alliance_id")
+                )
 
         if not ali_id:
             return await interaction.followup.send(
@@ -278,22 +311,28 @@ class FailleCog(commands.Cog):
             )
 
         url_hist = f"{self.api_base}/rift-raid/alliance/{ali_id}/{event_id}"
-        async with self.bot.session.get(url_hist, headers=headers, timeout=15) as r:
-            if r.status == 404:
-                return await interaction.followup.send(
-                    t(
-                        langue,
-                        "rift_err_no_history",
-                        defaut="{e_information} No historical data found for this alliance.",
-                    ).format(**DICT_EMOJIS)
-                )
-            if r.status != 200:
-                err = (await r.text())[:150]
-                logger.error(f"[RIFT ALLIANCE] Erreur History API ({r.status}) : {err}")
-                emo = DICT_EMOJIS.get("e_error", "❌")
-                return await interaction.followup.send(f"{emo} **API Error (History {r.status})** : `{err}`")
+        try:
+            async with self.bot.session.get(url_hist, headers=headers, timeout=15) as r:
+                if r.status == 404:
+                    return await interaction.followup.send(
+                        t(
+                            langue,
+                            "rift_err_no_history",
+                            defaut="{e_information} No historical data found for this alliance.",
+                        ).format(**DICT_EMOJIS)
+                    )
+                if r.status != 200:
+                    err = (await r.text())[:150]
+                    logger.error(f"❌ [Faille] Erreur History API ({r.status}) : {err}")
+                    emo = DICT_EMOJIS.get("e_error", "❌")
+                    return await interaction.followup.send(f"{emo} **API Error (History {r.status})** : `{err}`")
 
-            data_hist = await r.json()
+                data_hist = await r.json()
+        except Exception as e:
+            logger.error(f"❌ [Faille] Erreur chargement historique alliance Rift : {e}")
+            return await interaction.followup.send(
+                t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur technique : {e}").format(**DICT_EMOJIS)
+            )
 
         analysis = data_hist.get("analysis", [])
         meta = data_hist.get("meta", {})
@@ -310,7 +349,7 @@ class FailleCog(commands.Cog):
             try:
                 clean = date_str.replace("T", " ").replace("Z", "").replace(".000", "")
                 return datetime.strptime(clean, "%Y-%m-%d %H:%M:%S")
-            except:
+            except Exception:
                 return datetime.now()
 
         analysis.sort(key=lambda x: parse_rift_date(x.get("date", "")).timestamp(), reverse=True)

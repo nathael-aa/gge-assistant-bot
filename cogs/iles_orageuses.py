@@ -372,7 +372,11 @@ class IlesOrageusesCog(commands.Cog):
         lvl80: bool = False,
         min_attacks: app_commands.Range[int, 0, 10] = 0,
     ):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception:
+            return
+
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
 
@@ -403,11 +407,20 @@ class IlesOrageusesCog(commands.Cog):
                 params["filterByAvailability"] = availability
 
             url = f"{self.api_base}storms/forts"
-            async with self.bot.session.get(url, headers=headers, params=params, timeout=15) as r:
-                if r.status != 200:
-                    msg = t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
-                    return await current_inter.followup.send(msg, ephemeral=is_refresh)
-                data = await r.json()
+
+            try:
+                async with self.bot.session.get(url, headers=headers, params=params, timeout=15) as r:
+                    if r.status != 200:
+                        msg = t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
+                        return await current_inter.followup.send(msg, ephemeral=is_refresh)
+                    data = await r.json()
+            except Exception as e:
+                logger.error(f"❌ [Storms] Erreur connexion API {url}: {e}")
+                obs.record_error(source="command", scope="storm_forts", exception=e, cog="storms")
+                return await current_inter.followup.send(
+                    t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API."),
+                    ephemeral=is_refresh,
+                )
 
             forts = data.get("forts", [])
             if not forts:
@@ -427,7 +440,7 @@ class IlesOrageusesCog(commands.Cog):
                     try:
                         dt = datetime.fromisoformat(fort.get("available_at", "").replace("Z", "+00:00"))
                         return (int(dt.timestamp()), -fort.get("isle_id", 0))
-                    except:
+                    except Exception:
                         return (9999999999, -fort.get("isle_id", 0))
 
                 forts_filtres.sort(key=sort_by_spawn)
@@ -455,7 +468,7 @@ class IlesOrageusesCog(commands.Cog):
                         try:
                             dt = datetime.fromisoformat(fort.get("available_at", "").replace("Z", "+00:00"))
                             time_str = f" | {{e_time}} <t:{int(dt.timestamp())}:R>"
-                        except:
+                        except Exception:
                             pass
                     lignes_description.append(
                         f"**Lvl. {desc}** | {{e_compass}} `({x}:{y})` | {{e_attaque}} {attaques} {lbl_att_left}{time_str}"
@@ -506,7 +519,11 @@ class IlesOrageusesCog(commands.Cog):
     async def storm_isles(
         self, interaction: discord.Interaction, status: app_commands.Choice[int], resource: app_commands.Choice[int]
     ):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception:
+            return
+
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
 
@@ -516,11 +533,19 @@ class IlesOrageusesCog(commands.Cog):
                 params["filterByState"] = status.value
 
             url = f"{self.api_base}storms/isles"
-            async with self.bot.session.get(url, headers=headers, params=params, timeout=15) as r:
-                if r.status != 200:
-                    msg = t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
-                    return await current_inter.followup.send(msg, ephemeral=is_refresh)
-                data = await r.json()
+            try:
+                async with self.bot.session.get(url, headers=headers, params=params, timeout=15) as r:
+                    if r.status != 200:
+                        msg = t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
+                        return await current_inter.followup.send(msg, ephemeral=is_refresh)
+                    data = await r.json()
+            except Exception as e:
+                logger.error(f"❌ [Storms] Erreur connexion API {url}: {e}")
+                obs.record_error(source="command", scope="storm_isles", exception=e, cog="storms")
+                return await current_inter.followup.send(
+                    t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API."),
+                    ephemeral=is_refresh,
+                )
 
             isles = data.get("isles", [])
             allowed_isles = []
@@ -544,7 +569,7 @@ class IlesOrageusesCog(commands.Cog):
                     try:
                         dt = datetime.fromisoformat(isle.get("available_at", "").replace("Z", "+00:00"))
                         return int(dt.timestamp())
-                    except:
+                    except Exception:
                         return 9999999999
 
                 isles.sort(key=sort_by_spawn)
@@ -589,7 +614,7 @@ class IlesOrageusesCog(commands.Cog):
                                 datetime.fromisoformat(isle.get("available_at", "").replace("Z", "+00:00")).timestamp()
                             )
                             time_str = f"<t:{ts}:R>"
-                        except:
+                        except Exception:
                             time_str = t(langue, "storm_isle_soon", defaut="Soon")
                         ligne = f"{{e_time}} **{res_nom}** | {{e_compass}} `({x}:{y})` | {lbl_respawns} {time_str}"
                     else:
@@ -627,18 +652,30 @@ class IlesOrageusesCog(commands.Cog):
     @app_commands.autocomplete(player=joueur_autocomplete)
     @app_commands.describe(player="Exact player name")
     async def storm_occupier(self, interaction: discord.Interaction, player: str):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception:
+            return
+
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
         safe_joueur = urllib.parse.quote(player)
 
         async def fetch_and_build_view(current_inter: discord.Interaction, is_refresh: bool):
             url = f"{self.api_base}storms/isles?filterByOccupierName={safe_joueur}&size=4000"
-            async with self.bot.session.get(url, headers=headers, timeout=15) as r:
-                if r.status != 200:
-                    msg = t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
-                    return await current_inter.followup.send(msg, ephemeral=is_refresh)
-                data = await r.json()
+            try:
+                async with self.bot.session.get(url, headers=headers, timeout=15) as r:
+                    if r.status != 200:
+                        msg = t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
+                        return await current_inter.followup.send(msg, ephemeral=is_refresh)
+                    data = await r.json()
+            except Exception as e:
+                logger.error(f"❌ [Storms] Erreur connexion API {url}: {e}")
+                obs.record_error(source="command", scope="storm_occupier", exception=e, cog="storms")
+                return await current_inter.followup.send(
+                    t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API."),
+                    ephemeral=is_refresh,
+                )
 
             isles = data.get("isles", [])
             if not isles:
@@ -701,28 +738,39 @@ class IlesOrageusesCog(commands.Cog):
     @storm_group.command(name="status", description="Displays the freshness state of the Storm Islands map scan")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def storm_status(self, interaction: discord.Interaction):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception:
+            return
+
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
 
         url = f"{self.api_base}storms/meta"
-        async with self.bot.session.get(url, headers=headers, timeout=10) as r:
-            if r.status != 200:
-                return await interaction.followup.send(
-                    t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
-                )
-            data = await r.json()
+        try:
+            async with self.bot.session.get(url, headers=headers, timeout=10) as r:
+                if r.status != 200:
+                    return await interaction.followup.send(
+                        t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
+                    )
+                data = await r.json()
+        except Exception as e:
+            logger.error(f"❌ [Storms] Erreur connexion API {url}: {e}")
+            obs.record_error(source="command", scope="storm_status", exception=e, cog="storms")
+            return await interaction.followup.send(
+                t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
+            )
 
         try:
             scan_str = (
                 f"<t:{int(datetime.fromisoformat(data.get('last_scan_at', '').replace('Z', '+00:00')).timestamp())}:R>"
             )
-        except:
+        except Exception:
             scan_str = t(langue, "storm_status_unknown", defaut="Unknown")
 
         try:
             season_str = f"<t:{int(datetime.fromisoformat(data.get('season_started_at', '').replace('Z', '+00:00')).timestamp())}:D>"
-        except:
+        except Exception:
             season_str = t(langue, "storm_status_unknown", defaut="Unknown")
 
         embed = discord.Embed(
@@ -756,9 +804,12 @@ class IlesOrageusesCog(commands.Cog):
         ]
     )
     async def storm_player(self, interaction: discord.Interaction, player: str, mode: app_commands.Choice[str]):
-        await interaction.followup.defer(
-            thinking=True
-        ) if interaction.response.is_done() else await interaction.response.defer(thinking=True)
+        try:
+            await interaction.followup.defer(
+                thinking=True
+            ) if interaction.response.is_done() else await interaction.response.defer(thinking=True)
+        except Exception:
+            pass
 
         langue, serveur = await get_server_config(interaction)
         lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
@@ -803,7 +854,7 @@ class IlesOrageusesCog(commands.Cog):
                     )
                 snapshots = (await resp.json()).get("snapshots", [])
         except Exception as e:
-            logger.error(f"❌ ERREUR API Aquamarine : {str(e)}")
+            logger.error(f"❌ [Storms] ERREUR API Aquamarine : {str(e)}")
             obs.record_error(source="command", scope="storm_player", exception=e, cog="storms")
             return await interaction.followup.send(
                 t(
@@ -905,7 +956,7 @@ class IlesOrageusesCog(commands.Cog):
                         defaut=f"{{e_error}} **Attention :** Ce joueur n'a pas encore lancé l'édition actuelle. Affichage des archives de l'édition de **{nom_mois_s}**.\n\n",
                     )
                     couleur_embed = discord.Color.orange()
-                except:
+                except Exception:
                     pass
 
             embed = discord.Embed(title=title_txt, color=couleur_embed)
@@ -970,7 +1021,7 @@ class IlesOrageusesCog(commands.Cog):
                             "metrics": {m["metric_id"]: int(m["value"]) for m in sn.get("metrics", [])},
                         }
                     )
-                except:
+                except Exception:
                     continue
 
             if not months_dict:
@@ -1017,8 +1068,9 @@ class IlesOrageusesCog(commands.Cog):
     async def classement_iles(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
+
         langue, _ = await get_server_config(interaction)
         lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
 
@@ -1049,83 +1101,95 @@ class IlesOrageusesCog(commands.Cog):
                 for resp in responses:
                     if isinstance(resp, aiohttp.ClientResponse) and resp.status == 200:
                         players.extend((await resp.json()).get("players", []))
+        except Exception as e:
+            logger.error(f"❌ [Storms] Erreur connexion API pour leaderboard : {e}")
+            obs.record_error(source="command", scope="classement_iles", exception=e, cog="storms")
+            return await interaction.followup.send(
+                t(langue, "ev_err_api_unavail", defaut="{e_error} API indisponible.")
+            )
 
-            if not players:
-                return await interaction.followup.send(
-                    t(langue, "ev_err_no_players", defaut="{e_error} Aucun joueur trouvé.")
+        if not players:
+            return await interaction.followup.send(
+                t(langue, "ev_err_no_players", defaut="{e_error} Aucun joueur trouvé.")
+            )
+
+        mois_actif = ""
+        for p in players:
+            date_p = p.get("last_collected_at", "")
+            if date_p and date_p[:7] > mois_actif:
+                mois_actif = date_p[:7]
+
+        players_filtres = []
+        for p in players:
+            date_p = p.get("last_collected_at", "")
+            if date_p and date_p.startswith(mois_actif):
+                players_filtres.append(p)
+
+        players = players_filtres[:100]
+
+        if not players:
+            return await interaction.followup.send(
+                t(
+                    langue,
+                    "ev_err_aqua_not_started",
+                    defaut="{e_error} Aucun joueur n'a encore débuté l'édition de ce mois-ci.",
                 )
+            )
 
-            mois_actif = ""
-            for p in players:
-                date_p = p.get("last_collected_at", "")
-                if date_p and date_p[:7] > mois_actif:
-                    mois_actif = date_p[:7]
+        lignes = []
+        e_cargo = DICT_EMOJIS.get("e_pointscargo", "")
 
-            players_filtres = []
-            for p in players:
-                date_p = p.get("last_collected_at", "")
-                if date_p and date_p.startswith(mois_actif):
-                    players_filtres.append(p)
+        for r_idx, p in enumerate(players):
+            rang = r_idx + 1
+            nom = p.get("player_name", "???")
+            metrics = p.get("metrics", {})
+            pts = f"{int(metrics.get('100', 0)):,}".replace(",", " ")
+            medal = "🥇" if rang == 1 else "🥈" if rang == 2 else "🥉" if rang == 3 else f"**{rang}.**"
 
-            players = players_filtres[:100]
-
-            if not players:
-                return await interaction.followup.send(
-                    t(
-                        langue,
-                        "ev_err_aqua_not_started",
-                        defaut="{e_error} Aucun joueur n'a encore débuté l'édition de ce mois-ci.",
-                    )
-                )
-
-            lignes = []
-            e_cargo = DICT_EMOJIS.get("e_pointscargo", "")
-
-            for r_idx, p in enumerate(players):
-                rang = r_idx + 1
-                nom = p.get("player_name", "???")
-                metrics = p.get("metrics", {})
-                pts = f"{int(metrics.get('100', 0)):,}".replace(",", " ")
-                medal = "🥇" if rang == 1 else "🥈" if rang == 2 else "🥉" if rang == 3 else f"**{rang}.**"
-
-                lignes.append(f"{medal} **{nom}** ➔ **{pts} {e_cargo}**")
+            lignes.append(f"{medal} **{nom}** ➔ **{pts} {e_cargo}**")
 
             actualisation_dt = _get_api_timestamp(players)
 
-            embeds = []
+        embeds = []
+        try:
             annee_actuelle, mois_num_actuel = mois_actif.split("-")
             nom_mois_actif = f"{get_month_name(mois_num_actuel, langue)} {annee_actuelle}"
+        except Exception:
+            nom_mois_actif = mois_actif
 
-            titre = t(
-                langue,
-                "ev_class_aqua_title",
-                m=nom_mois_actif,
-                defaut=f"Top 100 Serveur - Îles Orageuses ({nom_mois_actif})",
-            )
-            desc = t(
-                langue,
-                "ev_class_aqua_desc",
-                t=total_items,
-                defaut=f"Classement basé sur les points cargo de l'édition en cours.\n*Total recensé sur le serveur : {total_items} joueurs*",
-            )
+        titre = t(
+            langue,
+            "ev_class_aqua_title",
+            m=nom_mois_actif,
+            defaut=f"Top 100 Serveur - Îles Orageuses ({nom_mois_actif})",
+        )
+        desc = t(
+            langue,
+            "ev_class_aqua_desc",
+            t=total_items,
+            defaut=f"Classement basé sur les points cargo de l'édition en cours.\n*Total recensé sur le serveur : {total_items} joueurs*",
+        )
 
-            for i in range(0, len(lignes), 10):
-                embed = discord.Embed(
-                    title=titre,
-                    description=f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{desc}",
-                    color=self.clr_aqua,
-                )
-                embed.add_field(
-                    name=t(langue, "ev_class_global_field", defaut="Classement global"),
-                    value="\n".join(lignes[i : i + 10]),
-                    inline=False,
-                )
-                await setup_embed_footer(embed, interaction, langue)
-                embeds.append(embed)
+        for i in range(0, len(lignes), 10):
+            embed = discord.Embed(
+                title=titre,
+                description=f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{desc}",
+                color=self.clr_aqua,
+            )
+            embed.add_field(
+                name=t(langue, "ev_class_global_field", defaut="Classement global"),
+                value="\n".join(lignes[i : i + 10]),
+                inline=False,
+            )
+            await setup_embed_footer(embed, interaction, langue)
+            embeds.append(embed)
+
+        try:
             view = PaginationView(embeds)
             view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
         except Exception as e:
+            logger.error(f"❌ [Storms] Erreur lors de l'affichage du leaderboard Aquamarine : {e}")
             obs.record_error(source="command", scope="leaderboard_storm_islands", exception=e, cog="storms")
             await interaction.followup.send(
                 t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur technique : {e}")
@@ -1152,7 +1216,11 @@ class IlesOrageusesCog(commands.Cog):
         ping_big: bool = False,
         role: discord.Role = None,
     ):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception:
+            return
+
         langue, serveur = await get_server_config(interaction)
 
         bot_permissions = channel.permissions_for(interaction.guild.me)
@@ -1230,7 +1298,11 @@ class IlesOrageusesCog(commands.Cog):
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def storm_stop_isles(self, interaction: discord.Interaction):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception:
+            return
+
         langue, serveur = await get_server_config(interaction)
 
         data = await load_storm_config()
@@ -1295,7 +1367,11 @@ class IlesOrageusesCog(commands.Cog):
         min_level: app_commands.Choice[int],
         role: discord.Role = None,
     ):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception:
+            return
+
         langue, serveur = await get_server_config(interaction)
 
         bot_permissions = channel.permissions_for(interaction.guild.me)
@@ -1365,7 +1441,11 @@ class IlesOrageusesCog(commands.Cog):
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
     async def storm_stop_forts(self, interaction: discord.Interaction):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception:
+            return
+
         langue, serveur = await get_server_config(interaction)
 
         data = await load_storm_config()
@@ -1469,10 +1549,10 @@ class IlesOrageusesCog(commands.Cog):
                                 isles_respawning = api_data.get("isles", [])
                             else:
                                 logger.warning(
-                                    f"⚠️ [Storm Alerts] Code {r.status} reçu de l'API. URL: {r.url} - Serveur configuré: {gge_server}"
+                                    f"⚠️ [Storms Alerts] Code {r.status} reçu de l'API. URL: {r.url} - Serveur configuré: {gge_server}"
                                 )
                     except Exception as e:
-                        logger.error(f"❌ [Storm Alerts] Erreur API Respawning pour {gge_server} : {e}")
+                        logger.error(f"❌ [Storms Alerts] Erreur API Respawning pour {gge_server} : {e}")
 
                 if gge_server in servers_with_spawned:
                     params_occupied = {"size": 4000, "filterByState": 2}
@@ -1489,10 +1569,10 @@ class IlesOrageusesCog(commands.Cog):
                                 }
                             else:
                                 logger.warning(
-                                    f"⚠️ [Storm Alerts] Code {r.status} API (Occupied). Serveur: {gge_server}"
+                                    f"⚠️ [Storms Alerts] Code {r.status} API (Occupied). Serveur: {gge_server}"
                                 )
                     except Exception as e:
-                        logger.error(f"❌ [Storm Alerts] Erreur API Occupied pour {gge_server} : {e}")
+                        logger.error(f"❌ [Storms Alerts] Erreur API Occupied pour {gge_server} : {e}")
 
                 # ==========================================
                 # 🏰 SCAN DES FORTS
@@ -1509,9 +1589,9 @@ class IlesOrageusesCog(commands.Cog):
                                 api_data = await r.json()
                                 forts_respawning = api_data.get("forts", [])
                             else:
-                                logger.warning(f"⚠️ [Storm Alerts] Code {r.status} API (Forts). Serveur: {gge_server}")
+                                logger.warning(f"⚠️ [Storms Alerts] Code {r.status} API (Forts). Serveur: {gge_server}")
                     except Exception as e:
-                        logger.error(f"❌ [Storm Alerts] Erreur API Forts pour {gge_server} : {e}")
+                        logger.error(f"❌ [Storms Alerts] Erreur API Forts pour {gge_server} : {e}")
 
                 # -- Préparation des annonces Îles --
                 isles_to_announce = []
@@ -1530,7 +1610,7 @@ class IlesOrageusesCog(commands.Cog):
                             isles_to_announce.append((isle, ts))
                             notified.append(uid)
                             modifie = True
-                    except:
+                    except Exception:
                         continue
 
                 # -- Préparation des annonces Forts --
@@ -1551,7 +1631,7 @@ class IlesOrageusesCog(commands.Cog):
                             forts_to_announce.append((fort, ts, fort_info["lvl"], fort_info["desc"]))
                             notified.append(uid)
                             modifie = True
-                    except:
+                    except Exception:
                         continue
 
                 if not isles_to_announce and not forts_to_announce:
@@ -1571,7 +1651,7 @@ class IlesOrageusesCog(commands.Cog):
                         if not channel:
                             try:
                                 channel = await self.bot.fetch_channel(channel_id)
-                            except:
+                            except Exception:
                                 pass
 
                         if channel:
@@ -1642,7 +1722,7 @@ class IlesOrageusesCog(commands.Cog):
                                         dm_blocked=1,
                                     )
                                 except discord.HTTPException as e:
-                                    logger.error(f"❌ [Storm Alerts] Erreur réseau Discord : {e}")
+                                    logger.error(f"❌ [Storms Alerts] Erreur réseau Discord : {e}")
 
                     # ==========================================
                     # 📣 ENVOI DES ALERTES FORTS
@@ -1653,7 +1733,7 @@ class IlesOrageusesCog(commands.Cog):
                         if not fort_channel:
                             try:
                                 fort_channel = await self.bot.fetch_channel(fort_channel_id)
-                            except:
+                            except Exception:
                                 pass
 
                         if fort_channel:
@@ -1698,7 +1778,9 @@ class IlesOrageusesCog(commands.Cog):
                                             }
                                         )
                                     except Exception as e:
-                                        logger.error(f"❌ [Storm Alerts] Erreur envoi Fort sur {fort_channel_id} : {e}")
+                                        logger.error(
+                                            f"❌ [Storms Alerts] Erreur envoi Fort sur {fort_channel_id} : {e}"
+                                        )
 
             # ==========================================
             # 🔄 MISE À JOUR DES ANCIENS MESSAGES
@@ -1740,7 +1822,7 @@ class IlesOrageusesCog(commands.Cog):
 
                     try:
                         await msg.edit(embed=emb)
-                    except:
+                    except Exception:
                         pass
                     alerts_to_keep.append(alert)
                     continue
@@ -1779,7 +1861,7 @@ class IlesOrageusesCog(commands.Cog):
 
                         try:
                             await msg.edit(embed=emb)
-                        except:
+                        except Exception:
                             pass
                     else:
                         if now <= ts + 7200:
@@ -1794,7 +1876,7 @@ class IlesOrageusesCog(commands.Cog):
                 await save_storm_config(data)
 
         except Exception as e:
-            logger.error(f"❌ [Storm Alerts CRASH FATAL] : {traceback.format_exc()}")
+            logger.error(f"❌ [Storms Alerts CRASH FATAL] : {traceback.format_exc()}")
             obs.record_error(source="task", scope="storm_alert_loop", exception=e, cog="storms", severity="critical")
 
     @storm_alert_loop.before_loop

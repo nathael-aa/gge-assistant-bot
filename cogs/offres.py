@@ -44,13 +44,15 @@ CAT_COLORS = {
 }
 
 
-class OfferCategorySelect(discord.ui.Select):
-    def __init__(self, cog, guild_id: str, default_cats: list, alerts_file, base_desc: str):
+class OffersSetupView(discord.ui.View):
+    def __init__(self, cog, guild_id: str, default_cats: list, alerts_file, base_desc: str, langue: str):
+        super().__init__(timeout=300)
         self.cog = cog
         self.guild_id = guild_id
-        self.langue = "EN"  # Forcé en anglais
         self.alerts_file = alerts_file
         self.base_desc = base_desc
+        self.langue = langue
+        self.selected_cats = default_cats
 
         options = []
         for key, (emoji, name_en) in CAT_MAPPING.items():
@@ -59,25 +61,40 @@ class OfferCategorySelect(discord.ui.Select):
                 discord.SelectOption(label=name_local, value=key, emoji=emoji, default=(key in default_cats))
             )
 
-        super().__init__(
+        self.select = discord.ui.Select(
             placeholder=t(self.langue, "offres_select_cat", defaut="Select categories to track..."),
             min_values=1,
             max_values=len(options),
             options=options,
         )
+        self.select.callback = self.select_callback
+        self.add_item(self.select)
 
-    async def callback(self, interaction: discord.Interaction):
+        self.btn_confirm = discord.ui.Button(
+            label=t(self.langue, "offres_btn_confirm", defaut="Confirm ✅"), style=discord.ButtonStyle.success
+        )
+        self.btn_confirm.callback = self.confirm_callback
+        self.add_item(self.btn_confirm)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        self.selected_cats = self.select.values
+        # Met à jour l'affichage visuel des options sélectionnées
+        for opt in self.select.options:
+            opt.default = opt.value in self.selected_cats
+        await interaction.response.edit_message(view=self)
+
+    async def confirm_callback(self, interaction: discord.Interaction):
         data = await async_json_load(self.alerts_file) or {"guilds": {}}
         if "guilds" not in data:
             data["guilds"] = {}
 
         if self.guild_id in data["guilds"]:
-            data["guilds"][self.guild_id]["categories"] = self.values
+            data["guilds"][self.guild_id]["categories"] = self.selected_cats
             prefs = data["guilds"][self.guild_id]
             await async_json_dump(self.alerts_file, data, indent=4)
 
             e_check = DICT_EMOJIS.get("e_check", "✅")
-            cats_localized = [t(self.langue, f"offres_cat_{v}", defaut=CAT_MAPPING[v][1]) for v in self.values]
+            cats_localized = [t(self.langue, f"offres_cat_{v}", defaut=CAT_MAPPING[v][1]) for v in self.selected_cats]
             cats_str = ", ".join(cats_localized)
 
             success_msg = t(
@@ -188,10 +205,13 @@ class OffersCog(commands.Cog):
         if ping_val:
             base_desc += f"\n🔔 **Ping:** {ping_val}"
 
-        prompt_desc = t(langue, "offres_setup_prompt", defaut="\n\n👇 **Select the categories you want to monitor:**")
+        prompt_desc = t(
+            langue,
+            "offres_setup_prompt",
+            defaut="\n\n👇 **Select the categories you want to monitor, then click Confirm:**",
+        )
 
-        view = discord.ui.View()
-        view.add_item(OfferCategorySelect(self, guild_id, default_cats, self.alerts_file, base_desc))
+        view = OffersSetupView(self, guild_id, default_cats, self.alerts_file, base_desc, langue)
 
         embed = discord.Embed(
             title=t(langue, "offres_setup_title", defaut="🛒 Offers Tracker Configuration"),
@@ -305,7 +325,6 @@ class OffersCog(commands.Cog):
         cat_emoji, cat_name_en = CAT_MAPPING.get(cat_key, ("🛒", "Offers"))
         cat_name = t(langue, f"offres_cat_{cat_key}", defaut=cat_name_en)
 
-        # Ajout de cat_emoji=cat_emoji pour que le format le trouve !
         msg_text = t(
             langue,
             "offres_thread_msg",
@@ -340,7 +359,7 @@ class OffersCog(commands.Cog):
                 await thread.send(embeds=embeds[i : i + 10])
                 await asyncio.sleep(1.0)
         except Exception as e:
-            logger.error(f"Error creating thread/sending offers to {channel.id}: {e}")
+            logger.error(f"❌ [Offers] Erreur création de thread pour l'envoi d'offres (Canal {channel.id}): {e}")
 
     async def trigger_immediate_scan(self, channel: discord.TextChannel, guild_id: str, prefs: dict):
         """Récupère et envoie immédiatement les offres actuelles (optimisé 100% anglais)."""
@@ -354,7 +373,7 @@ class OffersCog(commands.Cog):
                     return
                 api_data = await r.json()
         except Exception as e:
-            logger.error(f"❌ Immediate Scan Error for {guild_id} : {e}")
+            logger.error(f"❌ [Offers] Scan immédiat impossible pour le serveur {guild_id} : {e}")
             return
 
         cache = await async_json_load(self.cache_file) or {}
@@ -424,7 +443,7 @@ class OffersCog(commands.Cog):
                         continue
                     api_data = await r.json()
             except Exception as e:
-                logger.error(f"❌ Offers Tracker Error for {param_key} : {e}")
+                logger.error(f"❌ [Offers] Tracker - Erreur HTTP pour le groupe {param_key} : {e}")
                 continue
 
             if param_key not in cache:
@@ -477,7 +496,7 @@ class OffersCog(commands.Cog):
                 except discord.Forbidden:
                     pass
                 except Exception as e:
-                    logger.error(f"Error sending offers to {channel_id}: {e}")
+                    logger.error(f"❌ [Offers] Impossible d'envoyer les nouvelles offres (Canal {channel_id}): {e}")
 
             await asyncio.sleep(2)
 

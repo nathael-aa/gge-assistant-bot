@@ -69,7 +69,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
         try:
             await interaction.response.defer(ephemeral=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Radar] Defer failed sur /{interaction.command.name} : {e}")
             return
         langue, serveur = await get_server_config(interaction)
 
@@ -111,7 +111,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
         try:
             await interaction.response.defer(ephemeral=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Radar] Defer failed sur /{interaction.command.name} : {e}")
             return
         langue, serveur = await get_server_config(interaction)
 
@@ -222,7 +222,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
         try:
             await interaction.response.defer(ephemeral=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Radar] Defer failed sur /{interaction.command.name} : {e}")
             return
         langue, serveur = await get_server_config(interaction)
 
@@ -270,6 +270,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
                                     "rank": int(m.get("alliance_rank", 8)),
                                 }
         except Exception as e:
+            logger.error(f"❌ [Radar] Erreur recherche alliance serveurs : {e}")
             msg_api_err = t(
                 langue,
                 "rad_err_api_join",
@@ -356,7 +357,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
         try:
             await interaction.response.defer(ephemeral=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Radar] Defer failed sur /{interaction.command.name} : {e}")
             return
         langue, _ = await get_server_config(interaction)
 
@@ -401,7 +402,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
         try:
             await interaction.response.defer(ephemeral=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Radar] Defer failed sur /{interaction.command.name} : {e}")
             return
         langue, _ = await get_server_config(interaction)
 
@@ -450,7 +451,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
         try:
             await interaction.response.defer(ephemeral=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Radar] Defer failed sur /{interaction.command.name} : {e}")
             return
         langue, _ = await get_server_config(interaction)
 
@@ -532,7 +533,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Radar] Defer failed sur /{interaction.command.name} : {e}")
             return
 
         langue, serveur = await get_server_config(interaction)
@@ -643,7 +644,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Radar] Defer failed sur /{interaction.command.name} : {e}")
             return
 
         langue, serveur = await get_server_config(interaction)
@@ -683,7 +684,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
                                     "rank": int(m.get("alliance_rank", 8)),
                                 }
         except Exception as e:
-            logger.error(f"❌ [Radar Alli Add] Erreur API : {e}")
+            logger.error(f"❌ [Radar Alli Add] Erreur API MP : {e}")
             msg = t(
                 langue,
                 "rad_err_api_join",
@@ -780,7 +781,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Radar] Defer failed sur /{interaction.command.name} : {e}")
             return
 
         langue, _ = await get_server_config(interaction)
@@ -822,7 +823,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Radar] Defer failed sur /{interaction.command.name} : {e}")
             return
 
         langue, _ = await get_server_config(interaction)
@@ -868,7 +869,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed sur /{interaction.command.name} : {e}")
+            logger.warning(f"❌ [Radar] Defer failed sur /{interaction.command.name} : {e}")
             return
 
         langue, _ = await get_server_config(interaction)

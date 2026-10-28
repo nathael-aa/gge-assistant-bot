@@ -46,7 +46,8 @@ async def load_users_config():
         if path.exists():
             try:
                 return await async_json_load(path)
-            except Exception:
+            except Exception as e:
+                logger.error(f"❌ [Configuration] Erreur lecture users.json : {e}")
                 pass
     return {}
 
@@ -54,7 +55,10 @@ async def load_users_config():
 async def save_users_config(data):
     path = CONFIG_DIR / "users.json"
     async with get_file_lock(path):
-        await async_json_dump(path, data, indent=2, ensure_ascii=False)
+        try:
+            await async_json_dump(path, data, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"❌ [Configuration] Erreur écriture users.json : {e}")
 
 
 # ===========================================
@@ -507,7 +511,6 @@ class ServerSetupWizard(discord.ui.View):
         r_sel.callback = r_callback
         self.add_item(r_sel)
 
-        # Ajout du sélecteur de catégories de la boutique
         options_cats = []
         for key, (emoji, name_en) in CAT_MAPPING.items():
             name_local = t(self.lang, f"offres_cat_{key}", defaut=name_en)
@@ -532,7 +535,6 @@ class ServerSetupWizard(discord.ui.View):
         cat_sel.callback = cat_cb
         self.add_item(cat_sel)
 
-        # On décale les boutons de contrôle à la ligne 4 car la ligne 3 est occupée par les catégories
         self.add_controls(is_last=True, ctrl_row=4)
 
     # -------------------------------------------------------------
@@ -707,7 +709,10 @@ class ServerSetupWizard(discord.ui.View):
                 c = self.guild.get_channel(self.data["hub_alerts"]["channel_id"])
                 recap.append(f"• **Hub Alerts:** {c.mention if c else 'Set'}")
 
-            await async_json_dump(hub_file, hub_data, indent=4)
+            try:
+                await async_json_dump(hub_file, hub_data, indent=4)
+            except Exception as e:
+                logger.error(f"❌ [Configuration] Échec de sauvegarde hub_community.json : {e}")
 
         # 2. Calendar (calendrier.json)
         cal_file = self.servers_dir / "calendrier.json"
@@ -738,7 +743,10 @@ class ServerSetupWizard(discord.ui.View):
                 c = self.guild.get_channel(self.data["calendar"]["channel_id"])
                 recap.append(f"• **Calendar:** {c.mention if c else 'Set'}")
 
-            await async_json_dump(cal_file, cal_data, indent=4)
+            try:
+                await async_json_dump(cal_file, cal_data, indent=4)
+            except Exception as e:
+                logger.error(f"❌ [Configuration] Échec de sauvegarde calendrier.json : {e}")
 
         # 3 & 4. Storm Isle & Forts (storm_alerts.json)
         storm_file = self.servers_dir / "storm_alerts.json"
@@ -785,7 +793,10 @@ class ServerSetupWizard(discord.ui.View):
                     f"• **Storm Fortresses:** {c_forts.mention if c_forts else 'Set'} (Lvl: `{self.data['forts']['min_level']}+`)"
                 )
 
-            await async_json_dump(storm_file, storm_data, indent=4)
+            try:
+                await async_json_dump(storm_file, storm_data, indent=4)
+            except Exception as e:
+                logger.error(f"❌ [Configuration] Échec de sauvegarde storm_alerts.json : {e}")
 
         # 5. Radar (/joueurs/surveillance.json)
         radar_dir = self.servers_dir.parent / "joueurs"
@@ -823,7 +834,10 @@ class ServerSetupWizard(discord.ui.View):
                 c = self.guild.get_channel(self.data["radar"]["channel_id"])
                 recap.append(f"• **Radar:** {c.mention if c else 'Set'}")
 
-            await async_json_dump(radar_file, radar_data, indent=4)
+            try:
+                await async_json_dump(radar_file, radar_data, indent=4)
+            except Exception as e:
+                logger.error(f"❌ [Configuration] Échec de sauvegarde surveillance.json : {e}")
 
         # 6. Offers / Shop (offers_alerts.json)
         alerts_file = self.servers_dir / "offers_alerts.json"
@@ -861,7 +875,10 @@ class ServerSetupWizard(discord.ui.View):
                 if offers_cog and hasattr(offers_cog, "trigger_immediate_scan") and c:
                     asyncio.create_task(offers_cog.trigger_immediate_scan(c, guild_id, alerts_data["guilds"][guild_id]))
 
-            await async_json_dump(alerts_file, alerts_data, indent=4)
+            try:
+                await async_json_dump(alerts_file, alerts_data, indent=4)
+            except Exception as e:
+                logger.error(f"❌ [Configuration] Échec de sauvegarde offers_alerts.json : {e}")
 
         if not recap:
             recap.append(t(self.lang, "wizard_recap_none", defaut="*No channels were modified.*"))
@@ -955,7 +972,7 @@ class ConfigurationCog(commands.Cog):
                 )
                 await proc2.wait()
             except Exception as e:
-                logger.error(f"❌ Emergency scan error: {e}")
+                logger.error(f"❌ [Configuration] Erreur scan urgence : {e}")
             finally:
                 await asyncio.to_thread(_remove_flag)
 
@@ -980,7 +997,7 @@ class ConfigurationCog(commands.Cog):
         try:
             await interaction.response.defer(ephemeral=True)
         except Exception as e:
-            logger.warning(f"❌ Defer failed on /{interaction.command.name}: {e}")
+            logger.warning(f"❌ [Configuration] Defer failed on /{interaction.command.name}: {e}")
             return
 
         serveur_upper = server.upper()

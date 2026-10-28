@@ -45,7 +45,7 @@ class AlliancesCog(commands.Cog):
     async def alliance_info(self, interaction: discord.Interaction, alliance_name: str):
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
 
         langue, serveur = await get_server_config(interaction)
@@ -161,7 +161,7 @@ class AlliancesCog(commands.Cog):
             if isinstance(collected_time, str):
                 try:
                     collected_time = datetime.fromisoformat(collected_time.replace("Z", "+00:00"))
-                except:
+                except Exception:
                     collected_time = discord.utils.utcnow()
             elif not collected_time:
                 collected_time = discord.utils.utcnow()
@@ -258,7 +258,7 @@ class AlliancesCog(commands.Cog):
                 await interaction.followup.send(
                     t(langue, "prof_alli_err_internal", defaut="{e_error} Erreur système interne.")
                 )
-            except:
+            except Exception:
                 pass
 
     async def _get_alliance_full_data(
@@ -302,7 +302,7 @@ class AlliancesCog(commands.Cog):
                 async with session.get(url, headers=headers, timeout=timeout_val) as r:
                     if r.status == 200:
                         return await r.json()
-            except:
+            except Exception:
                 pass
             return None
 
@@ -387,7 +387,7 @@ class AlliancesCog(commands.Cog):
     async def alliance_might(self, interaction: discord.Interaction, alliance_name: str, days: int = 3):
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
 
         langue, serveur = await get_server_config(interaction)
@@ -430,7 +430,7 @@ class AlliancesCog(commands.Cog):
                     async with session.get(url, headers=headers, timeout=15) as r:
                         if r.status == 200:
                             return await r.json()
-                except:
+                except Exception:
                     pass
                 return None
 
@@ -470,7 +470,7 @@ class AlliancesCog(commands.Cog):
                 if day_str not in daily_data:
                     daily_data[day_str] = {}
                 daily_data[day_str][pid] = max(daily_data[day_str].get(pid, 0), pt)
-            except:
+            except Exception:
                 pass
 
         if not daily_data:
@@ -576,37 +576,47 @@ class AlliancesCog(commands.Cog):
     @app_commands.describe(alliance_name="Alliance name")
     @app_commands.autocomplete(alliance_name=alliance_autocomplete)
     async def alliance_property(self, interaction: discord.Interaction, alliance_name: str):
-        await interaction.response.defer(thinking=True)
+        try:
+            await interaction.response.defer(thinking=True)
+        except Exception:
+            return
+
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
 
         safe_alliance = quote(alliance_name)
         url_search = f"https://api.gge-tracker.com/api/v1/alliances/name/{safe_alliance}"
 
-        async with self.bot.session.get(url_search, headers=headers, timeout=10) as r:
-            if r.status != 200:
-                return await interaction.followup.send(
-                    t(
-                        langue,
-                        "cmd_prop_not_found",
-                        alliance_name=alliance_name,
-                        defaut=f"{{e_error}} Alliance **{alliance_name}** introuvable sur l'API.",
+        try:
+            async with self.bot.session.get(url_search, headers=headers, timeout=10) as r:
+                if r.status != 200:
+                    return await interaction.followup.send(
+                        t(
+                            langue,
+                            "cmd_prop_not_found",
+                            alliance_name=alliance_name,
+                            defaut=f"{{e_error}} Alliance **{alliance_name}** introuvable sur l'API.",
+                        )
                     )
-                )
-            data = await r.json()
-            if not data:
-                return await interaction.followup.send(
-                    t(
-                        langue,
-                        "cmd_prop_not_found",
-                        alliance_name=alliance_name,
-                        defaut=f"{{e_error}} Alliance **{alliance_name}** introuvable sur l'API.",
+                data = await r.json()
+                if not data:
+                    return await interaction.followup.send(
+                        t(
+                            langue,
+                            "cmd_prop_not_found",
+                            alliance_name=alliance_name,
+                            defaut=f"{{e_error}} Alliance **{alliance_name}** introuvable sur l'API.",
+                        )
                     )
-                )
 
-            target = data[0] if isinstance(data, list) else data
-            alliance_id = target.get("alliance_id") or target.get("id")
-            nom_officiel = target.get("alliance_name", alliance_name)
+                target = data[0] if isinstance(data, list) else data
+                alliance_id = target.get("alliance_id") or target.get("id")
+                nom_officiel = target.get("alliance_name", alliance_name)
+        except Exception as e:
+            logger.error(f"❌ [Profils - Alliance] Erreur property search : {e}")
+            return await interaction.followup.send(
+                t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur technique : {e}").format(**DICT_EMOJIS)
+            )
 
         if not alliance_id:
             return await interaction.followup.send(
@@ -619,16 +629,22 @@ class AlliancesCog(commands.Cog):
             )
 
         url_carto = f"https://api.gge-tracker.com/api/v1/cartography/id/{alliance_id}"
-        async with self.bot.session.get(url_carto, headers=headers, timeout=15) as r:
-            if r.status != 200:
-                return await interaction.followup.send(
-                    t(
-                        langue,
-                        "cmd_prop_api_err",
-                        defaut="{e_error} Erreur lors de la récupération des données cartographiques.",
+        try:
+            async with self.bot.session.get(url_carto, headers=headers, timeout=15) as r:
+                if r.status != 200:
+                    return await interaction.followup.send(
+                        t(
+                            langue,
+                            "cmd_prop_api_err",
+                            defaut="{e_error} Erreur lors de la récupération des données cartographiques.",
+                        )
                     )
-                )
-            carto_data = await r.json()
+                carto_data = await r.json()
+        except Exception as e:
+            logger.error(f"❌ [Profils - Alliance] Erreur property carto : {e}")
+            return await interaction.followup.send(
+                t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur technique : {e}").format(**DICT_EMOJIS)
+            )
 
         if not carto_data:
             return await interaction.followup.send(
@@ -742,7 +758,7 @@ class AlliancesCog(commands.Cog):
     async def alliance_description(self, interaction: discord.Interaction, alliance_name: str):
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
 
         langue, serveur = await get_server_config(interaction)
@@ -823,7 +839,7 @@ class AlliancesCog(commands.Cog):
                 if isinstance(data, list) and data:
                     data = data[0]
         except Exception as e:
-            logger.error(f"❌ Erreur API GGE Tracker (Murs) : {e}")
+            logger.error(f"❌ [Description Alliance] Erreur API GGE Tracker (Murs) : {e}")
             return await interaction.followup.send(
                 t(langue, "prof_desc_err_tech", defaut="{e_error} Erreur technique lors de la connexion à l'API.")
             )
@@ -863,7 +879,7 @@ class AlliancesCog(commands.Cog):
                 latest_str = latest_str[:-1] + "+00:00"
             try:
                 actualisation_dt = datetime.fromisoformat(latest_str)
-            except:
+            except Exception:
                 actualisation_dt = discord.utils.utcnow()
         else:
             actualisation_dt = discord.utils.utcnow()
@@ -897,7 +913,9 @@ class AlliancesCog(commands.Cog):
                     texte_affiche = clean_desc(entry.get("old_description", ""))
                     murs_blocks.append({"name": header_title, "value": texte_affiche})
                 except Exception as e:
-                    logger.warning(f"⚠️ Erreur de parsing date historique pour {nom_alliance} : {e}")
+                    logger.warning(
+                        f"⚠️ [Description Alliance] Erreur de parsing date historique pour {nom_alliance} : {e}"
+                    )
                     continue
 
         lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
@@ -949,7 +967,7 @@ class AlliancesCog(commands.Cog):
     async def alliance_scanner(self, interaction: discord.Interaction, alliance_name: str):
         try:
             await interaction.response.defer(thinking=True)
-        except:
+        except Exception:
             return
 
         langue, serveur = await get_server_config(interaction)
@@ -1035,7 +1053,7 @@ class AlliancesCog(commands.Cog):
                     if dt_peace > maintenant:
                         is_protected = True
                         colombes.append({"name": name, "pp": pp, "fin": int(dt_peace.timestamp())})
-                except:
+                except Exception:
                     pass
 
             if not is_protected:

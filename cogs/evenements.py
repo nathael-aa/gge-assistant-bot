@@ -83,7 +83,7 @@ def _get_api_timestamp(*sources):
         try:
             latest_str = max(dates_trouvees)
             return datetime.fromisoformat(latest_str.replace("Z", "+00:00"))
-        except:
+        except Exception:
             pass
 
     return discord.utils.utcnow()
@@ -117,9 +117,12 @@ class EvenementsCog(commands.Cog):
     async def event_player(
         self, interaction: discord.Interaction, event_name: str, player: str, mode: app_commands.Choice[str]
     ):
-        await interaction.followup.defer(
-            thinking=True
-        ) if interaction.response.is_done() else await interaction.response.defer(thinking=True)
+        try:
+            await interaction.followup.defer(
+                thinking=True
+            ) if interaction.response.is_done() else await interaction.response.defer(thinking=True)
+        except Exception:
+            pass
 
         langue, serveur = await get_server_config(interaction)
         event_trad = get_ev_name(event_name, langue)
@@ -179,6 +182,7 @@ class EvenementsCog(commands.Cog):
                     )
                 stats_data = await resp.json()
         except Exception as e:
+            logger.error(f"❌ [Evenements] Erreur API pour event_player : {e}")
             obs.record_error(source="command", scope="event_player", exception=e, cog="events")
             return await interaction.followup.send(
                 t(
@@ -226,7 +230,7 @@ class EvenementsCog(commands.Cog):
                         current_session = [(dt, pt)]
                     else:
                         current_session.append((dt, pt))
-            except:
+            except Exception:
                 pass
         if current_session:
             sessions.append(current_session)
@@ -439,9 +443,12 @@ class EvenementsCog(commands.Cog):
     async def event_alliance(
         self, interaction: discord.Interaction, event_name: str, alliance_name: str, display_mode: str = "list"
     ):
-        await interaction.followup.defer(
-            thinking=True
-        ) if interaction.response.is_done() else await interaction.response.defer(thinking=True)
+        try:
+            await interaction.followup.defer(
+                thinking=True
+            ) if interaction.response.is_done() else await interaction.response.defer(thinking=True)
+        except Exception:
+            pass
 
         langue, serveur = await get_server_config(interaction)
         event_trad = get_ev_name(event_name, langue)
@@ -462,6 +469,7 @@ class EvenementsCog(commands.Cog):
                 custom_server=serveur,
             )
         except Exception as e:
+            logger.error(f"❌ [Evenements] Erreur génération rapport alliance : {e}")
             obs.record_error(source="command", scope="event_alliance", exception=e, cog="events")
             return await interaction.followup.send(f"{{e_error}} Erreur interne : {e}")
 
@@ -475,7 +483,7 @@ class EvenementsCog(commands.Cog):
             if global_latest_str:
                 try:
                     actualisation_dt = datetime.fromisoformat(global_latest_str.replace("Z", "+00:00"))
-                except:
+                except Exception:
                     actualisation_dt = discord.utils.utcnow()
             else:
                 actualisation_dt = discord.utils.utcnow()
@@ -671,7 +679,7 @@ class EvenementsCog(commands.Cog):
                         users_data = json.load(f)
                         for uid, info in users_data.items():
                             users_lang[uid] = info.get("langue", "fr")
-                except:
+                except Exception:
                     pass
 
             changes_detected = False
@@ -738,7 +746,7 @@ class EvenementsCog(commands.Cog):
                                 return 0
                             merged.sort(key=lambda x: x.get("date", ""))
                             return int(merged[-1].get("point", 0))
-                    except:
+                    except Exception:
                         return 0
 
                 mon_score = await get_score(mon_pseudo)
@@ -818,7 +826,7 @@ class EvenementsCog(commands.Cog):
                                     dm_blocked=1,
                                 )
                             except Exception as e:
-                                logger.error(f"❌ Erreur envoi MP Rival: {e}")
+                                logger.error(f"❌ [Evenements] Erreur envoi MP Rival: {e}")
                                 obs.record_alert(
                                     source="rival",
                                     alert_type="overtake" if diff > 0 else "danger",
@@ -839,7 +847,7 @@ class EvenementsCog(commands.Cog):
                 await save_rivals_async(data)
 
         except Exception as e:
-            logger.error(f"❌ [RIVAL TASK CRASH] : {e}")
+            logger.error(f"❌ [Evenements] RIVAL TASK CRASH : {e}")
             obs.record_error(source="task", scope="rival_check_task", exception=e, cog="events", severity="critical")
 
 

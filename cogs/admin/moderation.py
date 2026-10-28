@@ -49,12 +49,22 @@ class AdminModeration(commands.Cog):
             )
             return await ctx.send(msg)
 
-        data = await load_blocks_async()
+        try:
+            data = await load_blocks_async()
+        except Exception as e:
+            logger.error(f"❌ [AdminModeration] Erreur lecture load_blocks_async : {e}")
+            return await ctx.send("❌ Erreur de lecture des configurations de blocage.")
+
         if "global_commands" not in data:
             data["global_commands"] = {}
 
         data["global_commands"][cmd_clean] = reason
-        await save_blocks_async(data)
+
+        try:
+            await save_blocks_async(data)
+        except Exception as e:
+            logger.error(f"❌ [AdminModeration] Erreur sauvegarde save_blocks_async : {e}")
+            return await ctx.send("❌ Erreur lors de l'enregistrement du blocage.")
 
         msg = t(
             self.admin_lang,
@@ -69,12 +79,22 @@ class AdminModeration(commands.Cog):
     async def unban_cmd(self, ctx, command: str):
         """[CACHÉE] !unban_cmd [command] : Débloque une commande globalement."""
 
-        data = await load_blocks_async()
+        try:
+            data = await load_blocks_async()
+        except Exception as e:
+            logger.error(f"❌ [AdminModeration] Erreur lecture load_blocks_async : {e}")
+            return await ctx.send("❌ Erreur de lecture des configurations de blocage.")
+
         cmd_clean = command.replace("/", "").strip()
 
         if cmd_clean in data.get("global_commands", {}):
             del data["global_commands"][cmd_clean]
-            await save_blocks_async(data)
+            try:
+                await save_blocks_async(data)
+            except Exception as e:
+                logger.error(f"❌ [AdminModeration] Erreur sauvegarde save_blocks_async : {e}")
+                return await ctx.send("❌ Erreur lors de l'enregistrement du déblocage.")
+
             msg = t(
                 self.admin_lang,
                 "admin_unban_cmd_success",
@@ -176,7 +196,7 @@ class AdminModeration(commands.Cog):
                     await async_json_dump(chemin, data, indent=2, ensure_ascii=False)
                     fichiers_purges.append(chemin.name)
             except Exception as e:
-                logger.error(f"❌ Erreur lors de la purge de {chemin.name} : {e}")
+                logger.error(f"❌ [Videur] Erreur lors de la purge de {chemin.name} : {e}")
 
         if fichiers_purges:
             logger.info(f"🧹 [Videur] Purge complète pour {uid}. Fichiers modifiés : {', '.join(fichiers_purges)}")
@@ -187,7 +207,12 @@ class AdminModeration(commands.Cog):
     async def ban_user(self, ctx, user: discord.User, command: str, *, reason: str = "⚠️ Abuse."):
         """[CACHÉE] !ban_user [user] [command] [reason] : Restreint un utilisateur."""
 
-        data = await load_blocks_async()
+        try:
+            data = await load_blocks_async()
+        except Exception as e:
+            logger.error(f"❌ [AdminModeration] Erreur lecture load_blocks_async : {e}")
+            return await ctx.send("❌ Erreur de lecture des configurations de blocage.")
+
         uid = str(user.id)
 
         # Formatage majuscule tolérant
@@ -201,7 +226,12 @@ class AdminModeration(commands.Cog):
             data["blocked_users"][uid] = {}
 
         data["blocked_users"][uid][cmd_clean] = reason
-        await save_blocks_async(data)
+
+        try:
+            await save_blocks_async(data)
+        except Exception as e:
+            logger.error(f"❌ [AdminModeration] Erreur sauvegarde save_blocks_async : {e}")
+            return await ctx.send("❌ Erreur lors de l'enregistrement du bannissement de l'utilisateur.")
 
         # 🔥 Lancement du "Droit à l'oubli" si bannissement total
         purge_msg = ""
@@ -228,7 +258,12 @@ class AdminModeration(commands.Cog):
     async def unban_user(self, ctx, user: discord.User, command: str):
         """[CACHÉE] !unban_user [user] [command] : Lève la restriction d'un utilisateur."""
 
-        data = await load_blocks_async()
+        try:
+            data = await load_blocks_async()
+        except Exception as e:
+            logger.error(f"❌ [AdminModeration] Erreur lecture load_blocks_async : {e}")
+            return await ctx.send("❌ Erreur de lecture des configurations de blocage.")
+
         uid = str(user.id)
         cmd_clean = command.replace("/", "").strip()
 
@@ -236,7 +271,12 @@ class AdminModeration(commands.Cog):
             del data["blocked_users"][uid][cmd_clean]
             if not data["blocked_users"][uid]:
                 del data["blocked_users"][uid]
-            await save_blocks_async(data)
+
+            try:
+                await save_blocks_async(data)
+            except Exception as e:
+                logger.error(f"❌ [AdminModeration] Erreur sauvegarde save_blocks_async : {e}")
+                return await ctx.send("❌ Erreur lors de l'enregistrement du déblocage de l'utilisateur.")
 
             scope = "toutes les commandes" if cmd_clean == "ALL" else f"`/{cmd_clean}`"
             msg = t(
@@ -268,13 +308,18 @@ class AdminModeration(commands.Cog):
                 cibles = await async_json_load(vigi_file)
                 if isinstance(cibles, dict):
                     cibles = cibles.get("cibles", [])
-            except Exception:
+            except Exception as e:
+                logger.error(f"❌ [AdminModeration] Erreur lecture vigilance.json : {e}")
                 cibles = []
 
         cible_clean = cible.lower().strip()
         if cible_clean not in cibles:
             cibles.append(cible_clean)
-            await async_json_dump(vigi_file, cibles, indent=2, ensure_ascii=True)
+            try:
+                await async_json_dump(vigi_file, cibles, indent=2, ensure_ascii=True)
+            except Exception as e:
+                logger.error(f"❌ [AdminModeration] Erreur écriture vigilance.json : {e}")
+                return await ctx.send("❌ Erreur lors de la sauvegarde de la cible de vigilance.")
 
             await ctx.send(
                 f"🕵️ **Surveillance activée.** Si quelqu'un utilise le bot avec `{cible}`, tu seras alerté en secret."
@@ -290,12 +335,20 @@ class AdminModeration(commands.Cog):
         if not vigi_file.exists():
             return await ctx.send("❌ Aucun fichier de vigilance.")
 
-        cibles = await async_json_load(vigi_file)
+        try:
+            cibles = await async_json_load(vigi_file)
+        except Exception as e:
+            logger.error(f"❌ [AdminModeration] Erreur lecture vigilance.json : {e}")
+            return await ctx.send("❌ Erreur de lecture du fichier de vigilance.")
 
         cible_clean = cible.lower().strip()
         if cible_clean in cibles:
             cibles.remove(cible_clean)
-            await async_json_dump(vigi_file, cibles, indent=2, ensure_ascii=True)
+            try:
+                await async_json_dump(vigi_file, cibles, indent=2, ensure_ascii=True)
+            except Exception as e:
+                logger.error(f"❌ [AdminModeration] Erreur écriture vigilance.json : {e}")
+                return await ctx.send("❌ Erreur lors de la sauvegarde de la liste de vigilance.")
 
             await ctx.send(f"🗑️ `{cible}` a été retiré de la liste de vigilance.")
         else:
@@ -309,7 +362,11 @@ class AdminModeration(commands.Cog):
         if not vigi_file.exists():
             return await ctx.send("ℹ️ Liste vide.")
 
-        cibles = await async_json_load(vigi_file)
+        try:
+            cibles = await async_json_load(vigi_file)
+        except Exception as e:
+            logger.error(f"❌ [AdminModeration] Erreur lecture vigilance.json : {e}")
+            return await ctx.send("❌ Erreur de lecture du fichier de vigilance.")
 
         if not cibles:
             return await ctx.send("ℹ️ Liste vide.")
@@ -342,6 +399,7 @@ class AdminModeration(commands.Cog):
         try:
             cibles = await async_json_load(vigi_file)
         except Exception as e:
+            logger.error(f"❌ [AdminModeration] Erreur de lecture de vigilance.json dans listener : {e}")
             obs.record_error(source="background", scope="vigilance_load", exception=e, cog="admin")
             return
 
@@ -412,5 +470,9 @@ class AdminModeration(commands.Cog):
                 webhook = discord.Webhook.from_url(webhook_url, session=session)
                 await webhook.send(embed=embed, username="GGE Videur 🕵️", avatar_url=self.bot.user.display_avatar.url)
         except Exception as e:
-            logger.error(f"❌ Erreur d'envoi Webhook Vigilance : {e}")
+            logger.error(f"❌ [AdminModeration] Erreur d'envoi Webhook Vigilance : {e}")
             obs.record_error(source="event", scope="vigilance_webhook", exception=e, cog="admin")
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(AdminModeration(bot))

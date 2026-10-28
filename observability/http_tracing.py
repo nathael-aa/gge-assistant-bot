@@ -246,9 +246,12 @@ class HttpTracer:
                 "instance": self.settings.instance,
             }
             self.client.enqueue("api_requests", row)
-        except Exception:
-            # A failed trace must never break anything
-            pass
+        except Exception as e:
+            # We add a log for tracking failed emissions which were previously swallowed.
+            import logging
+
+            logger = logging.getLogger("GGE_Bot")
+            logger.error(f"❌ [Metrics] Échec de la collecte d'un événement API : {e}")
 
     def build_trace_config(self) -> aiohttp.TraceConfig:
         trace_config = aiohttp.TraceConfig()
