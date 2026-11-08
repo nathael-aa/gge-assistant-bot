@@ -37,19 +37,52 @@ from utils import (
 )
 
 
-class RateLimitedSession(aiohttp.ClientSession):
-    """Wrapper global pour limiter la cadence des requêtes HTTP (Anti-Ban / SEC-04)."""
+class RateLimitedSession:
+    """Wrapper global pour limiter la cadence des requêtes HTTP sans héritage, compatible avec `async with`."""
 
-    def __init__(self, limit=5, delay=0.3, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, limit=5, delay=0.3, **kwargs):
         self._semaphore = asyncio.Semaphore(limit)
         self._delay = delay
+        self.session = aiohttp.ClientSession(**kwargs)
+        self.closed = False
 
-    async def _request(self, *args, **kwargs):
-        async with self._semaphore:
-            if self._delay > 0:
-                await asyncio.sleep(self._delay)
-            return await super()._request(*args, **kwargs)
+    def get(self, *args, **kwargs):
+        return _RequestContextManager(self, self.session.get(*args, **kwargs))
+
+    def post(self, *args, **kwargs):
+        return _RequestContextManager(self, self.session.post(*args, **kwargs))
+
+    async def close(self):
+        if not self.closed:
+            await self.session.close()
+            self.closed = True
+
+
+class _RequestContextManager:
+    """Gère le `async with` tout en appliquant la limite de taux de RateLimitedSession."""
+
+    def __init__(self, rl_session, request_coro):
+        self.rl_session = rl_session
+        self.request_coro = request_coro
+        self.response = None
+
+    async def __aenter__(self):
+        await self.rl_session._semaphore.acquire()
+        try:
+            if self.rl_session._delay > 0:
+                await asyncio.sleep(self.rl_session._delay)
+            self.response = await self.request_coro
+            return self.response
+        except Exception:
+            self.rl_session._semaphore.release()
+            raise
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        try:
+            if self.response:
+                self.response.close()
+        finally:
+            self.rl_session._semaphore.release()
 
 
 # =======================================
@@ -294,7 +327,7 @@ class GGEAssistantBot(commands.Bot):
                 color=0x2ECC71,
             )
             try:
-                webhook = discord.Webhook.from_url(webhook_start, session=self.session)
+                webhook = discord.Webhook.from_url(webhook_start, session=self.session.session)
                 self.loop.create_task(webhook.send(embed=embed, username="GGE Console 🟢"))
             except Exception as e:
                 logger.error(f"❌ [Bot] Impossible d'envoyer le webhook de démarrage : {e}")
@@ -389,7 +422,7 @@ class GGEAssistantBot(commands.Bot):
                 color=0x2ECC71,
             )
             try:
-                webhook = discord.Webhook.from_url(webhook_servers, session=self.session)
+                webhook = discord.Webhook.from_url(webhook_servers, session=self.session.session)
                 await webhook.send(embed=embed, username="GGE Serveurs 📈")
             except Exception as e:
                 logger.error(f"❌ [Bot] Erreur Webhook Join : {e}")
@@ -442,7 +475,7 @@ class GGEAssistantBot(commands.Bot):
                 color=0xE74C3C,
             )
             try:
-                webhook = discord.Webhook.from_url(webhook_servers, session=self.session)
+                webhook = discord.Webhook.from_url(webhook_servers, session=self.session.session)
                 await webhook.send(embed=embed, username="GGE Serveurs 📉")
             except Exception as e:
                 logger.error(f"❌ [Bot] Erreur Webhook Leave : {e}")
@@ -855,113 +888,113 @@ class GGEAssistantBot(commands.Bot):
                         if changed_flags:
                             changements_features.append(f"• **{name}** ➔ " + " | ".join(changed_flags))
 
-                            # ==========================================
-                            # 🧹 NETTOYAGE DES ABONNEMENTS TEMPÊTES
-                            # ==========================================
-                            if old_data.get("storm", False) and not new_data["storm"]:
-                                try:
-                                    storm_file = Path("data/serveurs/storm_alerts.json")
-                                    if storm_file.exists():
-                                        with open(storm_file, encoding="utf-8") as fs:
-                                            storm_data = json.load(fs)
+                        # ==========================================
+                        # 🧹 NETTOYAGE DES ABONNEMENTS TEMPÊTES
+                        # ==========================================
+                        if old_data.get("storm", False) and not new_data["storm"]:
+                            try:
+                                storm_file = Path("data/serveurs/storm_alerts.json")
+                                if storm_file.exists():
+                                    with open(storm_file, encoding="utf-8") as fs:
+                                        storm_data = json.load(fs)
 
-                                        guilds_modified = False
-                                        guilds_to_remove = []
+                                    guilds_modified = False
+                                    guilds_to_remove = []
 
-                                        for gid, config in storm_data.get("guilds", {}).items():
-                                            if config.get("gge_server") == name:
-                                                guilds_to_remove.append((gid, config))
+                                    for gid, config in storm_data.get("guilds", {}).items():
+                                        if config.get("gge_server") == name:
+                                            guilds_to_remove.append((gid, config))
 
-                                        for gid, config in guilds_to_remove:
-                                            channel_id = config.get("channel_id")
-                                            langue_serveur = config.get("langue", "fr")
+                                    for gid, config in guilds_to_remove:
+                                        channel_id = config.get("channel_id")
+                                        langue_serveur = config.get("langue", "fr")
 
-                                            try:
-                                                channel = self.get_channel(channel_id) or await self.fetch_channel(
-                                                    channel_id
+                                        try:
+                                            channel = self.get_channel(channel_id) or await self.fetch_channel(
+                                                channel_id
+                                            )
+                                            if channel:
+                                                titre = t(
+                                                    langue_serveur,
+                                                    "bot_alert_module_disabled_title",
+                                                    defaut="⚠️ Fin des alertes Tempêtes",
                                                 )
-                                                if channel:
-                                                    titre = t(
-                                                        langue_serveur,
-                                                        "bot_alert_module_disabled_title",
-                                                        defaut="⚠️ Fin des alertes Tempêtes",
-                                                    )
-                                                    desc = t(
-                                                        langue_serveur,
-                                                        "bot_alert_module_disabled_desc",
-                                                        server=name,
-                                                        defaut=f"Le serveur de jeu **{name}** ne gère plus les îles orageuses (ou a été désactivé par GGE-Tracker). Les alertes automatiques ont été désactivées pour ce salon.",
-                                                    )
-                                                    embed = discord.Embed(
-                                                        title=titre, description=desc, color=discord.Color.red()
-                                                    )
-                                                    self.loop.create_task(channel.send(embed=embed))
-                                            except Exception:
-                                                pass
+                                                desc = t(
+                                                    langue_serveur,
+                                                    "bot_alert_module_disabled_desc",
+                                                    server=name,
+                                                    defaut=f"Le serveur de jeu **{name}** ne gère plus les îles orageuses (ou a été désactivé par GGE-Tracker). Les alertes automatiques ont été désactivées pour ce salon.",
+                                                )
+                                                embed = discord.Embed(
+                                                    title=titre, description=desc, color=discord.Color.red()
+                                                )
+                                                self.loop.create_task(channel.send(embed=embed))
+                                        except Exception:
+                                            pass
 
-                                            del storm_data["guilds"][gid]
-                                            guilds_modified = True
+                                        del storm_data["guilds"][gid]
+                                        guilds_modified = True
 
-                                        if guilds_modified:
-                                            with open(storm_file, "w", encoding="utf-8") as fs:
-                                                json.dump(storm_data, fs, indent=4, ensure_ascii=False)
-                                            logger.info(
-                                                f"🧹 [XML Sync] Nettoyage : {len(guilds_to_remove)} serveurs Discord désabonnés du radar tempête pour {name}."
-                                            )
-                                except Exception as e:
-                                    logger.error(f"❌ [XML Sync] Erreur nettoyage tempêtes pour {name} : {e}")
+                                    if guilds_modified:
+                                        with open(storm_file, "w", encoding="utf-8") as fs:
+                                            json.dump(storm_data, fs, indent=4, ensure_ascii=False)
+                                        logger.info(
+                                            f"🧹 [XML Sync] Nettoyage : {len(guilds_to_remove)} serveurs Discord désabonnés du radar tempête pour {name}."
+                                        )
+                            except Exception as e:
+                                logger.error(f"❌ [XML Sync] Erreur nettoyage tempêtes pour {name} : {e}")
 
-                            # ==========================================
-                            # 🧹 NETTOYAGE DES SESSIONS FORTERESSES
-                            # ==========================================
-                            if old_data.get("fortress", False) and not new_data["fortress"]:
-                                try:
-                                    fortress_file = JOUEURS_DIR / "forteresses_sessions.json"
-                                    if fortress_file.exists():
-                                        with open(fortress_file, encoding="utf-8") as fs:
-                                            fort_data = json.load(fs)
+                        # ==========================================
+                        # 🧹 NETTOYAGE DES SESSIONS FORTERESSES
+                        # ==========================================
+                        if old_data.get("fortress", False) and not new_data["fortress"]:
+                            try:
+                                fortress_file = JOUEURS_DIR / "forteresses_sessions.json"
+                                if fortress_file.exists():
+                                    with open(fortress_file, encoding="utf-8") as fs:
+                                        fort_data = json.load(fs)
 
-                                        sessions_modified = False
-                                        users_to_remove = []
+                                    sessions_modified = False
+                                    users_to_remove = []
 
-                                        for uid, config in fort_data.get("sessions", {}).items():
-                                            srv = config.get("serveur") or config.get("gge_server")
-                                            if srv == name:
-                                                users_to_remove.append(uid)
+                                    for uid, config in fort_data.get("sessions", {}).items():
+                                        srv = config.get("serveur") or config.get("gge_server")
+                                        if srv == name:
+                                            users_to_remove.append(uid)
 
-                                        for uid in users_to_remove:
-                                            try:
-                                                user = self.get_user(int(uid)) or await self.fetch_user(int(uid))
-                                                if user:
-                                                    titre = t(
-                                                        "fr",
-                                                        "bot_alert_fortress_disabled_title",
-                                                        defaut="⚠️ Fin du Radar Forteresses",
-                                                    )
-                                                    desc = t(
-                                                        "fr",
-                                                        "bot_alert_fortress_disabled_desc",
-                                                        server=name,
-                                                        defaut=f"Le serveur de jeu **{name}** ne gère plus les forteresses (ou a été désactivé par l'API).\nTon radar automatique vient d'être arrêté en arrière-plan.",
-                                                    )
-                                                    embed = discord.Embed(
-                                                        title=titre, description=desc, color=discord.Color.red()
-                                                    )
-                                                    self.loop.create_task(user.send(embed=embed))
-                                            except Exception:
-                                                pass
+                                    for uid in users_to_remove:
+                                        try:
+                                            user = self.get_user(int(uid)) or await self.fetch_user(int(uid))
+                                            if user:
+                                                titre = t(
+                                                    "fr",
+                                                    "bot_alert_fortress_disabled_title",
+                                                    defaut="⚠️ Fin du Radar Forteresses",
+                                                )
+                                                desc = t(
+                                                    "fr",
+                                                    "bot_alert_fortress_disabled_desc",
+                                                    server=name,
+                                                    defaut=f"Le serveur de jeu **{name}** ne gère plus les forteresses (ou a été désactivé par l'API).\nTon radar automatique vient d'être arrêté en arrière-plan.",
+                                                )
+                                                embed = discord.Embed(
+                                                    title=titre, description=desc, color=discord.Color.red()
+                                                )
+                                                self.loop.create_task(user.send(embed=embed))
+                                        except Exception:
+                                            pass
 
-                                            del fort_data["sessions"][uid]
-                                            sessions_modified = True
+                                        del fort_data["sessions"][uid]
+                                        sessions_modified = True
 
-                                        if sessions_modified:
-                                            with open(fortress_file, "w", encoding="utf-8") as fs:
-                                                json.dump(fort_data, fs, indent=4, ensure_ascii=False)
-                                            logger.info(
-                                                f"🧹 [XML Sync] Nettoyage : {len(users_to_remove)} sessions forteresses arrêtées pour {name}."
-                                            )
-                                except Exception as e:
-                                    logger.error(f"❌ [XML Sync] Erreur nettoyage forteresses pour {name} : {e}")
+                                    if sessions_modified:
+                                        with open(fortress_file, "w", encoding="utf-8") as fs:
+                                            json.dump(fort_data, fs, indent=4, ensure_ascii=False)
+                                        logger.info(
+                                            f"🧹 [XML Sync] Nettoyage : {len(users_to_remove)} sessions forteresses arrêtées pour {name}."
+                                        )
+                            except Exception as e:
+                                logger.error(f"❌ [XML Sync] Erreur nettoyage forteresses pour {name} : {e}")
 
                     with open(cache_file, "w", encoding="utf-8") as f:
                         json.dump({"servers_info": nouveau_servers_info}, f, indent=4, ensure_ascii=False)
@@ -1054,7 +1087,7 @@ class GGEAssistantBot(commands.Bot):
         embed.set_footer(text=f"Utilisateur : {interaction.user.name} ({interaction.user.id})")
 
         try:
-            webhook = discord.Webhook.from_url(webhook_url, session=self.session)
+            webhook = discord.Webhook.from_url(webhook_url, session=self.session.session)
             await webhook.send(embed=embed, username="GGE Système 🚨")
         except Exception as e:
             logger.error(f"❌ [Bot] Erreur Webhook Système : {e}")
@@ -1075,7 +1108,7 @@ class GGEAssistantBot(commands.Bot):
                     webhook = discord.Webhook.from_url(webhook_url, session=session)
                     await webhook.send(embed=embed, username="GGE Crash Report 🐛")
             else:
-                webhook = discord.Webhook.from_url(webhook_url, session=self.session)
+                webhook = discord.Webhook.from_url(webhook_url, session=self.session.session)
                 await webhook.send(embed=embed, username="GGE Crash Report 🐛")
         except Exception as e:
             logger.error(f"❌ [Bot] Erreur critique du Webhook de Crash Background : {e}")
@@ -1227,13 +1260,87 @@ class GGEAssistantBot(commands.Bot):
         is_mine = interaction.user.id == MON_ID_DISCORD
         obs_ctx = obs.start_command(interaction, cmd_name, is_owner=is_mine)
 
-        if is_mine and getattr(self, "bypass_createur", True):
-            return True
-
         langue, serveur = await get_server_config(interaction)
         if obs_ctx is not None:
             obs_ctx.lang, obs_ctx.gge_server = langue, serveur
 
+        # ====================================================
+        # 1. IDENTIFICATION STRICTE DES PRÉREQUIS DE LA COMMANDE
+        # ====================================================
+        required_module = None
+        is_server_only = False
+        is_private_only = False
+        is_admin_only = False
+
+        try:
+            from cogs.aide import HELP_CONFIG
+
+            best_match_len = 0
+            for categorie in HELP_CONFIG.values():
+                for cmd in categorie.get("commands", []):
+                    config_cmd_base = cmd["name"].split(" (")[0].replace("/", "").strip()
+
+                    if cmd_name.startswith(config_cmd_base) and len(config_cmd_base) > best_match_len:
+                        best_match_len = len(config_cmd_base)
+                        is_server_only = cmd.get("server_only", False)
+                        is_private_only = cmd.get("private_only", False)
+                        required_module = cmd.get("required_module", None)
+                        is_admin_only = cmd.get("admin_only", False)
+        except Exception as e:
+            logger.error(f"❌ [Bot] Erreur lors de la lecture de HELP_CONFIG : {e}")
+
+        if cmd_name.startswith("storm"):
+            required_module = "storm"
+        elif cmd_name.startswith("fortress"):
+            required_module = "fortress"
+        elif cmd_name.startswith("target"):
+            required_module = "advanced_castle"
+
+        # ====================================================
+        # 2. VÉRIFICATION MATÉRIELLE DU SERVEUR GGE
+        # ====================================================
+        if required_module and serveur:
+            try:
+                import json
+
+                cache_file = CONFIG_DIR / "servers_cache.json"
+                is_module_active = False
+
+                if cache_file.exists():
+                    with open(cache_file, encoding="utf-8") as f:
+                        servers_info = json.load(f).get("servers_info", {})
+                        is_module_active = servers_info.get(serveur, {}).get(required_module, False)
+
+                if obs_ctx is not None:
+                    setattr(obs_ctx, f"server_module_{required_module}", bool(is_module_active))
+
+                if not is_module_active:
+                    if interaction.type == discord.InteractionType.application_command:
+                        nom_module_propre = required_module.replace("_", " ").title()
+                        msg = t(
+                            langue,
+                            f"err_unsupported_{required_module}",
+                            defaut=f"⚠️ La commande `/{cmd_name}` nécessite le module **{nom_module_propre}**, qui n'est pas activé sur le serveur **{serveur}**. Pour plus d'informations, rejoins notre serveur de support avec `/contact`.",
+                        )
+                        if interaction.response.is_done():
+                            await interaction.followup.send(msg, ephemeral=True)
+                        else:
+                            await interaction.response.send_message(msg, ephemeral=True)
+                    obs.deny_command(obs_ctx, f"missing_module_{required_module}")
+
+                    return False
+            except Exception as e:
+                logger.error(f"❌ [Bot] Erreur lors de la vérification du module {required_module} : {e}")
+
+        # ====================================================
+        # 3. PASSE-PARTOUT CRÉATEUR
+        # ====================================================
+        if is_mine and getattr(self, "bypass_createur", True):
+            return True
+
+        # ====================================================
+        # 4. ANTI-SPAM ET AUTRES CONTRÔLES...
+        # ====================================================
         import time
 
         if not hasattr(self, "_spam_cache"):
@@ -1243,22 +1350,13 @@ class GGEAssistantBot(commands.Bot):
             user_id = interaction.user.id
             now = time.time()
 
-            self._spam_cache[user_id] = [t for t in self._spam_cache.get(user_id, []) if now - t < 10]
+            self._spam_cache[user_id] = [t_stamp for t_stamp in self._spam_cache.get(user_id, []) if now - t_stamp < 10]
             self._spam_cache[user_id].append(now)
 
             if len(self._spam_cache[user_id]) > 6:
                 if len(self._spam_cache[user_id]) == 7:
                     msg = t(langue, "err_spam", defaut="⚠️ Tu vas trop vite ! Patiente quelques secondes.")
                     await interaction.response.send_message(msg, ephemeral=True)
-
-                    self.loop.create_task(
-                        self._send_system_alert(
-                            interaction,
-                            "⚠️ Alerte Spam",
-                            f"{interaction.user.mention} a lancé trop de commandes en moins de 10 secondes (`/{cmd_name}`).",
-                            0xFFA500,
-                        )
-                    )
                 obs.deny_command(obs_ctx, "spam_ratelimit")
                 return False
 
@@ -1277,21 +1375,13 @@ class GGEAssistantBot(commands.Bot):
                 extract_options(interaction.data.get("options", []))
                 options_txt = f" | ⚙️ [{', '.join(params)}]" if params else ""
                 logger.info(f"📝 [COMMANDE] {interaction.user.name} a lancé `/{cmd_name}` sur [{lieu}]{options_txt}")
-        except Exception as e:
-            logger.error(f"⚠️ [Bot] Erreur lors de l'écriture du log commande : {e}")
-            self.loop.create_task(
-                self._send_system_alert(
-                    interaction,
-                    "🐛 Erreur Console (Logs)",
-                    f"Impossible d'écrire le log pour `/{cmd_name}`.\n```py\n{e}\n```",
-                )
-            )
+        except Exception:
+            pass
 
         commandes_libres = ["setup", "help", "contact", "changelog"]
 
         if cmd_name not in commandes_libres:
             config_ok = False
-
             from utils import cache_mngr
 
             if cache_mngr.users_config and str(interaction.user.id) in cache_mngr.users_config:
@@ -1308,33 +1398,6 @@ class GGEAssistantBot(commands.Bot):
                 obs.deny_command(obs_ctx, "no_user_config")
                 return False
 
-        # ====================================================
-        # VÉRIFICATION DYNAMIQUE DES CONTRAINTES DE COMMANDE
-        # ====================================================
-        is_server_only = False
-        is_private_only = False
-        required_module = None
-        is_admin_only = False
-
-        try:
-            from cogs.aide import HELP_CONFIG
-
-            best_match_len = 0
-            for categorie in HELP_CONFIG.values():
-                for cmd in categorie.get("commands", []):
-                    config_cmd_base = cmd["name"].split(" (")[0].replace("/", "").strip()
-
-                    if cmd_name.startswith(config_cmd_base):
-                        if len(config_cmd_base) > best_match_len:
-                            best_match_len = len(config_cmd_base)
-                            is_server_only = cmd.get("server_only", False)
-                            is_private_only = cmd.get("private_only", False)
-                            required_module = cmd.get("required_module", None)
-                            is_admin_only = cmd.get("admin_only", False)
-        except Exception as e:
-            logger.error(f"❌ [Bot] Erreur lors de la lecture de HELP_CONFIG : {e}")
-
-        # 1. Vérification : Messages Privés Uniquement
         if interaction.guild and is_private_only:
             if interaction.type == discord.InteractionType.application_command:
                 msg = t(
@@ -1346,7 +1409,6 @@ class GGEAssistantBot(commands.Bot):
             obs.deny_command(obs_ctx, "dm_only")
             return False
 
-        # 2. Vérification : Serveurs Uniquement
         if not interaction.guild and is_server_only:
             if interaction.type == discord.InteractionType.application_command:
                 msg = t(
@@ -1358,7 +1420,6 @@ class GGEAssistantBot(commands.Bot):
             obs.deny_command(obs_ctx, "guild_only")
             return False
 
-        # 3. Vérification : Permissions Administrateur
         if interaction.guild and is_admin_only:
             if not interaction.user.guild_permissions.manage_guild:
                 if interaction.type == discord.InteractionType.application_command:
@@ -1370,43 +1431,6 @@ class GGEAssistantBot(commands.Bot):
                     await interaction.response.send_message(msg, ephemeral=True)
                 obs.deny_command(obs_ctx, "admin_only")
                 return False
-
-        # 4. Vérification : Modules Avancés (Storm, Fortress, Advanced Castle)
-        if required_module:
-            try:
-                import json
-
-                cache_file = CONFIG_DIR / "servers_cache.json"
-                is_module_active = False
-
-                if cache_file.exists():
-                    with open(cache_file, encoding="utf-8") as f:
-                        servers_info = json.load(f).get("servers_info", {})
-                        is_module_active = servers_info.get(serveur, {}).get(required_module, False)
-
-                if obs_ctx is not None:
-                    setattr(obs_ctx, f"server_module_{required_module}", bool(is_module_active))
-
-                if serveur and not is_module_active:
-                    if interaction.type == discord.InteractionType.application_command:
-                        nom_module_propre = required_module.replace("_", " ").title()
-                        msg = t(
-                            langue,
-                            f"err_unsupported_{required_module}",
-                            defaut=f"⚠️ La commande `/{cmd_name}` nécessite le module **{nom_module_propre}**, qui n'est pas activé sur le serveur **{serveur}**. Pour plus d'informations, rejoins notre serveur de support avec `/contact`.",
-                        )
-                        await interaction.response.send_message(msg, ephemeral=True)
-                    obs.deny_command(obs_ctx, f"missing_module_{required_module}")
-                    return False
-            except Exception as e:
-                logger.error(f"❌ [Bot] Erreur lors de la vérification du module {required_module} : {e}")
-                self.loop.create_task(
-                    self._send_system_alert(
-                        interaction,
-                        "🐛 Erreur Console (Vérification Serveur)",
-                        f"Impossible de valider le module '{required_module}' du serveur.\n```py\n{e}\n```",
-                    )
-                )
 
         if self.maintenance_mode:
             if interaction.type == discord.InteractionType.application_command:
@@ -1422,11 +1446,8 @@ class GGEAssistantBot(commands.Bot):
         blocks_data = await load_blocks_async()
         global_cmds = blocks_data.get("global_commands", {})
         blocked_users = blocks_data.get("blocked_users", {})
-
-        # Découpage du nom de la commande pour vérifier la hiérarchie
         parts = cmd_name.split()
 
-        # 1. Vérification des bans globaux
         for i in range(1, len(parts) + 1):
             check_name = " ".join(parts[:i])
             if check_name in global_cmds:
@@ -1439,12 +1460,9 @@ class GGEAssistantBot(commands.Bot):
                 obs.deny_command(obs_ctx, "command_blocked")
                 return False
 
-        # 2. Vérification des bans utilisateurs
         user_id_str = str(interaction.user.id)
         if user_id_str in blocked_users:
             user_blocks = blocked_users[user_id_str]
-
-            # Ban total
             if "ALL" in user_blocks:
                 if interaction.type == discord.InteractionType.application_command:
                     reason = user_blocks["ALL"]
@@ -1452,19 +1470,9 @@ class GGEAssistantBot(commands.Bot):
                         langue, "bot_err_user_blocked_all", reason=reason, defaut=f"🛑 **Accès refusé** :\n> {reason}"
                     )
                     await interaction.response.send_message(msg, ephemeral=True)
-
-                    self.loop.create_task(
-                        self._send_system_alert(
-                            interaction,
-                            "🛑 Intrusion bloquée (Ban ALL)",
-                            f"Un utilisateur banni a tenté de forcer le passage sur `/{cmd_name}`.\nRaison du ban : {reason}",
-                            0x8B0000,
-                        )
-                    )
                 obs.deny_command(obs_ctx, "user_banned_all")
                 return False
 
-            # Ban de commande spécifique
             for i in range(1, len(parts) + 1):
                 check_name = " ".join(parts[:i])
                 if check_name in user_blocks:
@@ -1477,15 +1485,6 @@ class GGEAssistantBot(commands.Bot):
                             defaut=f"🛑 **Accès restreint** :\n> {reason}",
                         )
                         await interaction.response.send_message(msg, ephemeral=True)
-
-                        self.loop.create_task(
-                            self._send_system_alert(
-                                interaction,
-                                "🛑 Intrusion bloquée (Ban Commande)",
-                                f"Un utilisateur a tenté d'utiliser la commande `/{cmd_name}` (bloquée par le parent `/{check_name}`).\nRaison du ban : {reason}",
-                                0x8B0000,
-                            )
-                        )
                     obs.deny_command(obs_ctx, "user_banned_command")
                     return False
 

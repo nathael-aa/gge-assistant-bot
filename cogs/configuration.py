@@ -91,18 +91,49 @@ class ServerSetupWizard(discord.ui.View):
             },
         }
 
-        self.step_keys = ["intro", "news", "patchnotes", "hub_alerts", "calendar", "isle", "forts", "radar", "shop"]
+        # 1. On charge la configuration des modules pour ce serveur GGE
+        self.module_storm_active = False
+        self.module_fortress_active = False
+
+        try:
+            cache_file = CONFIG_DIR / "servers_cache.json"
+            if cache_file.exists():
+                import json
+
+                with open(cache_file, encoding="utf-8") as f:
+                    servers_info = json.load(f).get("servers_info", {})
+                    srv_data = servers_info.get(self.gge_server, {})
+                    self.module_storm_active = srv_data.get("storm", False)
+                    self.module_fortress_active = srv_data.get("fortress", False)
+        except Exception as e:
+            logger.error(f"❌ [Configuration] Erreur lecture modules pour Wizard : {e}")
+
+        # 2. On construit la liste des étapes en filtrant celles non supportées
+        self.step_keys = ["intro", "news", "patchnotes", "hub_alerts", "calendar"]
         self.steps = [
             self.step_intro,
             self.step_news,
             self.step_patchnotes,
             self.step_hub_alerts,
             self.step_calendar,
-            self.step_isle,
-            self.step_forts,
-            self.step_radar,
-            self.step_shop,
         ]
+
+        # Ajout conditionnel des étapes Storm
+        if self.module_storm_active:
+            self.step_keys.append("isle")
+            self.steps.append(self.step_isle)
+        else:
+            self.data["isle"]["disabled"] = True  # Désactivé par défaut si non supporté
+
+        if self.module_fortress_active:
+            self.step_keys.append("forts")
+            self.steps.append(self.step_forts)
+        else:
+            self.data["forts"]["disabled"] = True  # Désactivé par défaut si non supporté
+
+        # Ajout des dernières étapes
+        self.step_keys.extend(["radar", "shop"])
+        self.steps.extend([self.step_radar, self.step_shop])
 
         self.setup_current_step()
 
@@ -562,11 +593,11 @@ class ServerSetupWizard(discord.ui.View):
             embed.set_footer(text=t(self.lang, "wizard_intro_footer", defaut="GGE Assistant • Configuration Mode"))
             return embed
 
-        idx = self.step_idx
-        total = len(self.steps) - 1
+        current_key = self.step_keys[self.step_idx]
 
-        steps_info = [
-            (
+        # On utilise une liste complète d'informations, même si on saute des étapes.
+        all_steps_info = {
+            "news": (
                 t(self.lang, "wizard_news_title", defaut="📢 Official News"),
                 t(
                     self.lang,
@@ -574,7 +605,7 @@ class ServerSetupWizard(discord.ui.View):
                     defaut="Select the channel and an optional role to ping for official game announcements.",
                 ),
             ),
-            (
+            "patchnotes": (
                 t(self.lang, "wizard_patchnotes_title", defaut="📜 Patchnotes"),
                 t(
                     self.lang,
@@ -582,7 +613,7 @@ class ServerSetupWizard(discord.ui.View):
                     defaut="Select the channel and an optional role to ping for game updates.",
                 ),
             ),
-            (
+            "hub_alerts": (
                 t(self.lang, "wizard_hub_alerts_title", defaut="⚠️ Hub Alerts"),
                 t(
                     self.lang,
@@ -590,7 +621,7 @@ class ServerSetupWizard(discord.ui.View):
                     defaut="Select the channel and an optional role to ping for quick Hub Alerts.",
                 ),
             ),
-            (
+            "calendar": (
                 t(self.lang, "wizard_calendar_title", defaut="📅 Event Calendar"),
                 t(
                     self.lang,
@@ -598,7 +629,7 @@ class ServerSetupWizard(discord.ui.View):
                     defaut="Select the channel. To track a specific alliance later, use `/calendar track`.",
                 ),
             ),
-            (
+            "isle": (
                 t(self.lang, "wizard_isle_title", defaut="🏝️ Storm Islands"),
                 t(
                     self.lang,
@@ -606,11 +637,11 @@ class ServerSetupWizard(discord.ui.View):
                     defaut="Select the channel, ping role, and toggle pings for small/big islands.",
                 ),
             ),
-            (
+            "forts": (
                 t(self.lang, "wizard_forts_title", defaut="🏰 Storm Fortresses"),
                 t(self.lang, "wizard_forts_desc", defaut="Select the channel, ping role, and minimum fortress level."),
             ),
-            (
+            "radar": (
                 t(self.lang, "wizard_radar_title", defaut="🛰️ Radar & Targets"),
                 t(
                     self.lang,
@@ -618,7 +649,7 @@ class ServerSetupWizard(discord.ui.View):
                     defaut="Select the channel and ping role for radar alerts. To track alliances later, use `/radar server add_alliance`.",
                 ),
             ),
-            (
+            "shop": (
                 t(self.lang, "wizard_shop_title", defaut="🛒 Shop Offers & Gifts"),
                 t(
                     self.lang,
@@ -626,9 +657,12 @@ class ServerSetupWizard(discord.ui.View):
                     defaut="Select the channel, player profile, ping role, and categories for shop alerts.",
                 ),
             ),
-        ]
+        }
 
-        title, desc = steps_info[self.step_idx - 1]
+        title, desc = all_steps_info[current_key]
+        idx = self.step_idx
+        total = len(self.steps) - 1
+
         embed = discord.Embed(
             title=f"Server Setup ({idx}/{total}) — {title}",
             description=desc,
@@ -760,16 +794,21 @@ class ServerSetupWizard(discord.ui.View):
 
             if "guilds" not in storm_data:
                 storm_data["guilds"] = {}
-            if guild_id not in storm_data["guilds"]:
-                storm_data["guilds"][guild_id] = {}
 
-            storm_data["guilds"][guild_id]["gge_server"] = self.gge_server
-            storm_data["guilds"][guild_id]["langue"] = self.lang
+            # Ne créer l'entrée de la guilde que si un des deux modules storm est utilisé
+            if not self.data["isle"]["disabled"] or not self.data["forts"]["disabled"]:
+                if guild_id not in storm_data["guilds"]:
+                    storm_data["guilds"][guild_id] = {}
+                storm_data["guilds"][guild_id]["gge_server"] = self.gge_server
+                storm_data["guilds"][guild_id]["langue"] = self.lang
 
             # Isle
             if self.data["isle"]["disabled"]:
-                storm_data["guilds"][guild_id].pop("isle_channel_id", None)
-                recap.append("• **Storm Isles:** *Désactivé*")
+                if guild_id in storm_data["guilds"]:
+                    storm_data["guilds"][guild_id].pop("isle_channel_id", None)
+                # Ne l'ajoute au récap que si le module est supporté, sinon ça fait du bruit pour rien
+                if self.module_storm_active:
+                    recap.append("• **Storm Isles:** *Désactivé*")
             elif self.data["isle"]["channel_id"]:
                 storm_data["guilds"][guild_id]["isle_channel_id"] = self.data["isle"]["channel_id"]
                 storm_data["guilds"][guild_id]["isle_ping_role"] = self.format_ping(self.data["isle"]["ping_role"])
@@ -781,8 +820,10 @@ class ServerSetupWizard(discord.ui.View):
 
             # Forts
             if self.data["forts"]["disabled"]:
-                storm_data["guilds"][guild_id].pop("fort_channel_id", None)
-                recap.append("• **Storm Fortresses:** *Désactivé*")
+                if guild_id in storm_data["guilds"]:
+                    storm_data["guilds"][guild_id].pop("fort_channel_id", None)
+                if self.module_fortress_active:
+                    recap.append("• **Storm Fortresses:** *Désactivé*")
             elif self.data["forts"]["channel_id"]:
                 storm_data["guilds"][guild_id]["fort_channel_id"] = self.data["forts"]["channel_id"]
                 storm_data["guilds"][guild_id]["fort_ping_role"] = self.format_ping(self.data["forts"]["ping_role"])
@@ -792,6 +833,13 @@ class ServerSetupWizard(discord.ui.View):
                 recap.append(
                     f"• **Storm Fortresses:** {c_forts.mention if c_forts else 'Set'} (Lvl: `{self.data['forts']['min_level']}+`)"
                 )
+
+            # Nettoyer la guilde si elle est complètement vide
+            if guild_id in storm_data["guilds"]:
+                if not storm_data["guilds"][guild_id].get("isle_channel_id") and not storm_data["guilds"][guild_id].get(
+                    "fort_channel_id"
+                ):
+                    del storm_data["guilds"][guild_id]
 
             try:
                 await async_json_dump(storm_file, storm_data, indent=4)

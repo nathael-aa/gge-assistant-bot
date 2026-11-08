@@ -78,7 +78,6 @@ class OffersSetupView(discord.ui.View):
 
     async def select_callback(self, interaction: discord.Interaction):
         self.selected_cats = self.select.values
-        # Met à jour l'affichage visuel des options sélectionnées
         for opt in self.select.options:
             opt.default = opt.value in self.selected_cats
         await interaction.response.edit_message(view=self)
@@ -97,11 +96,12 @@ class OffersSetupView(discord.ui.View):
             cats_localized = [t(self.langue, f"offres_cat_{v}", defaut=CAT_MAPPING[v][1]) for v in self.selected_cats]
             cats_str = ", ".join(cats_localized)
 
+            # Texte modifié pour indiquer qu'on commence à surveiller (et non plus "Initializing the first scan...")
             success_msg = t(
                 self.langue,
                 "offres_cat_saved",
                 cats=cats_str,
-                defaut=f"{e_check} **Categories saved!** Initializing the first scan...",
+                defaut=f"{e_check} **Categories saved!** Monitoring for future new offers...",
             )
 
             embed = interaction.message.embeds[0]
@@ -110,9 +110,10 @@ class OffersSetupView(discord.ui.View):
 
             await interaction.response.edit_message(content=None, embed=embed, view=None)
 
+            # Au lieu d'envoyer les offres, on initialise silencieusement le cache
             channel = interaction.guild.get_channel(prefs["channel_id"])
             if channel:
-                asyncio.create_task(self.cog.trigger_immediate_scan(channel, self.guild_id, prefs))
+                asyncio.create_task(self.cog.initialize_silent_cache(self.guild_id, prefs))
 
 
 class OffersCog(commands.Cog):
@@ -166,7 +167,7 @@ class OffersCog(commands.Cog):
         ping_role: discord.Role = None,
     ):
         _, gge_server = await get_server_config(interaction)
-        langue = "EN"  # Forcé en anglais
+        langue = "EN"
         guild_id = str(interaction.guild.id)
 
         legendary_level = 950 if profile.value == "legendary" else 0
@@ -177,7 +178,6 @@ class OffersCog(commands.Cog):
 
         default_cats = data["guilds"].get(guild_id, {}).get("categories", ["promos"])
 
-        # Conversion du ping en string pour harmoniser avec le Wizard
         ping_val = None
         if ping_role:
             ping_val = "@everyone" if ping_role.is_default() else ping_role.mention
@@ -247,16 +247,14 @@ class OffersCog(commands.Cog):
             await interaction.response.send_message(msg, ephemeral=True)
 
     def clean_gge_text(self, text: str) -> str:
-        """Nettoie proprement les accents corrompus et les retours à la ligne."""
         if not text:
             return ""
-
         cleaned = text.replace("\n", " ").strip()
         cleaned = cleaned.replace("embl?me", "emblème").replace("B?atrice", "Béatrice").replace("?norme", "énorme")
         return html.unescape(cleaned)
 
     def build_offer_embed(self, offer: dict, category_key: str) -> discord.Embed:
-        langue = "EN"  # Forcé en anglais
+        langue = "EN"
         price_raw = offer.get("price", 0)
         curr = offer.get("currencyCode", "EUR")
 
@@ -320,7 +318,6 @@ class OffersCog(commands.Cog):
     async def send_offers_to_channel(
         self, channel: discord.TextChannel, embeds: list, cat_key: str, ping_role_val=None
     ):
-        """Helper factorisé pour créer un Thread, envoyer les embeds et identifier le rôle si nécessaire."""
         langue = "EN"
         cat_emoji, cat_name_en = CAT_MAPPING.get(cat_key, ("🛒", "Offers"))
         cat_name = t(langue, f"offres_cat_{cat_key}", defaut=cat_name_en)
@@ -337,7 +334,6 @@ class OffersCog(commands.Cog):
         allowed_mentions = discord.AllowedMentions.none()
 
         if ping_role_val:
-            # Rétrocompatibilité : si l'ID est toujours sous forme de chiffre dans l'ancien JSON
             if isinstance(ping_role_val, int) or (isinstance(ping_role_val, str) and ping_role_val.isdigit()):
                 role = channel.guild.get_role(int(ping_role_val))
                 if str(ping_role_val) == str(channel.guild.id) or (role and role.name in ("@everyone", "@here")):
@@ -357,12 +353,12 @@ class OffersCog(commands.Cog):
 
             for i in range(0, len(embeds), 10):
                 await thread.send(embeds=embeds[i : i + 10])
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(2.0)  # Délai augmenté pour éviter le rate-limit
         except Exception as e:
             logger.error(f"❌ [Offers] Erreur création de thread pour l'envoi d'offres (Canal {channel.id}): {e}")
 
-    async def trigger_immediate_scan(self, channel: discord.TextChannel, guild_id: str, prefs: dict):
-        """Récupère et envoie immédiatement les offres actuelles (optimisé 100% anglais)."""
+    async def initialize_silent_cache(self, guild_id: str, prefs: dict):
+        """Récupère silencieusement les ID des offres actuelles pour ne pas les reposter au premier scan."""
         headers = await get_api_headers()
         leg = 950 if prefs.get("legendary", 0) > 0 else 0
         url = f"https://api.gge-tracker.com/api/v1/offers?locale=en&currency=EUR&level=70&legendaryLevel={leg}"
@@ -373,7 +369,7 @@ class OffersCog(commands.Cog):
                     return
                 api_data = await r.json()
         except Exception as e:
-            logger.error(f"❌ [Offers] Scan immédiat impossible pour le serveur {guild_id} : {e}")
+            logger.error(f"❌ [Offers] Init silencieuse impossible pour le serveur {guild_id} : {e}")
             return
 
         cache = await async_json_load(self.cache_file) or {}
@@ -390,24 +386,20 @@ class OffersCog(commands.Cog):
             if not offers:
                 continue
 
-            cat_embeds = [self.build_offer_embed(o, cat_key) for o in offers]
-
-            if cat_embeds:
-                await self.send_offers_to_channel(channel, cat_embeds, cat_key, prefs.get("ping_role"))
-                await asyncio.sleep(1.5)
-
             current_ids = {str(o["id"]) for o in offers if "id" in o}
             existing_cache = set(cache[param_key].get(cat_key, []))
 
-            cache[param_key][cat_key] = list(existing_cache | current_ids)
-            cache_modified = True
+            new_cache_set = existing_cache | current_ids
+            if len(new_cache_set) != len(existing_cache):
+                cache[param_key][cat_key] = list(new_cache_set)
+                cache_modified = True
 
         if cache_modified:
             await async_json_dump(self.cache_file, cache)
 
     @tasks.loop(hours=12)
     async def offers_tracker_task(self):
-        """Scans GGE-Tracker every 12 hours. Optimisé à 2 requêtes API max (100% EN)."""
+        """Scans GGE-Tracker every 12 hours. Envois espacés pour éviter le rate-limit Discord."""
         if not os.path.exists(self.alerts_file):
             return
 
@@ -463,6 +455,7 @@ class OffersCog(commands.Cog):
                 cached_ids = set(cache[param_key].get(cat_key, []))
 
                 if not cached_ids:
+                    # Premier passage complet pour ce niveau: on peuple le cache sans rien envoyer
                     cache[param_key][cat_key] = list(current_ids)
                     cache_modified = True
                     continue
@@ -483,6 +476,7 @@ class OffersCog(commands.Cog):
                                 channel_deliveries[c_id] = {"categories": {}, "ping_role": prefs.get("ping_role")}
                             channel_deliveries[c_id]["categories"][cat_key] = cat_embeds
 
+            # Délai entre les envois vers différents salons pour éviter de surcharger l'API Discord
             for channel_id, data in channel_deliveries.items():
                 try:
                     channel = self.bot.get_channel(channel_id) or await self.bot.fetch_channel(channel_id)
@@ -491,12 +485,14 @@ class OffersCog(commands.Cog):
 
                     for cat_key, embeds in data["categories"].items():
                         await self.send_offers_to_channel(channel, embeds, cat_key, data["ping_role"])
-                        await asyncio.sleep(1.5)
+                        await asyncio.sleep(2.0)  # Pause entre les catégories d'un même salon
 
                 except discord.Forbidden:
                     pass
                 except Exception as e:
                     logger.error(f"❌ [Offers] Impossible d'envoyer les nouvelles offres (Canal {channel_id}): {e}")
+
+                await asyncio.sleep(5.0)  # 👈 Délai crucial entre chaque serveur
 
             await asyncio.sleep(2)
 

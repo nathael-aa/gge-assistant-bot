@@ -1,5 +1,15 @@
 FROM python:3.11-slim
 
+# === CORRECTION DES VULNÉRABILITÉS TRIVY ===
+# Mise à jour des paquets système vulnérables pour Debian 13
+RUN apt-get update && apt-get install -y --only-upgrade \
+    apt \
+    libapt-pkg7.0 \
+    zlib1g \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+# ===========================================
+
 # Définir le fuseau horaire pour les logs
 ENV TZ=Europe/Paris
 
