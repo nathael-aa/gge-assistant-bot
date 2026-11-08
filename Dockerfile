@@ -1,8 +1,8 @@
 FROM python:3.11-slim
 
 # === CORRECTION DES VULNÉRABILITÉS TRIVY ===
-# Mise à jour des paquets système vulnérables pour Debian 13
-RUN apt-get update && apt-get install -y --only-upgrade \
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade \
     apt \
     libapt-pkg7.0 \
     zlib1g \
