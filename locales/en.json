@@ -919,5 +919,7 @@
     "help_cmd_offers_setup": "> Configure automatic alerts for new Shop offers and free gifts in a specific channel.",
     "help_cmd_offers_stop": "> Disable Shop offers and free gifts alerts for this server.",
     "welcome_step3_title": "{e_three} Server Setup",
+    "hub_err_proprio_title": "{e_warning} GGE Assistant Configuration Alert",
+    "hub_err_proprio_perm": "Hello!\nMy automatic GGE news system was just blocked on your server **{srv_name}** due to missing permissions (view channel, send messages, embed links, or create public threads).\n\n📋 **Disabled module(s) ({nb}/3):**\n{modules_list}\n\n*To avoid spamming the Discord API, news reception has been disabled for the module(s) above. Please fix my permissions and run the `/hub setup` command again.*",
     "welcome_step3_desc": "Use </server-setup:0> to interactively configure all your server alerts, channels, and pings in one place (Admins only)."
 }

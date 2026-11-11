@@ -897,5 +897,7 @@
     "help_cmd_offers_setup": "> Configure les alertes automatiques pour les nouvelles offres de la boutique et cadeaux gratuits.",
     "welcome_step3_title": "{e_three} Configuration du Serveur",
     "welcome_step3_desc": "Utilisez </server-setup:0> pour configurer de manière interactive tous les salons, alertes et mentions du serveur au même endroit (Admins uniquement).",
+    "hub_err_proprio_title": "{e_warning} Alerte Configuration GGE Assistant",
+    "hub_err_proprio_perm": "Salut !\nMon système d'actualités automatiques GGE vient d'être bloqué sur ton serveur **{srv_name}** suite à un manque de permissions (voir le salon, envoyer des messages, intégrer des liens ou créer des fils de discussion publics).\n\n📋 **Module(s) désactivé(s) ({nb}/3) :**\n{modules_list}\n\n*Pour éviter de spammer l'API Discord, la réception a été coupée pour ce(s) module(s). Merci de corriger mes permissions et de relancer la commande `/hub setup`.*",
     "help_cmd_offers_stop": "> Désactive les alertes des offres et cadeaux de la boutique sur ce serveur."
 }

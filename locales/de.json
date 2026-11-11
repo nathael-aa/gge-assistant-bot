@@ -897,5 +897,7 @@
     "help_cmd_offers_setup": "> Konfiguriert automatische Benachrichtigungen für neue Shop-Angebote und kostenlose Geschenke in einem Kanal.",
     "welcome_step3_title": "{e_three} Server-Einrichtung",
     "welcome_step3_desc": "Verwende </server-setup:0>, um interaktiv alle Serverkanäle, Alarme und Pings an einem Ort zu konfigurieren (Nur für Admins).",
+    "hub_err_proprio_title": "{e_warning} GGE Assistant Konfigurationsalarm",
+    "hub_err_proprio_perm": "Hallo!\nMein automatisches GGE-Nachrichtensystem wurde gerade auf deinem Server **{srv_name}** wegen fehlender Berechtigungen blockiert (Kanal anzeigen, Nachrichten senden, Links einbetten oder öffentliche Threads erstellen).\n\n📋 **Deaktivierte(s) Modul(e) ({nb}/3):**\n{modules_list}\n\n*Um Spamming der Discord-API zu vermeiden, wurde der Empfang für diese(s) Modul(e) deaktiviert. Bitte korrigiere meine Berechtigungen und führe den Befehl `/hub setup` erneut aus.*",
     "help_cmd_offers_stop": "> Deaktiviert die Warnungen für Shop-Angebote und kostenlose Geschenke auf diesem Server."
 }

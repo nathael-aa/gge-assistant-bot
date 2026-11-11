@@ -8,6 +8,7 @@ import socket
 import sys
 import traceback
 import xml.etree.ElementTree as ET
+from collections.abc import Coroutine
 from datetime import datetime, timedelta
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
@@ -38,7 +39,7 @@ from utils import (
 
 
 class RateLimitedSession:
-    """Wrapper global pour limiter la cadence des requêtes HTTP sans héritage, compatible avec `async with`."""
+    """Wrapper global pour limiter la cadence des requêtes HTTP sans héritage."""
 
     def __init__(self, limit=5, delay=0.3, **kwargs):
         self._semaphore = asyncio.Semaphore(limit)
@@ -52,37 +53,64 @@ class RateLimitedSession:
     def post(self, *args, **kwargs):
         return _RequestContextManager(self, self.session.post(*args, **kwargs))
 
+    # --- MÉTHODE AJOUTÉE POUR COMPATIBILITÉ 'AWAIT' DIRECT ---
+    async def request(self, method, url, **kwargs):
+        return await _RequestContextManager(self, self.session.request(method, url, **kwargs))
+
     async def close(self):
         if not self.closed:
             await self.session.close()
             self.closed = True
 
 
-class _RequestContextManager:
-    """Gère le `async with` tout en appliquant la limite de taux de RateLimitedSession."""
+class _RequestContextManager(Coroutine):
+    """
+    Hybride magique :
+    1. Fonctionne avec 'async with' (Context Manager)
+    2. Fonctionne avec 'await' direct
+    3. Passe les tests de 'asyncio.create_task' et 'asyncio.gather'
+    """
 
     def __init__(self, rl_session, request_coro):
         self.rl_session = rl_session
         self.request_coro = request_coro
         self.response = None
+        self._coro = self._execute()  # Encapsulation d'une vraie coroutine
 
-    async def __aenter__(self):
+    async def _execute(self):
         await self.rl_session._semaphore.acquire()
         try:
             if self.rl_session._delay > 0:
                 await asyncio.sleep(self.rl_session._delay)
             self.response = await self.request_coro
             return self.response
-        except Exception:
-            self.rl_session._semaphore.release()
-            raise
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        try:
-            if self.response:
-                self.response.close()
         finally:
             self.rl_session._semaphore.release()
+
+    # ==========================================
+    # SUPPORT DU 'async with'
+    # ==========================================
+    async def __aenter__(self):
+        return await self._coro
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.response:
+            self.response.close()
+
+    # ==========================================
+    # SUPPORT NATIF COROUTINE (create_task, gather)
+    # ==========================================
+    def send(self, value):
+        return self._coro.send(value)
+
+    def throw(self, typ, val=None, tb=None):
+        return self._coro.throw(typ, val, tb)
+
+    def close(self):
+        return self._coro.close()
+
+    def __await__(self):
+        return self._coro.__await__()
 
 
 # =======================================

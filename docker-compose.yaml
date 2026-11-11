@@ -1,8 +1,8 @@
 services:
   discord-bot:
-    #build: .
+    build: .
     image: ghcr.io/nathael-aa/gge-assistant-bot:latest
-    container_name: gge-assistant
+    #container_name: gge-assistant
     restart: unless-stopped
     dns:
       - 8.8.8.8

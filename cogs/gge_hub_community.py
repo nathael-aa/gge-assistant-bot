@@ -58,6 +58,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
         }
         self.changelog_url = "https://communityhub.goodgamestudios.com/2026/05/18/goodgame-empire-changelog/"
         self.headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        self._pending_purge_notifications = {}
 
     async def cog_load(self):
         if not self.check_hub_news_task.is_running():
@@ -65,6 +66,126 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
     async def cog_unload(self):
         self.check_hub_news_task.cancel()
+
+    async def _handle_permission_purge(
+        self, guild_id_str: str, category: str, channel_id: int, channel_name: str, langue: str, channel_obj=None
+    ):
+        """Enregistre la catégorie en échec pour l'alerte Embed groupée et purge immédiatement la config sur le disque."""
+        logger.warning(
+            f"⚠️ [Hub] Permissions manquantes ou salon introuvable pour {channel_id} (Guild {guild_id_str}). Purge."
+        )
+        if not guild_id_str:
+            return
+
+        try:
+            if guild_id_str not in self._pending_purge_notifications:
+                self._pending_purge_notifications[guild_id_str] = {
+                    "langue": langue,
+                    "channel_obj": channel_obj,
+                    "items": {},
+                }
+            elif channel_obj and not self._pending_purge_notifications[guild_id_str].get("channel_obj"):
+                self._pending_purge_notifications[guild_id_str]["channel_obj"] = channel_obj
+
+            self._pending_purge_notifications[guild_id_str]["items"][category] = (channel_id, channel_name)
+
+            # Purge immédiate dans le fichier JSON sur le disque
+            data = await load_hub_config()
+            if guild_id_str in data.get("guilds", {}):
+                if category in data["guilds"][guild_id_str]:
+                    data["guilds"][guild_id_str][category] = {}
+
+                if not any(data["guilds"][guild_id_str].get(cat) for cat in ["news", "patchnotes", "alerts"]):
+                    del data["guilds"][guild_id_str]
+
+                await save_hub_config(data)
+                logger.info(f"🧹 [Hub] Configuration {category} purgée sur le disque pour le serveur {guild_id_str}.")
+        except Exception as e:
+            logger.error(f"❌ [Hub] Erreur lors de la purge automatique : {e}")
+
+    async def _flush_purge_notifications(self):
+        """Envoie un seul Embed récapitulatif au propriétaire de chaque serveur ayant subi une ou plusieurs purges."""
+        if not self._pending_purge_notifications:
+            return
+
+        notifications = self._pending_purge_notifications.copy()
+        self._pending_purge_notifications.clear()
+
+        for guild_id_str, notif_data in notifications.items():
+            langue = notif_data["langue"]
+            channel_obj = notif_data["channel_obj"]
+            items = notif_data["items"]  # {category: (channel_id, channel_name)}
+
+            if not items:
+                continue
+
+            try:
+                guild = getattr(channel_obj, "guild", None) or self.bot.get_guild(int(guild_id_str))
+                if not guild or not getattr(guild, "owner_id", None):
+                    try:
+                        guild = await self.bot.fetch_guild(int(guild_id_str))
+                    except Exception as e_guild:
+                        logger.error(
+                            f"❌ [Hub] Impossible de fetch le serveur {guild_id_str} pour avertir le proprio : {e_guild}"
+                        )
+
+                if guild and getattr(guild, "owner_id", None):
+                    try:
+                        proprio = self.bot.get_user(guild.owner_id) or await self.bot.fetch_user(guild.owner_id)
+                        if proprio:
+                            lignes_modules = []
+                            for cat, (chan_id, chan_name) in items.items():
+                                nom_salon_txt = f" (`#{chan_name}`)" if chan_name and chan_name != str(chan_id) else ""
+                                lignes_modules.append(f"• **{cat.upper()}** ➔ <#{chan_id}>{nom_salon_txt}")
+
+                            modules_list_str = "\n".join(lignes_modules)
+                            nb_modules = len(items)
+
+                            titre_embed = t(
+                                langue,
+                                "hub_err_proprio_title",
+                                defaut="⚠️ Alerte Configuration GGE Assistant",
+                            )
+                            desc_embed = t(
+                                langue,
+                                "hub_err_proprio_perm",
+                                srv_name=guild.name,
+                                nb=nb_modules,
+                                modules_list=modules_list_str,
+                                defaut=(
+                                    f"Salut !\nMon système d'actualités automatiques GGE vient d'être bloqué sur ton serveur **{guild.name}** suite à un manque de permissions (voir le salon, envoyer des messages, intégrer des liens ou créer des fils de discussion publics).\n\n"
+                                    f"📋 **Module(s) désactivé(s) ({nb_modules}/3) :**\n{modules_list_str}\n\n"
+                                    f"*Pour éviter de spammer l'API Discord, la réception a été coupée pour ce(s) module(s). Merci de corriger mes permissions et de relancer la commande `/hub setup`.*"
+                                ),
+                            )
+
+                            embed = discord.Embed(
+                                title=titre_embed,
+                                description=desc_embed,
+                                color=0xE74C3C,
+                            )
+                            await setup_embed_footer(embed, None, langue)
+
+                            await proprio.send(embed=embed)
+                            logger.info(
+                                f"✉️ [Hub] Embed d'alerte ({nb_modules} module(s)) envoyé à {proprio.name} ({proprio.id}) pour {guild.name}."
+                            )
+                        else:
+                            logger.warning(
+                                f"⚠️ [Hub] Utilisateur propriétaire ({guild.owner_id}) introuvable pour {guild.name}."
+                            )
+                    except discord.Forbidden:
+                        logger.warning(
+                            f"⚠️ [Hub] Impossible d'avertir le proprio de {guild.name} ({guild.owner_id}) : MPs fermés."
+                        )
+                    except Exception as e_dm:
+                        logger.error(f"❌ [Hub] Erreur lors de l'envoi du MP au proprio ({guild.owner_id}) : {e_dm}")
+                else:
+                    logger.warning(
+                        f"⚠️ [Hub] Impossible d'identifier le propriétaire du serveur {guild_id_str} (guild={guild})."
+                    )
+            except Exception as e:
+                logger.error(f"❌ [Hub] Erreur lors de l'envoi de la notification de purge pour {guild_id_str} : {e}")
 
     async def translate_text(self, text: str, target_lang: str) -> str:
         """Traduit un texte dynamiquement en le découpant pour éviter les limites d'URL de Google."""
@@ -110,7 +231,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
         return translated_text
 
     async def _build_and_send_embed(
-        self, article, channel, ping_role, langue, serveur, final_titre, final_resume, final_full_md
+        self, article, channel, ping_role, langue, serveur, final_titre, final_resume, final_full_md, guild_id_str=None
     ):
         """Méthode utilitaire pour générer l'embed complet et l'envoyer proprement."""
         if article["type"] == "patchnotes":
@@ -201,6 +322,9 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                     for chunk in chunks_md:
                         if chunk.strip():
                             await thread.send(chunk)
+                except discord.Forbidden:
+                    logger.warning(f"⚠️ [Hub] Impossible de créer le thread patchnote dans {channel.id} (Permissions).")
+                    raise  # Déclenche la purge et le MP au propriétaire
                 except Exception as e:
                     logger.error(f"❌ [Hub] Erreur création thread patchnote : {e}")
 
@@ -214,6 +338,18 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                 failed=0,
                 dm_blocked=0,
             )
+
+        except (discord.Forbidden, discord.NotFound):
+            chan_name = channel.name if getattr(channel, "name", None) else str(channel.id)
+            await self._handle_permission_purge(
+                guild_id_str=guild_id_str,
+                category=article["type"],
+                channel_id=channel.id,
+                channel_name=chan_name,
+                langue=langue,
+                channel_obj=channel,
+            )
+
         except Exception as e:
             logger.error(f"❌ [Hub] Erreur d'envoi annonce HUB : {e}")
 
@@ -244,7 +380,8 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
         bot_permissions = channel.permissions_for(interaction.guild.me)
         if (
-            not bot_permissions.send_messages
+            not bot_permissions.view_channel
+            or not bot_permissions.send_messages
             or not bot_permissions.embed_links
             or not bot_permissions.create_public_threads
         ):
@@ -252,7 +389,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                 langue,
                 "hub_setup_perms",
                 salon=channel.mention,
-                defaut="{e_error} Je dois avoir la permission d'envoyer des messages, des embeds et de **créer des fils de discussion (threads)** dans {salon}.",
+                defaut="{e_error} Je dois avoir la permission de voir le salon, d'envoyer des messages, des embeds et de **créer des fils de discussion (threads)** dans {salon}.",
             ).format(**DICT_EMOJIS)
             return await interaction.followup.send(msg)
 
@@ -359,7 +496,9 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                     final_titre=final_titre,
                     final_resume=final_resume,
                     final_full_md=final_full_md,
+                    guild_id_str=guild_id,
                 )
+                await self._flush_purge_notifications()
         except Exception as e:
             logger.error(f"❌ [Hub] Erreur lors de l'envoi de bienvenue : {e}")
 
@@ -692,6 +831,8 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
     async def check_hub_news_logic(self):
         """Logique d'envoi et traduction."""
         obs.set_task_name("check_hub_news_task")
+        self._pending_purge_notifications.clear()
+
         try:
             nouveaux_articles = await self.fetch_latest_news()
             if not nouveaux_articles:
@@ -802,7 +943,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                         )
                         traductions[lang] = {"title": trad_titre, "resume": trad_resume, "full": trad_full}
 
-                    for guild_id_str, config in guilds_config.items():
+                    for guild_id_str, config in list(guilds_config.items()):
                         cat_config = config.get(article["type"], {})
                         channel_id = cat_config.get("channel_id")
 
@@ -837,6 +978,17 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                         if not channel:
                             try:
                                 channel = await self.bot.fetch_channel(channel_id)
+                            except (discord.Forbidden, discord.NotFound):
+                                await self._handle_permission_purge(
+                                    guild_id_str=guild_id_str,
+                                    category=article["type"],
+                                    channel_id=channel_id,
+                                    channel_name=str(channel_id),
+                                    langue=langue,
+                                    channel_obj=None,
+                                )
+                                config[article["type"]] = {}
+                                continue
                             except Exception:
                                 continue
 
@@ -849,10 +1001,16 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             final_titre=final_titre,
                             final_resume=final_resume,
                             final_full_md=final_full_md,
+                            guild_id_str=guild_id_str,
                         )
 
                     posted_news.append(article["id"])
 
+                # Envoi groupé des Embeds d'alerte aux propriétaires concernés
+                await self._flush_purge_notifications()
+
+                # Rechargement depuis le disque avant de sauvegarder posted_news pour conserver les purges
+                data = await load_hub_config()
                 data["posted_news"] = posted_news[-100:]
                 await save_hub_config(data)
                 logger.info(f"📰 [Hub] {len(articles_a_publier)} actualités envoyées et traduites.")

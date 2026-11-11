@@ -229,7 +229,8 @@ class RadarSpyMixin:
                     req_headers["If-None-Match"] = self.etags_cache[cache_key_server]
 
                 try:
-                    async with session.get(url_base, headers=req_headers, timeout=10) as r_base:
+                    r_base = await session.get(url_base, headers=req_headers, timeout=10)
+                    try:
                         if r_base.status == 304:
                             continue
 
@@ -242,7 +243,8 @@ class RadarSpyMixin:
                             if new_etag:
                                 self.etags_cache[cache_key_server] = str(new_etag)
                             self.next_scan[cache_key_server] = now_ts + interval
-
+                    finally:
+                        r_base.close()
                 except Exception as e:
                     logger.error(f"❌ [Radar Spy] Erreur check global {serveur} : {e}")
                     continue
@@ -258,7 +260,8 @@ class RadarSpyMixin:
 
                     try:
                         url_alli_live = f"https://api.gge-tracker.com/api/v1/alliances/id/{a_id}"
-                        async with session.get(url_alli_live, headers=headers, timeout=10) as r_live:
+                        r_live = await session.get(url_alli_live, headers=headers, timeout=10)
+                        try:
                             if r_live.status == 200:
                                 max_data = await r_live.json()
                                 if isinstance(max_data, list) and max_data:
@@ -495,6 +498,8 @@ class RadarSpyMixin:
                                 if new_name != old_name or entrees or sorties or rangs_changes:
                                     a_info["members"] = new_members_dict
                                     changes_detected = True
+                        finally:
+                            r_live.close()
                     except Exception as e:
                         logger.error(f"❌ [Radar Spy] Erreur analyse alliance {a_id} : {e}")
 
@@ -503,7 +508,8 @@ class RadarSpyMixin:
                     player_ids = [p_id for p_id, p_info in tracked_players]
                     try:
                         url_bulk = "https://api.gge-tracker.com/api/v1/players"
-                        async with session.post(url_bulk, headers=headers, json=player_ids, timeout=10) as r:
+                        r = await session.post(url_bulk, headers=headers, json=player_ids, timeout=10)
+                        try:
                             if r.status == 200:
                                 bulk_data_raw = await r.json()
                                 bulk_data = bulk_data_raw.get("players", [])
@@ -609,7 +615,7 @@ class RadarSpyMixin:
                                                         old=old_t,
                                                         new=new_t,
                                                         time=get_discord_timestamp(maintenant.isoformat(), "R", lg),
-                                                        defaut=f"**{player}**\n*{old_t}* ➔ **{new_t}**\n{e_time} *Fait {get_discord_timestamp(maintenant.isoformat(), 'R', lg)}*",
+                                                        defaut=f"**{player}**\n~~{old_t}~~ ➔ **{new_t}**\n{e_time} *Fait {get_discord_timestamp(maintenant.isoformat(), 'R', lg)}*",
                                                     ),
                                                 )
                                                 embeds_locales[lg] = embed
@@ -817,6 +823,8 @@ class RadarSpyMixin:
                                             f"❌ [Radar Spy] Erreur de parsing pour le joueur {info.get('name')}: {loop_e}"
                                         )
                                         pass
+                        finally:
+                            r.close()
                     except Exception as e:
                         logger.error(f"❌ [Radar Spy] Erreur Bulk Players : {e}")
 
@@ -824,7 +832,8 @@ class RadarSpyMixin:
                     url_movements = (
                         "https://api.gge-tracker.com/api/v1/server/movements?page=1&castleType=1&movementType=3"
                     )
-                    async with session.get(url_movements, headers=headers, timeout=5) as r:
+                    r = await session.get(url_movements, headers=headers, timeout=5)
+                    try:
                         if r.status == 200:
                             data_mouv = await r.json()
                             movements = data_mouv.get("movements", [])
@@ -883,6 +892,8 @@ class RadarSpyMixin:
                                         await self.envoyer_alerte_serveur(guild_abonnes, "position", embeds_locales)
                                         info["last_pos"] = m["created_at"]
                                         changes_detected = True
+                    finally:
+                        r.close()
                 except Exception as e:
                     logger.error(f"❌ [Radar Spy] Erreur Global Movements : {e}")
 
@@ -939,3 +950,9 @@ class RadarSpyMixin:
         except Exception as e:
             logger.error(f"❌ [RADAR CRASH] : {traceback.format_exc()}")
             obs.record_error(source="task", scope="radar_spy_task", exception=e, cog="radar", severity="critical")
+
+    @radar_spy_task.before_loop
+    async def before_radar_spy_task(self):
+        """Met la tâche en pause jusqu'à ce que on_ready() ait chargé les langues."""
+        await self.bot.wait_until_ready()
+        await asyncio.sleep(3)
