@@ -4,7 +4,7 @@ import json
 import logging
 import re
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import discord
 from bs4 import BeautifulSoup
@@ -23,6 +23,7 @@ from utils import (
 logger = logging.getLogger("GGE_Bot")
 
 HUB_CONFIG_FILE = SERVEURS_DIR / "hub_community.json"
+MAX_ARTICLE_AGE_DAYS = 14
 
 
 async def load_hub_config():
@@ -124,10 +125,24 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                 if not guild or not getattr(guild, "owner_id", None):
                     try:
                         guild = await self.bot.fetch_guild(int(guild_id_str))
+                    except discord.NotFound:
+                        # Le bot n'est plus sur ce serveur (Unknown Guild 10004) : on purge tout le serveur !
+                        data = await load_hub_config()
+                        if guild_id_str in data.get("guilds", {}):
+                            del data["guilds"][guild_id_str]
+                            await save_hub_config(data)
+                        logger.info(
+                            f"🧹 [Hub] Serveur {guild_id_str} introuvable (bot retiré). Entrée supprimée de hub_community.json."
+                        )
+                        continue
+                    except discord.Forbidden:
+                        logger.warning(f"⚠️ [Hub] Accès refusé (403) lors du fetch du serveur {guild_id_str}.")
+                        continue
                     except Exception as e_guild:
                         logger.error(
                             f"❌ [Hub] Impossible de fetch le serveur {guild_id_str} pour avertir le proprio : {e_guild}"
                         )
+                        continue
 
                 if guild and getattr(guild, "owner_id", None):
                     try:
@@ -215,7 +230,8 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
             params = {"client": "dict-chrome-ex", "sl": "en", "tl": target_lang, "q": chunk}
             try:
                 await asyncio.sleep(1)
-                async with self.bot.session.get(url, params=params, headers=headers_trad, timeout=10) as r:
+                r = await self.bot.session.get(url, params=params, headers=headers_trad, timeout=10)
+                try:
                     if r.status == 200:
                         data = await r.json()
                         if isinstance(data, list):
@@ -224,6 +240,8 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             translated_text += str(data)
                     else:
                         translated_text += chunk
+                finally:
+                    r.close()
             except Exception as e:
                 logger.error(f"❌ [Hub] Erreur traduction : {e}")
                 translated_text += chunk
@@ -232,8 +250,8 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
     async def _build_and_send_embed(
         self, article, channel, ping_role, langue, serveur, final_titre, final_resume, final_full_md, guild_id_str=None
-    ):
-        """Méthode utilitaire pour générer l'embed complet et l'envoyer proprement."""
+    ) -> bool:
+        """Méthode utilitaire pour générer l'embed complet et l'envoyer proprement. Retourne False si purgé."""
         if article["type"] == "patchnotes":
             couleur = 0x2ECC71
             titre_prefix = t(langue, "hub_patchnote_prefix", defaut="⚙️ [MISE À JOUR]")
@@ -286,8 +304,16 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
         await setup_embed_footer(embed, None, langue)
 
+        # Sécurisation du format du rôle (au cas où un int soit stocké dans le JSON)
+        if isinstance(ping_role, int):
+            ping_content = f"<@&{ping_role}>"
+        elif isinstance(ping_role, str) and ping_role.strip().isdigit():
+            ping_content = f"<@&{ping_role.strip()}>"
+        else:
+            ping_content = ping_role if ping_role else None
+
         try:
-            message = await channel.send(content=ping_role if ping_role else None, embed=embed)
+            message = await channel.send(content=ping_content, embed=embed)
 
             if article["type"] == "patchnotes" and final_full_md:
                 try:
@@ -338,6 +364,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                 failed=0,
                 dm_blocked=0,
             )
+            return True
 
         except (discord.Forbidden, discord.NotFound):
             chan_name = channel.name if getattr(channel, "name", None) else str(channel.id)
@@ -349,9 +376,11 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                 langue=langue,
                 channel_obj=channel,
             )
+            return False
 
         except Exception as e:
             logger.error(f"❌ [Hub] Erreur d'envoi annonce HUB : {e}")
+            return True
 
     @app_commands.command(name="setup", description="Configure the channel for GGE announcements")
     @app_commands.choices(
@@ -450,7 +479,8 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
                 if not texte_resume and latest_article["type"] in ["news", "alerts"]:
                     try:
-                        async with self.bot.session.get(latest_article["url"], headers=self.headers, timeout=10) as r:
+                        r = await self.bot.session.get(latest_article["url"], headers=self.headers, timeout=10)
+                        try:
                             if r.status == 200:
                                 html_article = await r.text()
 
@@ -472,6 +502,8 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                     texte_resume = (
                                         texte_complet[:400] + "..." if len(texte_complet) > 400 else texte_complet
                                     )
+                        finally:
+                            r.close()
                     except Exception as e:
                         logger.error(f"❌ [Hub] Setup fetch error: {e}")
 
@@ -562,7 +594,8 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
         for game_type, url in self.hub_urls.items():
             try:
-                async with self.bot.session.get(url, headers=self.headers, timeout=15) as r:
+                r = await self.bot.session.get(url, headers=self.headers, timeout=15)
+                try:
                     if r.status == 200:
                         html_content = await r.text()
                         soup = await asyncio.to_thread(BeautifulSoup, html_content, "html.parser")
@@ -571,9 +604,17 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             if "e-heading-base" in heading.get("class", []):
                                 parent = heading.find_parent("div", class_="elementor-element")
                                 if parent:
-                                    link_elem = parent.find("a", href=True)
-                                    if link_elem and re.search(r"/\d{4}/\d{2}/\d{2}/", link_elem["href"]):
-                                        url_article = link_elem["href"].split("?")[0].rstrip("/")
+                                    # On parcourt tous les liens du parent pour ignorer les liens wp-admin laissés par erreur par GGS
+                                    url_article = None
+                                    match = None
+                                    for a_tag in parent.find_all("a", href=True):
+                                        m = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", a_tag["href"])
+                                        if m and "wp-admin" not in a_tag["href"]:
+                                            url_article = a_tag["href"].split("?")[0].rstrip("/")
+                                            match = m
+                                            break
+
+                                    if url_article and match:
                                         if url_article == self.changelog_url.rstrip("/"):
                                             continue
 
@@ -590,13 +631,18 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                             title,
                                         ).strip()
 
-                                        match = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", url_article)
                                         date_obj = datetime(
                                             int(match.group(1)), int(match.group(2)), int(match.group(3))
                                         )
                                         discord_date = f"<t:{int(date_obj.timestamp())}:D>"
 
-                                        # ID basé UNIQUEMENT sur l'URL (insensible aux changements de titres)
+                                        # Image d'arrière-plan éventuelle sur la bannière
+                                        banner_img = None
+                                        style_bg = parent.get("data-settings", "")
+                                        m_bg = re.search(r'"url":"([^"]+)"', style_bg)
+                                        if m_bg:
+                                            banner_img = m_bg.group(1).replace("\\/", "/")
+
                                         article_id = hashlib.md5(url_article.encode()).hexdigest()
 
                                         articles.append(
@@ -606,7 +652,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                                 "url": url_article,
                                                 "date_discord": discord_date,
                                                 "date_obj": date_obj,
-                                                "image": None,
+                                                "image": banner_img,
                                                 "type": "news",
                                                 "resume_content": "",
                                                 "game": game_type,
@@ -624,7 +670,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
                             url_article = link_elem["href"].split("?")[0].rstrip("/")
 
-                            if url_article == self.changelog_url.rstrip("/"):
+                            if url_article == self.changelog_url.rstrip("/") or "wp-admin" in url_article:
                                 continue
 
                             existing = next((a for a in articles if a["url"] == url_article), None)
@@ -688,11 +734,14 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                     "game": game_type,
                                 }
                             )
+                finally:
+                    r.close()
             except Exception as e:
                 logger.error(f"❌ [Hub] Erreur de parsing HTML ({game_type}) : {e}")
 
         try:
-            async with self.bot.session.get(self.changelog_url, headers=self.headers, timeout=15) as r2:
+            r2 = await self.bot.session.get(self.changelog_url, headers=self.headers, timeout=15)
+            try:
                 if r2.status == 200:
                     html_changelog = await r2.text()
                     soup_cl = await asyncio.to_thread(BeautifulSoup, html_changelog, "html.parser")
@@ -818,6 +867,8 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                 "game": "both",
                             }
                         )
+            finally:
+                r2.close()
         except Exception as e:
             logger.error(f"❌ [Hub] Erreur de parsing HTML Patchnotes : {e}")
 
@@ -839,11 +890,15 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                 return
 
             data = await load_hub_config()
-            posted_news = data.get("posted_news", [])
+            # Nettoyage des doublons éventuels tout en préservant l'ordre
+            posted_news = list(dict.fromkeys(data.get("posted_news", [])))
             guilds_config = data.get("guilds", {})
 
             if not guilds_config:
                 return
+
+            date_limite_recente = datetime.now() - timedelta(days=MAX_ARTICLE_AGE_DAYS)
+            needs_silent_save = False
 
             # ==========================================
             # 🛡️ GESTION DU DÉMARRAGE ET BOUCLIER ANTI-SPAM
@@ -863,12 +918,25 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                     if art["id"] not in ids_a_garder:
                         posted_news.append(art["id"])
 
-                data["posted_news"] = posted_news[-100:]
+                data["posted_news"] = posted_news[-500:]
                 await save_hub_config(data)
 
                 articles_a_publier = sorted(derniers_par_type.values(), key=lambda x: x["date_obj"])
             else:
-                articles_a_publier = [art for art in nouveaux_articles if art["id"] not in posted_news]
+                articles_non_vus = [art for art in nouveaux_articles if art["id"] not in posted_news]
+                articles_a_publier = []
+
+                # Filtre anti-archéologie : tout article vieux de plus de 14 jours qui remonte en page 1
+                # est silencieusement enregistré dans posted_news sans être envoyé aux serveurs.
+                for art in articles_non_vus:
+                    if art["date_obj"] < date_limite_recente:
+                        logger.info(
+                            f"⏭️ [Hub] Article ancien ignoré et mémorisé ({art['title']} - {art['date_obj'].strftime('%Y-%m-%d')})."
+                        )
+                        posted_news.append(art["id"])
+                        needs_silent_save = True
+                    else:
+                        articles_a_publier.append(art)
 
                 if len(articles_a_publier) > 6:
                     logger.warning(
@@ -884,6 +952,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                     for art in articles_a_publier:
                         if art["id"] not in ids_a_garder:
                             posted_news.append(art["id"])
+                            needs_silent_save = True
 
                     articles_a_publier = sorted(derniers_par_type.values(), key=lambda x: x["date_obj"])
 
@@ -895,7 +964,8 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
                     if not texte_resume and article["type"] in ["news", "alerts"]:
                         try:
-                            async with self.bot.session.get(article["url"], headers=self.headers, timeout=10) as r:
+                            r = await self.bot.session.get(article["url"], headers=self.headers, timeout=10)
+                            try:
                                 if r.status == 200:
                                     html_article = await r.text()
 
@@ -925,6 +995,8 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                                             texte_resume = texte_complet[:400] + "..."
                                         else:
                                             texte_resume = texte_complet
+                            finally:
+                                r.close()
                         except Exception as e:
                             logger.error(f"❌ [Hub] Impossible de lire le contenu de {article['url']} : {e}")
 
@@ -992,7 +1064,7 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             except Exception:
                                 continue
 
-                        await self._build_and_send_embed(
+                        sent_ok = await self._build_and_send_embed(
                             article=article,
                             channel=channel,
                             ping_role=ping_role,
@@ -1003,6 +1075,10 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
                             final_full_md=final_full_md,
                             guild_id_str=guild_id_str,
                         )
+                        if not sent_ok:
+                            # Si le salon vient d'être purgé, on vide aussi la config en mémoire
+                            # pour ne pas réessayer sur un 2e article lors du même scan
+                            config[article["type"]] = {}
 
                     posted_news.append(article["id"])
 
@@ -1011,9 +1087,14 @@ class GGEHubCommunityCog(commands.GroupCog, group_name="hub", group_description=
 
                 # Rechargement depuis le disque avant de sauvegarder posted_news pour conserver les purges
                 data = await load_hub_config()
-                data["posted_news"] = posted_news[-100:]
+                data["posted_news"] = list(dict.fromkeys(posted_news))[-500:]
                 await save_hub_config(data)
                 logger.info(f"📰 [Hub] {len(articles_a_publier)} actualités envoyées et traduites.")
+
+            elif needs_silent_save:
+                data = await load_hub_config()
+                data["posted_news"] = list(dict.fromkeys(posted_news))[-500:]
+                await save_hub_config(data)
 
         except Exception as e:
             logger.error(f"❌ [Hub] CRASH FATAL : {traceback.format_exc()}")

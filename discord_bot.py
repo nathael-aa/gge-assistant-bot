@@ -26,6 +26,7 @@ from utils import (
     DICT_EMOJIS,
     JOUEURS_DIR,
     MON_ID_DISCORD,
+    SERVEURS_DIR,
     TOKEN,
     TOPGG_TOKEN,
     cache_mngr,
@@ -34,6 +35,8 @@ from utils import (
     get_server_config,
     load_blocks_async,
     load_maintenance,
+    load_surveillance_async,
+    save_surveillance_async,
     t,
 )
 
@@ -490,16 +493,105 @@ class GGEAssistantBot(commands.Bot):
     # SERVEUR SUPPRIME
     # ==========================================
     async def on_guild_remove(self, guild: discord.Guild):
-        logger.info(f"👋 [DÉPART SERVEUR] Le bot a été retiré de '{guild.name}' (ID: {guild.id})")
+        guild_id_str = str(guild.id)
+        logger.info(f"👋 [DÉPART SERVEUR] Le bot a été retiré de '{guild.name}' (ID: {guild_id_str})")
 
         obs.record_guild_event("guild_leave", guild=guild, guild_total=len(self.guilds))
         obs.upsert_guild(guild=guild, is_active=0, left_at=obs.ch_datetime())
 
+        # ==========================================
+        # PURGE AUTOMATIQUE DES CONFIGURATIONS
+        # ==========================================
+        purged_modules = []
+
+        def _purge_json_sync(filepath, key: str = None) -> bool:
+            if not filepath.exists():
+                return False
+            try:
+                with open(filepath, encoding="utf-8") as f:
+                    data = json.load(f)
+
+                modified = False
+                if key and isinstance(data, dict) and guild_id_str in data.get(key, {}):
+                    del data[key][guild_id_str]
+                    modified = True
+                elif not key and isinstance(data, dict) and guild_id_str in data:
+                    del data[guild_id_str]
+                    modified = True
+
+                if modified:
+                    with open(filepath, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=4, ensure_ascii=False)
+                return modified
+            except Exception as e:
+                logger.error(f"❌ [Purge] Erreur nettoyage {filepath.name} pour {guild_id_str} : {e}")
+                return False
+
+        # 1. Purge Hub Community
+        hub_file = SERVEURS_DIR / "hub_community.json"
+        if await asyncio.to_thread(_purge_json_sync, hub_file, "guilds"):
+            purged_modules.append("Hub")
+
+        # 2. Purge Îles Orageuses (Tempêtes)
+        for storm_filename in ("storm_alerts.json", "iles_orageuses.json"):
+            storm_file = SERVEURS_DIR / storm_filename
+            if await asyncio.to_thread(_purge_json_sync, storm_file, None) or await asyncio.to_thread(
+                _purge_json_sync, storm_file, "guilds"
+            ):
+                purged_modules.append("Tempêtes")
+
+        # 3. Purge Radar (surveillance.json)
+        try:
+            surv_data = await load_surveillance_async()
+            radar_modified = False
+
+            if guild_id_str in surv_data.get("guild_configs", {}):
+                del surv_data["guild_configs"][guild_id_str]
+                radar_modified = True
+
+            for p_id in list(surv_data.get("players", {}).keys()):
+                if guild_id_str in surv_data["players"][p_id].get("guild_abonnes", {}):
+                    del surv_data["players"][p_id]["guild_abonnes"][guild_id_str]
+                    radar_modified = True
+                    if not surv_data["players"][p_id].get("abonnes", {}) and not surv_data["players"][p_id].get(
+                        "guild_abonnes", {}
+                    ):
+                        del surv_data["players"][p_id]
+
+            for a_id in list(surv_data.get("alliances", {}).keys()):
+                if guild_id_str in surv_data["alliances"][a_id].get("guild_abonnes", {}):
+                    del surv_data["alliances"][a_id]["guild_abonnes"][guild_id_str]
+                    radar_modified = True
+                    if not surv_data["alliances"][a_id].get("abonnes", {}) and not surv_data["alliances"][a_id].get(
+                        "guild_abonnes", {}
+                    ):
+                        del surv_data["alliances"][a_id]
+
+            if radar_modified:
+                await save_surveillance_async(surv_data)
+                purged_modules.append("Radar")
+        except Exception as e:
+            logger.error(f"❌ [Purge] Erreur nettoyage Radar pour {guild_id_str} : {e}")
+
+        if purged_modules:
+            logger.info(
+                f"🧹 [Purge] Configurations supprimées pour '{guild.name}' ({guild_id_str}) : {', '.join(purged_modules)}"
+            )
+
+        # ==========================================
+        # WEBHOOK DE DÉPART
+        # ==========================================
         webhook_servers = os.getenv("WEBHOOK_LEAVE")
         if webhook_servers and webhook_servers.startswith("http"):
+            purge_txt = f"\n**Configs purgées :** `{', '.join(purged_modules)}`" if purged_modules else ""
             embed = discord.Embed(
                 title="👋 Serveur Quitté",
-                description=f"**Nom :** `{guild.name}`\n**ID :** `{guild.id}`\n**Membres perdus :** `{guild.member_count}`",
+                description=(
+                    f"**Nom :** `{guild.name}`\n"
+                    f"**ID :** `{guild.id}`\n"
+                    f"**Membres perdus :** `{guild.member_count}`"
+                    f"{purge_txt}"
+                ),
                 color=0xE74C3C,
             )
             try:
