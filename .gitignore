@@ -22,6 +22,7 @@ production/
 *$py.class
 .DS_Store
 .vscode
+docker-compose.yaml
 
 # ----------------------------------
 # ⚙️ AUTRES FICHIERS GÉNÉRÉS

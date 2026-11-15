@@ -13,9 +13,7 @@ from utils import (
     CONFIG_DIR,
     DICT_EMOJIS,
     EVENT_IDS,
-    PaginationView,
     alliance_autocomplete,
-    get_api_headers,
     get_server_config,
     joueur_autocomplete,
     setup_embed_footer,
@@ -24,84 +22,328 @@ from utils import (
 
 
 def get_emo(langue, default_emo):
-    """
-    Astuce anti-scanner : en passant la clé via une variable,
-    l'expression régulière de i18n_sync ne détectera pas cette ligne.
-    """
     k = "emo_ignore"
     return t(langue, k, defaut=default_emo)
 
 
-def extract_p_name(p):
+def extract_p_name(p) -> str:
     if isinstance(p, dict):
-        return p.get("P", p.get("N", ""))
+        return str(p.get("P", p.get("N", ""))).strip()
     info = next((item for item in p if isinstance(item, dict)), {})
     name = info.get("N", "")
     if name:
-        return name
+        return str(name).strip()
     if len(p) >= 4 and isinstance(p[3], str):
-        return p[3]
+        return p[3].strip()
     if len(p) >= 3 and isinstance(p[2], list) and len(p[2]) >= 2 and isinstance(p[2][1], str):
-        return p[2][1]
+        return p[2][1].strip()
     return ""
 
 
-def extract_p_rank(p):
+def extract_p_rank(p) -> int:
     if isinstance(p, dict):
         return int(p.get("R", 999999))
     if len(p) >= 5 and isinstance(p[4], (int, float)) and not isinstance(p[2], dict):
         return int(p[4])
-    return int(p[0]) if len(p) > 0 else 999999
+    return int(p[0]) if len(p) > 0 and isinstance(p[0], (int, float)) else 999999
 
 
-# -- VUE PERSONNALISÉE AVEC BOUTON REFRESH ET TIMEOUT --
-class RankingPaginationView(PaginationView):
-    def __init__(self, embeds, refresh_callback, user_id, timeout=3600):
-        super().__init__(embeds)
-        self.timeout = timeout
-        self.refresh_callback = refresh_callback
-        self.user_id = user_id
+class RankJumpModal(discord.ui.Modal):
+    def __init__(self, parent_view: "LiveRankingView", langue: str):
+        title_txt = t(langue, "rank_modal_title", defaut="Aller à un rang")[:45]
+        super().__init__(title=title_txt)
+        self.parent_view = parent_view
+        self.langue = langue
+
+        label_txt = t(langue, "rank_modal_label", defaut="Numéro du rang (ex: 50, 250...)")[:45]
+        self.rank_input = discord.ui.TextInput(
+            label=label_txt,
+            placeholder="1 - 99999",
+            min_length=1,
+            max_length=7,
+            required=True,
+        )
+        self.add_item(self.rank_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        val = self.rank_input.value.strip()
+        if not val.isdigit() or int(val) < 1:
+            msg_err = t(self.langue, "rank_modal_invalid", defaut="❌ Veuillez entrer un numéro de rang valide (>= 1).")
+            return await interaction.response.send_message(msg_err, ephemeral=True)
+
+        target_rank = int(val)
+        if self.parent_view.total_ranks and target_rank > self.parent_view.total_ranks:
+            target_rank = max(1, self.parent_view.total_ranks - 4)
+
+        await self.parent_view.navigate_to_rank(interaction, target_rank, force_refresh=False)
+
+
+class LiveRankingView(discord.ui.View):
+    def __init__(
+        self,
+        cog: "ClassementCog",
+        interaction: discord.Interaction,
+        langue: str,
+        serveur_api: str,
+        event_id: int,
+        lid: int,
+        titre: str,
+        embed_color: discord.Color,
+        event_name: str,
+        is_alliance: bool = False,
+        api_command: str = "hgh",
+        pagination_param: str = "SV",
+        is_string_val: bool = True,
+        page_step: int = None,
+        initial_sv: int = 1,
+        total_ranks: int = None,
+        highlight_player: str = None,
+        initial_embed: discord.Embed = None,
+        berimond_both_camps: bool = False,
+        timeout: int = 3600,
+    ):
+        super().__init__(timeout=timeout)
+        self.cog = cog
+        self.user_id = interaction.user.id
+        self.ctx_int = interaction
+        self.langue = langue
+        self.serveur_api = serveur_api
+        self.event_id = event_id
+        self.lid = lid
+        self.titre = titre
+        self.embed_color = embed_color
+        self.event_name = event_name
+        self.is_alliance = is_alliance
+        self.api_command = api_command
+        self.pagination_param = pagination_param
+        self.is_string_val = is_string_val
+        self.page_step = page_step or (10 if api_command == "llsp" else 8)
+        self.current_sv = max(1, initial_sv)
+        self.total_ranks = total_ranks
+        self.highlight_player = highlight_player
+        self.berimond_both_camps = berimond_both_camps
         self.message = None
 
-        btn = discord.ui.Button(
+        self._page_cache = {}
+        if initial_embed is not None:
+            norm_sv = self._normalize_sv(self.current_sv)
+            self._page_cache[norm_sv] = (initial_embed, self.total_ranks)
+
+        self._setup_buttons()
+        self.update_buttons()
+
+    def _normalize_sv(self, rank_val: int) -> int:
+        if rank_val <= 1:
+            return 1
+        bucket = (rank_val - 1) // self.page_step
+        return (bucket * self.page_step) + 1
+
+    def _compute_api_sv(self, norm_sv: int) -> int:
+        if self.api_command == "llsp":
+            return norm_sv
+        if norm_sv <= 1:
+            return 1
+        offset = (self.page_step - 1) // 2
+        return norm_sv + offset
+
+    def _setup_buttons(self):
+        self.clear_items()
+
+        # Ligne 1 (row=0) : Précédent | Refresh | Suivant
+        self.btn_prev = discord.ui.Button(
+            emoji=DICT_EMOJIS.get("e_last", "◀️"),
+            style=discord.ButtonStyle.primary,
+            row=0,
+            custom_id="rank_btn_prev",
+        )
+        self.btn_prev.callback = self.on_prev
+
+        self.btn_refresh = discord.ui.Button(
             label="Refresh",
+            emoji=DICT_EMOJIS.get("e_refresh", "🔁"),
+            style=discord.ButtonStyle.secondary,
+            row=0,
+            custom_id="rank_btn_refresh",
+        )
+        self.btn_refresh.callback = self.on_refresh
+
+        self.btn_next = discord.ui.Button(
+            emoji=DICT_EMOJIS.get("e_next", "▶️"),
+            style=discord.ButtonStyle.primary,
+            row=0,
+            custom_id="rank_btn_next",
+        )
+        self.btn_next.callback = self.on_next
+
+        # Ligne 2 (row=1) : Page 1 | Aller au Rang #
+        self.btn_first = discord.ui.Button(
+            emoji=DICT_EMOJIS.get("e_one", "1️⃣"),
             style=discord.ButtonStyle.secondary,
             row=1,
-            emoji=DICT_EMOJIS.get("e_refresh", "🔄"),
-            custom_id="btn_rank_refresh",
+            custom_id="rank_btn_first",
         )
-        btn.callback = self.refresh_action
-        self.add_item(btn)
+        self.btn_first.callback = self.on_first
 
-    async def refresh_action(self, interaction: discord.Interaction):
+        self.btn_jump = discord.ui.Button(
+            label=t(self.langue, "rank_btn_jump", defaut="Rang"),
+            emoji=DICT_EMOJIS.get("e_ranking", "🔢"),
+            style=discord.ButtonStyle.secondary,
+            row=1,
+            custom_id="rank_btn_jump",
+        )
+        self.btn_jump.callback = self.on_jump
+
+        self.add_item(self.btn_prev)
+        self.add_item(self.btn_refresh)
+        self.add_item(self.btn_next)
+        self.add_item(self.btn_first)
+        self.add_item(self.btn_jump)
+
+    def update_buttons(self):
+        norm_sv = self._normalize_sv(self.current_sv)
+        at_start = norm_sv <= 1
+        self.btn_first.disabled = at_start
+        self.btn_prev.disabled = at_start
+
+        if self.total_ranks and self.total_ranks > 0:
+            self.btn_next.disabled = (norm_sv + self.page_step) > self.total_ranks
+        else:
+            self.btn_next.disabled = False
+
+    async def _check_author(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user_id:
-            langue, _ = await get_server_config(interaction)
-            msg_err = t(langue, "err_not_author", defaut="❌ Only the command author can refresh it.")
-            return await interaction.response.send_message(msg_err, ephemeral=True)
+            msg_err = t(self.langue, "err_not_author", defaut="❌ Only the command author can use these buttons.")
+            await interaction.response.send_message(msg_err, ephemeral=True)
+            return False
+        return True
+
+    async def navigate_to_rank(self, interaction: discord.Interaction, target_sv: int, force_refresh: bool = False):
+        if not await self._check_author(interaction):
+            return
 
         try:
             await interaction.response.defer()
         except Exception as e:
-            logging.getLogger("GGE_Bot").error(f"❌ [Classement] Erreur defer : {e}")
+            self.cog.logger.error(f"❌ [Classement] Erreur defer navigation : {e}")
             return
 
-        new_embeds, new_page = await self.refresh_callback(interaction)
+        norm_sv = self._normalize_sv(max(1, target_sv))
 
-        if new_embeds:
-            self.embeds = new_embeds
-            if hasattr(self, "current_page"):
-                self.current_page = new_page
-            if hasattr(self, "index"):
-                self.index = new_page
-            if hasattr(self, "update_buttons"):
-                self.update_buttons()
-
-            if not self.message:
-                self.message = interaction.message
+        if not force_refresh and norm_sv in self._page_cache:
+            cached_embed, cached_total = self._page_cache[norm_sv]
+            self.current_sv = norm_sv
+            if cached_total:
+                self.total_ranks = cached_total
+            self.update_buttons()
             try:
-                await interaction.edit_original_response(embed=self.embeds[new_page], view=self)
+                await interaction.edit_original_response(embed=cached_embed, view=self)
             except Exception as e:
-                logging.getLogger("GGE_Bot").error(f"❌ [Classement] Erreur edition message refresh : {e}")
+                self.cog.logger.error(f"❌ [Classement] Erreur edit cache : {e}")
+            return
+
+        api_sv_val = self._compute_api_sv(norm_sv)
+
+        if self.berimond_both_camps:
+            res3 = await self.cog.fetch_single_chunk(
+                serveur_api=self.serveur_api, event_id=self.event_id, lid=3, sv_val=api_sv_val
+            )
+            res4 = await self.cog.fetch_single_chunk(
+                serveur_api=self.serveur_api, event_id=self.event_id, lid=4, sv_val=api_sv_val
+            )
+            l_chunk = []
+            lr_val = 0
+            for r_camp in (res3, res4):
+                if r_camp and str(r_camp.get("return_code")) == "0":
+                    c_data = r_camp.get("content", {})
+                    l_chunk.extend(c_data.get("L", []))
+                    if isinstance(c_data.get("LR"), int):
+                        lr_val = max(lr_val, c_data.get("LR"))
+            res_ok = bool(l_chunk)
+        else:
+            res = await self.cog.fetch_single_chunk(
+                serveur_api=self.serveur_api,
+                event_id=self.event_id,
+                lid=self.lid,
+                sv_val=api_sv_val,
+                is_alliance=self.is_alliance,
+                api_command=self.api_command,
+                pagination_param=self.pagination_param,
+                is_string_val=self.is_string_val,
+            )
+            res_ok = bool(res and str(res.get("return_code")) == "0")
+            content = res.get("content", {}) if res_ok else {}
+            l_chunk = content.get("L", [])
+            lr_val = content.get("LR")
+
+        if not res_ok:
+            msg_err = t(
+                self.langue,
+                "api_unavailable_error",
+                defaut="⚠️ **L'API de classement est momentanément indisponible ou la fin du classement est atteinte.**",
+            )
+            await interaction.followup.send(msg_err, ephemeral=True)
+            return
+
+        if not l_chunk:
+            msg_empty = t(self.langue, "rank_end_reached", defaut="📭 Aucune donnée supplémentaire à ce rang.")
+            self.btn_next.disabled = True
+            try:
+                await interaction.edit_original_response(view=self)
+            except Exception:
+                pass
+            await interaction.followup.send(msg_empty, ephemeral=True)
+            return
+
+        if isinstance(lr_val, int) and lr_val > 0:
+            self.total_ranks = lr_val
+
+        self.current_sv = norm_sv
+
+        embed, detected_step = await self.cog.build_single_page_embed(
+            ctx_int=interaction,
+            raw_list=l_chunk,
+            langue=self.langue,
+            titre=self.titre,
+            color=self.embed_color,
+            is_alliance=self.is_alliance,
+            highlight_player=self.highlight_player,
+            event_name=self.event_name,
+            total_ranks=self.total_ranks,
+            fallback_step=self.page_step,
+        )
+
+        if detected_step and detected_step >= 5:
+            self.page_step = detected_step
+
+        self._page_cache[norm_sv] = (embed, self.total_ranks)
+        self.update_buttons()
+
+        if not self.message:
+            self.message = interaction.message
+        try:
+            await interaction.edit_original_response(embed=embed, view=self)
+        except Exception as e:
+            self.cog.logger.error(f"❌ [Classement] Erreur edition message live : {e}")
+
+    async def on_first(self, interaction: discord.Interaction):
+        await self.navigate_to_rank(interaction, 1, force_refresh=False)
+
+    async def on_prev(self, interaction: discord.Interaction):
+        norm_sv = self._normalize_sv(self.current_sv)
+        await self.navigate_to_rank(interaction, max(1, norm_sv - self.page_step), force_refresh=False)
+
+    async def on_next(self, interaction: discord.Interaction):
+        norm_sv = self._normalize_sv(self.current_sv)
+        await self.navigate_to_rank(interaction, norm_sv + self.page_step, force_refresh=False)
+
+    async def on_refresh(self, interaction: discord.Interaction):
+        self._page_cache.clear()
+        await self.navigate_to_rank(interaction, self.current_sv, force_refresh=True)
+
+    async def on_jump(self, interaction: discord.Interaction):
+        if not await self._check_author(interaction):
+            return
+        await interaction.response.send_modal(RankJumpModal(self, self.langue))
 
     async def on_timeout(self):
         for item in self.children:
@@ -118,9 +360,70 @@ class ClassementCog(commands.Cog):
         self.bot = bot
         self.logger = logging.getLogger("GGE_Bot")
         self.ranking_api_url = "https://empire-api.fly.dev"
+        self._server_locks: dict[str, asyncio.Semaphore] = {}
+
+    def _get_server_sem(self, serveur_api: str) -> asyncio.Semaphore:
+        if serveur_api not in self._server_locks:
+            self._server_locks[serveur_api] = asyncio.Semaphore(2)
+        return self._server_locks[serveur_api]
+
+    async def _http_get_json(self, url: str, headers: dict = None, timeout: int = 10):
+        r = await self.bot.session.get(url, headers=headers, timeout=timeout)
+        try:
+            try:
+                data = await r.json()
+            except Exception:
+                data = None
+            return r.status, data
+        finally:
+            r.close()
+
+    async def fetch_single_chunk(
+        self,
+        serveur_api: str,
+        event_id: int,
+        lid: int,
+        sv_val,
+        is_alliance: bool = False,
+        api_command: str = "hgh",
+        pagination_param: str = "SV",
+        is_string_val: bool = True,
+    ):
+        sv_encoded = urllib.parse.quote(str(sv_val))
+        effective_lid = 1 if is_alliance else lid
+
+        if is_string_val:
+            url = (
+                f"{self.ranking_api_url}/{serveur_api}/{api_command}/"
+                f"%22LT%22:{event_id},%22LID%22:{effective_lid},%22{pagination_param}%22:%22{sv_encoded}%22"
+            )
+        else:
+            url = (
+                f"{self.ranking_api_url}/{serveur_api}/{api_command}/"
+                f"%22LT%22:{event_id},%22LID%22:{effective_lid},%22{pagination_param}%22:{sv_encoded}"
+            )
+
+        sem = self._get_server_sem(serveur_api)
+        async with sem:
+            for attempt in range(3):
+                try:
+                    status, data = await self._http_get_json(url, timeout=10)
+                    if status == 200 and data is not None:
+                        return data
+                    if status in [400, 404]:
+                        return data if isinstance(data, dict) else {"return_code": "-1", "http_status": status}
+
+                    self.logger.warning(f"⚠️ [API] Code {status} reçu. URL: {url}")
+                    if status in [429, 500, 502, 503, 504]:
+                        await asyncio.sleep(1.2)
+                except TimeoutError:
+                    self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
+                except Exception as e:
+                    self.logger.error(f"❌ [API] Erreur de connexion : {e}")
+                await asyncio.sleep(0.3)
+        return None
 
     def get_serveur_api(self, serveur_local: str) -> str:
-        """Récupère dynamiquement le nom API du serveur pour Fly.dev"""
         from utils import FLYDEV_MAPPING
 
         serveur_lower = serveur_local.lower()
@@ -150,38 +453,38 @@ class ClassementCog(commands.Cog):
                 choix = [app_commands.Choice(name="Global Ranking", value=1)]
             else:
                 choix = [
-                    app_commands.Choice(name="Levels < 20", value=1),
-                    app_commands.Choice(name="Levels 20-29", value=2),
-                    app_commands.Choice(name="Levels 30-39", value=3),
-                    app_commands.Choice(name="Levels 40-49", value=4),
-                    app_commands.Choice(name="Levels 50-69", value=5),
                     app_commands.Choice(name="Levels 70+", value=6),
+                    app_commands.Choice(name="Levels 50-69", value=5),
+                    app_commands.Choice(name="Levels 40-49", value=4),
+                    app_commands.Choice(name="Levels 30-39", value=3),
+                    app_commands.Choice(name="Levels 20-29", value=2),
+                    app_commands.Choice(name="Levels 1-19", value=1),
                 ]
         elif hasattr(ns, "evenement") and ns.evenement:
             ev = ns.evenement
             if ev == "berimond":
                 choix = [
-                    app_commands.Choice(name="Ursidae (Lvl 40-69)", value=1),
-                    app_commands.Choice(name="Gerbrandt (Lvl 40-69)", value=2),
                     app_commands.Choice(name="Ursidae (Lvl 70+)", value=3),
                     app_commands.Choice(name="Gerbrandt (Lvl 70+)", value=4),
+                    app_commands.Choice(name="Ursidae (Lvl 40-69)", value=1),
+                    app_commands.Choice(name="Gerbrandt (Lvl 40-69)", value=2),
                 ]
             elif ev == "nobility":
                 choix = [
-                    app_commands.Choice(name="Levels 10-14", value=1),
-                    app_commands.Choice(name="Levels 15-19", value=2),
-                    app_commands.Choice(name="Levels 20-24", value=3),
-                    app_commands.Choice(name="Levels 25-29", value=4),
-                    app_commands.Choice(name="Levels 30-49", value=5),
-                    app_commands.Choice(name="Levels 50-69", value=6),
                     app_commands.Choice(name="Legendary (70+)", value=7),
+                    app_commands.Choice(name="Levels 50-69", value=6),
+                    app_commands.Choice(name="Levels 30-49", value=5),
+                    app_commands.Choice(name="Levels 25-29", value=4),
+                    app_commands.Choice(name="Levels 20-24", value=3),
+                    app_commands.Choice(name="Levels 15-19", value=2),
+                    app_commands.Choice(name="Levels 10-14", value=1),
                 ]
             elif ev == "season":
                 choix = [
-                    app_commands.Choice(name="Legendary 1-199", value=1),
-                    app_commands.Choice(name="Legendary 200-649", value=2),
-                    app_commands.Choice(name="Legendary 650-949", value=3),
                     app_commands.Choice(name="Legendary 950+", value=4),
+                    app_commands.Choice(name="Legendary 650-949", value=3),
+                    app_commands.Choice(name="Legendary 200-649", value=2),
+                    app_commands.Choice(name="Legendary 1-199", value=1),
                 ]
             elif ev in [
                 "flora",
@@ -200,11 +503,11 @@ class ClassementCog(commands.Cog):
                 choix = [app_commands.Choice(name="Global Ranking", value=1)]
             else:
                 choix = [
-                    app_commands.Choice(name="Levels < 70", value=1),
-                    app_commands.Choice(name="Legendary 1-299", value=2),
-                    app_commands.Choice(name="Legendary 300-649", value=3),
-                    app_commands.Choice(name="Legendary 650-949", value=4),
                     app_commands.Choice(name="Legendary 950+", value=5),
+                    app_commands.Choice(name="Legendary 650-949", value=4),
+                    app_commands.Choice(name="Legendary 300-649", value=3),
+                    app_commands.Choice(name="Legendary 1-299", value=2),
+                    app_commands.Choice(name="Levels < 70", value=1),
                 ]
         else:
             choix = [app_commands.Choice(name="Global Ranking", value=1)]
@@ -231,7 +534,6 @@ class ClassementCog(commands.Cog):
     def format_page(
         self,
         chunk,
-        page_index,
         langue,
         color=discord.Color.gold(),
         is_alliance=False,
@@ -243,24 +545,6 @@ class ClassementCog(commands.Cog):
 
         txt_unknown = t(langue, "prof_unknown", defaut="Unknown")
         txt_none = t(langue, "prof_none", defaut="None")
-
-        TITRES_PRE = {
-            13: get_emo(langue, "{e_title_0}"),
-            103: get_emo(langue, "{e_title_1}"),
-            105: get_emo(langue, "{e_title_2}"),
-            112: get_emo(langue, "{e_title_3}"),
-            113: get_emo(langue, "{e_title_4}"),
-            115: get_emo(langue, "{e_title_5}"),
-        }
-
-        TITRES_SUF = {
-            24: "",
-            27: get_emo(langue, "{e_level_title_1}"),
-            28: get_emo(langue, "{e_level_title_2}"),
-            29: get_emo(langue, "{e_level_title_3}"),
-            30: get_emo(langue, "{e_level_title_3}"),
-            111: get_emo(langue, "{e_level_title_3}"),
-        }
 
         MEDAILLES = {
             1: get_emo(langue, "{e_medal_gold}"),
@@ -339,7 +623,7 @@ class ClassementCog(commands.Cog):
                     league_str = f" | {combo}"
 
             if is_alliance:
-                if event_name == "league":
+                if event_name == "alliance_league":
                     description += f"{medal} {display_name}{league_str}\n"
                 else:
                     description += f"{medal} {display_name}{league_str} | `{pts_str}` pts\n"
@@ -353,6 +637,253 @@ class ClassementCog(commands.Cog):
 
         embed.description = description
         return embed
+
+    async def build_single_page_embed(
+        self,
+        ctx_int: discord.Interaction,
+        raw_list: list,
+        langue: str,
+        titre: str,
+        color: discord.Color,
+        is_alliance: bool,
+        highlight_player: str = None,
+        event_name: str = None,
+        total_ranks: int = None,
+        warning_msg: str = "",
+        fallback_step: int = None,
+    ) -> tuple[discord.Embed, int]:
+        seen = set()
+        clean_list = []
+        for p in raw_list:
+            name = extract_p_name(p)
+            if name and name not in seen:
+                seen.add(name)
+                clean_list.append(p)
+
+        sorted_list = sorted(clean_list, key=extract_p_rank)
+        default_step = fallback_step or (10 if event_name == "season" else 8)
+        step = len(sorted_list) if 5 <= len(sorted_list) <= 12 else default_step
+        sorted_list = sorted_list[:step]
+
+        embed = self.format_page(
+            sorted_list,
+            langue=langue,
+            color=color,
+            is_alliance=is_alliance,
+            highlight_player=highlight_player,
+            event_name=event_name,
+        )
+        embed.title = titre
+        if warning_msg:
+            embed.description = (embed.description or "") + warning_msg
+
+        if sorted_list:
+            r_min = extract_p_rank(sorted_list[0])
+            r_max = extract_p_rank(sorted_list[-1])
+            cur_page = ((max(1, r_min) - 1) // step) + 1
+            if total_ranks and total_ranks > 0:
+                tot_pages = ((total_ranks - 1) // step) + 1
+                footer_text = t(
+                    langue,
+                    "ev_page_footer_live",
+                    cur=cur_page,
+                    tot=tot_pages,
+                    rmin=r_min,
+                    rmax=r_max,
+                    total=total_ranks,
+                    defaut=f"Page {cur_page}/{tot_pages} • Rangs #{r_min}–#{r_max} (Total : {total_ranks:,})".replace(
+                        ",", " "
+                    ),
+                )
+            else:
+                footer_text = f"Page {cur_page} • Rangs #{r_min}–#{r_max}"
+            embed.set_footer(text=footer_text)
+
+        await setup_embed_footer(embed, ctx_int, langue)
+        return embed, step
+
+    async def resolve_initial_ranking(
+        self,
+        serveur_api: str,
+        event_id: int,
+        search_lids: list[int],
+        default_lid: int,
+        search_target: str = None,
+        target_rank: int = None,
+        cross_server_suffix: str = None,
+        is_alliance: bool = False,
+        api_command: str = "hgh",
+        pagination_param: str = "SV",
+        is_string_val: bool = True,
+        berimond_both_camps: bool = False,
+    ):
+        search_mode = bool(search_target)
+        any_response = False
+
+        def matches_target(p_item) -> bool:
+            api_name = extract_p_name(p_item).lower()
+            if not api_name or not search_target:
+                return False
+            t_low = search_target.lower().strip()
+            if api_name == t_low or api_name.startswith(f"{t_low}_"):
+                return True
+            if cross_server_suffix and api_name == f"{t_low}_{cross_server_suffix.lower()}":
+                return True
+            return False
+
+        if search_mode and not target_rank and api_command == "hgh":
+            queries = [search_target.strip()]
+            if cross_server_suffix:
+                suffixed = f"{search_target.strip()}_{cross_server_suffix}"
+                if suffixed.lower() != search_target.strip().lower():
+                    queries.insert(0, suffixed)
+
+            first_valid_chunk = None
+            first_valid_lid = default_lid
+            first_valid_lr = None
+
+            for lid in search_lids:
+                for q_str in queries:
+                    res = await self.fetch_single_chunk(
+                        serveur_api=serveur_api,
+                        event_id=event_id,
+                        lid=lid,
+                        sv_val=q_str,
+                        is_alliance=is_alliance,
+                        api_command=api_command,
+                        pagination_param=pagination_param,
+                        is_string_val=True,
+                    )
+                    if res is not None:
+                        any_response = True
+                    if res and str(res.get("return_code")) == "0":
+                        content = res.get("content", {})
+                        l_chunk = content.get("L", [])
+                        lr_val = content.get("LR")
+                        if l_chunk:
+                            if first_valid_chunk is None:
+                                first_valid_chunk = l_chunk
+                                first_valid_lid = lid
+                                first_valid_lr = lr_val
+                            for p in l_chunk:
+                                if matches_target(p):
+                                    p_rank = extract_p_rank(p)
+                                    return l_chunk, lid, True, p_rank, lr_val, False
+
+            if first_valid_chunk:
+                r_anchor = extract_p_rank(first_valid_chunk[0])
+                return first_valid_chunk, first_valid_lid, True, r_anchor, first_valid_lr, False
+
+        if search_mode and not target_rank and api_command == "llsp":
+            for r_start in (1, 11, 21, 31, 41):
+                res = await self.fetch_single_chunk(
+                    serveur_api=serveur_api,
+                    event_id=event_id,
+                    lid=default_lid,
+                    sv_val=r_start,
+                    is_alliance=False,
+                    api_command="llsp",
+                    pagination_param="R",
+                    is_string_val=False,
+                )
+                if res is not None:
+                    any_response = True
+                if res and str(res.get("return_code")) == "0":
+                    content = res.get("content", {})
+                    l_chunk = content.get("L", [])
+                    lr_val = content.get("LR")
+                    if l_chunk:
+                        for p in l_chunk:
+                            if matches_target(p):
+                                return l_chunk, default_lid, True, r_start, lr_val, False
+                    else:
+                        break
+
+        requested_rank = max(1, target_rank) if target_rank else 1
+        if api_command == "llsp":
+            norm_sv = ((requested_rank - 1) // 10) * 10 + 1
+            api_sv = norm_sv
+        else:
+            api_sv = target_rank if target_rank else 1
+            norm_sv = requested_rank
+
+        if berimond_both_camps:
+            res3 = await self.fetch_single_chunk(serveur_api=serveur_api, event_id=event_id, lid=3, sv_val=api_sv)
+            res4 = await self.fetch_single_chunk(serveur_api=serveur_api, event_id=event_id, lid=4, sv_val=api_sv)
+            l_chunk = []
+            lr_val = 0
+            for r_camp in (res3, res4):
+                if r_camp is not None:
+                    any_response = True
+                if r_camp and str(r_camp.get("return_code")) == "0":
+                    c_data = r_camp.get("content", {})
+                    l_chunk.extend(c_data.get("L", []))
+                    if isinstance(c_data.get("LR"), int):
+                        lr_val = max(lr_val, c_data.get("LR"))
+            return l_chunk, 3, False, norm_sv, lr_val or None, not any_response
+
+        res = await self.fetch_single_chunk(
+            serveur_api=serveur_api,
+            event_id=event_id,
+            lid=default_lid,
+            sv_val=api_sv,
+            is_alliance=is_alliance,
+            api_command=api_command,
+            pagination_param=pagination_param,
+            is_string_val=is_string_val,
+        )
+
+        if res is None:
+            return [], default_lid, False, norm_sv, None, not any_response
+
+        if str(res.get("return_code")) == "0":
+            content = res.get("content", {})
+            l_chunk = content.get("L", [])
+            lr_val = content.get("LR")
+            found_in_fallback = any(matches_target(p) for p in l_chunk) if search_mode else False
+            first_r = extract_p_rank(l_chunk[0]) if l_chunk else norm_sv
+            return l_chunk, default_lid, found_in_fallback, first_r, lr_val, False
+
+        return [], default_lid, False, norm_sv, None, False
+
+    def _build_not_found_warning(
+        self, langue: str, target_name: str, target_rank: int = None, is_alliance: bool = False
+    ) -> str:
+        if is_alliance:
+            if target_rank:
+                msg = t(
+                    langue,
+                    "info_alliance_not_found_rank",
+                    alliance=target_name,
+                    rang=target_rank,
+                    defaut="*💡 Info: Alliance **{alliance}** not found. Showing rank {rang} instead.*",
+                )
+            else:
+                msg = t(
+                    langue,
+                    "info_alliance_not_found_top",
+                    alliance=target_name,
+                    top=8,
+                    defaut="*💡 Info: Alliance **{alliance}** not found in this ranking. Showing first page instead.*",
+                )
+        else:
+            if target_rank:
+                msg = t(
+                    langue,
+                    "info_player_not_found_rank",
+                    joueur=target_name,
+                    rang=target_rank,
+                    defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
+                )
+            else:
+                msg = t(
+                    langue,
+                    "info_player_not_found_top",
+                    joueur=target_name,
+                    top=8,
+                    defaut="*💡 Info: Player **{joueur}** not found in this bracket. Showing first page instead.*",
+                )
+        return f"\n\n{msg}"
 
     @classement.command(name="statistics", description="Displays a live ranking for player statistics.")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
@@ -384,12 +915,8 @@ class ClassementCog(commands.Cog):
             self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
             return
 
-        async def fetch_and_build(ctx_int):
-            loc_player = player
-            loc_rank = rank
-            loc_tranche = tranche
-
-            langue, serveur_local = await get_server_config(ctx_int)
+        try:
+            langue, serveur_local = await get_server_config(interaction)
             serveur_api = self.get_serveur_api(serveur_local)
             event_id = EVENT_IDS.get(statistic, 1)
 
@@ -397,183 +924,68 @@ class ClassementCog(commands.Cog):
                 "achievements": {
                     "name": t(langue, "cal_stat_achievements", defaut="Points de Succès"),
                     "emoji": get_emo(langue, "{e_std_trophy}"),
+                    "color": discord.Color(0xF1C40F),
                 },
                 "plunder": {
                     "name": t(langue, "cal_stat_plunder", defaut="Points de Pillage"),
                     "emoji": get_emo(langue, "{e_loot}"),
+                    "color": discord.Color(0xD35400),
                 },
                 "honor": {
                     "name": t(langue, "cal_stat_honor", defaut="Points d'Honneur"),
                     "emoji": get_emo(langue, "{e_honor}"),
+                    "color": discord.Color(0xF8F9FA),
                 },
                 "might": {
                     "name": t(langue, "cal_stat_might", defaut="Points de Puissance"),
                     "emoji": get_emo(langue, "{e_pp1}"),
+                    "color": discord.Color(0xC0392B),
                 },
                 "master": {
                     "name": t(langue, "cal_stat_master", defaut="Puissance de Construction"),
                     "emoji": get_emo(langue, "{e_dungeon1}"),
+                    "color": discord.Color(0xE74C3C),
                 },
                 "legendary": {
                     "name": t(langue, "cal_stat_legendary", defaut="Niveau Légendaire"),
                     "emoji": get_emo(langue, "{e_lvl}"),
+                    "color": discord.Color(0x5BC0BE),
                 },
             }
-            stat_info = STAT_MAP.get(statistic, {"name": statistic.capitalize(), "emoji": get_emo(langue, "{e_stats}")})
-
-            search_mode = bool(loc_player)
-            p_info = None
-
-            if search_mode:
-                headers = await get_api_headers(ctx_int)
-                url_precheck = (
-                    f"https://api.gge-tracker.com/api/v1/{serveur_api}/player/{urllib.parse.quote(loc_player)}"
-                )
-                try:
-                    async with self.bot.session.get(url_precheck, headers=headers, timeout=5) as r:
-                        if r.status == 200:
-                            data = await r.json()
-                            if isinstance(data, dict):
-                                p_info = data
-                            elif isinstance(data, list) and data:
-                                p_info = data[0]
-                except Exception:
-                    pass
-
-                if p_info:
-                    loc_player = p_info.get("player_name", p_info.get("name", loc_player))
-                    lvl = int(p_info.get("level", p_info.get("lvl", 70)))
-                    leg = int(
-                        p_info.get("legendaryLevel", p_info.get("legendary_level", p_info.get("paragonLevel", 999)))
-                    )
-                else:
-                    lvl = None
-                    leg = None
-            else:
-                lvl = 70
-                leg = 999
+            stat_info = STAT_MAP.get(
+                statistic,
+                {"name": statistic.capitalize(), "emoji": get_emo(langue, "{e_stats}"), "color": discord.Color.gold()},
+            )
 
             if statistic in ["plunder", "legendary"]:
-                possible_lids = [1]
+                search_lids = [1]
+                default_lid = 1
+            elif tranche is not None:
+                search_lids = [tranche]
+                default_lid = tranche
             else:
-                if loc_tranche is not None:
-                    possible_lids = [loc_tranche]
-                else:
-                    if lvl is None:
-                        possible_lids = [1, 2, 3, 4, 5, 6]
-                    elif lvl < 20:
-                        possible_lids = [1]
-                    elif lvl < 30:
-                        possible_lids = [2]
-                    elif lvl < 40:
-                        possible_lids = [3]
-                    elif lvl < 50:
-                        possible_lids = [4]
-                    elif lvl < 70:
-                        possible_lids = [5]
-                    else:
-                        possible_lids = [6]
+                search_lids = [6, 5, 4, 3, 2, 1]
+                default_lid = 6
 
-            found_lid = None
+            l_chunk, found_lid, player_found, anchor_sv, total_ranks, api_err = await self.resolve_initial_ranking(
+                serveur_api=serveur_api,
+                event_id=event_id,
+                search_lids=search_lids,
+                default_lid=default_lid,
+                search_target=player,
+                target_rank=rank,
+            )
 
-            warning_msg = ""
-            if loc_rank and not loc_tranche and not search_mode:
-                warning_msg += "\n" + t(
+            if api_err:
+                msg_err = t(
                     langue,
-                    "info_max_bracket",
-                    defaut="*💡 Info: Maximum bracket displayed by default. Use the `bracket` option to change.*",
+                    "api_unavailable_error",
+                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
                 )
+                return await interaction.followup.send(msg_err)
 
-            accumulated_data = {lid: [] for lid in possible_lids}
-            player_found = False
-
-            if search_mode and not loc_rank:
-                start_sv = 1
-                max_sv_limit = 1000
-            elif loc_rank:
-                start_sv = max(1, loc_rank - (loc_rank % 10))
-                if start_sv == 0:
-                    start_sv = 1
-                max_sv_limit = start_sv + 49
-            else:
-                start_sv = 1
-                max_sv_limit = 50
-
-            current_sv = start_sv
-            PLAYERS_PER_PAGE = 5
-            BATCH_SIZE = 3
-
-            async def fetch_chunk(sv_val, lid):
-                url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22LID%22:{lid},%22SV%22:%22{sv_val}%22"
-                for attempt in range(3):
-                    try:
-                        async with self.bot.session.get(url, timeout=10) as r:
-                            if r.status == 200:
-                                return await r.json()
-                            else:
-                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                if r.status in [429, 500, 502, 503, 504]:
-                                    await asyncio.sleep(2)
-                    except TimeoutError:
-                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
-                    except Exception as e:
-                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
-
-                    await asyncio.sleep(0.5)
-                return None
-
-            try:
-                while current_sv <= max_sv_limit and not player_found:
-                    task_lids = []
-                    task_coros = []
-                    for lid in possible_lids:
-                        for i in range(BATCH_SIZE):
-                            sv_val = current_sv + (i * PLAYERS_PER_PAGE)
-                            if sv_val > max_sv_limit:
-                                break
-                            task_lids.append(lid)
-                            task_coros.append(fetch_chunk(sv_val, lid))
-
-                    if not task_coros:
-                        break
-                    responses = await asyncio.gather(*task_coros)
-                    if all(resp is None for resp in responses):
-                        if any(len(data) > 0 for data in accumulated_data.values()):
-                            break
-                        else:
-                            msg_err = t(
-                                langue,
-                                "api_unavailable_error",
-                                defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                            )
-                            await ctx_int.followup.send(msg_err)
-                            return None, None
-                    batch_empty = True
-
-                    for i, jsonData in enumerate(responses):
-                        lid = task_lids[i]
-                        if jsonData and str(jsonData.get("return_code")) == "0":
-                            l_chunk = jsonData.get("content", {}).get("L", [])
-                            if l_chunk:
-                                accumulated_data[lid].extend(l_chunk)
-                                batch_empty = False
-
-                                if search_mode and not loc_rank and not player_found:
-                                    for p in l_chunk:
-                                        if extract_p_name(p).lower() == loc_player.lower():
-                                            player_found = True
-                                            found_lid = lid
-                                            break
-                    if batch_empty:
-                        break
-                    current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
-            except Exception as e:
-                self.logger.error(f"❌ [Classement] Erreur lors du fetch de statistics : {e}")
-                obs.record_error(source="command", scope="rank_statistics", exception=e, cog="classement")
-
-            has_any_data = any(len(data) > 0 for data in accumulated_data.values())
-            if not has_any_data:
-                await ctx_int.followup.send(
+            if not l_chunk:
+                return await interaction.followup.send(
                     t(
                         langue,
                         "ev_rank_empty",
@@ -582,121 +994,74 @@ class ClassementCog(commands.Cog):
                         defaut="{e_error} Aucun classement.",
                     )
                 )
-                return None, None
-
-            found_lid = found_lid or possible_lids[-1]
-            all_players_raw = accumulated_data[found_lid]
 
             bracket_icon = (
                 get_emo(langue, "{e_icon_points}")
                 if statistic in ["plunder", "legendary"]
                 else get_emo(langue, "{e_lvl}")
             )
-
             if statistic in ["plunder", "legendary"]:
                 nom_tranche = t(langue, "ev_bracket_all", defaut="Global Ranking")
             else:
-                nom_tranche_defaut = "Levels 70+" if found_lid == 6 else f"Bracket {found_lid}"
+                STAT_BRACKET_NAMES = {
+                    6: "Levels 70+",
+                    5: "Levels 50-69",
+                    4: "Levels 40-49",
+                    3: "Levels 30-39",
+                    2: "Levels 20-29",
+                    1: "Levels 1-19",
+                }
+                nom_tranche_defaut = STAT_BRACKET_NAMES.get(found_lid, f"Bracket {found_lid}")
                 nom_tranche = t(langue, f"stat_bracket_{found_lid}", defaut=nom_tranche_defaut)
 
             mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
             titre = f"{stat_info['emoji']} {mot_classement} {stat_info['name']}\n{bracket_icon} {nom_tranche}"
 
-            seen_players = set()
-            all_players_clean = []
-            for p in all_players_raw:
-                name = extract_p_name(p)
-                if name and name not in seen_players:
-                    seen_players.add(name)
-                    all_players_clean.append(p)
-
-            all_players = sorted(all_players_clean, key=extract_p_rank)
-            page_cible = 0
-            chunks = [all_players[i : i + 10] for i in range(0, len(all_players), 10)]
-
-            if player_found:
-                for i, chunk in enumerate(chunks):
-                    if any(extract_p_name(p).lower() == loc_player.lower() for p in chunk):
-                        page_cible = i
-                        break
-            elif loc_rank:
-                for i, chunk in enumerate(chunks):
-                    if any(extract_p_rank(p) >= loc_rank for p in chunk):
-                        page_cible = i
-                        break
-
-            if search_mode and not player_found:
-                if loc_rank:
-                    msg = t(
-                        langue,
-                        "info_player_not_found_rank",
-                        joueur=loc_player,
-                        rang=loc_rank,
-                        defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                else:
-                    msg = t(
-                        langue,
-                        "info_player_not_found_top",
-                        joueur=loc_player,
-                        top=max_sv_limit,
-                        defaut="*💡 Info: Player **{joueur}** not found in the Top {top}. Showing first page instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                    page_cible = 0
-
-            if statistic == "achievements":
-                embed_color = discord.Color(0xEADA24)
-            elif statistic == "plunder":
-                embed_color = discord.Color(0x522E00)
-            elif statistic == "honor":
-                embed_color = discord.Color(0xFFFFFF)
-            elif statistic == "might":
-                embed_color = discord.Color(0xA70000)
-            elif statistic == "master":
-                embed_color = discord.Color(0xB93132)
-            elif statistic == "legendary":
-                embed_color = discord.Color(0xB3ECEC)
-            else:
-                embed_color = discord.Color.gold()
-
-            embeds = []
-            for i, chunk in enumerate(chunks):
-                embed = self.format_page(
-                    chunk,
-                    i,
+            warning_msg = ""
+            if rank and not tranche and not player and statistic not in ["plunder", "legendary"]:
+                warning_msg += "\n" + t(
                     langue,
-                    color=embed_color,
-                    highlight_player=loc_player if search_mode else None,
-                    event_name=statistic,
+                    "info_max_bracket",
+                    defaut="*💡 Info: Maximum bracket displayed by default. Use the `bracket` option to change.*",
                 )
-                embed.title = titre
-                if warning_msg and i == page_cible:
-                    embed.description = embed.description + warning_msg
+            if player and not player_found:
+                warning_msg += self._build_not_found_warning(langue, player, rank, is_alliance=False)
 
-                footer_text = t(
-                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
-                )
-                embed.set_footer(text=footer_text)
-                await setup_embed_footer(embed, ctx_int, langue)
-                embeds.append(embed)
+            embed, step = await self.build_single_page_embed(
+                ctx_int=interaction,
+                raw_list=l_chunk,
+                langue=langue,
+                titre=titre,
+                color=stat_info["color"],
+                is_alliance=False,
+                highlight_player=player if player_found else None,
+                event_name=statistic,
+                total_ranks=total_ranks,
+                warning_msg=warning_msg,
+            )
 
-            return embeds, page_cible
+            view = LiveRankingView(
+                cog=self,
+                interaction=interaction,
+                langue=langue,
+                serveur_api=serveur_api,
+                event_id=event_id,
+                lid=found_lid,
+                titre=titre,
+                embed_color=stat_info["color"],
+                event_name=statistic,
+                is_alliance=False,
+                page_step=step,
+                initial_sv=anchor_sv,
+                total_ranks=total_ranks,
+                highlight_player=player if player_found else None,
+                initial_embed=embed,
+            )
+            view.message = await interaction.followup.send(embed=embed, view=view, wait=True)
 
-        embeds, page_cible = await fetch_and_build(interaction)
-        if not embeds:
-            return
-
-        view = RankingPaginationView(embeds, fetch_and_build, interaction.user.id)
-        if hasattr(view, "current_page"):
-            view.current_page = page_cible
-        if hasattr(view, "index"):
-            view.index = page_cible
-        if hasattr(view, "update_buttons"):
-            view.update_buttons()
-
-        view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
+        except Exception as e:
+            self.logger.error(f"❌ [Classement] Erreur sur /rank statistics : {e}")
+            obs.record_error(source="command", scope="rank_statistics", exception=e, cog="classement")
 
     @classement.command(name="event", description="Displays an event's live ranking.")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
@@ -727,12 +1092,8 @@ class ClassementCog(commands.Cog):
             self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
             return
 
-        async def fetch_and_build(ctx_int):
-            loc_player = player
-            loc_rank = rank
-            loc_tranche = tranche
-
-            langue, serveur_local = await get_server_config(ctx_int)
+        try:
+            langue, serveur_local = await get_server_config(interaction)
             serveur_api = self.get_serveur_api(serveur_local)
             event_id = EVENT_IDS.get(evenement, 30 if evenement == "berimond" else 44)
 
@@ -740,181 +1101,71 @@ class ClassementCog(commands.Cog):
                 "nomads": {
                     "name": t(langue, "cal_ev_nomad", defaut="Invasion des Nomades"),
                     "emoji": get_emo(langue, "{e_nomads}"),
+                    "color": discord.Color(0xEDCB5A),
                 },
                 "foreigners": {
                     "name": t(langue, "cal_ev_realms", defaut="Guerre des Royaumes"),
                     "emoji": get_emo(langue, "{e_war_realms}"),
+                    "color": discord.Color(0x6C5CE7),
                 },
                 "samurais": {
                     "name": t(langue, "cal_ev_samurai", defaut="Invasion des Samouraïs"),
                     "emoji": get_emo(langue, "{e_samurai}"),
+                    "color": discord.Color(0xD43C27),
                 },
                 "bloodcrows": {
                     "name": t(langue, "cal_ev_bloodcrow", defaut="Corbeaux de Sang"),
                     "emoji": get_emo(langue, "{e_bloodcrow}"),
+                    "color": discord.Color(0x8B001A),
                 },
                 "berimond": {
                     "name": t(langue, "cal_ev_berimond", defaut="Bataille de Bérimond"),
                     "emoji": get_emo(langue, "{e_berimond}"),
+                    "color": discord.Color(0x0094FF),
                 },
             }
             ev_info = EVENT_MAP.get(
-                evenement, {"name": evenement.capitalize(), "emoji": get_emo(langue, "{e_events4}")}
+                evenement,
+                {
+                    "name": evenement.capitalize(),
+                    "emoji": get_emo(langue, "{e_events4}"),
+                    "color": discord.Color(0x6C5CE7),
+                },
             )
 
-            search_mode = bool(loc_player)
-            p_info = None
-
-            if search_mode:
-                headers = await get_api_headers(ctx_int)
-                url_precheck = (
-                    f"https://api.gge-tracker.com/api/v1/{serveur_api}/player/{urllib.parse.quote(loc_player)}"
-                )
-                try:
-                    async with self.bot.session.get(url_precheck, headers=headers, timeout=5) as r:
-                        if r.status == 200:
-                            data = await r.json()
-                            if isinstance(data, dict):
-                                p_info = data
-                            elif isinstance(data, list) and data:
-                                p_info = data[0]
-                except Exception:
-                    pass
-
-                if p_info:
-                    loc_player = p_info.get("player_name", p_info.get("name", loc_player))
-                    lvl = int(p_info.get("level", p_info.get("lvl", 70)))
-                    leg = int(
-                        p_info.get("legendaryLevel", p_info.get("legendary_level", p_info.get("paragonLevel", 999)))
-                    )
-                else:
-                    lvl = None
-                    leg = None
+            berimond_both = False
+            if tranche is not None:
+                search_lids = [tranche]
+                default_lid = tranche
+            elif evenement == "berimond":
+                search_lids = [3, 4, 1, 2]
+                default_lid = 3
+                if not player:
+                    berimond_both = True
             else:
-                lvl = 70
-                leg = 999
+                search_lids = [5, 4, 3, 2, 1]
+                default_lid = 5
 
-            if loc_tranche is not None:
-                possible_lids = [loc_tranche]
-            else:
-                if evenement == "berimond":
-                    if lvl is None:
-                        possible_lids = [1, 2, 3, 4]
-                    else:
-                        possible_lids = [1, 2] if lvl < 70 else [3, 4]
-                else:
-                    if lvl is None:
-                        possible_lids = [1, 2, 3, 4, 5]
-                    elif lvl < 70:
-                        possible_lids = [1]
-                    elif leg < 300:
-                        possible_lids = [2]
-                    elif leg < 650:
-                        possible_lids = [3]
-                    elif leg < 950:
-                        possible_lids = [4]
-                    else:
-                        possible_lids = [5]
+            l_chunk, found_lid, player_found, anchor_sv, total_ranks, api_err = await self.resolve_initial_ranking(
+                serveur_api=serveur_api,
+                event_id=event_id,
+                search_lids=search_lids,
+                default_lid=default_lid,
+                search_target=player,
+                target_rank=rank,
+                berimond_both_camps=berimond_both,
+            )
 
-            found_lid = None
-
-            warning_msg = ""
-            if loc_rank and not loc_tranche and not search_mode:
-                warning_msg += "\n" + t(
+            if api_err:
+                msg_err = t(
                     langue,
-                    "info_max_bracket",
-                    defaut="*💡 Info: Maximum bracket displayed by default. Use the `bracket` option to change.*",
+                    "api_unavailable_error",
+                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
                 )
-            accumulated_data = {lid: [] for lid in possible_lids}
-            player_found = False
+                return await interaction.followup.send(msg_err)
 
-            if search_mode and not loc_rank:
-                start_sv = 1
-                max_sv_limit = 1000
-            elif loc_rank:
-                start_sv = max(1, loc_rank - (loc_rank % 10))
-                if start_sv == 0:
-                    start_sv = 1
-                max_sv_limit = start_sv + 49
-            else:
-                start_sv = 1
-                max_sv_limit = 50
-
-            current_sv = start_sv
-            PLAYERS_PER_PAGE = 5
-            BATCH_SIZE = 3
-
-            async def fetch_chunk(sv_val, lid):
-                url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22LID%22:{lid},%22SV%22:%22{sv_val}%22"
-                for attempt in range(3):
-                    try:
-                        async with self.bot.session.get(url, timeout=10) as r:
-                            if r.status == 200:
-                                return await r.json()
-                            else:
-                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                if r.status in [429, 500, 502, 503, 504]:
-                                    await asyncio.sleep(2)
-                    except TimeoutError:
-                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
-                    except Exception as e:
-                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
-
-                    await asyncio.sleep(0.5)
-                return None
-
-            try:
-                while current_sv <= max_sv_limit and not player_found:
-                    task_lids = []
-                    task_coros = []
-                    for lid in possible_lids:
-                        for i in range(BATCH_SIZE):
-                            sv_val = current_sv + (i * PLAYERS_PER_PAGE)
-                            if sv_val > max_sv_limit:
-                                break
-                            task_lids.append(lid)
-                            task_coros.append(fetch_chunk(sv_val, lid))
-
-                    if not task_coros:
-                        break
-                    responses = await asyncio.gather(*task_coros)
-                    if all(resp is None for resp in responses):
-                        if any(len(data) > 0 for data in accumulated_data.values()):
-                            break
-                        else:
-                            msg_err = t(
-                                langue,
-                                "api_unavailable_error",
-                                defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                            )
-                            await ctx_int.followup.send(msg_err)
-                            return None, None
-                    batch_empty = True
-
-                    for i, jsonData in enumerate(responses):
-                        lid = task_lids[i]
-                        if jsonData and str(jsonData.get("return_code")) == "0":
-                            l_chunk = jsonData.get("content", {}).get("L", [])
-                            if l_chunk:
-                                accumulated_data[lid].extend(l_chunk)
-                                batch_empty = False
-
-                                if search_mode and not loc_rank and not player_found:
-                                    for p in l_chunk:
-                                        if extract_p_name(p).lower() == loc_player.lower():
-                                            player_found = True
-                                            found_lid = lid
-                                            break
-                    if batch_empty:
-                        break
-                    current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
-            except Exception as e:
-                self.logger.error(f"❌ [Classement] Erreur lors du fetch de event : {e}")
-                obs.record_error(source="command", scope="rank_event", exception=e, cog="classement")
-
-            has_any_data = any(len(data) > 0 for data in accumulated_data.values())
-            if not has_any_data:
-                await ctx_int.followup.send(
+            if not l_chunk:
+                return await interaction.followup.send(
                     t(
                         langue,
                         "ev_rank_empty",
@@ -923,33 +1174,20 @@ class ClassementCog(commands.Cog):
                         defaut="{e_error} Aucun classement.",
                     )
                 )
-                return None, None
-
-            found_lid = found_lid or possible_lids[-1]
-
-            if not search_mode and evenement == "berimond" and loc_tranche is None:
-                all_players_raw = []
-                for lid_data in accumulated_data.values():
-                    all_players_raw.extend(lid_data)
-            else:
-                all_players_raw = accumulated_data[found_lid]
 
             mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
-
             if evenement == "berimond":
                 c1 = t(langue, "camp_ursidae", defaut="Ursidae Camp")
                 c2 = t(langue, "camp_gerbrandt", defaut="Gerbrandt Camp")
                 l1 = t(langue, "lvl_40_69", defaut="Levels 40-69")
                 l2 = t(langue, "lvl_70_plus", defaut="Legendary (70+)")
-                BERIMOND_DETAILS = {
-                    1: (c1, l1),
-                    2: (c2, l1),
-                    3: (c1, l2),
-                    4: (c2, l2),
-                }
-                camp_txt, lvl_txt = BERIMOND_DETAILS.get(found_lid, ("Berimond", l2))
-                if not search_mode and not loc_tranche:
+                BERIMOND_DETAILS = {1: (c1, l1), 2: (c2, l1), 3: (c1, l2), 4: (c2, l2)}
+                camp_txt, lvl_txt = BERIMOND_DETAILS.get(found_lid, (c1, l2))
+                if berimond_both:
                     camp_txt = t(langue, "camp_both", defaut="Both camps")
+                    embed_color = discord.Color(0x5865F2)
+                else:
+                    embed_color = discord.Color(0x0094FF) if found_lid in [1, 3] else discord.Color(0xE74C3C)
                 titre = f"{get_emo(langue, '{e_berimond}')} {t(langue, 'cal_ev_berimond', defaut='Battle of Berimond')} — {camp_txt}\n{get_emo(langue, '{e_lvl}')} {lvl_txt}"
             else:
                 nom_tranche_defaut = BRACKETS.get(str(found_lid), f"Bracket {found_lid}")
@@ -957,98 +1195,54 @@ class ClassementCog(commands.Cog):
                 titre = (
                     f"{ev_info['emoji']} {mot_classement} {ev_info['name']}\n{get_emo(langue, '{e_lvl}')} {nom_tranche}"
                 )
+                embed_color = ev_info["color"]
 
-            seen_players = set()
-            all_players_clean = []
-            for p in all_players_raw:
-                name = extract_p_name(p)
-                if name and name not in seen_players:
-                    seen_players.add(name)
-                    all_players_clean.append(p)
-
-            all_players = sorted(all_players_clean, key=extract_p_rank)
-            page_cible = 0
-            chunks = [all_players[i : i + 10] for i in range(0, len(all_players), 10)]
-
-            if player_found:
-                for i, chunk in enumerate(chunks):
-                    if any(extract_p_name(p).lower() == loc_player.lower() for p in chunk):
-                        page_cible = i
-                        break
-            elif loc_rank:
-                for i, chunk in enumerate(chunks):
-                    if any(extract_p_rank(p) >= loc_rank for p in chunk):
-                        page_cible = i
-                        break
-
-            if search_mode and not player_found:
-                if loc_rank:
-                    msg = t(
-                        langue,
-                        "info_player_not_found_rank",
-                        joueur=loc_player,
-                        rang=loc_rank,
-                        defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                else:
-                    msg = t(
-                        langue,
-                        "info_player_not_found_top",
-                        joueur=loc_player,
-                        top=max_sv_limit,
-                        defaut="*💡 Info: Player **{joueur}** not found in the Top {top}. Showing first page instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                    page_cible = 0
-
-            if evenement == "berimond" and (search_mode or loc_tranche):
-                embed_color = discord.Color(0x0094FF) if found_lid in [1, 3] else discord.Color(0xFF0000)
-            elif evenement == "nomads":
-                embed_color = discord.Color(0xEDCB5A)
-            elif evenement == "samurais":
-                embed_color = discord.Color(0xD43C27)
-            elif evenement == "bloodcrows":
-                embed_color = discord.Color(0x670111)
-            else:
-                embed_color = discord.Color(0x49415D)
-
-            embeds = []
-            for i, chunk in enumerate(chunks):
-                embed = self.format_page(
-                    chunk,
-                    i,
+            warning_msg = ""
+            if rank and not tranche and not player:
+                warning_msg += "\n" + t(
                     langue,
-                    color=embed_color,
-                    highlight_player=loc_player if search_mode else None,
-                    event_name=evenement,
+                    "info_max_bracket",
+                    defaut="*💡 Info: Maximum bracket displayed by default. Use the `bracket` option to change.*",
                 )
-                embed.title = titre
-                if warning_msg and i == page_cible:
-                    embed.description = embed.description + warning_msg
+            if player and not player_found:
+                warning_msg += self._build_not_found_warning(langue, player, rank, is_alliance=False)
 
-                footer_text = t(
-                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
-                )
-                embed.set_footer(text=footer_text)
-                await setup_embed_footer(embed, ctx_int, langue)
-                embeds.append(embed)
+            embed, step = await self.build_single_page_embed(
+                ctx_int=interaction,
+                raw_list=l_chunk,
+                langue=langue,
+                titre=titre,
+                color=embed_color,
+                is_alliance=False,
+                highlight_player=player if player_found else None,
+                event_name=evenement,
+                total_ranks=total_ranks,
+                warning_msg=warning_msg,
+            )
 
-            return embeds, page_cible
+            view = LiveRankingView(
+                cog=self,
+                interaction=interaction,
+                langue=langue,
+                serveur_api=serveur_api,
+                event_id=event_id,
+                lid=found_lid,
+                titre=titre,
+                embed_color=embed_color,
+                event_name=evenement,
+                is_alliance=False,
+                page_step=step,
+                initial_sv=anchor_sv,
+                total_ranks=total_ranks,
+                highlight_player=player if player_found else None,
+                initial_embed=embed,
+                berimond_both_camps=berimond_both,
+            )
+            view.message = await interaction.followup.send(embed=embed, view=view, wait=True)
 
-        embeds, page_cible = await fetch_and_build(interaction)
-        if not embeds:
-            return
-
-        view = RankingPaginationView(embeds, fetch_and_build, interaction.user.id)
-        if hasattr(view, "current_page"):
-            view.current_page = page_cible
-        if hasattr(view, "index"):
-            view.index = page_cible
-        if hasattr(view, "update_buttons"):
-            view.update_buttons()
-
-        view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
+        except Exception as e:
+            self.logger.error(f"❌ [Classement] Erreur sur /rank event : {e}")
+            obs.record_error(source="command", scope="rank_event", exception=e, cog="classement")
 
     @classement.command(name="gacha", description="Displays a live ranking for Gacha events")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
@@ -1073,11 +1267,8 @@ class ClassementCog(commands.Cog):
             self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
             return
 
-        async def fetch_and_build(ctx_int):
-            loc_player = player
-            loc_rank = rank
-
-            langue, serveur_local = await get_server_config(ctx_int)
+        try:
+            langue, serveur_local = await get_server_config(interaction)
             serveur_api = self.get_serveur_api(serveur_local)
             event_id = EVENT_IDS.get(evenement, 80)
 
@@ -1085,147 +1276,62 @@ class ClassementCog(commands.Cog):
                 "flora": {
                     "name": t(langue, "cal_ev_flora", defaut="Piège de la Flore Fatale"),
                     "emoji": DICT_EMOJIS.get("e_FloraToken", "{e_floratoken}"),
+                    "color": discord.Color(0x81C24A),
                 },
                 "snowglobe": {
                     "name": t(langue, "cal_ev_snowglobe", defaut="La Boule à Neige Enchantée"),
                     "emoji": DICT_EMOJIS.get("e_FrozenCarrot", "{e_frozencarrot}"),
+                    "color": discord.Color(0xA5F3FC),
                 },
                 "hollowmoon": {
                     "name": t(langue, "cal_ev_hollowmoon", defaut="Invocation de Lune"),
                     "emoji": DICT_EMOJIS.get("e_Moonegg", "{e_moonegg}"),
+                    "color": discord.Color(0xFF8D00),
                 },
                 "sandfortune": {
                     "name": t(langue, "cal_ev_sandfortune", defaut="Sables de Fortune"),
                     "emoji": DICT_EMOJIS.get("e_Orange", "{e_orange}"),
+                    "color": discord.Color(0xFCD34D),
                 },
                 "banquet": {
                     "name": t(langue, "cal_ev_banquet", defaut="Banquet du Roi"),
                     "emoji": DICT_EMOJIS.get("e_Cake", "{e_cake}"),
+                    "color": discord.Color(0xF59E0B),
                 },
                 "midnight": {
                     "name": t(langue, "cal_ev_midnight", defaut="Marché de Minuit"),
                     "emoji": DICT_EMOJIS.get("e_Midnight_key", "{e_midnight_key}"),
+                    "color": discord.Color(0x4F46E5),
                 },
             }
             ev_info = EVENT_MAP.get(
-                evenement, {"name": evenement.capitalize(), "emoji": DICT_EMOJIS.get("e_gacha_currency", "🪙")}
+                evenement,
+                {
+                    "name": evenement.capitalize(),
+                    "emoji": DICT_EMOJIS.get("e_gacha_currency", "🪙"),
+                    "color": discord.Color.gold(),
+                },
             )
 
-            search_mode = bool(loc_player)
-            p_info = None
+            l_chunk, found_lid, player_found, anchor_sv, total_ranks, api_err = await self.resolve_initial_ranking(
+                serveur_api=serveur_api,
+                event_id=event_id,
+                search_lids=[1],
+                default_lid=1,
+                search_target=player,
+                target_rank=rank,
+            )
 
-            if search_mode:
-                headers = await get_api_headers(ctx_int)
-                url_precheck = (
-                    f"https://api.gge-tracker.com/api/v1/{serveur_api}/player/{urllib.parse.quote(loc_player)}"
+            if api_err:
+                msg_err = t(
+                    langue,
+                    "api_unavailable_error",
+                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
                 )
-                try:
-                    async with self.bot.session.get(url_precheck, headers=headers, timeout=5) as r:
-                        if r.status == 200:
-                            data = await r.json()
-                            if isinstance(data, dict):
-                                p_info = data
-                            elif isinstance(data, list) and data:
-                                p_info = data[0]
-                except Exception:
-                    pass
+                return await interaction.followup.send(msg_err)
 
-                if p_info:
-                    loc_player = p_info.get("player_name", p_info.get("name", loc_player))
-
-            possible_lids = [1]
-            found_lid = None
-
-            accumulated_data = {1: []}
-            player_found = False
-
-            if search_mode and not loc_rank:
-                start_sv = 1
-                max_sv_limit = 1000
-            elif loc_rank:
-                start_sv = max(1, loc_rank - (loc_rank % 10))
-                if start_sv == 0:
-                    start_sv = 1
-                max_sv_limit = start_sv + 49
-            else:
-                start_sv = 1
-                max_sv_limit = 50
-
-            current_sv = start_sv
-            PLAYERS_PER_PAGE = 5
-            BATCH_SIZE = 3
-
-            async def fetch_chunk(sv_val, lid):
-                url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22LID%22:{lid},%22SV%22:%22{sv_val}%22"
-                for attempt in range(3):
-                    try:
-                        async with self.bot.session.get(url, timeout=10) as r:
-                            if r.status == 200:
-                                return await r.json()
-                            else:
-                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                if r.status in [429, 500, 502, 503, 504]:
-                                    await asyncio.sleep(2)
-                    except TimeoutError:
-                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
-                    except Exception as e:
-                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
-
-                    await asyncio.sleep(0.5)
-                return None
-
-            try:
-                while current_sv <= max_sv_limit and not player_found:
-                    task_lids = []
-                    task_coros = []
-                    for lid in possible_lids:
-                        for i in range(BATCH_SIZE):
-                            sv_val = current_sv + (i * PLAYERS_PER_PAGE)
-                            if sv_val > max_sv_limit:
-                                break
-                            task_lids.append(lid)
-                            task_coros.append(fetch_chunk(sv_val, lid))
-
-                    if not task_coros:
-                        break
-                    responses = await asyncio.gather(*task_coros)
-                    if all(resp is None for resp in responses):
-                        if any(len(data) > 0 for data in accumulated_data.values()):
-                            break
-                        else:
-                            msg_err = t(
-                                langue,
-                                "api_unavailable_error",
-                                defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                            )
-                            await ctx_int.followup.send(msg_err)
-                            return None, None
-                    batch_empty = True
-
-                    for i, jsonData in enumerate(responses):
-                        lid = task_lids[i]
-                        if jsonData and str(jsonData.get("return_code")) == "0":
-                            l_chunk = jsonData.get("content", {}).get("L", [])
-                            if l_chunk:
-                                accumulated_data[lid].extend(l_chunk)
-                                batch_empty = False
-
-                                if search_mode and not loc_rank and not player_found:
-                                    for p in l_chunk:
-                                        if extract_p_name(p).lower() == loc_player.lower():
-                                            player_found = True
-                                            found_lid = lid
-                                            break
-                    if batch_empty:
-                        break
-                    current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
-            except Exception as e:
-                self.logger.error(f"❌ [Classement] Erreur lors du fetch de gacha : {e}")
-                obs.record_error(source="command", scope="rank_gacha", exception=e, cog="classement")
-
-            has_any_data = any(len(data) > 0 for data in accumulated_data.values())
-            if not has_any_data:
-                await ctx_int.followup.send(
+            if not l_chunk:
+                return await interaction.followup.send(
                     t(
                         langue,
                         "ev_rank_empty",
@@ -1234,109 +1340,51 @@ class ClassementCog(commands.Cog):
                         defaut="{e_error} Aucun classement.",
                     )
                 )
-                return None, None
-
-            all_players_raw = accumulated_data[1]
 
             nom_tranche = t(langue, "ev_bracket_all", defaut="Global Ranking")
             mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
             bracket_icon = get_emo(langue, "{e_icon_points}")
             titre = f"{ev_info['emoji']} {mot_classement} {ev_info['name']}\n{bracket_icon} {nom_tranche}"
 
-            seen_players = set()
-            all_players_clean = []
-            for p in all_players_raw:
-                name = extract_p_name(p)
-                if name and name not in seen_players:
-                    seen_players.add(name)
-                    all_players_clean.append(p)
-
-            all_players = sorted(all_players_clean, key=extract_p_rank)
-            page_cible = 0
-            chunks = [all_players[i : i + 10] for i in range(0, len(all_players), 10)]
-
-            if player_found:
-                for i, chunk in enumerate(chunks):
-                    if any(extract_p_name(p).lower() == loc_player.lower() for p in chunk):
-                        page_cible = i
-                        break
-            elif loc_rank:
-                for i, chunk in enumerate(chunks):
-                    if any(extract_p_rank(p) >= loc_rank for p in chunk):
-                        page_cible = i
-                        break
-
             warning_msg = ""
-            if search_mode and not player_found:
-                if loc_rank:
-                    msg = t(
-                        langue,
-                        "info_player_not_found_rank",
-                        joueur=loc_player,
-                        rang=loc_rank,
-                        defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                else:
-                    msg = t(
-                        langue,
-                        "info_player_not_found_top",
-                        joueur=loc_player,
-                        top=max_sv_limit,
-                        defaut="*💡 Info: Player **{joueur}** not found in the Top {top}. Showing first page instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                    page_cible = 0
+            if player and not player_found:
+                warning_msg += self._build_not_found_warning(langue, player, rank, is_alliance=False)
 
-            if evenement == "flora":
-                embed_color = discord.Color(0x81C24A)
-            elif evenement == "snowglobe":
-                embed_color = discord.Color(0xFFFFFF)
-            elif evenement == "hollowmoon":
-                embed_color = discord.Color(0xFF8D00)
-            elif evenement == "sandfortune":
-                embed_color = discord.Color(0xFFE29C)
-            elif evenement == "midnight":
-                embed_color = discord.Color(0x282442)
-            else:
-                embed_color = discord.Color.gold()
+            embed, step = await self.build_single_page_embed(
+                ctx_int=interaction,
+                raw_list=l_chunk,
+                langue=langue,
+                titre=titre,
+                color=ev_info["color"],
+                is_alliance=False,
+                highlight_player=player if player_found else None,
+                event_name=evenement,
+                total_ranks=total_ranks,
+                warning_msg=warning_msg,
+            )
 
-            embeds = []
-            for i, chunk in enumerate(chunks):
-                embed = self.format_page(
-                    chunk,
-                    i,
-                    langue,
-                    color=embed_color,
-                    highlight_player=loc_player if search_mode else None,
-                    event_name=evenement,
-                )
-                embed.title = titre
-                if warning_msg and i == page_cible:
-                    embed.description = embed.description + warning_msg
+            view = LiveRankingView(
+                cog=self,
+                interaction=interaction,
+                langue=langue,
+                serveur_api=serveur_api,
+                event_id=event_id,
+                lid=1,
+                titre=titre,
+                embed_color=ev_info["color"],
+                event_name=evenement,
+                is_alliance=False,
+                page_step=step,
+                initial_sv=anchor_sv,
+                total_ranks=total_ranks,
+                highlight_player=player if player_found else None,
+                initial_embed=embed,
+            )
+            view.message = await interaction.followup.send(embed=embed, view=view, wait=True)
 
-                footer_text = t(
-                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
-                )
-                embed.set_footer(text=footer_text)
-                await setup_embed_footer(embed, ctx_int, langue)
-                embeds.append(embed)
-
-            return embeds, page_cible
-
-        embeds, page_cible = await fetch_and_build(interaction)
-        if not embeds:
-            return
-
-        view = RankingPaginationView(embeds, fetch_and_build, interaction.user.id)
-        if hasattr(view, "current_page"):
-            view.current_page = page_cible
-        if hasattr(view, "index"):
-            view.index = page_cible
-        if hasattr(view, "update_buttons"):
-            view.update_buttons()
-
-        view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
+        except Exception as e:
+            self.logger.error(f"❌ [Classement] Erreur sur /rank gacha : {e}")
+            obs.record_error(source="command", scope="rank_gacha", exception=e, cog="classement")
 
     @classement.command(name="realms", description="Displays a ranking for cross-server events")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
@@ -1358,11 +1406,8 @@ class ClassementCog(commands.Cog):
             self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
             return
 
-        async def fetch_and_build(ctx_int):
-            loc_player = player
-            loc_rank = rank
-
-            langue, serveur_local = await get_server_config(ctx_int)
+        try:
+            langue, serveur_local = await get_server_config(interaction)
             serveur_api = self.get_serveur_api(serveur_local)
 
             if evenement == "realms_current":
@@ -1376,142 +1421,50 @@ class ClassementCog(commands.Cog):
                 "realms_current": {
                     "name": t(langue, "cal_ev_realms_current", defaut="Royaumes Extérieurs"),
                     "emoji": get_emo(langue, "{e_war_realms}"),
+                    "color": discord.Color(0xF25500),
                 },
                 "realms_finished": {
                     "name": t(langue, "cal_ev_realms_finished", defaut="Royaumes Extérieurs"),
                     "emoji": get_emo(langue, "{e_war_realms}"),
+                    "color": discord.Color(0xF25500),
                 },
                 "horizon": {
                     "name": t(langue, "cal_ev_horizon", defaut="Au-delà de l'Horizon"),
                     "emoji": get_emo(langue, "{e_std_world_map}"),
+                    "color": discord.Color(0x3B8EA5),
                 },
             }
             ev_info = EVENT_MAP.get(
-                evenement, {"name": evenement.capitalize(), "emoji": DICT_EMOJIS.get("e_events4", "🛡️")}
+                evenement,
+                {
+                    "name": evenement.capitalize(),
+                    "emoji": DICT_EMOJIS.get("e_events4", "🛡️"),
+                    "color": discord.Color(0xF25500),
+                },
             )
 
-            search_mode = bool(loc_player)
-            suffixe = serveur_local.replace("e4k_", "").upper()
-            target_name_exact = f"{loc_player}_{suffixe}".lower() if search_mode else ""
-            p_info = None
+            suffixe = serveur_local.replace("E4K_", "").replace("e4k_", "").upper()
 
-            if search_mode:
-                headers = await get_api_headers(ctx_int)
-                url_precheck = (
-                    f"https://api.gge-tracker.com/api/v1/{serveur_api}/player/{urllib.parse.quote(loc_player)}"
+            l_chunk, found_lid, player_found, anchor_sv, total_ranks, api_err = await self.resolve_initial_ranking(
+                serveur_api=serveur_api,
+                event_id=event_id,
+                search_lids=[1],
+                default_lid=1,
+                search_target=player,
+                target_rank=rank,
+                cross_server_suffix=suffixe,
+            )
+
+            if api_err:
+                msg_err = t(
+                    langue,
+                    "api_unavailable_error",
+                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
                 )
-                try:
-                    async with self.bot.session.get(url_precheck, headers=headers, timeout=5) as r:
-                        if r.status == 200:
-                            data = await r.json()
-                            if isinstance(data, dict):
-                                p_info = data
-                            elif isinstance(data, list) and data:
-                                p_info = data[0]
-                except Exception:
-                    pass
+                return await interaction.followup.send(msg_err)
 
-                if p_info:
-                    loc_player = p_info.get("player_name", p_info.get("name", loc_player))
-
-            possible_lids = [1]
-            found_lid = None
-
-            accumulated_data = {1: []}
-            player_found = False
-
-            if search_mode and not loc_rank:
-                start_sv = 1
-                max_sv_limit = 1000
-            elif loc_rank:
-                start_sv = max(1, loc_rank - (loc_rank % 10))
-                if start_sv == 0:
-                    start_sv = 1
-                max_sv_limit = start_sv + 49
-            else:
-                start_sv = 1
-                max_sv_limit = 50
-
-            current_sv = start_sv
-            PLAYERS_PER_PAGE = 5
-            BATCH_SIZE = 20
-
-            async def fetch_chunk(sv_val, lid):
-                url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22LID%22:{lid},%22SV%22:%22{sv_val}%22"
-                for attempt in range(3):
-                    try:
-                        async with self.bot.session.get(url, timeout=10) as r:
-                            if r.status == 200:
-                                return await r.json()
-                            else:
-                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                if r.status in [429, 500, 502, 503, 504]:
-                                    await asyncio.sleep(2)
-                    except TimeoutError:
-                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
-                    except Exception as e:
-                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
-
-                    await asyncio.sleep(0.5)
-                return None
-
-            try:
-                while current_sv <= max_sv_limit and not player_found:
-                    task_lids = []
-                    task_coros = []
-                    for lid in possible_lids:
-                        for i in range(BATCH_SIZE):
-                            sv_val = current_sv + (i * PLAYERS_PER_PAGE)
-                            if sv_val > max_sv_limit:
-                                break
-                            task_lids.append(lid)
-                            task_coros.append(fetch_chunk(sv_val, lid))
-
-                    if not task_coros:
-                        break
-                    responses = await asyncio.gather(*task_coros)
-                    if all(resp is None for resp in responses):
-                        if any(len(data) > 0 for data in accumulated_data.values()):
-                            break
-                        else:
-                            msg_err = t(
-                                langue,
-                                "api_unavailable_error",
-                                defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                            )
-                            await ctx_int.followup.send(msg_err)
-                            return None, None
-                    batch_empty = True
-
-                    for i, jsonData in enumerate(responses):
-                        lid = task_lids[i]
-                        if jsonData and str(jsonData.get("return_code")) == "0":
-                            l_chunk = jsonData.get("content", {}).get("L", [])
-                            if l_chunk:
-                                accumulated_data[lid].extend(l_chunk)
-                                batch_empty = False
-
-                                if search_mode and not loc_rank and not player_found:
-                                    for p in l_chunk:
-                                        api_name = extract_p_name(p).lower()
-                                        if api_name and (
-                                            api_name == target_name_exact
-                                            or api_name == loc_player.lower()
-                                            or api_name.startswith(f"{loc_player.lower()}_")
-                                        ):
-                                            player_found = True
-                                            found_lid = lid
-                                            break
-                    if batch_empty:
-                        break
-                    current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
-            except Exception as e:
-                self.logger.error(f"❌ [Classement] Erreur lors du fetch de realms : {e}")
-                obs.record_error(source="command", scope="rank_realms", exception=e, cog="classement")
-
-            has_any_data = any(len(data) > 0 for data in accumulated_data.values())
-            if not has_any_data:
-                await ctx_int.followup.send(
+            if not l_chunk:
+                return await interaction.followup.send(
                     t(
                         langue,
                         "ev_rank_empty",
@@ -1520,103 +1473,51 @@ class ClassementCog(commands.Cog):
                         defaut="{e_error} Aucun classement.",
                     )
                 )
-                return None, None
-
-            all_players_raw = accumulated_data[1]
 
             nom_tranche = t(langue, "ev_bracket_cross_server", defaut="Cross-Server Ranking")
             mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
             bracket_icon = get_emo(langue, "{e_icon_points}")
             titre = f"{ev_info['emoji']} {mot_classement} {ev_info['name']}\n{bracket_icon} {nom_tranche}"
 
-            seen_players = set()
-            all_players_clean = []
-            for p in all_players_raw:
-                name = extract_p_name(p)
-                if name and name not in seen_players:
-                    seen_players.add(name)
-                    all_players_clean.append(p)
-
-            all_players = sorted(all_players_clean, key=extract_p_rank)
-            page_cible = 0
-            chunks = [all_players[i : i + 10] for i in range(0, len(all_players), 10)]
-
-            if player_found:
-                for i, chunk in enumerate(chunks):
-                    if any(
-                        extract_p_name(p).lower() == target_name_exact
-                        or extract_p_name(p).lower() == loc_player.lower()
-                        or extract_p_name(p).lower().startswith(f"{loc_player.lower()}_")
-                        for p in chunk
-                    ):
-                        page_cible = i
-                        break
-            elif loc_rank:
-                for i, chunk in enumerate(chunks):
-                    if any(extract_p_rank(p) >= loc_rank for p in chunk):
-                        page_cible = i
-                        break
-
             warning_msg = ""
-            if search_mode and not player_found:
-                if loc_rank:
-                    msg = t(
-                        langue,
-                        "info_player_not_found_rank",
-                        joueur=loc_player,
-                        rang=loc_rank,
-                        defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                else:
-                    msg = t(
-                        langue,
-                        "info_player_not_found_top",
-                        joueur=loc_player,
-                        top=max_sv_limit,
-                        defaut="*💡 Info: Player **{joueur}** not found in the Top {top}. Showing first page instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                    page_cible = 0
+            if player and not player_found:
+                warning_msg += self._build_not_found_warning(langue, player, rank, is_alliance=False)
 
-            embed_color = discord.Color(0x4A7160) if evenement == "horizon" else discord.Color(0xF25500)
+            embed, step = await self.build_single_page_embed(
+                ctx_int=interaction,
+                raw_list=l_chunk,
+                langue=langue,
+                titre=titre,
+                color=ev_info["color"],
+                is_alliance=False,
+                highlight_player=player if player_found else None,
+                event_name=evenement,
+                total_ranks=total_ranks,
+                warning_msg=warning_msg,
+            )
 
-            embeds = []
-            for i, chunk in enumerate(chunks):
-                embed = self.format_page(
-                    chunk,
-                    i,
-                    langue,
-                    color=embed_color,
-                    highlight_player=loc_player if search_mode else None,
-                    event_name=evenement,
-                )
-                embed.title = titre
-                if warning_msg and i == page_cible:
-                    embed.description = embed.description + warning_msg
+            view = LiveRankingView(
+                cog=self,
+                interaction=interaction,
+                langue=langue,
+                serveur_api=serveur_api,
+                event_id=event_id,
+                lid=1,
+                titre=titre,
+                embed_color=ev_info["color"],
+                event_name=evenement,
+                is_alliance=False,
+                page_step=step,
+                initial_sv=anchor_sv,
+                total_ranks=total_ranks,
+                highlight_player=player if player_found else None,
+                initial_embed=embed,
+            )
+            view.message = await interaction.followup.send(embed=embed, view=view, wait=True)
 
-                footer_text = t(
-                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
-                )
-                embed.set_footer(text=footer_text)
-                await setup_embed_footer(embed, ctx_int, langue)
-                embeds.append(embed)
-
-            return embeds, page_cible
-
-        embeds, page_cible = await fetch_and_build(interaction)
-        if not embeds:
-            return
-
-        view = RankingPaginationView(embeds, fetch_and_build, interaction.user.id)
-        if hasattr(view, "current_page"):
-            view.current_page = page_cible
-        if hasattr(view, "index"):
-            view.index = page_cible
-        if hasattr(view, "update_buttons"):
-            view.update_buttons()
-
-        view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
+        except Exception as e:
+            self.logger.error(f"❌ [Classement] Erreur sur /rank realms : {e}")
+            obs.record_error(source="command", scope="rank_realms", exception=e, cog="classement")
 
     @classement.command(name="league", description="Displays a ranking for Season and League events")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
@@ -1644,12 +1545,8 @@ class ClassementCog(commands.Cog):
             self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
             return
 
-        async def fetch_and_build(ctx_int):
-            loc_player = player
-            loc_rank = rank
-            loc_tranche = tranche
-
-            langue, serveur_local = await get_server_config(ctx_int)
+        try:
+            langue, serveur_local = await get_server_config(interaction)
             serveur_api = self.get_serveur_api(serveur_local)
             event_id = EVENT_IDS.get(evenement, 53)
 
@@ -1657,187 +1554,59 @@ class ClassementCog(commands.Cog):
                 "season": {
                     "name": t(langue, "cal_ev_season", defaut="Saison / Festival"),
                     "emoji": get_emo(langue, "{e_std_trophy}"),
+                    "color": discord.Color(0xC084FC),
                 },
                 "league": {
                     "name": t(langue, "cal_ev_league", defaut="Ligue du Royaume"),
                     "emoji": get_emo(langue, "{e_empirerankings}"),
+                    "color": discord.Color(0x008B45),
                 },
             }
             ev_info = EVENT_MAP.get(
-                evenement, {"name": evenement.capitalize(), "emoji": DICT_EMOJIS.get("e_leagueicon", "🛡️")}
+                evenement,
+                {
+                    "name": evenement.capitalize(),
+                    "emoji": DICT_EMOJIS.get("e_leagueicon", "🛡️"),
+                    "color": discord.Color(0x008B45),
+                },
             )
 
-            search_mode = bool(loc_player)
-            p_info = None
-
-            if search_mode:
-                headers = await get_api_headers(ctx_int)
-                url_precheck = (
-                    f"https://api.gge-tracker.com/api/v1/{serveur_api}/player/{urllib.parse.quote(loc_player)}"
-                )
-                try:
-                    async with self.bot.session.get(url_precheck, headers=headers, timeout=5) as r:
-                        if r.status == 200:
-                            data = await r.json()
-                            if isinstance(data, dict):
-                                p_info = data
-                            elif isinstance(data, list) and data:
-                                p_info = data[0]
-                except Exception:
-                    pass
-
-                if p_info:
-                    loc_player = p_info.get("player_name", p_info.get("name", loc_player))
-                    lvl = int(p_info.get("level", p_info.get("lvl", 70)))
-                    leg = int(
-                        p_info.get("legendaryLevel", p_info.get("legendary_level", p_info.get("paragonLevel", 999)))
-                    )
-                else:
-                    lvl = None
-                    leg = None
-            else:
-                lvl = 70
-                leg = 999
-
-            api_command = "hgh"
-            pagination_param = "SV"
-            is_string_val = True
+            api_command = "llsp" if evenement == "season" else "hgh"
+            pagination_param = "R" if evenement == "season" else "SV"
+            is_string_val = evenement != "season"
 
             if evenement == "league":
-                possible_lids = [1]
-            elif evenement == "season":
-                api_command = "llsp"
-                pagination_param = "R"
-                is_string_val = False
-
-                if lvl is not None and lvl < 70 and search_mode:
-                    await ctx_int.followup.send(
-                        t(
-                            langue,
-                            "ev_err_season_level",
-                            defaut="{e_error} Classement de saison indisponible avant le niveau 70.",
-                        )
-                    )
-                    return None, None
-
-                if loc_tranche is not None:
-                    possible_lids = [loc_tranche]
-                else:
-                    if lvl is None:
-                        possible_lids = [1, 2, 3, 4]
-                    elif leg < 200:
-                        possible_lids = [1]
-                    elif leg < 650:
-                        possible_lids = [2]
-                    elif leg < 950:
-                        possible_lids = [3]
-                    else:
-                        possible_lids = [4]
-
-            found_lid = None
-
-            warning_msg = ""
-            if loc_rank and not loc_tranche and not search_mode:
-                warning_msg += "\n" + t(
-                    langue,
-                    "info_max_bracket",
-                    defaut="*💡 Info: Maximum bracket displayed by default. Use the `bracket` option to change.*",
-                )
-
-            accumulated_data = {lid: [] for lid in possible_lids}
-            player_found = False
-
-            if search_mode and not loc_rank:
-                start_sv = 1
-                max_sv_limit = 1000
-            elif loc_rank:
-                start_sv = max(1, loc_rank - (loc_rank % 10))
-                if start_sv == 0:
-                    start_sv = 1
-                max_sv_limit = start_sv + 49
+                search_lids = [1]
+                default_lid = 1
+            elif tranche is not None:
+                search_lids = [tranche]
+                default_lid = tranche
             else:
-                start_sv = 1
-                max_sv_limit = 50
+                search_lids = [4, 3, 2, 1]
+                default_lid = 4
 
-            current_sv = start_sv
-            PLAYERS_PER_PAGE = 10
-            BATCH_SIZE = 3
+            l_chunk, found_lid, player_found, anchor_sv, total_ranks, api_err = await self.resolve_initial_ranking(
+                serveur_api=serveur_api,
+                event_id=event_id,
+                search_lids=search_lids,
+                default_lid=default_lid,
+                search_target=player,
+                target_rank=rank,
+                api_command=api_command,
+                pagination_param=pagination_param,
+                is_string_val=is_string_val,
+            )
 
-            async def fetch_chunk(sv_val, lid):
-                if is_string_val:
-                    url = f"{self.ranking_api_url}/{serveur_api}/{api_command}/%22LT%22:{event_id},%22LID%22:{lid},%22{pagination_param}%22:%22{sv_val}%22"
-                else:
-                    url = f"{self.ranking_api_url}/{serveur_api}/{api_command}/%22LT%22:{event_id},%22LID%22:{lid},%22{pagination_param}%22:{sv_val}"
+            if api_err:
+                msg_err = t(
+                    langue,
+                    "api_unavailable_error",
+                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                )
+                return await interaction.followup.send(msg_err)
 
-                for attempt in range(3):
-                    try:
-                        async with self.bot.session.get(url, timeout=10) as r:
-                            if r.status == 200:
-                                return await r.json()
-                            else:
-                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                if r.status in [429, 500, 502, 503, 504]:
-                                    await asyncio.sleep(2)
-                    except TimeoutError:
-                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
-                    except Exception as e:
-                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
-
-                    await asyncio.sleep(0.5)
-                return None
-
-            try:
-                while current_sv <= max_sv_limit and not player_found:
-                    task_lids = []
-                    task_coros = []
-                    for lid in possible_lids:
-                        for i in range(BATCH_SIZE):
-                            sv_val = current_sv + (i * PLAYERS_PER_PAGE)
-                            if sv_val > max_sv_limit:
-                                break
-                            task_lids.append(lid)
-                            task_coros.append(fetch_chunk(sv_val, lid))
-
-                    if not task_coros:
-                        break
-                    responses = await asyncio.gather(*task_coros)
-                    if all(resp is None for resp in responses):
-                        if any(len(data) > 0 for data in accumulated_data.values()):
-                            break
-                        else:
-                            msg_err = t(
-                                langue,
-                                "api_unavailable_error",
-                                defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                            )
-                            await ctx_int.followup.send(msg_err)
-                            return None, None
-                    batch_empty = True
-
-                    for i, jsonData in enumerate(responses):
-                        lid = task_lids[i]
-                        if jsonData and str(jsonData.get("return_code")) == "0":
-                            l_chunk = jsonData.get("content", {}).get("L", [])
-                            if l_chunk:
-                                accumulated_data[lid].extend(l_chunk)
-                                batch_empty = False
-
-                                if search_mode and not loc_rank and not player_found:
-                                    for p in l_chunk:
-                                        if extract_p_name(p).lower() == loc_player.lower():
-                                            player_found = True
-                                            found_lid = lid
-                                            break
-                    if batch_empty:
-                        break
-                    current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
-            except Exception as e:
-                self.logger.error(f"❌ [Classement] Erreur lors du fetch de league : {e}")
-                obs.record_error(source="command", scope="rank_league", exception=e, cog="classement")
-
-            has_any_data = any(len(data) > 0 for data in accumulated_data.values())
-            if not has_any_data:
-                await ctx_int.followup.send(
+            if not l_chunk:
+                return await interaction.followup.send(
                     t(
                         langue,
                         "ev_rank_empty",
@@ -1846,117 +1615,71 @@ class ClassementCog(commands.Cog):
                         defaut="{e_error} Aucun classement.",
                     )
                 )
-                return None, None
-
-            found_lid = found_lid or possible_lids[-1]
-            all_players_raw = accumulated_data[found_lid]
 
             if evenement == "league":
                 nom_tranche = t(langue, "ev_bracket_all", defaut="Global Ranking")
-            elif evenement == "season":
-                nom_tranche_defaut = f"Bracket {found_lid}" if found_lid != 4 else "Legendary 950+"
+            else:
+                SEASON_BRACKET_NAMES = {
+                    4: "Legendary 950+",
+                    3: "Legendary 650-949",
+                    2: "Legendary 200-649",
+                    1: "Legendary 1-199",
+                }
+                nom_tranche_defaut = SEASON_BRACKET_NAMES.get(found_lid, f"Bracket {found_lid}")
                 nom_tranche = t(langue, f"season_bracket_{found_lid}", defaut=nom_tranche_defaut)
 
             bracket_icon = get_emo(langue, "{e_lvl}")
             mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
             titre = f"{ev_info['emoji']} {mot_classement} {ev_info['name']}\n{bracket_icon} {nom_tranche}"
 
-            seen_players = set()
-            all_players_clean = []
-            for p in all_players_raw:
-                name = extract_p_name(p)
-                rank_val = extract_p_rank(p)
-                if name and name not in seen_players:
-                    seen_players.add(name)
-                    all_players_clean.append((rank_val, p))
-
-            all_players_sorted = sorted(all_players_clean, key=lambda x: x[0])
-            all_players = [item[1] for item in all_players_sorted]
-
-            page_cible = 0
-            chunks = [all_players[i : i + 10] for i in range(0, len(all_players), 10)]
-
-            if player_found:
-                for i, chunk in enumerate(chunks):
-                    trouve_dans_page = False
-                    for p in chunk:
-                        if extract_p_name(p).lower() == loc_player.lower():
-                            page_cible = i
-                            trouve_dans_page = True
-                            break
-                    if trouve_dans_page:
-                        break
-            elif loc_rank:
-                for i, chunk in enumerate(chunks):
-                    trouve_dans_page = False
-                    for p in chunk:
-                        if extract_p_rank(p) >= loc_rank:
-                            page_cible = i
-                            trouve_dans_page = True
-                            break
-                    if trouve_dans_page:
-                        break
-
             warning_msg = ""
-            if search_mode and not player_found:
-                if loc_rank:
-                    msg = t(
-                        langue,
-                        "info_player_not_found_rank",
-                        joueur=loc_player,
-                        rang=loc_rank,
-                        defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                else:
-                    msg = t(
-                        langue,
-                        "info_player_not_found_top",
-                        joueur=loc_player,
-                        top=max_sv_limit,
-                        defaut="*💡 Info: Player **{joueur}** not found in the Top {top}. Showing first page instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                    page_cible = 0
-
-            embed_color = discord.Color(0xDDAADD) if evenement == "season" else discord.Color(0x004D25)
-
-            embeds = []
-            for i, chunk in enumerate(chunks):
-                embed = self.format_page(
-                    chunk,
-                    i,
+            if rank and not tranche and not player and evenement == "season":
+                warning_msg += "\n" + t(
                     langue,
-                    color=embed_color,
-                    highlight_player=loc_player if search_mode else None,
-                    event_name=evenement,
+                    "info_max_bracket",
+                    defaut="*💡 Info: Maximum bracket displayed by default. Use the `bracket` option to change.*",
                 )
-                embed.title = titre
-                if warning_msg and i == page_cible:
-                    embed.description = embed.description + warning_msg
+            if player and not player_found:
+                warning_msg += self._build_not_found_warning(langue, player, rank, is_alliance=False)
 
-                footer_text = t(
-                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
-                )
-                embed.set_footer(text=footer_text)
-                await setup_embed_footer(embed, ctx_int, langue)
-                embeds.append(embed)
+            embed, step = await self.build_single_page_embed(
+                ctx_int=interaction,
+                raw_list=l_chunk,
+                langue=langue,
+                titre=titre,
+                color=ev_info["color"],
+                is_alliance=False,
+                highlight_player=player if player_found else None,
+                event_name=evenement,
+                total_ranks=total_ranks,
+                warning_msg=warning_msg,
+            )
 
-            return embeds, page_cible
+            view = LiveRankingView(
+                cog=self,
+                interaction=interaction,
+                langue=langue,
+                serveur_api=serveur_api,
+                event_id=event_id,
+                lid=found_lid,
+                titre=titre,
+                embed_color=ev_info["color"],
+                event_name=evenement,
+                is_alliance=False,
+                api_command=api_command,
+                pagination_param=pagination_param,
+                is_string_val=is_string_val,
+                page_step=step,
+                initial_sv=anchor_sv,
+                total_ranks=total_ranks,
+                highlight_player=player if player_found else None,
+                initial_embed=embed,
+            )
+            view.message = await interaction.followup.send(embed=embed, view=view, wait=True)
 
-        embeds, page_cible = await fetch_and_build(interaction)
-        if not embeds:
-            return
-
-        view = RankingPaginationView(embeds, fetch_and_build, interaction.user.id)
-        if hasattr(view, "current_page"):
-            view.current_page = page_cible
-        if hasattr(view, "index"):
-            view.index = page_cible
-        if hasattr(view, "update_buttons"):
-            view.update_buttons()
-
-        view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
+        except Exception as e:
+            self.logger.error(f"❌ [Classement] Erreur sur /rank league : {e}")
+            obs.record_error(source="command", scope="rank_league", exception=e, cog="classement")
 
     @classement.command(name="contests", description="Displays a ranking for specific contests")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
@@ -1986,12 +1709,8 @@ class ClassementCog(commands.Cog):
             self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
             return
 
-        async def fetch_and_build(ctx_int):
-            loc_player = player
-            loc_rank = rank
-            loc_tranche = tranche
-
-            langue, serveur_local = await get_server_config(ctx_int)
+        try:
+            langue, serveur_local = await get_server_config(interaction)
             serveur_api = self.get_serveur_api(serveur_local)
             event_id = EVENT_IDS.get(evenement, 60)
 
@@ -1999,195 +1718,65 @@ class ClassementCog(commands.Cog):
                 "shapeshifters": {
                     "name": t(langue, "cal_ev_shape", defaut="Les Métamorphes"),
                     "emoji": DICT_EMOJIS.get("e_shapeshifter", "👹"),
+                    "color": discord.Color(0x8E44AD),
                 },
                 "nobility": {
                     "name": t(langue, "cal_ev_nobility", defaut="Concours de Noblesse"),
                     "emoji": get_emo(langue, "{e_std_crown}"),
+                    "color": discord.Color(0xF1C40F),
                 },
                 "woa": {
                     "name": t(langue, "cal_ev_woa", defaut="Guerre des Alliances"),
                     "emoji": get_emo(langue, "{e_woa_points}"),
+                    "color": discord.Color(0x2ECC71),
                 },
                 "patronage": {
                     "name": t(langue, "cal_ev_patronage", defaut="Patronage"),
                     "emoji": DICT_EMOJIS.get("e_patronage", "🪙"),
+                    "color": discord.Color(0xE67E22),
                 },
             }
             ev_info = EVENT_MAP.get(
-                evenement, {"name": evenement.capitalize(), "emoji": DICT_EMOJIS.get("e_events4", "🏆")}
+                evenement,
+                {
+                    "name": evenement.capitalize(),
+                    "emoji": DICT_EMOJIS.get("e_events4", "🏆"),
+                    "color": discord.Color.gold(),
+                },
             )
 
-            search_mode = bool(loc_player)
-            p_info = None
-
-            if search_mode:
-                headers = await get_api_headers(ctx_int)
-                url_precheck = (
-                    f"https://api.gge-tracker.com/api/v1/{serveur_api}/player/{urllib.parse.quote(loc_player)}"
-                )
-                try:
-                    async with self.bot.session.get(url_precheck, headers=headers, timeout=5) as r:
-                        if r.status == 200:
-                            data = await r.json()
-                            if isinstance(data, dict):
-                                p_info = data
-                            elif isinstance(data, list) and data:
-                                p_info = data[0]
-                except Exception:
-                    pass
-
-                if p_info:
-                    loc_player = p_info.get("player_name", p_info.get("name", loc_player))
-                    lvl = int(p_info.get("level", p_info.get("lvl", 70)))
-                    leg = int(
-                        p_info.get("legendaryLevel", p_info.get("legendary_level", p_info.get("paragonLevel", 999)))
-                    )
-                else:
-                    lvl = None
-                    leg = None
-            else:
-                lvl = 70
-                leg = 999
-
             if evenement in ["woa", "patronage"]:
-                possible_lids = [1]
+                search_lids = [1]
+                default_lid = 1
+            elif tranche is not None:
+                search_lids = [tranche]
+                default_lid = tranche
             elif evenement == "shapeshifters":
-                if loc_tranche is not None:
-                    possible_lids = [loc_tranche]
-                else:
-                    if lvl is None:
-                        possible_lids = [1, 2, 3, 4, 5]
-                    elif lvl < 70:
-                        possible_lids = [1]
-                    elif leg < 300:
-                        possible_lids = [2]
-                    elif leg < 650:
-                        possible_lids = [3]
-                    elif leg < 950:
-                        possible_lids = [4]
-                    else:
-                        possible_lids = [5]
-            elif evenement == "nobility":
-                if loc_tranche is not None:
-                    possible_lids = [loc_tranche]
-                else:
-                    if lvl is None:
-                        possible_lids = [1, 2, 3, 4, 5, 6, 7]
-                    elif lvl < 15:
-                        possible_lids = [1]
-                    elif lvl < 20:
-                        possible_lids = [2]
-                    elif lvl < 25:
-                        possible_lids = [3]
-                    elif lvl < 30:
-                        possible_lids = [4]
-                    elif lvl < 50:
-                        possible_lids = [5]
-                    elif lvl < 70:
-                        possible_lids = [6]
-                    else:
-                        possible_lids = [7]
-
-            found_lid = None
-
-            warning_msg = ""
-            if loc_rank and not loc_tranche and not search_mode:
-                warning_msg += "\n" + t(
-                    langue,
-                    "info_max_bracket",
-                    defaut="*💡 Info: Maximum bracket displayed by default. Use the `bracket` option to change.*",
-                )
-
-            accumulated_data = {lid: [] for lid in possible_lids}
-            player_found = False
-
-            if search_mode and not loc_rank:
-                start_sv = 1
-                max_sv_limit = 1000
-            elif loc_rank:
-                start_sv = max(1, loc_rank - (loc_rank % 10))
-                if start_sv == 0:
-                    start_sv = 1
-                max_sv_limit = start_sv + 49
+                search_lids = [5, 4, 3, 2, 1]
+                default_lid = 5
             else:
-                start_sv = 1
-                max_sv_limit = 50
+                search_lids = [7, 6, 5, 4, 3, 2, 1]
+                default_lid = 7
 
-            current_sv = start_sv
-            PLAYERS_PER_PAGE = 5
-            BATCH_SIZE = 3
+            l_chunk, found_lid, player_found, anchor_sv, total_ranks, api_err = await self.resolve_initial_ranking(
+                serveur_api=serveur_api,
+                event_id=event_id,
+                search_lids=search_lids,
+                default_lid=default_lid,
+                search_target=player,
+                target_rank=rank,
+            )
 
-            async def fetch_chunk(sv_val, lid):
-                url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22LID%22:{lid},%22SV%22:%22{sv_val}%22"
-                for attempt in range(3):
-                    try:
-                        async with self.bot.session.get(url, timeout=10) as r:
-                            if r.status == 200:
-                                return await r.json()
-                            else:
-                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                if r.status in [429, 500, 502, 503, 504]:
-                                    await asyncio.sleep(2)
-                    except TimeoutError:
-                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
-                    except Exception as e:
-                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
+            if api_err:
+                msg_err = t(
+                    langue,
+                    "api_unavailable_error",
+                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                )
+                return await interaction.followup.send(msg_err)
 
-                    await asyncio.sleep(0.5)
-                return None
-
-            try:
-                while current_sv <= max_sv_limit and not player_found:
-                    task_lids = []
-                    task_coros = []
-                    for lid in possible_lids:
-                        for i in range(BATCH_SIZE):
-                            sv_val = current_sv + (i * PLAYERS_PER_PAGE)
-                            if sv_val > max_sv_limit:
-                                break
-                            task_lids.append(lid)
-                            task_coros.append(fetch_chunk(sv_val, lid))
-
-                    if not task_coros:
-                        break
-                    responses = await asyncio.gather(*task_coros)
-                    if all(resp is None for resp in responses):
-                        if any(len(data) > 0 for data in accumulated_data.values()):
-                            break
-                        else:
-                            msg_err = t(
-                                langue,
-                                "api_unavailable_error",
-                                defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                            )
-                            await ctx_int.followup.send(msg_err)
-                            return None, None
-                    batch_empty = True
-
-                    for i, jsonData in enumerate(responses):
-                        lid = task_lids[i]
-                        if jsonData and str(jsonData.get("return_code")) == "0":
-                            l_chunk = jsonData.get("content", {}).get("L", [])
-                            if l_chunk:
-                                accumulated_data[lid].extend(l_chunk)
-                                batch_empty = False
-
-                                if search_mode and not loc_rank and not player_found:
-                                    for p in l_chunk:
-                                        if extract_p_name(p).lower() == loc_player.lower():
-                                            player_found = True
-                                            found_lid = lid
-                                            break
-                    if batch_empty:
-                        break
-                    current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
-            except Exception as e:
-                self.logger.error(f"❌ [Classement] Erreur lors du fetch de contests : {e}")
-                obs.record_error(source="command", scope="rank_contests", exception=e, cog="classement")
-
-            has_any_data = any(len(data) > 0 for data in accumulated_data.values())
-            if not has_any_data:
-                await ctx_int.followup.send(
+            if not l_chunk:
+                return await interaction.followup.send(
                     t(
                         langue,
                         "ev_rank_empty",
@@ -2196,10 +1785,6 @@ class ClassementCog(commands.Cog):
                         defaut="{e_error} Aucun classement.",
                     )
                 )
-                return None, None
-
-            found_lid = found_lid or possible_lids[-1]
-            all_players_raw = accumulated_data[found_lid]
 
             if evenement in ["woa", "patronage"]:
                 nom_tranche = t(langue, "ev_bracket_all", defaut="Global Ranking")
@@ -2208,95 +1793,69 @@ class ClassementCog(commands.Cog):
                 nom_tranche_defaut = BRACKETS.get(str(found_lid), f"Bracket {found_lid}")
                 nom_tranche = t(langue, f"ev_bracket_{found_lid}", defaut=nom_tranche_defaut)
                 bracket_icon = get_emo(langue, "{e_lvl}")
-            elif evenement == "nobility":
-                nom_tranche_defaut = f"Bracket {found_lid}" if found_lid != 7 else "Legendary (70+)"
+            else:
+                NOBILITY_BRACKET_NAMES = {
+                    7: "Legendary (70+)",
+                    6: "Levels 50-69",
+                    5: "Levels 30-49",
+                    4: "Levels 25-29",
+                    3: "Levels 20-24",
+                    2: "Levels 15-19",
+                    1: "Levels 10-14",
+                }
+                nom_tranche_defaut = NOBILITY_BRACKET_NAMES.get(found_lid, f"Bracket {found_lid}")
                 nom_tranche = t(langue, f"nobility_bracket_{found_lid}", defaut=nom_tranche_defaut)
                 bracket_icon = get_emo(langue, "{e_lvl}")
 
             mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
             titre = f"{ev_info['emoji']} {mot_classement} {ev_info['name']}\n{bracket_icon} {nom_tranche}"
 
-            seen_players = set()
-            all_players_clean = []
-            for p in all_players_raw:
-                name = extract_p_name(p)
-                if name and name not in seen_players:
-                    seen_players.add(name)
-                    all_players_clean.append(p)
-
-            all_players = sorted(all_players_clean, key=extract_p_rank)
-            page_cible = 0
-            chunks = [all_players[i : i + 10] for i in range(0, len(all_players), 10)]
-
-            if player_found:
-                for i, chunk in enumerate(chunks):
-                    if any(extract_p_name(p).lower() == loc_player.lower() for p in chunk):
-                        page_cible = i
-                        break
-            elif loc_rank:
-                for i, chunk in enumerate(chunks):
-                    if any(extract_p_rank(p) >= loc_rank for p in chunk):
-                        page_cible = i
-                        break
-
-            if search_mode and not player_found:
-                if loc_rank:
-                    msg = t(
-                        langue,
-                        "info_player_not_found_rank",
-                        joueur=loc_player,
-                        rang=loc_rank,
-                        defaut="*💡 Info: Player **{joueur}** not found. Showing rank {rang} instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                else:
-                    msg = t(
-                        langue,
-                        "info_player_not_found_top",
-                        joueur=loc_player,
-                        top=max_sv_limit,
-                        defaut="*💡 Info: Player **{joueur}** not found in the Top {top}. Showing first page instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                    page_cible = 0
-
-            embed_color = discord.Color.gold()
-            embeds = []
-            for i, chunk in enumerate(chunks):
-                embed = self.format_page(
-                    chunk,
-                    i,
+            warning_msg = ""
+            if rank and not tranche and not player and evenement not in ["woa", "patronage"]:
+                warning_msg += "\n" + t(
                     langue,
-                    color=embed_color,
-                    highlight_player=loc_player if search_mode else None,
-                    event_name=evenement,
+                    "info_max_bracket",
+                    defaut="*💡 Info: Maximum bracket displayed by default. Use the `bracket` option to change.*",
                 )
-                embed.title = titre
-                if warning_msg and i == page_cible:
-                    embed.description = embed.description + warning_msg
+            if player and not player_found:
+                warning_msg += self._build_not_found_warning(langue, player, rank, is_alliance=False)
 
-                footer_text = t(
-                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
-                )
-                embed.set_footer(text=footer_text)
-                await setup_embed_footer(embed, ctx_int, langue)
-                embeds.append(embed)
+            embed_color = ev_info["color"]
+            embed, step = await self.build_single_page_embed(
+                ctx_int=interaction,
+                raw_list=l_chunk,
+                langue=langue,
+                titre=titre,
+                color=embed_color,
+                is_alliance=False,
+                highlight_player=player if player_found else None,
+                event_name=evenement,
+                total_ranks=total_ranks,
+                warning_msg=warning_msg,
+            )
 
-            return embeds, page_cible
+            view = LiveRankingView(
+                cog=self,
+                interaction=interaction,
+                langue=langue,
+                serveur_api=serveur_api,
+                event_id=event_id,
+                lid=found_lid,
+                titre=titre,
+                embed_color=embed_color,
+                event_name=evenement,
+                is_alliance=False,
+                page_step=step,
+                initial_sv=anchor_sv,
+                total_ranks=total_ranks,
+                highlight_player=player if player_found else None,
+                initial_embed=embed,
+            )
+            view.message = await interaction.followup.send(embed=embed, view=view, wait=True)
 
-        embeds, page_cible = await fetch_and_build(interaction)
-        if not embeds:
-            return
-
-        view = RankingPaginationView(embeds, fetch_and_build, interaction.user.id)
-        if hasattr(view, "current_page"):
-            view.current_page = page_cible
-        if hasattr(view, "index"):
-            view.index = page_cible
-        if hasattr(view, "update_buttons"):
-            view.update_buttons()
-
-        view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
+        except Exception as e:
+            self.logger.error(f"❌ [Classement] Erreur sur /rank contests : {e}")
+            obs.record_error(source="command", scope="rank_contests", exception=e, cog="classement")
 
     @classement.command(name="alliance", description="Displays live rankings and statistics for alliances")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
@@ -2310,6 +1869,7 @@ class ClassementCog(commands.Cog):
             app_commands.Choice(name="Nomad Invasion", value="alliance_nomad"),
             app_commands.Choice(name="War of the Realms", value="alliance_foreigners"),
             app_commands.Choice(name="Samurai Invasion", value="alliance_samurais"),
+            app_commands.Choice(name="Battle of Berimond", value="alliance_berimond"),
             app_commands.Choice(name="Bloodcrow Invasion", value="alliance_bloodcrows"),
             app_commands.Choice(name="Kingdom League", value="alliance_league"),
             app_commands.Choice(name="Beyond the Horizon", value="alliance_horizon"),
@@ -2325,34 +1885,45 @@ class ClassementCog(commands.Cog):
             self.logger.warning(f"❌ [Classement] Defer failed sur /{interaction.command.name}: {e}")
             return
 
-        async def fetch_and_build(ctx_int):
-            loc_alliance = alliance_name
-            loc_rank = rank
-
-            langue, serveur_local = await get_server_config(ctx_int)
+        try:
+            langue, serveur_local = await get_server_config(interaction)
             serveur_api = self.get_serveur_api(serveur_local)
-            event_id = EVENT_IDS.get(categorie, 10)
+
+            ALLIANCE_LT_MAP = {
+                "alliance_honor": 10,
+                "alliance_might": 11,
+                "alliance_command": 12,
+                "alliance_cargo": 13,
+                "alliance_foreigners": 45,
+                "alliance_nomad": 47,
+                "alliance_samurais": 52,
+                "alliance_berimond": 56,
+                "alliance_bloodcrows": 59,
+                "alliance_league": 67,
+                "alliance_horizon": 77,
+            }
+            event_id = ALLIANCE_LT_MAP.get(categorie, EVENT_IDS.get(categorie, 10))
 
             CAT_MAP = {
                 "alliance_honor": {
                     "name": t(langue, "cal_stat_honor", defaut="Points d'Honneur"),
                     "emoji": get_emo(langue, "{e_honor}"),
-                    "color": discord.Color(0xFFFFFF),
+                    "color": discord.Color(0xF8F9FA),
                 },
                 "alliance_might": {
                     "name": t(langue, "cal_stat_might", defaut="Points de Puissance"),
                     "emoji": get_emo(langue, "{e_pp2}"),
-                    "color": discord.Color(0xBB270D),
+                    "color": discord.Color(0xC0392B),
                 },
                 "alliance_command": {
                     "name": t(langue, "cal_stat_command", defaut="Points de Commandement"),
                     "emoji": DICT_EMOJIS.get("e_alliance_icon", "🛡️"),
-                    "color": discord.Color(0xAFAFAF),
+                    "color": discord.Color(0x95A5A6),
                 },
                 "alliance_cargo": {
                     "name": t(langue, "cal_stat_cargo", defaut="Points de Fret"),
                     "emoji": get_emo(langue, "{e_pointscargo}"),
-                    "color": discord.Color(0x84CED1),
+                    "color": discord.Color(0x38BDF8),
                 },
                 "alliance_nomad": {
                     "name": t(langue, "cal_ev_nomad", defaut="Invasion des Nomades"),
@@ -2362,30 +1933,34 @@ class ClassementCog(commands.Cog):
                 "alliance_foreigners": {
                     "name": t(langue, "cal_ev_realms", defaut="Guerre des Royaumes"),
                     "emoji": get_emo(langue, "{e_war_realms}"),
-                    "color": discord.Color(0x49415D),
+                    "color": discord.Color(0x6C5CE7),
                 },
                 "alliance_samurais": {
                     "name": t(langue, "cal_ev_samurai", defaut="Invasion des Samouraïs"),
                     "emoji": get_emo(langue, "{e_samurai}"),
                     "color": discord.Color(0xD43C27),
                 },
+                "alliance_berimond": {
+                    "name": t(langue, "cal_ev_berimond", defaut="Bataille de Bérimond"),
+                    "emoji": get_emo(langue, "{e_berimond}"),
+                    "color": discord.Color(0x0094FF),
+                },
                 "alliance_bloodcrows": {
                     "name": t(langue, "cal_ev_bloodcrow", defaut="Corbeaux de Sang"),
                     "emoji": get_emo(langue, "{e_bloodcrow}"),
-                    "color": discord.Color(0x670111),
+                    "color": discord.Color(0x8B001A),
                 },
                 "alliance_league": {
                     "name": t(langue, "cal_ev_league", defaut="Ligue du Royaume"),
                     "emoji": get_emo(langue, "{e_std_trophy}"),
-                    "color": discord.Color(0x004D25),
+                    "color": discord.Color(0x008B45),
                 },
                 "alliance_horizon": {
                     "name": t(langue, "cal_ev_horizon", defaut="Au-delà de l'Horizon"),
                     "emoji": get_emo(langue, "{e_std_world_map}"),
-                    "color": discord.Color(0x4A7160),
+                    "color": discord.Color(0x3B8EA5),
                 },
             }
-
             cat_info = CAT_MAP.get(
                 categorie,
                 {
@@ -2394,102 +1969,26 @@ class ClassementCog(commands.Cog):
                     "color": discord.Color.gold(),
                 },
             )
-            embed_color = cat_info["color"]
 
-            tranche = 1
-            nom_tranche = t(langue, "ev_bracket_alliance", defaut="Global Alliance Ranking")
+            l_chunk, found_lid, alliance_found, anchor_sv, total_ranks, api_err = await self.resolve_initial_ranking(
+                serveur_api=serveur_api,
+                event_id=event_id,
+                search_lids=[1],
+                default_lid=1,
+                search_target=alliance_name,
+                target_rank=rank,
+                is_alliance=True,
+            )
 
-            search_mode = bool(loc_alliance)
-            all_alliances_raw = []
-            alliance_found = False
+            if api_err:
+                msg_err = t(
+                    langue,
+                    "api_unavailable_error",
+                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+                )
+                return await interaction.followup.send(msg_err)
 
-            if search_mode and not loc_rank:
-                start_sv = None
-                max_sv_limit = None
-            elif loc_rank:
-                start_sv = max(1, loc_rank - (loc_rank % 10))
-                if start_sv == 0:
-                    start_sv = 1
-                max_sv_limit = start_sv + 49
-            else:
-                start_sv = 1
-                max_sv_limit = 50
-
-            current_sv = start_sv
-            PLAYERS_PER_PAGE = 5
-            BATCH_SIZE = 3
-
-            async def fetch_chunk(sv_val):
-                sv_encoded = urllib.parse.quote(str(sv_val))
-                url = f"{self.ranking_api_url}/{serveur_api}/hgh/%22LT%22:{event_id},%22SV%22:%22{sv_encoded}%22"
-
-                for attempt in range(3):
-                    try:
-                        async with self.bot.session.get(url, timeout=10) as r:
-                            if r.status == 200:
-                                return await r.json()
-                            else:
-                                self.logger.warning(f"⚠️ [API] Code {r.status} reçu. URL: {url}")
-                                if r.status in [429, 500, 502, 503, 504]:
-                                    await asyncio.sleep(2)
-                    except TimeoutError:
-                        self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
-                    except Exception as e:
-                        self.logger.error(f"❌ [API] Erreur de connexion : {e}")
-
-                    await asyncio.sleep(0.5)
-                return None
-
-            try:
-                if search_mode and not loc_rank:
-                    res = await fetch_chunk(loc_alliance)
-
-                    if res and str(res.get("return_code")) == "0":
-                        l_chunk = res.get("content", {}).get("L", [])
-                        if l_chunk:
-                            all_alliances_raw.extend(l_chunk)
-                            for p in l_chunk:
-                                api_name = extract_p_name(p).lower()
-                                if api_name == loc_alliance.lower() or api_name.startswith(f"{loc_alliance.lower()}_"):
-                                    alliance_found = True
-                                    break
-                else:
-                    while current_sv <= max_sv_limit and not alliance_found:
-                        tasks = [
-                            fetch_chunk(current_sv + (i * PLAYERS_PER_PAGE))
-                            for i in range(BATCH_SIZE)
-                            if current_sv + (i * PLAYERS_PER_PAGE) <= max_sv_limit
-                        ]
-                        if not tasks:
-                            break
-
-                        responses = await asyncio.gather(*tasks)
-                        batch_empty = True
-
-                        for jsonData in responses:
-                            if jsonData and str(jsonData.get("return_code")) == "0":
-                                l_chunk = jsonData.get("content", {}).get("L", [])
-                                if l_chunk:
-                                    all_alliances_raw.extend(l_chunk)
-                                    batch_empty = False
-
-                                    if search_mode and loc_rank and not alliance_found:
-                                        for p in l_chunk:
-                                            api_name = extract_p_name(p).lower()
-                                            if api_name == loc_alliance.lower() or api_name.startswith(
-                                                f"{loc_alliance.lower()}_"
-                                            ):
-                                                alliance_found = True
-                                                break
-
-                        if batch_empty:
-                            break
-                        current_sv += BATCH_SIZE * PLAYERS_PER_PAGE
-            except Exception as e:
-                self.logger.error(f"❌ [Classement] Erreur lors du fetch de alliance : {e}")
-                obs.record_error(source="command", scope="rank_alliance", exception=e, cog="classement")
-
-            if not all_alliances_raw:
+            if not l_chunk:
                 embed_empty = discord.Embed(
                     title=t(langue, "ev_rank_empty_title", defaut="📭 Ranking unavailable"),
                     description=t(
@@ -2500,94 +1999,51 @@ class ClassementCog(commands.Cog):
                     ),
                     color=discord.Color.light_grey(),
                 )
-                await ctx_int.followup.send(embed=embed_empty)
-                return None, None
+                return await interaction.followup.send(embed_empty)
 
-            seen_alliances = set()
-            all_alliances_clean = []
-            for p in all_alliances_raw:
-                a_name = extract_p_name(p)
-                if a_name and a_name not in seen_alliances:
-                    seen_alliances.add(a_name)
-                    all_alliances_clean.append(p)
-
-            all_alliances = sorted(all_alliances_clean, key=extract_p_rank)
-            page_cible = 0
-            chunks = [all_alliances[i : i + 10] for i in range(0, len(all_alliances), 10)]
-
-            if alliance_found:
-                for i, chunk in enumerate(chunks):
-                    if any(extract_p_name(p).lower() == loc_alliance.lower() for p in chunk):
-                        page_cible = i
-                        break
-            elif loc_rank:
-                for i, chunk in enumerate(chunks):
-                    if any(extract_p_rank(p) >= loc_rank for p in chunk):
-                        page_cible = i
-                        break
-
-            warning_msg = ""
-            if search_mode and not alliance_found:
-                if loc_rank:
-                    msg = t(
-                        langue,
-                        "info_alliance_not_found_rank",
-                        alliance=loc_alliance,
-                        rang=loc_rank,
-                        defaut="*💡 Info: Alliance **{alliance}** not found. Showing rank {rang} instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                else:
-                    msg = t(
-                        langue,
-                        "info_alliance_not_found_top",
-                        alliance=loc_alliance,
-                        top=max_sv_limit,
-                        defaut="*💡 Info: Alliance **{alliance}** not found in the Top {top}. Showing first page instead.*",
-                    )
-                    warning_msg += f"\n\n{msg}"
-                    page_cible = 0
-
+            nom_tranche = t(langue, "ev_bracket_alliance", defaut="Global Alliance Ranking")
             mot_classement = t(langue, "ev_word_rank", defaut="Ranking")
             titre = f"{cat_info['emoji']} {mot_classement} {cat_info['name']}\n🛡️ {nom_tranche}"
 
-            embeds = []
-            for i, chunk in enumerate(chunks):
-                embed = self.format_page(
-                    chunk,
-                    i,
-                    langue,
-                    color=embed_color,
-                    is_alliance=True,
-                    highlight_player=loc_alliance if search_mode else None,
-                    event_name=categorie,
-                )
-                embed.title = titre
-                if warning_msg and i == page_cible:
-                    embed.description = embed.description + warning_msg
+            warning_msg = ""
+            if alliance_name and not alliance_found:
+                warning_msg += self._build_not_found_warning(langue, alliance_name, rank, is_alliance=True)
 
-                footer_text = t(
-                    langue, "ev_page_footer", cur=i + 1, tot=len(chunks), defaut=f"Page {i + 1}/{len(chunks)}"
-                )
-                embed.set_footer(text=footer_text)
-                await setup_embed_footer(embed, ctx_int, langue)
-                embeds.append(embed)
+            embed, step = await self.build_single_page_embed(
+                ctx_int=interaction,
+                raw_list=l_chunk,
+                langue=langue,
+                titre=titre,
+                color=cat_info["color"],
+                is_alliance=True,
+                highlight_player=alliance_name if alliance_found else None,
+                event_name=categorie,
+                total_ranks=total_ranks,
+                warning_msg=warning_msg,
+            )
 
-            return embeds, page_cible
+            view = LiveRankingView(
+                cog=self,
+                interaction=interaction,
+                langue=langue,
+                serveur_api=serveur_api,
+                event_id=event_id,
+                lid=1,
+                titre=titre,
+                embed_color=cat_info["color"],
+                event_name=categorie,
+                is_alliance=True,
+                page_step=step,
+                initial_sv=anchor_sv,
+                total_ranks=total_ranks,
+                highlight_player=alliance_name if alliance_found else None,
+                initial_embed=embed,
+            )
+            view.message = await interaction.followup.send(embed=embed, view=view, wait=True)
 
-        embeds, page_cible = await fetch_and_build(interaction)
-        if not embeds:
-            return
-
-        view = RankingPaginationView(embeds, fetch_and_build, interaction.user.id)
-        if hasattr(view, "current_page"):
-            view.current_page = page_cible
-        if hasattr(view, "index"):
-            view.index = page_cible
-        if hasattr(view, "update_buttons"):
-            view.update_buttons()
-
-        view.message = await interaction.followup.send(embed=embeds[page_cible], view=view, wait=True)
+        except Exception as e:
+            self.logger.error(f"❌ [Classement] Erreur sur /rank alliance : {e}")
+            obs.record_error(source="command", scope="rank_alliance", exception=e, cog="classement")
 
 
 async def setup(bot):
