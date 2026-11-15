@@ -544,26 +544,40 @@ async def get_autocomplete_list(serveur: str, type_liste: str):
 # ========================================
 
 
+def _build_safe_choices(items: list, current: str, limit: int = 25) -> list[app_commands.Choice[str]]:
+    """
+    Filtre et construit jusqu'à 25 Choice Discord de manière ultra-rapide (arrêt dès 25 résultats)
+    en éliminant les None, les chaînes vides et les caractères invisibles.
+    """
+    q = (current or "").strip().lower()
+    results = []
+    seen = set()
+
+    for raw in items:
+        if not raw or not isinstance(raw, str):
+            continue
+        clean = raw.strip()[:100].strip()
+        if not clean or clean in seen:
+            continue
+        if not q or q in clean.lower():
+            seen.add(clean)
+            results.append(app_commands.Choice(name=clean, value=clean))
+            if len(results) >= limit:
+                break
+
+    return results
+
+
 async def joueur_autocomplete(interaction: discord.Interaction, current: str):
     _, serveur = await get_server_config(interaction)
     joueurs = await get_autocomplete_list(serveur, "players")
-
-    return [
-        app_commands.Choice(name=str(n)[:100], value=str(n)[:100])
-        for n in joueurs
-        if current.lower() in str(n).lower() and str(n).strip()
-    ][:25]
+    return _build_safe_choices(joueurs, current)
 
 
 async def alliance_autocomplete(interaction: discord.Interaction, current: str):
     _, serveur = await get_server_config(interaction)
     alliances = await get_autocomplete_list(serveur, "alliances")
-
-    return [
-        app_commands.Choice(name=str(n)[:100], value=str(n)[:100])
-        for n in alliances
-        if current.lower() in str(n).lower() and str(n).strip()
-    ][:25]
+    return _build_safe_choices(alliances, current)
 
 
 async def event_autocomplete(interaction: discord.Interaction, current: str):
@@ -574,12 +588,18 @@ async def event_autocomplete(interaction: discord.Interaction, current: str):
         "War of the Realms",
         "Battle of Berimond",
     ]
-    return [app_commands.Choice(name=e, value=e) for e in events_en if current.lower() in e.lower()][:25]
+    return _build_safe_choices(events_en, current)
 
 
 async def event_alliance_autocomplete(interaction: discord.Interaction, current: str):
-    events_en = ["Nomad Invasion", "Samurai Invasion", "Bloodcrow Invasion", "War of the Realms", "Battle of Berimond"]
-    return [app_commands.Choice(name=e, value=e) for e in events_en if current.lower() in e.lower()][:25]
+    events_en = [
+        "Nomad Invasion",
+        "Samurai Invasion",
+        "Bloodcrow Invasion",
+        "War of the Realms",
+        "Battle of Berimond",
+    ]
+    return _build_safe_choices(events_en, current)
 
 
 # ========================================
@@ -942,6 +962,7 @@ EVENT_IDS = {
     "alliance_bloodcrows": 59,
     "alliance_league": 67,
     "alliance_horizon": 77,
+    "alliance_berimond": 56,
 }
 
 BRACKETS = {
