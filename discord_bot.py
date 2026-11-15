@@ -540,6 +540,15 @@ class GGEAssistantBot(commands.Bot):
             ):
                 purged_modules.append("Tempêtes")
 
+        # 2b. Purge Calendrier
+        for cal_filename in ("calendar_alerts.json", "calendar_tracks.json", "calendrier.json"):
+            cal_file = SERVEURS_DIR / cal_filename
+            if await asyncio.to_thread(_purge_json_sync, cal_file, None) or await asyncio.to_thread(
+                _purge_json_sync, cal_file, "guilds"
+            ):
+                if "Calendrier" not in purged_modules:
+                    purged_modules.append("Calendrier")
+
         # 3. Purge Radar (surveillance.json)
         try:
             surv_data = await load_surveillance_async()
@@ -637,12 +646,14 @@ class GGEAssistantBot(commands.Bot):
     @tasks.loop(seconds=20)
     async def status_task(self):
         obs.set_task_name("status_task")
+        if self.is_closed() or not self.is_ready():
+            return
+
         try:
             if self.maintenance_mode:
                 statut_maint = t("fr", "bot_activity_maintenance", defaut="🚧 EN MAINTENANCE 🚧")
                 activity = discord.Activity(type=discord.ActivityType.watching, name=statut_maint)
-                if not self.is_closed():
-                    await self.change_presence(activity=activity, status=discord.Status.dnd)
+                await self.change_presence(activity=activity, status=discord.Status.dnd)
                 return
 
             nb_serveurs = len(self.guilds)
@@ -672,8 +683,12 @@ class GGEAssistantBot(commands.Bot):
             activity = statuts[self.status_index % len(statuts)]
             self.status_index += 1
 
-            if not self.is_closed():
-                await self.change_presence(activity=activity, status=discord.Status.online)
+            await self.change_presence(activity=activity, status=discord.Status.online)
+        except (ConnectionResetError, discord.ConnectionClosed, RuntimeError) as e:
+            if "closing transport" in str(e).lower():
+                logger.debug("🔄 [Bot] Reconnexion WebSocket en cours, change_presence reporté.")
+            else:
+                logger.warning(f"⚠️ [Bot] WebSocket occupé lors de status_task : {e}")
         except Exception as e:
             logger.error(f"❌ [Bot] Erreur status_task : {e}")
             obs.record_error(source="task", scope="status_task", exception=e, cog="core")
@@ -1328,7 +1343,11 @@ class GGEAssistantBot(commands.Bot):
         tb_str_short = tb_str[-2000:] if len(tb_str) > 2000 else tb_str
 
         cmd_name = interaction.command.name if interaction.command else "Inconnue"
-        serveur = interaction.guild.name if interaction.guild else "Message Privé"
+        serveur = (
+            (interaction.guild.name or f"Serveur Externe ({interaction.guild.id})")
+            if interaction.guild
+            else "Message Privé"
+        )
 
         logger.error(f"❌ [Bot] Crash sur la commande '/{cmd_name}':\n{tb_str}")
 
@@ -1482,7 +1501,11 @@ class GGEAssistantBot(commands.Bot):
 
         try:
             if interaction.type == discord.InteractionType.application_command:
-                lieu = interaction.guild.name if interaction.guild else "Message Privé"
+                lieu = (
+                    (interaction.guild.name or f"Serveur Externe ({interaction.guild.id})")
+                    if interaction.guild
+                    else "Message Privé"
+                )
                 params = []
 
                 def extract_options(opts):

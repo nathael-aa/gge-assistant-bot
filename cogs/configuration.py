@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 
@@ -48,7 +49,6 @@ async def load_users_config():
                 return await async_json_load(path)
             except Exception as e:
                 logger.error(f"❌ [Configuration] Erreur lecture users.json : {e}")
-                pass
     return {}
 
 
@@ -91,15 +91,12 @@ class ServerSetupWizard(discord.ui.View):
             },
         }
 
-        # 1. On charge la configuration des modules pour ce serveur GGE
         self.module_storm_active = False
         self.module_fortress_active = False
 
         try:
             cache_file = CONFIG_DIR / "servers_cache.json"
             if cache_file.exists():
-                import json
-
                 with open(cache_file, encoding="utf-8") as f:
                     servers_info = json.load(f).get("servers_info", {})
                     srv_data = servers_info.get(self.gge_server, {})
@@ -108,7 +105,6 @@ class ServerSetupWizard(discord.ui.View):
         except Exception as e:
             logger.error(f"❌ [Configuration] Erreur lecture modules pour Wizard : {e}")
 
-        # 2. On construit la liste des étapes en filtrant celles non supportées
         self.step_keys = ["intro", "news", "patchnotes", "hub_alerts", "calendar"]
         self.steps = [
             self.step_intro,
@@ -118,27 +114,47 @@ class ServerSetupWizard(discord.ui.View):
             self.step_calendar,
         ]
 
-        # Ajout conditionnel des étapes Storm
         if self.module_storm_active:
             self.step_keys.append("isle")
             self.steps.append(self.step_isle)
         else:
-            self.data["isle"]["disabled"] = True  # Désactivé par défaut si non supporté
+            self.data["isle"]["disabled"] = True
 
         if self.module_fortress_active:
             self.step_keys.append("forts")
             self.steps.append(self.step_forts)
         else:
-            self.data["forts"]["disabled"] = True  # Désactivé par défaut si non supporté
+            self.data["forts"]["disabled"] = True
 
-        # Ajout des dernières étapes
         self.step_keys.extend(["radar", "shop"])
         self.steps.extend([self.step_radar, self.step_shop])
 
         self.setup_current_step()
 
+    async def _select_channel(self, interaction: discord.Interaction, step_key: str, selected_channel) -> bool:
+        """Vérifie que le bot possède les permissions d'écriture et d'embed dans le salon sélectionné."""
+        real_channel = self.guild.get_channel(selected_channel.id) if self.guild else None
+        if real_channel and self.guild and self.guild.me:
+            perms = real_channel.permissions_for(self.guild.me)
+            if not (perms.view_channel and perms.send_messages and perms.embed_links):
+                self.data[step_key]["channel_id"] = None
+                msg_perm = t(
+                    self.lang,
+                    "cal_err_missing_perms",
+                    salon=real_channel.mention,
+                    defaut=(
+                        f"⚠️ Je n'ai pas les permissions nécessaires (**Voir le salon**, **Envoyer des messages** "
+                        f"et **Intégrer des liens**) dans {real_channel.mention}. Donne-moi ces permissions ou choisis un autre salon."
+                    ),
+                )
+                await interaction.response.send_message(msg_perm, ephemeral=True)
+                return False
+
+        self.data[step_key]["channel_id"] = int(selected_channel.id)
+        await interaction.response.defer()
+        return True
+
     def format_ping(self, r_id):
-        """Transforme l'ID brut du rôle en format mention Discord compréhensible par l'API."""
         if not r_id:
             return ""
         role = self.guild.get_role(r_id)
@@ -151,7 +167,6 @@ class ServerSetupWizard(discord.ui.View):
         self.steps[self.step_idx]()
 
     def add_controls(self, is_last: bool = False, extra_buttons: list = None, ctrl_row: int = 3):
-        """Standardise l'ordre des boutons: Cancel -> Extras -> Disable -> Skip -> Next"""
         btn_cancel = discord.ui.Button(
             label=t(self.lang, "wizard_btn_cancel", defaut="Cancel ✖️"), style=discord.ButtonStyle.danger, row=ctrl_row
         )
@@ -219,9 +234,6 @@ class ServerSetupWizard(discord.ui.View):
             view=None,
         )
 
-    # -------------------------------------------------------------
-    # 0. INTRO
-    # -------------------------------------------------------------
     def step_intro(self):
         btn_cancel = discord.ui.Button(
             label=t(self.lang, "wizard_btn_cancel", defaut="Cancel ✖️"), style=discord.ButtonStyle.danger, row=3
@@ -235,9 +247,6 @@ class ServerSetupWizard(discord.ui.View):
         btn_start.callback = self.advance
         self.add_item(btn_start)
 
-    # -------------------------------------------------------------
-    # 1. NEWS
-    # -------------------------------------------------------------
     def step_news(self):
         c_sel = discord.ui.ChannelSelect(
             channel_types=[discord.ChannelType.text],
@@ -246,8 +255,7 @@ class ServerSetupWizard(discord.ui.View):
         )
 
         async def c_callback(interaction: discord.Interaction):
-            self.data["news"]["channel_id"] = int(c_sel.values[0].id)
-            await interaction.response.defer()
+            await self._select_channel(interaction, "news", c_sel.values[0])
 
         c_sel.callback = c_callback
         self.add_item(c_sel)
@@ -265,9 +273,6 @@ class ServerSetupWizard(discord.ui.View):
 
         self.add_controls()
 
-    # -------------------------------------------------------------
-    # 2. PATCHNOTES
-    # -------------------------------------------------------------
     def step_patchnotes(self):
         c_sel = discord.ui.ChannelSelect(
             channel_types=[discord.ChannelType.text],
@@ -276,8 +281,7 @@ class ServerSetupWizard(discord.ui.View):
         )
 
         async def c_callback(interaction: discord.Interaction):
-            self.data["patchnotes"]["channel_id"] = int(c_sel.values[0].id)
-            await interaction.response.defer()
+            await self._select_channel(interaction, "patchnotes", c_sel.values[0])
 
         c_sel.callback = c_callback
         self.add_item(c_sel)
@@ -295,9 +299,6 @@ class ServerSetupWizard(discord.ui.View):
 
         self.add_controls()
 
-    # -------------------------------------------------------------
-    # 3. HUB ALERTS
-    # -------------------------------------------------------------
     def step_hub_alerts(self):
         c_sel = discord.ui.ChannelSelect(
             channel_types=[discord.ChannelType.text],
@@ -306,8 +307,7 @@ class ServerSetupWizard(discord.ui.View):
         )
 
         async def c_callback(interaction: discord.Interaction):
-            self.data["hub_alerts"]["channel_id"] = int(c_sel.values[0].id)
-            await interaction.response.defer()
+            await self._select_channel(interaction, "hub_alerts", c_sel.values[0])
 
         c_sel.callback = c_callback
         self.add_item(c_sel)
@@ -325,9 +325,6 @@ class ServerSetupWizard(discord.ui.View):
 
         self.add_controls()
 
-    # -------------------------------------------------------------
-    # 4. CALENDAR
-    # -------------------------------------------------------------
     def step_calendar(self):
         c_sel = discord.ui.ChannelSelect(
             channel_types=[discord.ChannelType.text],
@@ -336,17 +333,13 @@ class ServerSetupWizard(discord.ui.View):
         )
 
         async def c_callback(interaction: discord.Interaction):
-            self.data["calendar"]["channel_id"] = int(c_sel.values[0].id)
-            await interaction.response.defer()
+            await self._select_channel(interaction, "calendar", c_sel.values[0])
 
         c_sel.callback = c_callback
         self.add_item(c_sel)
 
         self.add_controls()
 
-    # -------------------------------------------------------------
-    # 5. ISLE (Storm Islands)
-    # -------------------------------------------------------------
     def step_isle(self):
         c_sel = discord.ui.ChannelSelect(
             channel_types=[discord.ChannelType.text],
@@ -355,8 +348,7 @@ class ServerSetupWizard(discord.ui.View):
         )
 
         async def c_callback(interaction: discord.Interaction):
-            self.data["isle"]["channel_id"] = int(c_sel.values[0].id)
-            await interaction.response.defer()
+            await self._select_channel(interaction, "isle", c_sel.values[0])
 
         c_sel.callback = c_callback
         self.add_item(c_sel)
@@ -414,9 +406,6 @@ class ServerSetupWizard(discord.ui.View):
 
         self.add_controls(extra_buttons=[btn_small, btn_big])
 
-    # -------------------------------------------------------------
-    # 6. FORTS (Storm Fortresses)
-    # -------------------------------------------------------------
     def step_forts(self):
         c_sel = discord.ui.ChannelSelect(
             channel_types=[discord.ChannelType.text],
@@ -425,8 +414,7 @@ class ServerSetupWizard(discord.ui.View):
         )
 
         async def c_callback(interaction: discord.Interaction):
-            self.data["forts"]["channel_id"] = int(c_sel.values[0].id)
-            await interaction.response.defer()
+            await self._select_channel(interaction, "forts", c_sel.values[0])
 
         c_sel.callback = c_callback
         self.add_item(c_sel)
@@ -462,9 +450,6 @@ class ServerSetupWizard(discord.ui.View):
 
         self.add_controls()
 
-    # -------------------------------------------------------------
-    # 7. RADAR
-    # -------------------------------------------------------------
     def step_radar(self):
         c_sel = discord.ui.ChannelSelect(
             channel_types=[discord.ChannelType.text],
@@ -473,8 +458,7 @@ class ServerSetupWizard(discord.ui.View):
         )
 
         async def c_callback(interaction: discord.Interaction):
-            self.data["radar"]["channel_id"] = int(c_sel.values[0].id)
-            await interaction.response.defer()
+            await self._select_channel(interaction, "radar", c_sel.values[0])
 
         c_sel.callback = c_callback
         self.add_item(c_sel)
@@ -492,9 +476,6 @@ class ServerSetupWizard(discord.ui.View):
 
         self.add_controls()
 
-    # -------------------------------------------------------------
-    # 8. SHOP / OFFERS
-    # -------------------------------------------------------------
     def step_shop(self):
         c_sel = discord.ui.ChannelSelect(
             channel_types=[discord.ChannelType.text],
@@ -503,8 +484,7 @@ class ServerSetupWizard(discord.ui.View):
         )
 
         async def c_callback(interaction: discord.Interaction):
-            self.data["shop"]["channel_id"] = int(c_sel.values[0].id)
-            await interaction.response.defer()
+            await self._select_channel(interaction, "shop", c_sel.values[0])
 
         c_sel.callback = c_callback
         self.add_item(c_sel)
@@ -568,11 +548,7 @@ class ServerSetupWizard(discord.ui.View):
 
         self.add_controls(is_last=True, ctrl_row=4)
 
-    # -------------------------------------------------------------
-    # EMBED GENERATION
-    # -------------------------------------------------------------
     def get_progress_color(self) -> discord.Color:
-        """Calcule un dégradé du bleu (52, 152, 219) au vert (46, 204, 113)"""
         progress = self.step_idx / max(1, len(self.steps) - 1)
         r = int(52 + (46 - 52) * progress)
         g = int(152 + (204 - 152) * progress)
@@ -595,7 +571,6 @@ class ServerSetupWizard(discord.ui.View):
 
         current_key = self.step_keys[self.step_idx]
 
-        # On utilise une liste complète d'informations, même si on saute des étapes.
         all_steps_info = {
             "news": (
                 t(self.lang, "wizard_news_title", defaut="📢 Official News"),
@@ -677,9 +652,6 @@ class ServerSetupWizard(discord.ui.View):
         )
         return embed
 
-    # -------------------------------------------------------------
-    # FINAL SAVE
-    # -------------------------------------------------------------
     async def finish_setup(self, interaction: discord.Interaction):
         self.stop()
         guild_id = str(self.guild.id)
@@ -707,7 +679,6 @@ class ServerSetupWizard(discord.ui.View):
             for old_key in ["news_channel_id", "news_ping_role", "patchnotes_channel_id", "patchnotes_ping_role"]:
                 hub_data["guilds"][guild_id].pop(old_key, None)
 
-            # News
             if self.data["news"]["disabled"]:
                 hub_data["guilds"][guild_id].pop("news", None)
                 recap.append("• **News:** *Désactivé*")
@@ -719,7 +690,6 @@ class ServerSetupWizard(discord.ui.View):
                 c = self.guild.get_channel(self.data["news"]["channel_id"])
                 recap.append(f"• **News:** {c.mention if c else 'Set'}")
 
-            # Patchnotes
             if self.data["patchnotes"]["disabled"]:
                 hub_data["guilds"][guild_id].pop("patchnotes", None)
                 recap.append("• **Patchnotes:** *Désactivé*")
@@ -731,7 +701,6 @@ class ServerSetupWizard(discord.ui.View):
                 c = self.guild.get_channel(self.data["patchnotes"]["channel_id"])
                 recap.append(f"• **Patchnotes:** {c.mention if c else 'Set'}")
 
-            # Hub Alerts
             if self.data["hub_alerts"]["disabled"]:
                 hub_data["guilds"][guild_id].pop("alerts", None)
                 recap.append("• **Hub Alerts:** *Désactivé*")
@@ -742,6 +711,9 @@ class ServerSetupWizard(discord.ui.View):
                 }
                 c = self.guild.get_channel(self.data["hub_alerts"]["channel_id"])
                 recap.append(f"• **Hub Alerts:** {c.mention if c else 'Set'}")
+
+            if not any(k in hub_data["guilds"][guild_id] for k in ("news", "patchnotes", "alerts")):
+                del hub_data["guilds"][guild_id]
 
             try:
                 await async_json_dump(hub_file, hub_data, indent=4)
@@ -777,6 +749,11 @@ class ServerSetupWizard(discord.ui.View):
                 c = self.guild.get_channel(self.data["calendar"]["channel_id"])
                 recap.append(f"• **Calendar:** {c.mention if c else 'Set'}")
 
+            if not cal_data["guilds"][guild_id].get("channel_id") and not cal_data["guilds"][guild_id].get(
+                "tracked_alliances"
+            ):
+                del cal_data["guilds"][guild_id]
+
             try:
                 await async_json_dump(cal_file, cal_data, indent=4)
             except Exception as e:
@@ -795,18 +772,15 @@ class ServerSetupWizard(discord.ui.View):
             if "guilds" not in storm_data:
                 storm_data["guilds"] = {}
 
-            # Ne créer l'entrée de la guilde que si un des deux modules storm est utilisé
             if not self.data["isle"]["disabled"] or not self.data["forts"]["disabled"]:
                 if guild_id not in storm_data["guilds"]:
                     storm_data["guilds"][guild_id] = {}
                 storm_data["guilds"][guild_id]["gge_server"] = self.gge_server
                 storm_data["guilds"][guild_id]["langue"] = self.lang
 
-            # Isle
             if self.data["isle"]["disabled"]:
                 if guild_id in storm_data["guilds"]:
                     storm_data["guilds"][guild_id].pop("isle_channel_id", None)
-                # Ne l'ajoute au récap que si le module est supporté, sinon ça fait du bruit pour rien
                 if self.module_storm_active:
                     recap.append("• **Storm Isles:** *Désactivé*")
             elif self.data["isle"]["channel_id"]:
@@ -818,7 +792,6 @@ class ServerSetupWizard(discord.ui.View):
                 c_isle = self.guild.get_channel(self.data["isle"]["channel_id"])
                 recap.append(f"• **Storm Isles:** {c_isle.mention if c_isle else 'Set'}")
 
-            # Forts
             if self.data["forts"]["disabled"]:
                 if guild_id in storm_data["guilds"]:
                     storm_data["guilds"][guild_id].pop("fort_channel_id", None)
@@ -834,7 +807,6 @@ class ServerSetupWizard(discord.ui.View):
                     f"• **Storm Fortresses:** {c_forts.mention if c_forts else 'Set'} (Lvl: `{self.data['forts']['min_level']}+`)"
                 )
 
-            # Nettoyer la guilde si elle est complètement vide
             if guild_id in storm_data["guilds"]:
                 if not storm_data["guilds"][guild_id].get("isle_channel_id") and not storm_data["guilds"][guild_id].get(
                     "fort_channel_id"
@@ -882,6 +854,9 @@ class ServerSetupWizard(discord.ui.View):
                 c = self.guild.get_channel(self.data["radar"]["channel_id"])
                 recap.append(f"• **Radar:** {c.mention if c else 'Set'}")
 
+            if not radar_data["guild_configs"][guild_id].get("channel_id"):
+                del radar_data["guild_configs"][guild_id]
+
             try:
                 await async_json_dump(radar_file, radar_data, indent=4)
             except Exception as e:
@@ -918,10 +893,12 @@ class ServerSetupWizard(discord.ui.View):
                 prof_label = "LL 950+" if self.data["shop"]["profile"] == 950 else "Normal (LL 0)"
                 recap.append(f"• **Shop Offers:** {c.mention if c else 'Set'} (`{prof_label}`)")
 
-                # Lancement du scan de bienvenue
                 offers_cog = self.cog.bot.get_cog("OffersCog")
                 if offers_cog and hasattr(offers_cog, "trigger_immediate_scan") and c:
                     asyncio.create_task(offers_cog.trigger_immediate_scan(c, guild_id, alerts_data["guilds"][guild_id]))
+
+            if not alerts_data["guilds"][guild_id].get("channel_id"):
+                del alerts_data["guilds"][guild_id]
 
             try:
                 await async_json_dump(alerts_file, alerts_data, indent=4)
@@ -947,9 +924,6 @@ class ConfigurationCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    # ==========================================
-    # 🔍 SERVER AUTOCOMPLETE
-    # ==========================================
     async def server_autocomplete(self, interaction: discord.Interaction, current: str):
         langue, _ = await get_server_config(interaction)
 
@@ -991,9 +965,6 @@ class ConfigurationCog(commands.Cog):
 
         return choix
 
-    # ==========================================
-    # ⚙️ EMERGENCY SCAN ENGINE
-    # ==========================================
     def trigger_emergency_scan(self, serveur_upper: str) -> bool:
         dossier_serveur = BASE_DATA_PATH / "server_scans" / serveur_upper
         if dossier_serveur.exists():
@@ -1027,9 +998,6 @@ class ConfigurationCog(commands.Cog):
         self.bot.loop.create_task(scan_urgence_background(serveur_upper))
         return True
 
-    # ==========================================
-    # 👤 USER SETUP
-    # ==========================================
     @app_commands.command(name="setup", description="Configure your language and your primary GGE server.")
     @app_commands.describe(language="Your primary language", server="Your Goodgame Empire server")
     @app_commands.choices(
@@ -1041,7 +1009,6 @@ class ConfigurationCog(commands.Cog):
     )
     @app_commands.autocomplete(server=server_autocomplete)
     async def c_setup(self, interaction: discord.Interaction, language: app_commands.Choice[str], server: str):
-
         try:
             await interaction.response.defer(ephemeral=True)
         except Exception as e:
@@ -1116,9 +1083,6 @@ class ConfigurationCog(commands.Cog):
 
         await interaction.followup.send(embed=embed)
 
-    # ==========================================
-    # ⚙️ SERVER SETUP (STANDALONE COMMAND)
-    # ==========================================
     @app_commands.command(
         name="server-setup",
         description="Launch the interactive wizard to configure alerts, channels and notifications.",

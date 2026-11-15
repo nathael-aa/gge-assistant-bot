@@ -1,9 +1,10 @@
 import json
 import logging
 import os
+import time
 import traceback
 import urllib.parse
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
 import aiohttp
@@ -30,19 +31,20 @@ from utils import (
 logger = logging.getLogger("GGE_Bot")
 
 
-# ==========================================
-# LE COMPOSANT UI : VÉRIFIER & RELANCER
-# ==========================================
 class FortressActionView(discord.ui.View):
-    def __init__(self, cog, user_id: str, cibles: list, joueur: str, serveur: str, langue: str = "fr"):
+    def __init__(
+        self, cog: "ForteressesCog", user_id: str, cibles: list, joueur: str, serveur: str, langue: str = "fr"
+    ):
         super().__init__(timeout=3600)
         self.cog = cog
-        self.user_id = user_id
+        self.user_id = str(user_id)
         self.message = None
         self.cibles = cibles
         self.joueur = joueur
         self.serveur = serveur
         self.langue = langue
+        self._is_processing = False
+        self._last_verify_ts = 0.0
 
         self.btn_verify = discord.ui.Button(
             style=discord.ButtonStyle.secondary,
@@ -63,24 +65,56 @@ class FortressActionView(discord.ui.View):
         self.add_item(self.btn_verify)
         self.add_item(self.btn_relaunch)
 
-    async def callback_verify(self, interaction: discord.Interaction):
-        logger.info(f"🔎 [Forts] {interaction.user.name} a cliqué sur 'Vérifier' pour {self.joueur}.")
-        await interaction.response.defer(thinking=True, ephemeral=False)
-        await self.cog.verify_and_send(interaction, self.cibles, self.joueur, self.serveur, self.langue)
+        self.cog.register_view(self.user_id, self)
 
-    async def callback_relaunch(self, interaction: discord.Interaction):
-        logger.info(f"🔄 [Forts] {interaction.user.name} a cliqué sur 'Relancer' pour {self.joueur}.")
-        await interaction.response.defer(thinking=True, ephemeral=False)
-        await self.cog.relaunch_scan(interaction, self.user_id, self.langue)
-
-    async def on_timeout(self):
+    async def disable_all_buttons(self):
         for child in self.children:
             child.disabled = True
-        if hasattr(self, "message") and self.message:
+        if self.message:
             try:
                 await self.message.edit(view=self)
             except discord.HTTPException:
                 pass
+
+    async def callback_verify(self, interaction: discord.Interaction):
+        now = time.monotonic()
+        if self._is_processing or (now - self._last_verify_ts) < 3.0:
+            msg_wait = t(self.langue, "err_spam", defaut="⏳ Une action est déjà en cours, patiente un instant...")
+            return await interaction.response.send_message(msg_wait, ephemeral=True)
+
+        self._is_processing = True
+        self._last_verify_ts = now
+        try:
+            logger.info(f"🔎 [Forts] {interaction.user.name} a cliqué sur 'Vérifier' pour {self.joueur}.")
+            await interaction.response.defer(thinking=True, ephemeral=False)
+            if not self.message:
+                self.message = interaction.message
+            await self.cog.verify_and_send(interaction, self.cibles, self.joueur, self.serveur, self.langue)
+        finally:
+            self._is_processing = False
+
+    async def callback_relaunch(self, interaction: discord.Interaction):
+        if self._is_processing or self.btn_relaunch.disabled:
+            msg_wait = t(self.langue, "err_spam", defaut="⏳ Relance déjà en cours, patiente un instant...")
+            return await interaction.response.send_message(msg_wait, ephemeral=True)
+
+        self._is_processing = True
+        self.btn_relaunch.disabled = True
+        try:
+            logger.info(f"🔄 [Forts] {interaction.user.name} a cliqué sur 'Relancer' pour {self.joueur}.")
+            await interaction.response.defer(thinking=True, ephemeral=False)
+            if not self.message:
+                self.message = interaction.message
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
+            await self.cog.relaunch_scan(interaction, self.user_id, self.langue, source_view=self)
+        finally:
+            self._is_processing = False
+
+    async def on_timeout(self):
+        await self.disable_all_buttons()
 
 
 @app_commands.allowed_contexts(guilds=False, dms=True, private_channels=True)
@@ -92,6 +126,20 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         self.clr_activation = discord.Color.from_rgb(180, 238, 180)
         self.clr_attente = discord.Color.from_rgb(255, 195, 160)
         self.base_api = "https://api.gge-tracker.com/api/v1"
+        self.active_views: dict[str, list[FortressActionView]] = defaultdict(list)
+
+    def register_view(self, user_id: str, view: FortressActionView):
+        uid = str(user_id)
+        self.active_views[uid].append(view)
+        if len(self.active_views[uid]) > 10:
+            self.active_views[uid] = self.active_views[uid][-10:]
+
+    async def deactivate_user_views(self, user_id: str):
+        uid = str(user_id)
+        views = self.active_views.pop(uid, [])
+        for v in views:
+            v.stop()
+            await v.disable_all_buttons()
 
     async def cog_load(self):
         if not self.dungeon_spy_task.is_running():
@@ -101,7 +149,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         self.dungeon_spy_task.cancel()
 
     async def fetch_meta_scan(self, session: aiohttp.ClientSession, headers: dict) -> str:
-        """Récupère l'heure du dernier scan global des forteresses."""
         url = f"{self.base_api}/dungeons/meta"
         try:
             async with session.get(url, headers=headers, timeout=5) as r:
@@ -198,9 +245,17 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         await setup_embed_footer(embed, interaction, langue)
         await interaction.followup.send(embed=embed, ephemeral=False)
 
-    async def relaunch_scan(self, interaction: discord.Interaction, user_id: str, langue: str):
+    async def relaunch_scan(
+        self,
+        interaction: discord.Interaction,
+        user_id: str,
+        langue: str,
+        source_view: FortressActionView = None,
+    ):
         data = await load_dungeons_async()
         if user_id not in data.get("sessions", {}):
+            if source_view:
+                await source_view.disable_all_buttons()
             msg_err = t(
                 langue,
                 "fort_err_no_session",
@@ -251,8 +306,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
     def chain_targets_by_coordinates(self, cibles: list) -> list:
         if not cibles:
             return []
-
-        from collections import defaultdict
 
         by_kid = defaultdict(list)
         for c in cibles:
@@ -545,6 +598,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         user_id = str(interaction.user.id)
 
         if user_id in data.get("sessions", {}):
+            await self.deactivate_user_views(user_id)
             msg_warn = t(
                 langue,
                 "fort_warn_overwrite",
@@ -580,7 +634,6 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         data["sessions"][user_id] = info_session
         await save_dungeons_async(data)
 
-        # Enregistrement Télémétrie
         if interaction.guild:
             obs.record_guild_event(
                 "fortress_scan_started",
@@ -666,12 +719,13 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         data = await load_dungeons_async()
         user_id = str(interaction.user.id)
 
+        await self.deactivate_user_views(user_id)
+
         if user_id in data["sessions"]:
             del data["sessions"][user_id]
             await save_dungeons_async(data)
             logger.info(f"🛑 [Forts] {interaction.user.name} a stoppé son scan radar.")
 
-            # Enregistrement Télémétrie
             if interaction.guild:
                 obs.record_guild_event(
                     "fortress_scan_stopped", guild=interaction.guild, user_id=interaction.user.id, gge_server=serveur
@@ -723,6 +777,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                     if maintenant > end_dt:
                         del data["sessions"][user_id]
                         sessions_modifiees = True
+                        await self.deactivate_user_views(user_id)
                         try:
                             user = self.bot.get_user(int(user_id)) or await self.bot.fetch_user(int(user_id))
                             msg = t(
@@ -766,7 +821,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                         logger.info(
                             f"📤 [Forts] Envoi automatique de nouvelles cibles à {user.name} ({user_id}) pour {joueur}."
                         )
-                        await user.send(embed=embed_cibles, view=view)
+                        view.message = await user.send(embed=embed_cibles, view=view)
 
                         obs.record_alert(
                             source="fortress",

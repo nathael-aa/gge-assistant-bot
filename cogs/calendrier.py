@@ -29,9 +29,6 @@ logger = logging.getLogger("GGE_Bot")
 CALENDRIER_FILE = SERVEURS_DIR / "calendrier.json"
 
 
-# ===========================================
-# 🛠️ CLASSE DE NAVIGATION UI (AVEC TIMEOUT)
-# ===========================================
 class CalendarNavView(discord.ui.View):
     def __init__(self, embeds_dict, current_page, langue="fr", timeout=3600):
         super().__init__(timeout=timeout)
@@ -108,7 +105,6 @@ class CalendarNavView(discord.ui.View):
 
 
 def generate_event_id(event_key, ts_start):
-    """Génère un ID court (4-5 caractères) prévisible pour l'événement"""
     raw_str = f"{event_key}_{ts_start}"
     return hashlib.md5(raw_str.encode()).hexdigest()[:5]
 
@@ -202,6 +198,17 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
 
         langue, serveur = await get_server_config(interaction)
 
+        if interaction.guild and interaction.guild.me:
+            perms = channel.permissions_for(interaction.guild.me)
+            if not (perms.view_channel and perms.send_messages and perms.embed_links):
+                msg_perm = t(
+                    langue,
+                    "cal_err_missing_perms",
+                    salon=channel.mention,
+                    defaut=f"⚠️ Je n'ai pas les permissions nécessaires (**Voir le salon**, **Envoyer des messages** et **Intégrer des liens**) dans {channel.mention}.",
+                )
+                return await interaction.followup.send(msg_perm, ephemeral=True)
+
         data = await load_calendrier_async()
         guild_id = str(interaction.guild_id)
 
@@ -214,7 +221,6 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
 
         await save_calendrier_async(data)
 
-        # Enregistrement Télémétrie d'engagement
         obs.record_guild_event(
             "calendar_setup",
             guild=interaction.guild,
@@ -628,10 +634,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                             if not channel:
                                 try:
                                     channel = await self.bot.fetch_channel(channel_id)
-                                except discord.NotFound:
-                                    guilds_to_remove.append(guild_id)
-                                    continue
-                                except discord.Forbidden:
+                                except (discord.NotFound, discord.Forbidden):
                                     guilds_to_remove.append(guild_id)
                                     continue
                                 except Exception:
@@ -721,17 +724,20 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
 
                     guilds_to_remove = []
 
-                    for guild_id, g_info in data.get("guilds", {}).items():
+                    # Tri des guildes par serveur GGE pour éviter de recharger plusieurs fois le même serveur en RAM (Anti-OOM)
+                    sorted_guilds = sorted(
+                        data.get("guilds", {}).items(),
+                        key=lambda item: item[1].get("gge_server", "E4K_FR1"),
+                    )
+
+                    for guild_id, g_info in sorted_guilds:
                         channel_id = g_info.get("channel_id")
                         if channel_id:
                             channel = self.bot.get_channel(channel_id)
                             if not channel:
                                 try:
                                     channel = await self.bot.fetch_channel(channel_id)
-                                except discord.NotFound:
-                                    guilds_to_remove.append(guild_id)
-                                    continue
-                                except discord.Forbidden:
+                                except (discord.NotFound, discord.Forbidden):
                                     guilds_to_remove.append(guild_id)
                                     continue
                                 except Exception:
@@ -785,6 +791,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                         failed=1,
                                         dm_blocked=0,
                                     )
+                                    continue
                                 except Exception as e:
                                     logger.error(f"❌ [Calendar] Erreur d'envoi alerte fin calendrier : {e}")
                                     obs.record_alert(
@@ -817,7 +824,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                                     try:
                                                         await channel.send(embed=embed_rapport)
                                                     except (discord.Forbidden, discord.NotFound):
-                                                        pass
+                                                        break
                                                     except Exception as req_e:
                                                         logger.error(
                                                             f"❌ [Calendar] Impossible d'envoyer le rapport final de {alliance_nom} : {req_e}"
@@ -833,7 +840,7 @@ class CalendrierCog(commands.GroupCog, group_name="calendar", group_description=
                                                     try:
                                                         await channel.send(err_msg)
                                                     except (discord.Forbidden, discord.NotFound):
-                                                        pass
+                                                        break
                                                     except Exception as req_e:
                                                         logger.error(
                                                             f"❌ [Calendar] Impossible d'envoyer l'erreur de rapport pour {alliance_nom} : {req_e}"
