@@ -85,6 +85,7 @@ class LiveRankingView(discord.ui.View):
         interaction: discord.Interaction,
         langue: str,
         serveur_api: str,
+        serveur_local: str,
         event_id: int,
         lid: int,
         titre: str,
@@ -108,6 +109,7 @@ class LiveRankingView(discord.ui.View):
         self.ctx_int = interaction
         self.langue = langue
         self.serveur_api = serveur_api
+        self.serveur_local = serveur_local
         self.event_id = event_id
         self.lid = lid
         self.titre = titre
@@ -149,7 +151,6 @@ class LiveRankingView(discord.ui.View):
     def _setup_buttons(self):
         self.clear_items()
 
-        # Ligne 1 (row=0) : Précédent | Refresh | Suivant
         self.btn_prev = discord.ui.Button(
             emoji=DICT_EMOJIS.get("e_last", "◀️"),
             style=discord.ButtonStyle.primary,
@@ -175,7 +176,6 @@ class LiveRankingView(discord.ui.View):
         )
         self.btn_next.callback = self.on_next
 
-        # Ligne 2 (row=1) : Page 1 | Aller au Rang #
         self.btn_first = discord.ui.Button(
             emoji=DICT_EMOJIS.get("e_one", "1️⃣"),
             style=discord.ButtonStyle.secondary,
@@ -242,6 +242,7 @@ class LiveRankingView(discord.ui.View):
             return
 
         api_sv_val = self._compute_api_sv(norm_sv)
+        err_kind = None
 
         if self.berimond_both_camps:
             res3 = await self.cog.fetch_single_chunk(
@@ -258,6 +259,8 @@ class LiveRankingView(discord.ui.View):
                     l_chunk.extend(c_data.get("L", []))
                     if isinstance(c_data.get("LR"), int):
                         lr_val = max(lr_val, c_data.get("LR"))
+                elif r_camp and r_camp.get("_err_kind"):
+                    err_kind = r_camp.get("_err_kind")
             res_ok = bool(l_chunk)
         else:
             res = await self.cog.fetch_single_chunk(
@@ -271,16 +274,21 @@ class LiveRankingView(discord.ui.View):
                 is_string_val=self.is_string_val,
             )
             res_ok = bool(res and str(res.get("return_code")) == "0")
+            if not res_ok and isinstance(res, dict):
+                err_kind = res.get("_err_kind")
             content = res.get("content", {}) if res_ok else {}
             l_chunk = content.get("L", [])
             lr_val = content.get("LR")
 
         if not res_ok:
-            msg_err = t(
-                self.langue,
-                "api_unavailable_error",
-                defaut="⚠️ **L'API de classement est momentanément indisponible ou la fin du classement est atteinte.**",
-            )
+            if err_kind and err_kind != "not_found_or_inactive":
+                msg_err = self.cog._build_api_error_message(self.langue, err_kind, self.serveur_local)
+            else:
+                msg_err = t(
+                    self.langue,
+                    "rank_end_reached",
+                    defaut="📭 Aucune donnée supplémentaire à ce rang.",
+                )
             await interaction.followup.send(msg_err, ephemeral=True)
             return
 
@@ -367,6 +375,55 @@ class ClassementCog(commands.Cog):
             self._server_locks[serveur_api] = asyncio.Semaphore(2)
         return self._server_locks[serveur_api]
 
+    def _build_api_error_message(self, langue: str, err_kind: str, serveur_local: str) -> str:
+        if err_kind == "unsupported":
+            return t(
+                langue,
+                "rank_err_server_unsupported",
+                srv=serveur_local,
+                defaut=f"⚠️ **Le serveur `{serveur_local}` n'est pas encore supporté par l'API des classements en direct.**",
+            )
+        if err_kind == "server_500":
+            return t(
+                langue,
+                "rank_err_relay_500",
+                srv=serveur_local,
+                defaut=f"⚠️ **Le serveur relais de `{serveur_local}` rencontre actuellement une erreur interne (500).**\nL'API externe du jeu ne répond pas pour ce serveur pour le moment, réessayez plus tard.",
+            )
+        if err_kind == "rate_limit":
+            return t(
+                langue,
+                "rank_err_rate_limit",
+                srv=serveur_local,
+                defaut=f"⏳ **Trop de requêtes simultanées** sur le serveur `{serveur_local}`.\nVeuillez patienter quelques secondes avant de réessayer.",
+            )
+        if err_kind == "timeout":
+            return t(
+                langue,
+                "rank_err_api_timeout",
+                srv=serveur_local,
+                defaut=f"⏳ **Délai d'attente dépassé** : le serveur `{serveur_local}` met trop de temps à répondre.\nVeuillez réessayer dans quelques instants.",
+            )
+        if err_kind == "not_found_or_inactive":
+            return t(
+                langue,
+                "rank_err_inactive_or_missing",
+                srv=serveur_local,
+                defaut=f"📭 **Aucune donnée disponible** : cet événement n'est probablement pas actif actuellement sur `{serveur_local}` (ou le rang demandé est hors limite).",
+            )
+        if err_kind == "client_error":
+            return t(
+                langue,
+                "rank_err_client",
+                srv=serveur_local,
+                defaut=f"⚠️ **Requête rejetée par l'API de classement** pour `{serveur_local}`.\nVérifiez les paramètres saisis ou réessayez plus tard.",
+            )
+        return t(
+            langue,
+            "api_unavailable_error",
+            defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
+        )
+
     async def _http_get_json(self, url: str, headers: dict = None, timeout: int = 10):
         r = await self.bot.session.get(url, headers=headers, timeout=timeout)
         try:
@@ -389,6 +446,9 @@ class ClassementCog(commands.Cog):
         pagination_param: str = "SV",
         is_string_val: bool = True,
     ):
+        if not serveur_api:
+            return {"return_code": "-1", "_err_kind": "unsupported"}
+
         sv_encoded = urllib.parse.quote(str(sv_val))
         effective_lid = 1 if is_alliance else lid
 
@@ -403,6 +463,7 @@ class ClassementCog(commands.Cog):
                 f"%22LT%22:{event_id},%22LID%22:{effective_lid},%22{pagination_param}%22:{sv_encoded}"
             )
 
+        last_err_kind = "unavailable"
         sem = self._get_server_sem(serveur_api)
         async with sem:
             for attempt in range(3):
@@ -410,20 +471,35 @@ class ClassementCog(commands.Cog):
                     status, data = await self._http_get_json(url, timeout=10)
                     if status == 200 and data is not None:
                         return data
+                    if status == 429:
+                        last_err_kind = "rate_limit"
+                        self.logger.warning(f"⚠️ [API] Rate limit (429) sur {serveur_api}. URL: {url}")
+                        await asyncio.sleep(1.5)
+                        continue
                     if status in [400, 404]:
-                        return data if isinstance(data, dict) else {"return_code": "-1", "http_status": status}
+                        if isinstance(data, dict):
+                            data.setdefault("_err_kind", "not_found_or_inactive")
+                            return data
+                        return {"return_code": "-1", "http_status": status, "_err_kind": "not_found_or_inactive"}
+                    if 400 <= status < 500:
+                        self.logger.warning(f"⚠️ [API] Erreur client {status} reçue. URL: {url}")
+                        return {"return_code": "-1", "http_status": status, "_err_kind": "client_error"}
 
                     self.logger.warning(f"⚠️ [API] Code {status} reçu. URL: {url}")
-                    if status in [429, 500, 502, 503, 504]:
+                    if status in [500, 502, 503, 504]:
+                        last_err_kind = "server_500"
                         await asyncio.sleep(1.2)
                 except TimeoutError:
+                    last_err_kind = "timeout"
                     self.logger.warning(f"⏳ [API] Timeout (Tentative {attempt + 1}/3) - URL: {url}")
                 except Exception as e:
-                    self.logger.error(f"❌ [API] Erreur de connexion : {e}")
+                    last_err_kind = "unavailable"
+                    self.logger.error(f"❌ [API] Erreur de connexion : {type(e).__name__}: {e}")
                 await asyncio.sleep(0.3)
-        return None
 
-    def get_serveur_api(self, serveur_local: str) -> str:
+        return {"return_code": "-1", "_err_kind": last_err_kind}
+
+    def get_serveur_api(self, serveur_local: str) -> str | None:
         from utils import FLYDEV_MAPPING
 
         serveur_lower = serveur_local.lower()
@@ -717,8 +793,11 @@ class ClassementCog(commands.Cog):
         is_string_val: bool = True,
         berimond_both_camps: bool = False,
     ):
+        if not serveur_api:
+            return [], default_lid, False, 1, None, "unsupported"
+
         search_mode = bool(search_target)
-        any_response = False
+        last_err_kind = None
 
         def matches_target(p_item) -> bool:
             api_name = extract_p_name(p_item).lower()
@@ -754,8 +833,8 @@ class ClassementCog(commands.Cog):
                         pagination_param=pagination_param,
                         is_string_val=True,
                     )
-                    if res is not None:
-                        any_response = True
+                    if res and res.get("_err_kind"):
+                        last_err_kind = res.get("_err_kind")
                     if res and str(res.get("return_code")) == "0":
                         content = res.get("content", {})
                         l_chunk = content.get("L", [])
@@ -768,11 +847,11 @@ class ClassementCog(commands.Cog):
                             for p in l_chunk:
                                 if matches_target(p):
                                     p_rank = extract_p_rank(p)
-                                    return l_chunk, lid, True, p_rank, lr_val, False
+                                    return l_chunk, lid, True, p_rank, lr_val, None
 
             if first_valid_chunk:
                 r_anchor = extract_p_rank(first_valid_chunk[0])
-                return first_valid_chunk, first_valid_lid, True, r_anchor, first_valid_lr, False
+                return first_valid_chunk, first_valid_lid, True, r_anchor, first_valid_lr, None
 
         if search_mode and not target_rank and api_command == "llsp":
             for r_start in (1, 11, 21, 31, 41):
@@ -786,8 +865,8 @@ class ClassementCog(commands.Cog):
                     pagination_param="R",
                     is_string_val=False,
                 )
-                if res is not None:
-                    any_response = True
+                if res and res.get("_err_kind"):
+                    last_err_kind = res.get("_err_kind")
                 if res and str(res.get("return_code")) == "0":
                     content = res.get("content", {})
                     l_chunk = content.get("L", [])
@@ -795,7 +874,7 @@ class ClassementCog(commands.Cog):
                     if l_chunk:
                         for p in l_chunk:
                             if matches_target(p):
-                                return l_chunk, default_lid, True, r_start, lr_val, False
+                                return l_chunk, default_lid, True, r_start, lr_val, None
                     else:
                         break
 
@@ -813,14 +892,15 @@ class ClassementCog(commands.Cog):
             l_chunk = []
             lr_val = 0
             for r_camp in (res3, res4):
-                if r_camp is not None:
-                    any_response = True
+                if r_camp and r_camp.get("_err_kind"):
+                    last_err_kind = r_camp.get("_err_kind")
                 if r_camp and str(r_camp.get("return_code")) == "0":
                     c_data = r_camp.get("content", {})
                     l_chunk.extend(c_data.get("L", []))
                     if isinstance(c_data.get("LR"), int):
                         lr_val = max(lr_val, c_data.get("LR"))
-            return l_chunk, 3, False, norm_sv, lr_val or None, not any_response
+            err_out = None if l_chunk else last_err_kind
+            return l_chunk, 3, False, norm_sv, lr_val or None, err_out
 
         res = await self.fetch_single_chunk(
             serveur_api=serveur_api,
@@ -833,18 +913,16 @@ class ClassementCog(commands.Cog):
             is_string_val=is_string_val,
         )
 
-        if res is None:
-            return [], default_lid, False, norm_sv, None, not any_response
-
-        if str(res.get("return_code")) == "0":
+        if res and str(res.get("return_code")) == "0":
             content = res.get("content", {})
             l_chunk = content.get("L", [])
             lr_val = content.get("LR")
             found_in_fallback = any(matches_target(p) for p in l_chunk) if search_mode else False
             first_r = extract_p_rank(l_chunk[0]) if l_chunk else norm_sv
-            return l_chunk, default_lid, found_in_fallback, first_r, lr_val, False
+            return l_chunk, default_lid, found_in_fallback, first_r, lr_val, None
 
-        return [], default_lid, False, norm_sv, None, False
+        err_out = (res.get("_err_kind") if isinstance(res, dict) else None) or last_err_kind
+        return [], default_lid, False, norm_sv, None, err_out
 
     def _build_not_found_warning(
         self, langue: str, target_name: str, target_rank: int = None, is_alliance: bool = False
@@ -977,12 +1055,7 @@ class ClassementCog(commands.Cog):
             )
 
             if api_err:
-                msg_err = t(
-                    langue,
-                    "api_unavailable_error",
-                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                )
-                return await interaction.followup.send(msg_err)
+                return await interaction.followup.send(self._build_api_error_message(langue, api_err, serveur_local))
 
             if not l_chunk:
                 return await interaction.followup.send(
@@ -1045,6 +1118,7 @@ class ClassementCog(commands.Cog):
                 interaction=interaction,
                 langue=langue,
                 serveur_api=serveur_api,
+                serveur_local=serveur_local,
                 event_id=event_id,
                 lid=found_lid,
                 titre=titre,
@@ -1157,12 +1231,7 @@ class ClassementCog(commands.Cog):
             )
 
             if api_err:
-                msg_err = t(
-                    langue,
-                    "api_unavailable_error",
-                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                )
-                return await interaction.followup.send(msg_err)
+                return await interaction.followup.send(self._build_api_error_message(langue, api_err, serveur_local))
 
             if not l_chunk:
                 return await interaction.followup.send(
@@ -1225,6 +1294,7 @@ class ClassementCog(commands.Cog):
                 interaction=interaction,
                 langue=langue,
                 serveur_api=serveur_api,
+                serveur_local=serveur_local,
                 event_id=event_id,
                 lid=found_lid,
                 titre=titre,
@@ -1323,12 +1393,7 @@ class ClassementCog(commands.Cog):
             )
 
             if api_err:
-                msg_err = t(
-                    langue,
-                    "api_unavailable_error",
-                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                )
-                return await interaction.followup.send(msg_err)
+                return await interaction.followup.send(self._build_api_error_message(langue, api_err, serveur_local))
 
             if not l_chunk:
                 return await interaction.followup.send(
@@ -1368,6 +1433,7 @@ class ClassementCog(commands.Cog):
                 interaction=interaction,
                 langue=langue,
                 serveur_api=serveur_api,
+                serveur_local=serveur_local,
                 event_id=event_id,
                 lid=1,
                 titre=titre,
@@ -1456,12 +1522,7 @@ class ClassementCog(commands.Cog):
             )
 
             if api_err:
-                msg_err = t(
-                    langue,
-                    "api_unavailable_error",
-                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                )
-                return await interaction.followup.send(msg_err)
+                return await interaction.followup.send(self._build_api_error_message(langue, api_err, serveur_local))
 
             if not l_chunk:
                 return await interaction.followup.send(
@@ -1501,6 +1562,7 @@ class ClassementCog(commands.Cog):
                 interaction=interaction,
                 langue=langue,
                 serveur_api=serveur_api,
+                serveur_local=serveur_local,
                 event_id=event_id,
                 lid=1,
                 titre=titre,
@@ -1598,12 +1660,7 @@ class ClassementCog(commands.Cog):
             )
 
             if api_err:
-                msg_err = t(
-                    langue,
-                    "api_unavailable_error",
-                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                )
-                return await interaction.followup.send(msg_err)
+                return await interaction.followup.send(self._build_api_error_message(langue, api_err, serveur_local))
 
             if not l_chunk:
                 return await interaction.followup.send(
@@ -1660,6 +1717,7 @@ class ClassementCog(commands.Cog):
                 interaction=interaction,
                 langue=langue,
                 serveur_api=serveur_api,
+                serveur_local=serveur_local,
                 event_id=event_id,
                 lid=found_lid,
                 titre=titre,
@@ -1768,12 +1826,7 @@ class ClassementCog(commands.Cog):
             )
 
             if api_err:
-                msg_err = t(
-                    langue,
-                    "api_unavailable_error",
-                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                )
-                return await interaction.followup.send(msg_err)
+                return await interaction.followup.send(self._build_api_error_message(langue, api_err, serveur_local))
 
             if not l_chunk:
                 return await interaction.followup.send(
@@ -1839,6 +1892,7 @@ class ClassementCog(commands.Cog):
                 interaction=interaction,
                 langue=langue,
                 serveur_api=serveur_api,
+                serveur_local=serveur_local,
                 event_id=event_id,
                 lid=found_lid,
                 titre=titre,
@@ -1981,12 +2035,7 @@ class ClassementCog(commands.Cog):
             )
 
             if api_err:
-                msg_err = t(
-                    langue,
-                    "api_unavailable_error",
-                    defaut="⚠️ **L'API de classement est actuellement indisponible ou trop lente.**\nVeuillez réessayer dans quelques instants.",
-                )
-                return await interaction.followup.send(msg_err)
+                return await interaction.followup.send(self._build_api_error_message(langue, api_err, serveur_local))
 
             if not l_chunk:
                 embed_empty = discord.Embed(
@@ -2027,6 +2076,7 @@ class ClassementCog(commands.Cog):
                 interaction=interaction,
                 langue=langue,
                 serveur_api=serveur_api,
+                serveur_local=serveur_local,
                 event_id=event_id,
                 lid=1,
                 titre=titre,

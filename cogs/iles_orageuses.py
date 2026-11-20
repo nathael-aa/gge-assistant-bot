@@ -34,6 +34,13 @@ logger = logging.getLogger("GGE_Bot")
 STORM_CONFIG_PATH = SERVEURS_DIR / "storm_alerts.json"
 
 
+def _fmt_net_err(exc: Exception) -> str:
+    msg = str(exc).strip()
+    if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+        return f"TimeoutError ({msg})" if msg else "TimeoutError (délai dépassé)"
+    return f"{type(exc).__name__}: {msg}" if msg else type(exc).__name__
+
+
 # ===========================================
 # 💾 GESTION DE LA SAUVEGARDE
 # ===========================================
@@ -326,8 +333,8 @@ class AquamarineSelectView(discord.ui.View):
 class IlesOrageusesCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.clr_forts = discord.Color.from_rgb(230, 126, 34)  # Orange
-        self.clr_isles = discord.Color.from_rgb(64, 224, 208)  # Cyan
+        self.clr_forts = discord.Color.from_rgb(230, 126, 34)
+        self.clr_isles = discord.Color.from_rgb(64, 224, 208)
         self.clr_occupier = discord.Color.from_rgb(137, 196, 199)
         self.clr_status = discord.Color.from_rgb(132, 206, 209)
         self.clr_setup = discord.Color.from_rgb(144, 232, 219)
@@ -338,6 +345,38 @@ class IlesOrageusesCog(commands.Cog):
         self.active_alerts = []
 
     storm_group = app_commands.Group(name="storm", description="Commands for the Storm Islands event")
+
+    async def _fetch_storm_api(self, url: str, headers: dict, params: dict, label: str, gge_server: str) -> dict:
+        for attempt in range(2):
+            try:
+                async with self.bot.session.get(url, headers=headers, params=params, timeout=18) as r:
+                    if r.status == 200:
+                        return await r.json()
+                    logger.warning(f"⚠️ [Storms Alerts] Code {r.status} API ({label}). Serveur: {gge_server}")
+                    return {}
+            except (TimeoutError, aiohttp.ClientOSError, ConnectionResetError) as e:
+                if attempt == 0:
+                    await asyncio.sleep(1.5)
+                    continue
+                logger.warning(f"⚠️ [Storms Alerts] Réseau/Timeout API ({label}) pour {gge_server} : {_fmt_net_err(e)}")
+            except Exception as e:
+                logger.error(f"❌ [Storms Alerts] Erreur API ({label}) pour {gge_server} : {_fmt_net_err(e)}")
+                break
+        return {}
+
+    async def _send_with_retry(
+        self, channel: discord.abc.Messageable, content: str = None, embed: discord.Embed = None
+    ):
+        for attempt in range(2):
+            try:
+                return await channel.send(content=content, embed=embed)
+            except (discord.Forbidden, discord.NotFound):
+                raise
+            except (aiohttp.ClientOSError, ConnectionResetError, TimeoutError):
+                if attempt == 0:
+                    await asyncio.sleep(1.0)
+                    continue
+                raise
 
     # -------------------------------------------
     # 🔍 COMMANDES DE RECHERCHE ET CLASSEMENT
@@ -415,7 +454,7 @@ class IlesOrageusesCog(commands.Cog):
                         return await current_inter.followup.send(msg, ephemeral=is_refresh)
                     data = await r.json()
             except Exception as e:
-                logger.error(f"❌ [Storms] Erreur connexion API {url}: {e}")
+                logger.error(f"❌ [Storms] Erreur connexion API {url}: {_fmt_net_err(e)}")
                 obs.record_error(source="command", scope="storm_forts", exception=e, cog="storms")
                 return await current_inter.followup.send(
                     t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API."),
@@ -540,7 +579,7 @@ class IlesOrageusesCog(commands.Cog):
                         return await current_inter.followup.send(msg, ephemeral=is_refresh)
                     data = await r.json()
             except Exception as e:
-                logger.error(f"❌ [Storms] Erreur connexion API {url}: {e}")
+                logger.error(f"❌ [Storms] Erreur connexion API {url}: {_fmt_net_err(e)}")
                 obs.record_error(source="command", scope="storm_isles", exception=e, cog="storms")
                 return await current_inter.followup.send(
                     t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API."),
@@ -670,7 +709,7 @@ class IlesOrageusesCog(commands.Cog):
                         return await current_inter.followup.send(msg, ephemeral=is_refresh)
                     data = await r.json()
             except Exception as e:
-                logger.error(f"❌ [Storms] Erreur connexion API {url}: {e}")
+                logger.error(f"❌ [Storms] Erreur connexion API {url}: {_fmt_net_err(e)}")
                 obs.record_error(source="command", scope="storm_occupier", exception=e, cog="storms")
                 return await current_inter.followup.send(
                     t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API."),
@@ -755,7 +794,7 @@ class IlesOrageusesCog(commands.Cog):
                     )
                 data = await r.json()
         except Exception as e:
-            logger.error(f"❌ [Storms] Erreur connexion API {url}: {e}")
+            logger.error(f"❌ [Storms] Erreur connexion API {url}: {_fmt_net_err(e)}")
             obs.record_error(source="command", scope="storm_status", exception=e, cog="storms")
             return await interaction.followup.send(
                 t(langue, "cmd_storm_api_err", defaut="{e_error} Error connecting to the Storms API.")
@@ -854,7 +893,7 @@ class IlesOrageusesCog(commands.Cog):
                     )
                 snapshots = (await resp.json()).get("snapshots", [])
         except Exception as e:
-            logger.error(f"❌ [Storms] ERREUR API Aquamarine : {str(e)}")
+            logger.error(f"❌ [Storms] ERREUR API Aquamarine : {_fmt_net_err(e)}")
             obs.record_error(source="command", scope="storm_player", exception=e, cog="storms")
             return await interaction.followup.send(
                 t(
@@ -1102,7 +1141,7 @@ class IlesOrageusesCog(commands.Cog):
                     if isinstance(resp, aiohttp.ClientResponse) and resp.status == 200:
                         players.extend((await resp.json()).get("players", []))
         except Exception as e:
-            logger.error(f"❌ [Storms] Erreur connexion API pour leaderboard : {e}")
+            logger.error(f"❌ [Storms] Erreur connexion API pour leaderboard : {_fmt_net_err(e)}")
             obs.record_error(source="command", scope="classement_iles", exception=e, cog="storms")
             return await interaction.followup.send(
                 t(langue, "ev_err_api_unavail", defaut="{e_error} API indisponible.")
@@ -1527,7 +1566,7 @@ class IlesOrageusesCog(commands.Cog):
             }
 
             modifie = False
-            total_annoncailles = 0
+            guilds_to_purge = []
             occupied_isles_by_server = {}
 
             for gge_server, guilds_list in servers_to_check.items():
@@ -1538,62 +1577,42 @@ class IlesOrageusesCog(commands.Cog):
                 # ==========================================
                 isles_respawning = []
                 if gge_server in needs_isles:
-                    params_respawning = {"size": 4000, "filterByState": 3}
-                    try:
-                        url_respawning = f"{self.api_base}storms/isles"
-                        async with self.bot.session.get(
-                            url_respawning, headers=headers, params=params_respawning, timeout=15
-                        ) as r:
-                            if r.status == 200:
-                                api_data = await r.json()
-                                isles_respawning = api_data.get("isles", [])
-                            else:
-                                logger.warning(
-                                    f"⚠️ [Storms Alerts] Code {r.status} reçu de l'API. URL: {r.url} - Serveur configuré: {gge_server}"
-                                )
-                    except Exception as e:
-                        logger.error(f"❌ [Storms Alerts] Erreur API Respawning pour {gge_server} : {e}")
+                    api_data = await self._fetch_storm_api(
+                        f"{self.api_base}storms/isles",
+                        headers,
+                        {"size": 4000, "filterByState": 3},
+                        "Respawning",
+                        gge_server,
+                    )
+                    isles_respawning = api_data.get("isles", [])
 
                 if gge_server in servers_with_spawned:
-                    params_occupied = {"size": 4000, "filterByState": 2}
-                    try:
-                        url_occupied = f"{self.api_base}storms/isles"
-                        async with self.bot.session.get(
-                            url_occupied, headers=headers, params=params_occupied, timeout=15
-                        ) as r:
-                            if r.status == 200:
-                                occ_data = await r.json()
-                                occupied_isles_by_server[gge_server] = {
-                                    (isle.get("position_x"), isle.get("position_y")): isle
-                                    for isle in occ_data.get("isles", [])
-                                }
-                            else:
-                                logger.warning(
-                                    f"⚠️ [Storms Alerts] Code {r.status} API (Occupied). Serveur: {gge_server}"
-                                )
-                    except Exception as e:
-                        logger.error(f"❌ [Storms Alerts] Erreur API Occupied pour {gge_server} : {e}")
+                    occ_data = await self._fetch_storm_api(
+                        f"{self.api_base}storms/isles",
+                        headers,
+                        {"size": 4000, "filterByState": 2},
+                        "Occupied",
+                        gge_server,
+                    )
+                    if occ_data:
+                        occupied_isles_by_server[gge_server] = {
+                            (isle.get("position_x"), isle.get("position_y")): isle for isle in occ_data.get("isles", [])
+                        }
 
                 # ==========================================
                 # 🏰 SCAN DES FORTS
                 # ==========================================
                 forts_respawning = []
                 if gge_server in needs_forts:
-                    params_forts = {"size": 4000, "filterByAvailability": 2}
-                    try:
-                        url_forts = f"{self.api_base}storms/forts"
-                        async with self.bot.session.get(
-                            url_forts, headers=headers, params=params_forts, timeout=15
-                        ) as r:
-                            if r.status == 200:
-                                api_data = await r.json()
-                                forts_respawning = api_data.get("forts", [])
-                            else:
-                                logger.warning(f"⚠️ [Storms Alerts] Code {r.status} API (Forts). Serveur: {gge_server}")
-                    except Exception as e:
-                        logger.error(f"❌ [Storms Alerts] Erreur API Forts pour {gge_server} : {e}")
+                    api_data = await self._fetch_storm_api(
+                        f"{self.api_base}storms/forts",
+                        headers,
+                        {"size": 4000, "filterByAvailability": 2},
+                        "Forts",
+                        gge_server,
+                    )
+                    forts_respawning = api_data.get("forts", [])
 
-                # -- Préparation des annonces Îles --
                 isles_to_announce = []
                 for isle in isles_respawning:
                     isle_id = isle.get("isle_id")
@@ -1613,7 +1632,6 @@ class IlesOrageusesCog(commands.Cog):
                     except Exception:
                         continue
 
-                # -- Préparation des annonces Forts --
                 forts_to_announce = []
                 for fort in forts_respawning:
                     isle_id = fort.get("isle_id")
@@ -1637,8 +1655,6 @@ class IlesOrageusesCog(commands.Cog):
                 if not isles_to_announce and not forts_to_announce:
                     continue
 
-                total_annoncailles += len(isles_to_announce) + len(forts_to_announce)
-
                 for guild_id_str, config in guilds_list:
                     langue = config.get("langue", "fr")
 
@@ -1651,8 +1667,11 @@ class IlesOrageusesCog(commands.Cog):
                         if not channel:
                             try:
                                 channel = await self.bot.fetch_channel(channel_id)
+                            except (discord.Forbidden, discord.NotFound):
+                                guilds_to_purge.append((guild_id_str, "isle"))
+                                channel = None
                             except Exception:
-                                pass
+                                channel = None
 
                         if channel:
                             ping_small = config.get("isle_ping_small", False)
@@ -1685,7 +1704,7 @@ class IlesOrageusesCog(commands.Cog):
                                 )
 
                                 try:
-                                    sent_msg = await channel.send(content=msg_content, embed=embed)
+                                    sent_msg = await self._send_with_retry(channel, content=msg_content, embed=embed)
                                     obs.record_alert(
                                         source="storm_islands",
                                         alert_type="respawn",
@@ -1710,7 +1729,8 @@ class IlesOrageusesCog(commands.Cog):
                                             "status": "pending",
                                         }
                                     )
-                                except discord.Forbidden:
+                                except (discord.Forbidden, discord.NotFound):
+                                    guilds_to_purge.append((guild_id_str, "isle"))
                                     obs.record_alert(
                                         source="storm_islands",
                                         alert_type="respawn",
@@ -1721,8 +1741,11 @@ class IlesOrageusesCog(commands.Cog):
                                         failed=1,
                                         dm_blocked=1,
                                     )
-                                except discord.HTTPException as e:
-                                    logger.error(f"❌ [Storms Alerts] Erreur réseau Discord : {e}")
+                                    break
+                                except Exception as e:
+                                    logger.warning(
+                                        f"⚠️ [Storms Alerts] Erreur envoi Île sur {channel_id} : {_fmt_net_err(e)}"
+                                    )
 
                     # ==========================================
                     # 📣 ENVOI DES ALERTES FORTS
@@ -1733,8 +1756,11 @@ class IlesOrageusesCog(commands.Cog):
                         if not fort_channel:
                             try:
                                 fort_channel = await self.bot.fetch_channel(fort_channel_id)
+                            except (discord.Forbidden, discord.NotFound):
+                                guilds_to_purge.append((guild_id_str, "fort"))
+                                fort_channel = None
                             except Exception:
-                                pass
+                                fort_channel = None
 
                         if fort_channel:
                             fort_min_level = config.get("fort_min_level", 80)
@@ -1762,7 +1788,9 @@ class IlesOrageusesCog(commands.Cog):
 
                                     msg_content = fort_ping_role if fort_ping_role else None
                                     try:
-                                        sent_msg = await fort_channel.send(content=msg_content, embed=embed)
+                                        sent_msg = await self._send_with_retry(
+                                            fort_channel, content=msg_content, embed=embed
+                                        )
                                         self.active_alerts.append(
                                             {
                                                 "type": "fort",
@@ -1777,10 +1805,28 @@ class IlesOrageusesCog(commands.Cog):
                                                 "status": "pending",
                                             }
                                         )
+                                    except (discord.Forbidden, discord.NotFound):
+                                        guilds_to_purge.append((guild_id_str, "fort"))
+                                        break
                                     except Exception as e:
-                                        logger.error(
-                                            f"❌ [Storms Alerts] Erreur envoi Fort sur {fort_channel_id} : {e}"
+                                        logger.warning(
+                                            f"⚠️ [Storms Alerts] Erreur envoi Fort sur {fort_channel_id} : {_fmt_net_err(e)}"
                                         )
+
+            for gid, module_type in guilds_to_purge:
+                if gid in data.get("guilds", {}):
+                    if module_type == "isle":
+                        for k in ("isle_channel_id", "isle_ping_small", "isle_ping_big", "isle_ping_role"):
+                            data["guilds"][gid].pop(k, None)
+                    elif module_type == "fort":
+                        for k in ("fort_channel_id", "fort_min_level", "fort_ping_role"):
+                            data["guilds"][gid].pop(k, None)
+                    if not data["guilds"][gid].get("isle_channel_id") and not data["guilds"][gid].get(
+                        "fort_channel_id"
+                    ):
+                        del data["guilds"][gid]
+                    modifie = True
+                    logger.info(f"🧹 [Storms Alerts] Abonnement {module_type} purgé (salon inaccessible) pour {gid}.")
 
             # ==========================================
             # 🔄 MISE À JOUR DES ANCIENS MESSAGES

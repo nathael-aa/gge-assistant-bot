@@ -1,5 +1,6 @@
 import asyncio
 import io
+import json
 import logging
 import os
 import re
@@ -105,6 +106,14 @@ class AdminI18n(commands.Cog):
                 "cal_ev_outer",
                 "cal_ev_patronage",
                 "cal_ev_nobility",
+                "offres_cat_cashoffers",
+                "offres_cat_dailybundles",
+                "offres_cat_eventoffers",
+                "offres_cat_hardCurrency",
+                "offres_cat_hcbundles",
+                "offres_cat_promos",
+                "offres_cat_subscriptions",
+                "offres_cat_supersale",
             ]
         )
 
@@ -174,10 +183,13 @@ class AdminI18n(commands.Cog):
                     data[c] = f"[TODO] {val}" if val != "[TODO] Texte manquant" else "[TODO] Texte manquant"
             locales_data[lang] = dict(sorted(data.items()))
 
+        fichiers_discord = []
         try:
             for lang, data in locales_data.items():
                 fichier = LOCALES_DIR / f"{lang}.json"
                 await async_json_dump(fichier, data, indent=4, ensure_ascii=False)
+                payload = json.dumps(data, indent=4, ensure_ascii=False).encode("utf-8")
+                fichiers_discord.append(discord.File(fp=io.BytesIO(payload), filename=f"{lang}.json"))
         except Exception as e:
             logger.error(f"❌ [AdminI18n] Erreur écriture JSON i18n_sync : {e}")
             return await ctx.send("❌ Échec de la sauvegarde des modifications.")
@@ -204,6 +216,9 @@ class AdminI18n(commands.Cog):
                 pass
         else:
             await ctx.send(embed=embed_success)
+
+        if fichiers_discord:
+            await ctx.send("📦 **Fichiers JSON synchronisés :**", files=fichiers_discord)
 
     @commands.command(name="i18n_export", hidden=True)
     async def i18n_export(self, ctx, langue_cible: str = "en"):

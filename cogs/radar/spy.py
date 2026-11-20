@@ -4,6 +4,7 @@ import logging
 import traceback
 from datetime import datetime
 
+import aiohttp
 import discord
 from discord.ext import tasks
 
@@ -21,6 +22,14 @@ from utils import (
 )
 
 logger = logging.getLogger("GGE_Bot")
+
+
+def _fmt_net_err(exc: Exception) -> str:
+    msg = str(exc).strip()
+    if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+        return f"TimeoutError ({msg})" if msg else "TimeoutError (délai dépassé)"
+    return f"{type(exc).__name__}: {msg}" if msg else type(exc).__name__
+
 
 RANKS_MAP = {
     0: "Chef",
@@ -143,14 +152,26 @@ class RadarSpyMixin:
                     content = config["ping_role"]
 
                 await setup_embed_footer(embed, None, langue)
-                await channel.send(content=content, embed=embed)
+                for attempt in range(2):
+                    try:
+                        await channel.send(content=content, embed=embed)
+                        break
+                    except (discord.Forbidden, discord.NotFound):
+                        raise
+                    except (aiohttp.ClientOSError, ConnectionResetError, TimeoutError):
+                        if attempt == 0:
+                            await asyncio.sleep(1.0)
+                            continue
+                        raise
             except (discord.Forbidden, discord.NotFound):
                 logger.warning(
                     f"⚠️ [Radar Spy] Accès bloqué ou salon supprimé pour le serveur {guild_id_str}. Ajout à la purge."
                 )
                 self.guilds_to_purge.add(guild_id_str)
             except Exception as e:
-                logger.error(f"❌ [Radar Spy] Impossible d'envoyer l'alerte radar au serveur {guild_id_str} : {e}")
+                logger.warning(
+                    f"⚠️ [Radar Spy] Impossible d'envoyer l'alerte radar au serveur {guild_id_str} : {_fmt_net_err(e)}"
+                )
 
     @tasks.loop(seconds=20)
     async def radar_spy_task(self):
@@ -229,7 +250,7 @@ class RadarSpyMixin:
                     req_headers["If-None-Match"] = self.etags_cache[cache_key_server]
 
                 try:
-                    r_base = await session.get(url_base, headers=req_headers, timeout=10)
+                    r_base = await session.get(url_base, headers=req_headers, timeout=12)
                     try:
                         if r_base.status == 304:
                             continue
@@ -245,8 +266,11 @@ class RadarSpyMixin:
                             self.next_scan[cache_key_server] = now_ts + interval
                     finally:
                         r_base.close()
+                except (TimeoutError, aiohttp.ClientOSError, ConnectionResetError) as e:
+                    logger.warning(f"⚠️ [Radar Spy] Réseau/Timeout check global {serveur} : {_fmt_net_err(e)}")
+                    continue
                 except Exception as e:
-                    logger.error(f"❌ [Radar Spy] Erreur check global {serveur} : {e}")
+                    logger.error(f"❌ [Radar Spy] Erreur check global {serveur} : {_fmt_net_err(e)}")
                     continue
 
                 for a_id, a_info in targets["alliances"]:
@@ -260,7 +284,7 @@ class RadarSpyMixin:
 
                     try:
                         url_alli_live = f"https://api.gge-tracker.com/api/v1/alliances/id/{a_id}"
-                        r_live = await session.get(url_alli_live, headers=headers, timeout=10)
+                        r_live = await session.get(url_alli_live, headers=headers, timeout=12)
                         try:
                             if r_live.status == 200:
                                 max_data = await r_live.json()
@@ -500,15 +524,17 @@ class RadarSpyMixin:
                                     changes_detected = True
                         finally:
                             r_live.close()
+                    except (TimeoutError, aiohttp.ClientOSError, ConnectionResetError) as e:
+                        logger.warning(f"⚠️ [Radar Spy] Réseau/Timeout analyse alliance {a_id} : {_fmt_net_err(e)}")
                     except Exception as e:
-                        logger.error(f"❌ [Radar Spy] Erreur analyse alliance {a_id} : {e}")
+                        logger.error(f"❌ [Radar Spy] Erreur analyse alliance {a_id} : {_fmt_net_err(e)}")
 
                 tracked_players = targets["players"]
                 if tracked_players:
                     player_ids = [p_id for p_id, p_info in tracked_players]
                     try:
                         url_bulk = "https://api.gge-tracker.com/api/v1/players"
-                        r = await session.post(url_bulk, headers=headers, json=player_ids, timeout=10)
+                        r = await session.post(url_bulk, headers=headers, json=player_ids, timeout=12)
                         try:
                             if r.status == 200:
                                 bulk_data_raw = await r.json()
@@ -820,19 +846,20 @@ class RadarSpyMixin:
                                             changes_detected = True
                                     except Exception as loop_e:
                                         logger.error(
-                                            f"❌ [Radar Spy] Erreur de parsing pour le joueur {info.get('name')}: {loop_e}"
+                                            f"❌ [Radar Spy] Erreur de parsing pour le joueur {info.get('name')}: {_fmt_net_err(loop_e)}"
                                         )
-                                        pass
                         finally:
                             r.close()
+                    except (TimeoutError, aiohttp.ClientOSError, ConnectionResetError) as e:
+                        logger.warning(f"⚠️ [Radar Spy] Réseau/Timeout Bulk Players ({serveur}) : {_fmt_net_err(e)}")
                     except Exception as e:
-                        logger.error(f"❌ [Radar Spy] Erreur Bulk Players : {e}")
+                        logger.error(f"❌ [Radar Spy] Erreur Bulk Players ({serveur}) : {_fmt_net_err(e)}")
 
                 try:
                     url_movements = (
                         "https://api.gge-tracker.com/api/v1/server/movements?page=1&castleType=1&movementType=3"
                     )
-                    r = await session.get(url_movements, headers=headers, timeout=5)
+                    r = await session.get(url_movements, headers=headers, timeout=8)
                     try:
                         if r.status == 200:
                             data_mouv = await r.json()
@@ -894,8 +921,10 @@ class RadarSpyMixin:
                                         changes_detected = True
                     finally:
                         r.close()
+                except (TimeoutError, aiohttp.ClientOSError, ConnectionResetError) as e:
+                    logger.warning(f"⚠️ [Radar Spy] Réseau/Timeout Global Movements ({serveur}) : {_fmt_net_err(e)}")
                 except Exception as e:
-                    logger.error(f"❌ [Radar Spy] Erreur Global Movements : {e}")
+                    logger.error(f"❌ [Radar Spy] Erreur Global Movements ({serveur}) : {_fmt_net_err(e)}")
 
             if self.users_to_purge:
                 for uid in self.users_to_purge:

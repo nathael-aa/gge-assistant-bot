@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -31,6 +32,13 @@ from utils import (
 logger = logging.getLogger("GGE_Bot")
 
 
+def _fmt_net_err(exc: Exception) -> str:
+    msg = str(exc).strip()
+    if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+        return f"TimeoutError ({msg})" if msg else "TimeoutError (délai dépassé)"
+    return f"{type(exc).__name__}: {msg}" if msg else type(exc).__name__
+
+
 class FortressActionView(discord.ui.View):
     def __init__(
         self, cog: "ForteressesCog", user_id: str, cibles: list, joueur: str, serveur: str, langue: str = "fr"
@@ -58,7 +66,7 @@ class FortressActionView(discord.ui.View):
             style=discord.ButtonStyle.primary,
             label=t(langue, "fort_btn_relaunch", defaut="Relancer (10 suivantes)"),
             emoji=DICT_EMOJIS.get("e_refresh", "🔄"),
-            custom_id="fort_btn_relaunch",
+            custom_id="btn_fort_relaunch",
         )
         self.btn_relaunch.callback = self.callback_relaunch
 
@@ -66,6 +74,16 @@ class FortressActionView(discord.ui.View):
         self.add_item(self.btn_relaunch)
 
         self.cog.register_view(self.user_id, self)
+
+    async def disable_relaunch_only(self):
+        if self.btn_relaunch.disabled:
+            return
+        self.btn_relaunch.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
     async def disable_all_buttons(self):
         for child in self.children:
@@ -94,11 +112,14 @@ class FortressActionView(discord.ui.View):
             self._is_processing = False
 
     async def callback_relaunch(self, interaction: discord.Interaction):
-        if self._is_processing or self.btn_relaunch.disabled:
-            msg_wait = t(self.langue, "err_spam", defaut="⏳ Relance déjà en cours, patiente un instant...")
+        now = time.monotonic()
+        last_global = self.cog._last_user_relaunch.get(self.user_id, 0.0)
+        if self._is_processing or self.btn_relaunch.disabled or (now - last_global) < 5.0:
+            msg_wait = t(self.langue, "err_spam", defaut="⏳ Relance déjà en cours, patiente quelques secondes...")
             return await interaction.response.send_message(msg_wait, ephemeral=True)
 
         self._is_processing = True
+        self.cog._last_user_relaunch[self.user_id] = now
         self.btn_relaunch.disabled = True
         try:
             logger.info(f"🔄 [Forts] {interaction.user.name} a cliqué sur 'Relancer' pour {self.joueur}.")
@@ -127,12 +148,19 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         self.clr_attente = discord.Color.from_rgb(255, 195, 160)
         self.base_api = "https://api.gge-tracker.com/api/v1"
         self.active_views: dict[str, list[FortressActionView]] = defaultdict(list)
+        self._last_user_relaunch: dict[str, float] = {}
 
     def register_view(self, user_id: str, view: FortressActionView):
         uid = str(user_id)
         self.active_views[uid].append(view)
         if len(self.active_views[uid]) > 10:
             self.active_views[uid] = self.active_views[uid][-10:]
+
+    async def disable_previous_relaunch_buttons(self, user_id: str, exclude_view: FortressActionView = None):
+        uid = str(user_id)
+        for v in list(self.active_views.get(uid, [])):
+            if v is not exclude_view:
+                await v.disable_relaunch_only()
 
     async def deactivate_user_views(self, user_id: str):
         uid = str(user_id)
@@ -198,7 +226,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                             "last_attack": d.get("last_attack", ""),
                         }
         except Exception as e:
-            logger.error(f"❌ [Forts] Erreur API lors de la vérification globale : {e}")
+            logger.warning(f"⚠️ [Forts] Erreur API lors de la vérification globale : {_fmt_net_err(e)}")
             obs.record_error(source="background", scope="verify_and_send", exception=e, cog="forteresses")
 
         embed = discord.Embed(
@@ -283,6 +311,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             await save_dungeons_async(data)
 
         if cibles_list:
+            await self.disable_previous_relaunch_buttons(user_id)
             view = FortressActionView(self, user_id, cibles_list, joueur, serveur, langue)
             await setup_embed_footer(embed_cibles, interaction, langue)
             view.message = await interaction.followup.send(embed=embed_cibles, view=view, ephemeral=False, wait=True)
@@ -421,7 +450,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                                 cibles_moins_1h.append(cible_data)
 
         except Exception as e:
-            logger.error(f"❌ [Forts] Erreur API Globale fetch_cibles: {e}")
+            logger.warning(f"⚠️ [Forts] Erreur API Globale fetch_cibles : {_fmt_net_err(e)}")
             obs.record_error(source="background", scope="fetch_cibles", exception=e, cog="forteresses")
 
         last_scan_str = await self.fetch_meta_scan(session, headers)
@@ -816,6 +845,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
 
                 if cibles_list:
                     try:
+                        await self.disable_previous_relaunch_buttons(user_id)
                         user = self.bot.get_user(int(user_id)) or await self.bot.fetch_user(int(user_id))
                         view = FortressActionView(self, user_id, cibles_list, joueur, serveur, langue)
                         logger.info(
@@ -845,7 +875,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                             dm_blocked=1,
                         )
                     except Exception as e:
-                        logger.error(f"❌ [Forts] Erreur d'envoi MP à {user_id}: {e}")
+                        logger.error(f"❌ [Forts] Erreur d'envoi MP à {user_id}: {_fmt_net_err(e)}")
                         obs.record_alert(
                             source="fortress",
                             alert_type="spawned",
@@ -903,7 +933,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                             player_id = str(p_data.get("player_id", p_data.get("id", "")))
                             vrai_nom = p_data.get("player_name", player)
             except Exception as e:
-                logger.error(f"❌ [Forts] Erreur recherche joueur API : {e}")
+                logger.warning(f"⚠️ [Forts] Erreur recherche joueur API : {_fmt_net_err(e)}")
 
         if not player_id:
             return await interaction.followup.send(
@@ -929,9 +959,9 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                 data = await r.json()
                 dungeons = data.get("dungeons", [])
         except Exception as e:
-            logger.error(f"❌ [Forts] Erreur API Fortress History : {e}")
+            logger.warning(f"⚠️ [Forts] Erreur API Fortress History : {_fmt_net_err(e)}")
             return await interaction.followup.send(
-                t(langue, "ev_err_tech", e=str(e), defaut=f"{{e_error}} Erreur technique : {e}")
+                t(langue, "ev_err_tech", e=_fmt_net_err(e), defaut=f"{{e_error}} Erreur technique : {_fmt_net_err(e)}")
             )
 
         if not dungeons:

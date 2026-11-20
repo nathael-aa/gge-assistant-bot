@@ -20,7 +20,7 @@ from utils import (
     t,
 )
 
-from .spy import RadarSpyMixin
+from .spy import RadarSpyMixin, _fmt_net_err
 from .views import RadarAllianceSettingsView, RadarSettingsView
 
 logger = logging.getLogger("GGE_Bot")
@@ -77,8 +77,18 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
             msg = t(langue, "cmd_guild_only", defaut="❌ Cette commande ne peut être utilisée que sur un serveur.")
             return await interaction.followup.send(msg)
 
+        if interaction.guild.me:
+            perms = channel.permissions_for(interaction.guild.me)
+            if not (perms.view_channel and perms.send_messages and perms.embed_links):
+                msg_perm = t(
+                    langue,
+                    "cal_err_missing_perms",
+                    salon=channel.mention,
+                    defaut=f"⚠️ Je n'ai pas les permissions nécessaires (**Voir le salon**, **Envoyer des messages** et **Intégrer des liens**) dans {channel.mention}.",
+                )
+                return await interaction.followup.send(msg_perm)
+
         data = await load_surveillance_async()
-        guild_id = str(interaction.guild.id)
 
         if "guild_configs" not in data:
             data["guild_configs"] = {}
@@ -270,7 +280,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
                                     "rank": int(m.get("alliance_rank", 8)),
                                 }
         except Exception as e:
-            logger.error(f"❌ [Radar] Erreur recherche alliance serveurs : {e}")
+            logger.warning(f"⚠️ [Radar] Erreur recherche alliance serveurs : {_fmt_net_err(e)}")
             msg_api_err = t(
                 langue,
                 "rad_err_api_join",
@@ -684,7 +694,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
                                     "rank": int(m.get("alliance_rank", 8)),
                                 }
         except Exception as e:
-            logger.error(f"❌ [Radar Alli Add] Erreur API MP : {e}")
+            logger.warning(f"⚠️ [Radar Alli Add] Erreur API MP : {_fmt_net_err(e)}")
             msg = t(
                 langue,
                 "rad_err_api_join",
@@ -859,7 +869,7 @@ class RadarCog(commands.GroupCog, RadarSpyMixin, group_name="radar", group_descr
                 langue,
                 "rad_alli_rem_fail",
                 a=alliance_name,
-                defaut=f"{e_warning} L'alliance **{alliance_name}** n'est pas dans ton radar.",
+                defaut=f"{e_warning} **{alliance_name}** n'est pas dans ton radar.",
             )
             await interaction.followup.send(msg)
 
