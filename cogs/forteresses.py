@@ -17,7 +17,10 @@ import observability as obs
 from emojis import DICT_EMOJIS
 from utils import (
     CONFIG_DIR,
+    GgeTrackerLinkView,
     PaginationView,
+    add_ggetracker_button,
+    build_ggetracker_url,
     get_api_headers,
     get_cached_data,
     get_server_config,
@@ -87,7 +90,8 @@ class FortressActionView(discord.ui.View):
 
     async def disable_all_buttons(self):
         for child in self.children:
-            child.disabled = True
+            if getattr(child, "url", None) is None:
+                child.disabled = True
         if self.message:
             try:
                 await self.message.edit(view=self)
@@ -175,6 +179,84 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
 
     async def cog_unload(self):
         self.dungeon_spy_task.cancel()
+
+    async def build_session_recap_embed(
+        self,
+        info: dict,
+        langue: str,
+        stopped_manually: bool,
+        interaction: discord.Interaction = None,
+    ) -> tuple[discord.Embed, str]:
+        joueur = info.get("joueur", "Inconnu")
+        kids = info.get("kids", [])
+        nb_cibles = len(info.get("notified", []))
+
+        noms_royaumes = []
+        if 1 in kids:
+            noms_royaumes.append(t(langue, "fort_realm_sands", defaut="Sables {e_dungeon1}"))
+        if 2 in kids:
+            noms_royaumes.append(t(langue, "fort_realm_ice", defaut="Glaces {e_dungeon2}"))
+        if 3 in kids:
+            noms_royaumes.append(t(langue, "fort_realm_peaks", defaut="Pics {e_dungeon3}"))
+
+        duree_str = "< 1 min"
+        started_raw = info.get("started_at")
+        if started_raw:
+            try:
+                start_dt = datetime.fromisoformat(started_raw.replace("Z", "+00:00"))
+                total_mins = max(0, int((discord.utils.utcnow() - start_dt).total_seconds() // 60))
+                heures, mins = divmod(total_mins, 60)
+                if heures > 0:
+                    duree_str = f"{heures}h {mins:02d} min"
+                elif mins > 0:
+                    duree_str = f"{mins} min"
+            except Exception:
+                pass
+
+        tracker_url = build_ggetracker_url("/dungeons", campaign="fortress_recap")
+
+        if stopped_manually:
+            title = t(langue, "fort_recap_title_stop", defaut="{e_tomatobulletpoint} Session de Guet Arrêtée")
+            desc = t(
+                langue,
+                "fort_recap_desc_stop",
+                defaut="Ton radar de forteresses a bien été arrêté. Voici le récapitulatif de ta session :",
+            )
+            color = discord.Color.from_rgb(231, 76, 60)
+        else:
+            title = t(langue, "fort_recap_title_end", defaut="{e_std_alarm_clock} Fin de Session de Guet")
+            desc = t(
+                langue,
+                "fort_recap_desc_end",
+                defaut="Ton radar de forteresses s'est éteint automatiquement. Voici le récapitulatif de ta session :",
+            )
+            color = discord.Color.from_rgb(241, 196, 15)
+
+        embed = discord.Embed(title=title, description=desc, color=color, url=tracker_url)
+        embed.add_field(
+            name=t(langue, "fort_field_player", defaut="{e_players} Joueur"),
+            value=f"`{joueur}`",
+            inline=True,
+        )
+        embed.add_field(
+            name=t(langue, "fort_recap_field_duration", defaut="{e_std_stopwatch} Durée"),
+            value=f"`{duree_str}`",
+            inline=True,
+        )
+        embed.add_field(
+            name=t(langue, "fort_recap_field_targets", defaut="{e_attaque} Cibles repérées"),
+            value=f"**{nb_cibles}**",
+            inline=True,
+        )
+        if noms_royaumes:
+            embed.add_field(
+                name=t(langue, "fort_field_realms", defaut="{e_icon_world} Mondes"),
+                value=" • ".join(noms_royaumes),
+                inline=False,
+            )
+
+        await setup_embed_footer(embed, interaction, langue)
+        return embed, tracker_url
 
     async def fetch_meta_scan(self, session: aiohttp.ClientSession, headers: dict) -> str:
         url = f"{self.base_api}/dungeons/meta"
@@ -650,6 +732,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             "kids": kids,
             "distance_max": DIST_MAX,
             "frequence_minutes": freq_val,
+            "started_at": maintenant.isoformat().replace("+00:00", "Z"),
             "end_time": end_time.isoformat().replace("+00:00", "Z"),
             "next_scan": (maintenant + timedelta(minutes=freq_val)).isoformat().replace("+00:00", "Z"),
             "notified": [],
@@ -686,9 +769,11 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         st_elev = t(langue, "fort_status_high", defaut="{e_tomatobulletpoint} `Élevée`")
         status_charge = st_fluide if nb_sessions_actives < 4 else st_mod if nb_sessions_actives < 8 else st_elev
 
+        tracker_url = build_ggetracker_url("/dungeons", campaign="fortress_scan")
         embed_conf = discord.Embed(
             title=t(langue, "fort_setup_title", defaut="{e_events4} Dispositif de Guet Activé"),
             color=self.clr_activation,
+            url=tracker_url,
         )
         embed_conf.add_field(
             name=t(langue, "fort_field_player", defaut="{e_players} Joueur"),
@@ -710,7 +795,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             name=t(langue, "fort_field_load", defaut="{e_stats} Charge Bot"), value=f"{status_charge}", inline=True
         )
         await setup_embed_footer(embed_conf, interaction, langue)
-        await interaction.followup.send(embed=embed_conf, ephemeral=False)
+        await interaction.followup.send(embed=embed_conf, view=GgeTrackerLinkView(tracker_url), ephemeral=False)
 
         logger.info(f"🟢 [Forts] {interaction.user.name} a démarré un scan radar pour {nom_joueur}.")
 
@@ -751,7 +836,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
         await self.deactivate_user_views(user_id)
 
         if user_id in data["sessions"]:
-            del data["sessions"][user_id]
+            session_info = data["sessions"].pop(user_id)
             await save_dungeons_async(data)
             logger.info(f"🛑 [Forts] {interaction.user.name} a stoppé son scan radar.")
 
@@ -760,14 +845,10 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                     "fortress_scan_stopped", guild=interaction.guild, user_id=interaction.user.id, gge_server=serveur
                 )
 
-            await interaction.followup.send(
-                t(
-                    langue,
-                    "fort_stop_success",
-                    defaut="{e_check} **Session arrêtée.** Fin des alertes.",
-                ),
-                ephemeral=False,
+            embed_recap, tracker_url = await self.build_session_recap_embed(
+                session_info, langue, stopped_manually=True, interaction=interaction
             )
+            await interaction.followup.send(embed=embed_recap, view=GgeTrackerLinkView(tracker_url), ephemeral=False)
         else:
             await interaction.followup.send(
                 t(langue, "fort_stop_fail", defaut="{e_error} Tu n'as aucune session active."),
@@ -804,18 +885,15 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
                 try:
                     end_dt = datetime.fromisoformat(info["end_time"].replace("Z", "+00:00"))
                     if maintenant > end_dt:
-                        del data["sessions"][user_id]
+                        session_info = data["sessions"].pop(user_id)
                         sessions_modifiees = True
                         await self.deactivate_user_views(user_id)
                         try:
                             user = self.bot.get_user(int(user_id)) or await self.bot.fetch_user(int(user_id))
-                            msg = t(
-                                langue,
-                                "fort_session_ended",
-                                joueur=joueur,
-                                defaut="{e_information} **Fin de session !** Ton radar pour **{joueur}** s'est éteint.",
+                            embed_recap, tracker_url = await self.build_session_recap_embed(
+                                session_info, langue, stopped_manually=False
                             )
-                            await user.send(msg)
+                            await user.send(embed=embed_recap, view=GgeTrackerLinkView(tracker_url))
                             logger.info(f"🏁 [Forts] Session terminée naturellement pour {user.name}.")
                         except Exception:
                             pass
@@ -1064,6 +1142,8 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
 
             lignes.append(f"• **{day_fmt}** : {texte_royaumes} ➔ **{jour_rubis}** {DICT_EMOJIS.get('e_ruby', '💎')}")
 
+        tracker_url = build_ggetracker_url("/dungeons", campaign="fortress_history")
+
         embeds = []
         chunk_size = 5
         nb_pages = max(1, (len(lignes) - 1) // chunk_size + 1)
@@ -1079,7 +1159,7 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             chunk = lignes[i : i + chunk_size]
             page_actuelle = (i // chunk_size) + 1
 
-            embed = discord.Embed(title=title, color=self.clr_attente)
+            embed = discord.Embed(title=title, color=self.clr_attente, url=tracker_url)
             embed.description = f"{lbl_date} <t:{latest_attack_ts}:F> (<t:{latest_attack_ts}:R>)\n\n{stats_desc}"
 
             field_value = "\n".join(chunk)
@@ -1101,9 +1181,10 @@ class ForteressesCog(commands.GroupCog, group_name="fortress", group_description
             return
 
         if len(embeds) == 1:
-            await interaction.followup.send(embed=embeds[0])
+            await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
         else:
             view = PaginationView(embeds)
+            add_ggetracker_button(view, tracker_url)
             view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 

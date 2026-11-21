@@ -2,7 +2,14 @@ import logging
 
 import discord
 
-from utils import DICT_EMOJIS, load_surveillance_async, save_surveillance_async, t
+from utils import (
+    DICT_EMOJIS,
+    GgeTrackerLinkView,
+    build_ggetracker_url,
+    load_surveillance_async,
+    save_surveillance_async,
+    t,
+)
 
 logger = logging.getLogger("GGE_Bot")
 
@@ -121,8 +128,9 @@ class RadarSettingsView(discord.ui.View):
             target=target,
             defaut=f"{e_check} **Préférences enregistrées !** {target} est actif.",
         )
+        tracker_url = build_ggetracker_url(f"/player/{self.p_id}", campaign="radar_setup_player")
         try:
-            await interaction.response.edit_message(content=msg, view=None)
+            await interaction.response.edit_message(content=msg, view=GgeTrackerLinkView(tracker_url))
         except Exception:
             pass
 
@@ -215,7 +223,8 @@ class RadarAllianceSettingsView(discord.ui.View):
             target=target,
             defaut=f"{e_check} **Préférences enregistrées !** {target} est actif.",
         )
+        tracker_url = build_ggetracker_url(f"/alliance/{self.a_id}", campaign="radar_setup_alliance")
         try:
-            await interaction.response.edit_message(content=msg, view=None)
+            await interaction.response.edit_message(content=msg, view=GgeTrackerLinkView(tracker_url))
         except Exception:
             pass

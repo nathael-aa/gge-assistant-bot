@@ -16,7 +16,7 @@ from discord import app_commands
 import observability as obs
 
 logger = logging.getLogger("GGE_Bot")
-BOT_VERSION = "GGE Assistant • Version 1.4.2"
+BOT_VERSION = "GGE Assistant • Version 1.4.3"
 
 # ========================================
 # ⚙️ GESTION DES CHEMINS & DOSSIER
@@ -288,6 +288,53 @@ class RefreshOnlyView(discord.ui.View):
                 await self.message.edit(view=self)
             except discord.HTTPException:
                 pass
+
+
+# ==========================================
+# 🔗 LIENS GGE-TRACKER (UTM)
+# ==========================================
+
+GGETRACKER_WEB_BASE = "https://gge-tracker.com"
+
+
+def build_ggetracker_url(
+    path: str,
+    campaign: str = "discord_bot",
+    params: dict | None = None,
+) -> str:
+    """Construit une URL gge-tracker.com avec paramètres de requête et UTM."""
+    clean_path = path if path.startswith("/") else f"/{path}"
+    query = {}
+    if params:
+        query.update({k: v for k, v in params.items() if v is not None})
+    query.update(
+        {
+            "utm_source": "gge_assistant",
+            "utm_medium": "discord_bot",
+            "utm_campaign": campaign,
+        }
+    )
+    return f"{GGETRACKER_WEB_BASE}{clean_path}?{urllib.parse.urlencode(query)}"
+
+
+def add_ggetracker_button(view: discord.ui.View, url: str, label: str = "GGE-Tracker") -> discord.ui.View:
+    """Ajoute un bouton lien GGE-Tracker à une View existante."""
+    view.add_item(
+        discord.ui.Button(
+            label=label,
+            url=url,
+            emoji=DICT_EMOJIS.get("e_website", "🌐"),
+        )
+    )
+    return view
+
+
+class GgeTrackerLinkView(discord.ui.View):
+    """Vue légère avec un bouton lien vers GGE-Tracker (pour les commandes sans autre bouton)."""
+
+    def __init__(self, url: str, label: str = "GGE-Tracker"):
+        super().__init__(timeout=None)
+        add_ggetracker_button(self, url, label=label)
 
 
 # ========================================

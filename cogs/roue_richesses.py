@@ -11,8 +11,11 @@ from discord.ext import commands
 import observability as obs
 from utils import (
     DICT_EMOJIS,
+    GgeTrackerLinkView,
     PaginationView,
     _get_api_timestamp,
+    add_ggetracker_button,
+    build_ggetracker_url,
     get_api_headers,
     get_server_config,
     joueur_autocomplete,
@@ -81,6 +84,7 @@ class RoueRichessesCog(commands.Cog):
                 )
 
             actualisation_dt = _get_api_timestamp(events)
+            tracker_url = f"{build_ggetracker_url(f'/player/{player_id}', campaign='woa_history')}#woa"
 
             from collections import defaultdict
 
@@ -167,11 +171,17 @@ class RoueRichessesCog(commands.Cog):
                     description=f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{overv}\n{stats_txt}\n\n{det_title}\n"
                     + "\n".join(lignes),
                     color=self.clr_woa_historique,
+                    url=tracker_url,
                 )
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
-            view = PaginationView(embeds)
-            view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
+
+            if len(embeds) == 1:
+                await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
+            else:
+                view = PaginationView(embeds)
+                add_ggetracker_button(view, tracker_url)
+                view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
         except Exception as e:
             logger.error(f"❌ [RoueRichesses] Erreur lors de l'affichage de l'historique pour {player} : {e}")
@@ -211,6 +221,7 @@ class RoueRichessesCog(commands.Cog):
 
             all_events.sort(key=lambda x: x.get("date", ""), reverse=True)
             actualisation_dt = _get_api_timestamp(all_events)
+            tracker_url = build_ggetracker_url("/woa", campaign="woa_summary")
 
             t_editions = len(all_events)
             t_tickets = sum(int(ev.get("total_tickets", 0)) for ev in all_events)
@@ -263,12 +274,17 @@ class RoueRichessesCog(commands.Cog):
                     description=f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{glob}\n{stats_globales}\n\n{det}\n"
                     + "\n".join(lignes[i : i + 15]),
                     color=self.clr_woa_bilan,
+                    url=tracker_url,
                 )
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
 
-            view = PaginationView(embeds)
-            view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
+            if len(embeds) == 1:
+                await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
+            else:
+                view = PaginationView(embeds)
+                add_ggetracker_button(view, tracker_url)
+                view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
         except Exception as e:
@@ -338,12 +354,14 @@ class RoueRichessesCog(commands.Cog):
                 lignes.append(f"{medal} **{nom}** [{alli}] ➔ **{pts} {e_woa}**")
 
             actualisation_dt = _get_api_timestamp(data_rank, woa_base_data)
+            tracker_url = build_ggetracker_url("/woa", campaign="woa_leaderboard")
 
             embeds = []
             for i in range(0, len(lignes), 10):
                 embed = discord.Embed(
                     title=t(langue, "ev_class_woa_title", defaut="Top 100 Serveur - Roue de la Fortune"),
                     color=self.clr_woa_classement,
+                    url=tracker_url,
                 )
                 embed.description = (
                     f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)"
@@ -355,8 +373,13 @@ class RoueRichessesCog(commands.Cog):
                 )
                 await setup_embed_footer(embed, interaction, langue)
                 embeds.append(embed)
-            view = PaginationView(embeds)
-            view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
+
+            if len(embeds) == 1:
+                await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
+            else:
+                view = PaginationView(embeds)
+                add_ggetracker_button(view, tracker_url)
+                view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=10, langue=langue)
         except Exception as e:
             logger.error(f"❌ [RoueRichesses] Erreur lors de l'affichage du leaderboard WoA : {e}")

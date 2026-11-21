@@ -15,8 +15,11 @@ import observability as obs
 from utils import (
     DICT_EMOJIS,
     SERVEURS_DIR,
+    GgeTrackerLinkView,
     PaginationView,
     _get_api_timestamp,
+    add_ggetracker_button,
+    build_ggetracker_url,
     find_player_in_cache,
     format_num,
     get_api_headers,
@@ -119,7 +122,8 @@ class RefreshOnlyView(discord.ui.View):
 
     async def on_timeout(self):
         for child in self.children:
-            child.disabled = True
+            if getattr(child, "url", None) is None:
+                child.disabled = True
         if self.message:
             try:
                 await self.message.edit(view=self)
@@ -139,7 +143,8 @@ class LocalPaginationView(discord.ui.View):
 
     async def on_timeout(self):
         for child in self.children:
-            child.disabled = True
+            if getattr(child, "url", None) is None:
+                child.disabled = True
         if self.message:
             try:
                 await self.message.edit(view=self)
@@ -180,6 +185,7 @@ class AquamarineSelectView(discord.ui.View):
         monthly_finals,
         gt_cargo,
         gt_am,
+        tracker_url: str = None,
     ):
         super().__init__(timeout=3600)
         self.interaction = interaction
@@ -192,6 +198,7 @@ class AquamarineSelectView(discord.ui.View):
         self.monthly_finals = monthly_finals
         self.gt_cargo = gt_cargo
         self.gt_am = gt_am
+        self.tracker_url = tracker_url
         self.message = None
 
         options = []
@@ -205,6 +212,9 @@ class AquamarineSelectView(discord.ui.View):
         self.select = discord.ui.Select(placeholder=placeholder_txt, options=options)
         self.select.callback = self.on_select
         self.add_item(self.select)
+
+        if tracker_url:
+            add_ggetracker_button(self, tracker_url)
 
         self.current_month = sorted_months[0]
 
@@ -222,7 +232,8 @@ class AquamarineSelectView(discord.ui.View):
 
     async def on_timeout(self):
         for child in self.children:
-            child.disabled = True
+            if getattr(child, "url", None) is None:
+                child.disabled = True
         if hasattr(self, "message") and self.message:
             try:
                 await self.message.edit(view=self)
@@ -265,6 +276,7 @@ class AquamarineSelectView(discord.ui.View):
             ),
             description=f"{lbl_date} <t:{int(self.actualisation_dt.timestamp())}:F> (<t:{int(self.actualisation_dt.timestamp())}:R>)\n\n{profil_desc}\n",
             color=self.clr,
+            url=self.tracker_url,
         )
 
         stats_globales = t(
@@ -418,6 +430,7 @@ class IlesOrageusesCog(commands.Cog):
 
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
+        tracker_url = build_ggetracker_url("/storm-tracker", campaign="storm_forts")
 
         async def fetch_and_build_view(current_inter: discord.Interaction, is_refresh: bool):
             isle_ids = []
@@ -496,7 +509,11 @@ class IlesOrageusesCog(commands.Cog):
             for i in range(0, len(forts_filtres), items_par_page):
                 page_items = forts_filtres[i : i + items_par_page]
                 numero_page = (i // items_par_page) + 1
-                embed = discord.Embed(title=f"{titre_base} (Page {numero_page}/{total_pages})", color=self.clr_forts)
+                embed = discord.Embed(
+                    title=f"{titre_base} (Page {numero_page}/{total_pages})",
+                    color=self.clr_forts,
+                    url=tracker_url,
+                )
 
                 lignes_description = []
                 for desc, fort in page_items:
@@ -530,6 +547,7 @@ class IlesOrageusesCog(commands.Cog):
                 )
                 refresh_btn.callback = refresh_callback
                 view.add_item(refresh_btn)
+            add_ggetracker_button(view, tracker_url)
 
             if is_refresh:
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
@@ -565,6 +583,7 @@ class IlesOrageusesCog(commands.Cog):
 
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
+        tracker_url = build_ggetracker_url("/storm-tracker", campaign="storm_isles")
 
         async def fetch_and_build_view(current_inter: discord.Interaction, is_refresh: bool):
             params = {"page": 1, "size": 500}
@@ -634,7 +653,9 @@ class IlesOrageusesCog(commands.Cog):
             for i in range(0, len(isles), items_par_page):
                 page_items = isles[i : i + items_par_page]
                 embed = discord.Embed(
-                    title=f"{titre_base} (Page {(i // items_par_page) + 1}/{total_pages})", color=self.clr_isles
+                    title=f"{titre_base} (Page {(i // items_par_page) + 1}/{total_pages})",
+                    color=self.clr_isles,
+                    url=tracker_url,
                 )
 
                 lignes_description = []
@@ -677,6 +698,7 @@ class IlesOrageusesCog(commands.Cog):
                 )
                 refresh_btn.callback = refresh_callback
                 view.add_item(refresh_btn)
+            add_ggetracker_button(view, tracker_url)
 
             if is_refresh:
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
@@ -699,6 +721,7 @@ class IlesOrageusesCog(commands.Cog):
         langue, serveur = await get_server_config(interaction)
         headers = await get_api_headers(interaction)
         safe_joueur = urllib.parse.quote(player)
+        tracker_url = build_ggetracker_url("/storm-tracker", campaign="storm_occupier")
 
         async def fetch_and_build_view(current_inter: discord.Interaction, is_refresh: bool):
             url = f"{self.api_base}storms/isles?filterByOccupierName={safe_joueur}&size=4000"
@@ -743,6 +766,7 @@ class IlesOrageusesCog(commands.Cog):
                     title=f"{titre_base} (Page {(i // items_par_page) + 1}/{total_pages})",
                     description=f"{desc_total}\n\n",
                     color=self.clr_occupier,
+                    url=tracker_url,
                 )
                 lignes_description = [
                     f"{{e_compass}} `({isle.get('position_x')}:{isle.get('position_y')})` | {get_isle_name(isle.get('isle_id'), langue)}"
@@ -765,6 +789,7 @@ class IlesOrageusesCog(commands.Cog):
                 )
                 refresh_btn.callback = refresh_callback
                 view.add_item(refresh_btn)
+            add_ggetracker_button(view, tracker_url)
 
             if is_refresh:
                 await current_inter.edit_original_response(embed=embeds[0], view=view)
@@ -812,9 +837,11 @@ class IlesOrageusesCog(commands.Cog):
         except Exception:
             season_str = t(langue, "storm_status_unknown", defaut="Unknown")
 
+        tracker_url = build_ggetracker_url("/storm-tracker", campaign="storm_status")
         embed = discord.Embed(
             title=t(langue, "cmd_storm_status_title", defaut="{e_std_satellite} Storm Islands Status"),
             color=self.clr_status,
+            url=tracker_url,
         )
         embed.description = t(
             langue,
@@ -831,7 +858,7 @@ class IlesOrageusesCog(commands.Cog):
             ),
         )
         await setup_embed_footer(embed, interaction, langue)
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed, view=GgeTrackerLinkView(tracker_url))
 
     @storm_group.command(name="player", description="View a player's Aquamarine performance (Latest or History)")
     @app_commands.checks.cooldown(1, 2.0, key=lambda i: i.user.id)
@@ -930,6 +957,8 @@ class IlesOrageusesCog(commands.Cog):
                         alliance_name = a_name
                         break
 
+        tracker_url = f"{build_ggetracker_url(f'/player/{player_id}', campaign='storm_player')}#aquamarine"
+
         if mode.value == "latest":
             live = snapshots[0]
             actualisation_dt = _get_api_timestamp(live)
@@ -998,7 +1027,7 @@ class IlesOrageusesCog(commands.Cog):
                 except Exception:
                     pass
 
-            embed = discord.Embed(title=title_txt, color=couleur_embed)
+            embed = discord.Embed(title=title_txt, color=couleur_embed, url=tracker_url)
             embed.description = (
                 f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)"
             )
@@ -1041,7 +1070,7 @@ class IlesOrageusesCog(commands.Cog):
                 )
 
             await setup_embed_footer(embed, interaction, langue)
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, view=GgeTrackerLinkView(tracker_url))
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
         elif mode.value == "history":
@@ -1096,6 +1125,7 @@ class IlesOrageusesCog(commands.Cog):
                 monthly_finals=monthly_finals,
                 gt_cargo=grand_total_cargo,
                 gt_am=grand_total_am,
+                tracker_url=tracker_url,
             )
 
             embed = await view.generate_embed(sorted_months[0])
@@ -1189,6 +1219,8 @@ class IlesOrageusesCog(commands.Cog):
 
             actualisation_dt = _get_api_timestamp(players)
 
+        tracker_url = build_ggetracker_url("/stormy-isles", campaign="storm_leaderboard")
+
         embeds = []
         try:
             annee_actuelle, mois_num_actuel = mois_actif.split("-")
@@ -1214,6 +1246,7 @@ class IlesOrageusesCog(commands.Cog):
                 title=titre,
                 description=f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)\n\n{desc}",
                 color=self.clr_aqua,
+                url=tracker_url,
             )
             embed.add_field(
                 name=t(langue, "ev_class_global_field", defaut="Classement global"),
@@ -1224,8 +1257,12 @@ class IlesOrageusesCog(commands.Cog):
             embeds.append(embed)
 
         try:
-            view = PaginationView(embeds)
-            view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
+            if len(embeds) == 1:
+                await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
+            else:
+                view = PaginationView(embeds)
+                add_ggetracker_button(view, tracker_url)
+                view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=15, langue=langue)
         except Exception as e:
             logger.error(f"❌ [Storms] Erreur lors de l'affichage du leaderboard Aquamarine : {e}")

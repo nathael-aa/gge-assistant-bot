@@ -13,9 +13,12 @@ import observability as obs
 from utils import (
     BASE_DATA_PATH,
     DICT_EMOJIS,
+    GgeTrackerLinkView,
     PaginationView,
     _get_api_timestamp,
+    add_ggetracker_button,
     alliance_autocomplete,
+    build_ggetracker_url,
     format_num,
     get_api_headers,
     get_cached_data,
@@ -170,6 +173,12 @@ class AlliancesCog(commands.Cog):
             suffixe_cache = " *(Plan B activé)*" if not is_live else ""
             str_date_header = f"{lbl_date} <t:{ts}:F> (<t:{ts}:R>){suffixe_cache}\n\n"
 
+            tracker_url = (
+                build_ggetracker_url(f"/alliance/{target_alliance_id}", campaign="alliance_profile")
+                if target_alliance_id
+                else None
+            )
+
             embeds = []
             rank_emojis = {
                 0: DICT_EMOJIS.get("e_0_", "{e_0_}"),
@@ -196,7 +205,7 @@ class AlliancesCog(commands.Cog):
                     a=alliance_name,
                     defaut="{e_alliance_icon} Alliance : {a}",
                 )
-                embed = discord.Embed(title=embed_title, color=self.clr_alliance)
+                embed = discord.Embed(title=embed_title, color=self.clr_alliance, url=tracker_url)
                 embed.description = str_date_header.strip()
 
                 info_title = t(langue, "prof_info_title", defaut="{e_information} Informations")
@@ -245,9 +254,14 @@ class AlliancesCog(commands.Cog):
                 embeds.append(embed)
 
             if len(embeds) == 1:
-                await interaction.followup.send(embed=embeds[0])
+                if tracker_url:
+                    await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
+                else:
+                    await interaction.followup.send(embed=embeds[0])
             else:
                 view = PaginationView(embeds)
+                if tracker_url:
+                    add_ggetracker_button(view, tracker_url)
                 await interaction.followup.send(embed=embeds[0], view=view)
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
@@ -527,6 +541,8 @@ class AlliancesCog(commands.Cog):
 
             lignes_historique.append(f"• **{day}** ➔ **{format_num(pp_jour)} PP** {diff_txt}")
 
+        tracker_url = build_ggetracker_url(f"/alliance/{alliance_id}", campaign="alliance_might")
+
         embeds = []
         chunk_size = 15
         nb_pages = max(1, (len(lignes_historique) - 1) // chunk_size + 1)
@@ -548,6 +564,7 @@ class AlliancesCog(commands.Cog):
                     defaut=f"Évolution de la Puissance pour : {alliance_name_real}",
                 ),
                 color=self.clr_alliance_pp,
+                url=tracker_url,
             )
             embed_desc_i18n = t(
                 langue, "prof_pp_embed_desc", j=days, defaut=f"Analyse sur les **{days} derniers jours**."
@@ -565,9 +582,10 @@ class AlliancesCog(commands.Cog):
             embeds.append(embed)
 
         if len(embeds) == 1:
-            await interaction.followup.send(embed=embeds[0])
+            await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
         else:
             view = PaginationView(embeds)
+            add_ggetracker_button(view, tracker_url)
             await interaction.followup.send(embed=embeds[0], view=view)
         await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
@@ -711,6 +729,8 @@ class AlliancesCog(commands.Cog):
 
         all_props.sort(key=lambda p: (p["type"], p["world_id"], p["player"].lower()))
 
+        tracker_url = build_ggetracker_url(f"/alliance/{alliance_id}", campaign="alliance_property")
+
         embeds = []
         titre_base = t(langue, "cmd_prop_embed_title", alliance=nom_officiel, defaut=f"🏰 Propriétés de {nom_officiel}")
 
@@ -720,7 +740,7 @@ class AlliancesCog(commands.Cog):
             defaut="{e_information} **Monde | Type | Joueur ➔ Coordonnées**\n\n",
         )
 
-        current_embed = discord.Embed(title=titre_base, color=self.clr_alliance_property)
+        current_embed = discord.Embed(title=titre_base, color=self.clr_alliance_property, url=tracker_url)
         current_desc = header_desc
 
         for p in all_props:
@@ -733,7 +753,9 @@ class AlliancesCog(commands.Cog):
                 current_embed.description = current_desc
                 embeds.append(current_embed)
 
-                current_embed = discord.Embed(title=f"{titre_base} (Suite)", color=discord.Color.from_rgb(255, 215, 0))
+                current_embed = discord.Embed(
+                    title=f"{titre_base} (Suite)", color=discord.Color.from_rgb(255, 215, 0), url=tracker_url
+                )
                 current_desc = header_desc + ligne
             else:
                 current_desc += ligne
@@ -747,9 +769,10 @@ class AlliancesCog(commands.Cog):
 
         if len(embeds) > 1:
             view = PaginationView(embeds)
+            add_ggetracker_button(view, tracker_url)
             await interaction.followup.send(embed=embeds[0], view=view)
         else:
-            await interaction.followup.send(embed=embeds[0])
+            await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
         await prompt_vote_if_lucky(interaction, probability_percent=5, langue=langue)
 
     @alliance_group.command(name="description", description="View the history of the last wall changes")
@@ -934,6 +957,8 @@ class AlliancesCog(commands.Cog):
             defaut=f"Archives Alliance : {nom_alliance.upper()}",
         )
 
+        tracker_url = build_ggetracker_url(f"/alliance/{alliance_id}", campaign="alliance_description")
+
         embeds = []
         chunks = [murs_blocks[i : i + 3] for i in range(0, len(murs_blocks), 3)]
 
@@ -942,6 +967,7 @@ class AlliancesCog(commands.Cog):
                 title=embed_title,
                 description=str_date_header + desc_i18n,
                 color=getattr(self, "clr_descalli", discord.Color.blue()),
+                url=tracker_url,
             )
 
             for block in chunk:
@@ -956,9 +982,10 @@ class AlliancesCog(commands.Cog):
             embeds.append(embed)
 
         if len(embeds) == 1:
-            await interaction.followup.send(embed=embeds[0])
+            await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
         else:
             view = PaginationView(embeds)
+            add_ggetracker_button(view, tracker_url)
             await interaction.followup.send(embed=embeds[0], view=view)
 
     @alliance_group.command(name="scanner", description="Analyze the enemy roster in real time (Doves, PP, Targets)")
@@ -1062,6 +1089,8 @@ class AlliancesCog(commands.Cog):
         cibles_libres.sort(key=lambda x: x["pp"], reverse=True)
         colombes.sort(key=lambda x: x["fin"])
 
+        tracker_url = build_ggetracker_url(f"/alliance/{target_id}", campaign="alliance_scanner")
+
         embeds = []
         chunk_size = 10
 
@@ -1082,6 +1111,7 @@ class AlliancesCog(commands.Cog):
                     defaut=f"{{e_icon_search}} Scanner de Guerre : {alliance_name}",
                 ),
                 color=self.clr_scanner,
+                url=tracker_url,
             )
 
             desc_i18n = t(
@@ -1152,9 +1182,10 @@ class AlliancesCog(commands.Cog):
             )
 
         if len(embeds) == 1:
-            await interaction.followup.send(embed=embeds[0])
+            await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
         else:
             view = PaginationView(embeds)
+            add_ggetracker_button(view, tracker_url)
             await interaction.followup.send(embed=embeds[0], view=view)
         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 

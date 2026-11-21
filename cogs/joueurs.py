@@ -13,7 +13,9 @@ import observability as obs
 from utils import (
     BASE_DATA_PATH,
     DICT_EMOJIS,
+    GgeTrackerLinkView,
     _get_api_timestamp,
+    build_ggetracker_url,
     format_num,
     get_api_headers,
     get_server_config,
@@ -30,12 +32,13 @@ logger = logging.getLogger("GGE_Bot")
 # 🎛️ MENU INTERACTIF DES FILTRES JOUEURS
 # ===========================================
 class HistoriqueView(discord.ui.View):
-    def __init__(self, embeds_dict, interaction: discord.Interaction, langue: str = "fr"):
+    def __init__(self, embeds_dict, interaction: discord.Interaction, langue: str = "fr", tracker_url: str = None):
         super().__init__(timeout=3600)
         self.embeds_dict = embeds_dict
         self.interaction = interaction
         self.message = None
         self.langue = langue
+        self.tracker_url = tracker_url
 
         self.btn_pseudo.label = t(langue, "prof_hist_btn_pseudos", defaut="Pseudos")
         self.btn_pseudo.emoji = DICT_EMOJIS.get("e_listitem", "📝")
@@ -48,6 +51,17 @@ class HistoriqueView(discord.ui.View):
 
         self.btn_prev.emoji = DICT_EMOJIS.get("e_last", "⏮️")
         self.btn_next.emoji = DICT_EMOJIS.get("e_next", "⏭️")
+
+        self.btn_tracker = (
+            discord.ui.Button(
+                label="GGE-Tracker",
+                url=tracker_url,
+                emoji=DICT_EMOJIS.get("e_website", "🌐"),
+                row=1,
+            )
+            if tracker_url
+            else None
+        )
 
         self.current_cat = "pseudo"
         self.current_page = 0
@@ -74,6 +88,9 @@ class HistoriqueView(discord.ui.View):
             self.add_item(self.btn_prev)
             self.add_item(self.btn_next)
 
+        if self.btn_tracker:
+            self.add_item(self.btn_tracker)
+
     async def _switch_category(self, interaction: discord.Interaction, cat: str):
         self.current_cat = cat
         self.current_page = 0
@@ -84,7 +101,8 @@ class HistoriqueView(discord.ui.View):
 
     async def on_timeout(self):
         for child in self.children:
-            child.disabled = True
+            if getattr(child, "url", None) is None:
+                child.disabled = True
         if hasattr(self, "message") and self.message:
             try:
                 await self.message.edit(view=self)
@@ -253,7 +271,8 @@ class JoueursCog(commands.Cog):
         )
         desc = t(langue, "server_desc", ts=timestamp_str, defaut="Actualisation des données : {ts}")
 
-        embed = discord.Embed(title=titre, description=desc, color=self.clr_server)
+        tracker_url = build_ggetracker_url("/statistics", campaign="server_stats")
+        embed = discord.Embed(title=titre, description=desc, color=self.clr_server, url=tracker_url)
 
         lbl_demo_title = t(langue, "server_demo_title", defaut="{e_players} Démographie")
         lbl_demo_val = t(
@@ -316,7 +335,7 @@ class JoueursCog(commands.Cog):
         embed.add_field(name=lbl_loot_title, value=lbl_loot_val, inline=True)
 
         await setup_embed_footer(embed, interaction, langue)
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed, view=GgeTrackerLinkView(tracker_url))
 
     @player_group.command(name="profile", description="Detailed player profile")
     @app_commands.checks.cooldown(1, 3.0, key=lambda i: i.user.id)
@@ -416,13 +435,16 @@ class JoueursCog(commands.Cog):
                 collected = discord.utils.utcnow()
             ts = int(collected.timestamp())
 
+            player_id = data.get("player_id")
+            tracker_url = build_ggetracker_url(f"/player/{player_id}", campaign="player_profile") if player_id else None
+
             embed_title = t(
                 langue,
                 "prof_joueur_title",
                 n=data.get("name", player),
                 defaut="{e_players} Profil de {n}",
             )
-            embed = discord.Embed(title=embed_title, color=self.clr_joueur)
+            embed = discord.Embed(title=embed_title, color=self.clr_joueur, url=tracker_url)
             embed.description = f"{lbl_date} <t:{ts}:F> (<t:{ts}:R>)"
 
             info_title = t(langue, "prof_info_title", defaut="{e_information} Informations Générales")
@@ -547,13 +569,15 @@ class JoueursCog(commands.Cog):
                 )
                 embed.add_field(name=vr_title, value=f"{v_txt}\n\n{v_coords}"[:1024], inline=False)
 
-            player_id = data.get("player_id")
             if player_id:
                 image_url = f"https://api.gge-tracker.com/api/v1/assets/og/player/{player_id}.jpg"
                 embed.set_image(url=image_url)
 
             await setup_embed_footer(embed, interaction, langue)
-            await interaction.followup.send(embed=embed)
+            if tracker_url:
+                await interaction.followup.send(embed=embed, view=GgeTrackerLinkView(tracker_url))
+            else:
+                await interaction.followup.send(embed=embed)
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
         except Exception as e:
@@ -798,6 +822,7 @@ class JoueursCog(commands.Cog):
             await interaction.followup.send(t(langue, "prof_hist_err_id", j=player, defaut="{e_error} ID introuvable."))
             return
 
+        tracker_url = build_ggetracker_url(f"/player/{p_id}", campaign="player_history")
         headers = await get_api_headers(interaction)
 
         urls_to_fetch = {
@@ -902,6 +927,7 @@ class JoueursCog(commands.Cog):
                         title=f"{cat['emoji']} {cat['title']} - {player}{suffixe_titre}",
                         description=str_date_header + "\n".join(chunk),
                         color=self.clr_historique,
+                        url=tracker_url,
                     )
                     await setup_embed_footer(emb, interaction, langue)
                     embeds_dict[cat["key"]].append(emb)
@@ -911,6 +937,7 @@ class JoueursCog(commands.Cog):
                     title=f"{cat['emoji']} {cat['title']} - {player}",
                     description=str_date_header + desc_empty,
                     color=self.clr_historique,
+                    url=tracker_url,
                 )
                 await setup_embed_footer(emb, interaction, langue)
                 embeds_dict[cat["key"]].append(emb)
@@ -921,12 +948,13 @@ class JoueursCog(commands.Cog):
                 title=t(langue, "prof_hist_empty_title", j=player, defaut=f"Dossier - {player}"),
                 description=str_date_header + desc_empty_global,
                 color=self.clr_historique,
+                url=tracker_url,
             )
             await setup_embed_footer(embed_vide, interaction, langue)
-            await interaction.followup.send(embed=embed_vide)
+            await interaction.followup.send(embed=embed_vide, view=GgeTrackerLinkView(tracker_url))
             return
 
-        view = HistoriqueView(embeds_dict, interaction, langue=langue)
+        view = HistoriqueView(embeds_dict, interaction, langue=langue, tracker_url=tracker_url)
         view.message = await interaction.followup.send(embed=embeds_dict[view.current_cat][0], view=view, wait=True)
         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
@@ -966,9 +994,13 @@ class JoueursCog(commands.Cog):
                     ts = int(dt_peace.timestamp())
 
                     if dt_peace > maintenant:
+                        p_id = p_data.get("player_id") or p_data.get("id")
+                        tracker_url = build_ggetracker_url(f"/player/{p_id}", campaign="player_dove") if p_id else None
+
                         embed = discord.Embed(
                             title=t(langue, "prof_col_embed_title", defaut="{e_peace} Statut de la Colombe"),
                             color=self.clr_colombe,
+                            url=tracker_url,
                         )
 
                         api_timestamp = _get_api_timestamp(p_data)
@@ -985,7 +1017,10 @@ class JoueursCog(commands.Cog):
                         )
 
                         await setup_embed_footer(embed, interaction, langue)
-                        await interaction.followup.send(embed=embed)
+                        if tracker_url:
+                            await interaction.followup.send(embed=embed, view=GgeTrackerLinkView(tracker_url))
+                        else:
+                            await interaction.followup.send(embed=embed)
                         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
                     else:
                         await interaction.followup.send(
@@ -1263,6 +1298,7 @@ class JoueursCog(commands.Cog):
             ),
         )
 
+        tracker_url = build_ggetracker_url("/compare/players", campaign="player_compare")
         embed = discord.Embed(
             title=t(
                 langue,
@@ -1270,6 +1306,7 @@ class JoueursCog(commands.Cog):
                 defaut="{e_icon_analyze} Analyse : Grille de Confrontation",
             ),
             color=self.clr_compare_j,
+            url=tracker_url,
         )
 
         lbl_date = t(langue, "guerre_lbl_date_data", defaut="⏱️ **Données datées de :**")
@@ -1341,7 +1378,7 @@ class JoueursCog(commands.Cog):
         embed.add_field(name=lbl_f5, value=f"> *{verdict}*", inline=False)
         await setup_embed_footer(embed, interaction, langue)
 
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed, view=GgeTrackerLinkView(tracker_url))
 
 
 async def setup(bot: commands.Bot):

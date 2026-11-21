@@ -7,8 +7,11 @@ from discord.ext import commands
 
 from utils import (
     DICT_EMOJIS,
+    GgeTrackerLinkView,
     PaginationView,
+    add_ggetracker_button,
     alliance_autocomplete,
+    build_ggetracker_url,
     get_api_headers,
     get_server_config,
     setup_embed_footer,
@@ -192,6 +195,8 @@ class FailleCog(commands.Cog):
         except Exception:
             dt_snap = datetime.now()
 
+        tracker_url = build_ggetracker_url("/rift-raid", campaign="rift_rank")
+
         e_div = DICT_EMOJIS.get(f"e_division{division}", "🏅")
         titre = t(
             langue,
@@ -218,6 +223,7 @@ class FailleCog(commands.Cog):
                 title=f"{titre} (Page {(i // items_per_page) + 1}/{total_pages})",
                 description=f"{desc_maj}\n\n",
                 color=self.clr_rift_rank,
+                url=tracker_url,
             )
 
             lignes = []
@@ -236,9 +242,10 @@ class FailleCog(commands.Cog):
             embeds.append(embed)
 
         if len(embeds) == 1:
-            await interaction.followup.send(embed=embeds[0])
+            await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
         else:
             view = PaginationView(embeds)
+            add_ggetracker_button(view, tracker_url)
             view.current_page = target_local_page
             view.message = await interaction.followup.send(embed=embeds[target_local_page], view=view)
 
@@ -391,6 +398,8 @@ class FailleCog(commands.Cog):
             ),
         )
 
+        tracker_url = build_ggetracker_url("/rift-raid", campaign="rift_alliance")
+
         embeds = []
         items_per_page = 15
         total_pages = (len(analysis) - 1) // items_per_page + 1
@@ -409,6 +418,7 @@ class FailleCog(commands.Cog):
                 title=f"{titre} (Page {(i // items_per_page) + 1}/{total_pages})",
                 description=synth_text,
                 color=self.clr_rift_alliance,
+                url=tracker_url,
             )
 
             lignes = []
@@ -427,9 +437,10 @@ class FailleCog(commands.Cog):
             embeds.append(embed)
 
         if len(embeds) == 1:
-            await interaction.followup.send(embed=embeds[0])
+            await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
         else:
             view = PaginationView(embeds)
+            add_ggetracker_button(view, tracker_url)
             view.message = await interaction.followup.send(embed=embeds[0], view=view)
 
 

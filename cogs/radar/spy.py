@@ -12,6 +12,7 @@ import observability as obs
 from utils import (
     CONFIG_DIR,
     DICT_EMOJIS,
+    build_ggetracker_url,
     format_num,
     get_api_headers,
     get_discord_timestamp,
@@ -282,6 +283,8 @@ class RadarSpyMixin:
                     if not abonnes_alliance and not guild_abonnes_alliance:
                         continue
 
+                    alli_url = build_ggetracker_url(f"/alliance/{a_id}", campaign="radar_alert_alliance")
+
                     try:
                         url_alli_live = f"https://api.gge-tracker.com/api/v1/alliances/id/{a_id}"
                         r_live = await session.get(url_alli_live, headers=headers, timeout=12)
@@ -315,6 +318,7 @@ class RadarSpyMixin:
                                                 defaut=f"{e_alli} ALERTE ALLIANCE : NOUVEAU NOM",
                                             ),
                                             color=discord.Color.purple(),
+                                            url=alli_url,
                                         )
                                         embed.add_field(
                                             name=t(lg, "rad_spy_alli_name_mod", defaut="Modification"),
@@ -374,6 +378,7 @@ class RadarSpyMixin:
                                                 defaut=f"L'alliance **{new_name}** a changé de couronne !",
                                             ),
                                             color=discord.Color.gold(),
+                                            url=alli_url,
                                         )
                                         embed.add_field(
                                             name=t(lg, "rad_spy_alli_lead_f", defaut="Nouveau Chef"),
@@ -432,6 +437,7 @@ class RadarSpyMixin:
                                                 defaut=f"Mouvements récents chez **{new_name}**",
                                             ),
                                             color=discord.Color.blue(),
+                                            url=alli_url,
                                         )
                                         if entrees_loc:
                                             embed.add_field(
@@ -501,6 +507,7 @@ class RadarSpyMixin:
                                                 defaut=f"Changements de hiérarchie chez **{new_name}**",
                                             ),
                                             color=discord.Color.orange(),
+                                            url=alli_url,
                                         )
                                         embed.add_field(
                                             name=t(lg, "rad_spy_alli_rank_f", defaut="Mouvements internes"),
@@ -553,6 +560,9 @@ class RadarSpyMixin:
                                         if not p_data:
                                             continue
 
+                                        player_url = build_ggetracker_url(
+                                            f"/player/{p_id}", campaign="radar_alert_player"
+                                        )
                                         player = info["name"]
                                         new_name = p_data.get("player_name", player)
                                         if new_name != player:
@@ -573,6 +583,7 @@ class RadarSpyMixin:
                                                         lg, "rad_spy_p_name_title", defaut=f"{e_warning} ALERTE PSEUDO"
                                                     ),
                                                     color=discord.Color.orange(),
+                                                    url=player_url,
                                                 )
                                                 embed.add_field(
                                                     name="Cible",
@@ -631,6 +642,7 @@ class RadarSpyMixin:
                                                         defaut=f"{e_warning} ALERTE ALLIANCE",
                                                     ),
                                                     color=discord.Color.brand_red(),
+                                                    url=player_url,
                                                 )
                                                 embed.add_field(
                                                     name="Cible",
@@ -681,6 +693,7 @@ class RadarSpyMixin:
                                                         defaut=f"{e_warning} ALERTE PUISSANCE {emoji_str}",
                                                     ),
                                                     color=color,
+                                                    url=player_url,
                                                 )
                                                 embed.add_field(
                                                     name="Cible",
@@ -779,6 +792,7 @@ class RadarSpyMixin:
                                                                 defaut=f"**{player}** est sous protection !\n{e_time} Fin : <t:{ts}:f> (<t:{ts}:R>)",
                                                             ),
                                                             color=discord.Color.light_grey(),
+                                                            url=player_url,
                                                         )
                                                     elif trigger == "mod":
                                                         embed = discord.Embed(
@@ -795,6 +809,7 @@ class RadarSpyMixin:
                                                                 defaut=f"**{player}** a modifié sa protection !\n{e_time} Fin : <t:{ts}:f> (<t:{ts}:R>)",
                                                             ),
                                                             color=discord.Color.blue(),
+                                                            url=player_url,
                                                         )
                                                     elif trigger == "off":
                                                         embed = discord.Embed(
@@ -810,6 +825,7 @@ class RadarSpyMixin:
                                                                 defaut=f"La protection de **{player}** a expiré ou a été annulée. Il est vulnérable !",
                                                             ),
                                                             color=discord.Color.brand_green(),
+                                                            url=player_url,
                                                         )
                                                     elif trigger == "end":
                                                         embed = discord.Embed(
@@ -825,6 +841,7 @@ class RadarSpyMixin:
                                                                 defaut=f"La protection de **{player}** a expiré ou a été annulée. Il est vulnérable !",
                                                             ),
                                                             color=discord.Color.brand_green(),
+                                                            url=player_url,
                                                         )
                                                     embeds_locales[lg] = embed
 
@@ -876,6 +893,9 @@ class RadarSpyMixin:
                                         if not abonnes and not guild_abonnes:
                                             continue
 
+                                        player_url = build_ggetracker_url(
+                                            f"/player/{p_id}", campaign="radar_alert_player"
+                                        )
                                         x_old, y_old, x_new, y_new = (
                                             m.get("position_x_old"),
                                             m.get("position_y_old"),
@@ -890,6 +910,7 @@ class RadarSpyMixin:
                                                     lg, "rad_spy_p_pos_title", defaut=f"{e_warning} ALERTE DÉMÉNAGEMENT"
                                                 ),
                                                 color=discord.Color.dark_purple(),
+                                                url=player_url,
                                             )
                                             embed.add_field(
                                                 name="Cible",

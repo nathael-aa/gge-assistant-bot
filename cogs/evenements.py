@@ -12,8 +12,11 @@ import observability as obs
 from utils import (
     CONFIG_DIR,
     TRACKER_EVENTS,
+    GgeTrackerLinkView,
     PaginationView,
+    add_ggetracker_button,
     alliance_autocomplete,
+    build_ggetracker_url,
     event_alliance_autocomplete,
     event_autocomplete,
     format_num,
@@ -153,6 +156,8 @@ class EvenementsCog(commands.Cog):
                     defaut=f"{{e_error}} Joueur **{player}** introuvable dans le cache local.",
                 )
             )
+
+        tracker_url = build_ggetracker_url(f"/player/{player_id}", campaign="event_player")
 
         headers = await get_api_headers(interaction)
         base_api = "https://api.gge-tracker.com/api/v1"
@@ -319,6 +324,7 @@ class EvenementsCog(commands.Cog):
                         defaut=f"{{e_stats}} Analyse & Historique de {player} pour : {event_trad}",
                     ),
                     color=self.clr_joueur_cumul,
+                    url=tracker_url,
                 )
                 desc_i18n = t(
                     langue,
@@ -358,9 +364,10 @@ class EvenementsCog(commands.Cog):
                 embeds.append(embed)
 
             if len(embeds) == 1:
-                await interaction.followup.send(embed=embeds[0])
+                await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
             else:
                 view = PaginationView(embeds)
+                add_ggetracker_button(view, tracker_url)
                 view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
@@ -393,6 +400,7 @@ class EvenementsCog(commands.Cog):
                     defaut=f"{{e_podium}} Score en direct de {player} pour : {event_trad}",
                 ),
                 color=self.clr_joueur_dernier,
+                url=tracker_url,
             )
             embed.description = (
                 f"{lbl_date} <t:{int(actualisation_dt.timestamp())}:F> (<t:{int(actualisation_dt.timestamp())}:R>)"
@@ -427,7 +435,7 @@ class EvenementsCog(commands.Cog):
                 )
 
             await setup_embed_footer(embed, interaction, langue)
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, view=GgeTrackerLinkView(tracker_url))
             await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     @app_commands.command(name="event_alliance", description="Ranking and participation of an alliance in an event")
@@ -476,9 +484,31 @@ class EvenementsCog(commands.Cog):
         if not embed:
             return await interaction.followup.send(f"{{e_error}} {error_or_lignes}")
 
+        alliance_id = None
+        cache = await get_cached_data(serveur)
+        for p_info in cache.get("players_data", {}).values():
+            a_obj = p_info.get("alliance")
+            a_name = a_obj.get("name") if isinstance(a_obj, dict) else (p_info.get("alliance_name") or a_obj)
+            if a_name and str(a_name).lower() == alliance_name.lower():
+                aid = p_info.get("allianceId") or p_info.get("alliance_id")
+                if not aid and isinstance(a_obj, dict):
+                    aid = a_obj.get("allianceId") or a_obj.get("alliance_id")
+                if aid:
+                    alliance_id = str(aid)
+                    break
+
+        tracker_url = (
+            build_ggetracker_url(f"/alliance/{alliance_id}", campaign="event_alliance") if alliance_id else None
+        )
+
         if display_mode == "list":
+            if tracker_url:
+                embed.url = tracker_url
             await setup_embed_footer(embed, interaction, langue)
-            await interaction.followup.send(embed=embed)
+            if tracker_url:
+                await interaction.followup.send(embed=embed, view=GgeTrackerLinkView(tracker_url))
+            else:
+                await interaction.followup.send(embed=embed)
         else:
             if global_latest_str:
                 try:
@@ -502,6 +532,7 @@ class EvenementsCog(commands.Cog):
                         defaut=f"{{e_alliance_icon}} {alliance_name} - {event_trad}",
                     ),
                     color=self.clr_alliance,
+                    url=tracker_url,
                 )
 
                 emb.description = (
@@ -525,8 +556,17 @@ class EvenementsCog(commands.Cog):
 
                 await setup_embed_footer(emb, interaction, langue)
                 embeds.append(emb)
-            view = PaginationView(embeds)
-            view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
+
+            if len(embeds) == 1:
+                if tracker_url:
+                    await interaction.followup.send(embed=embeds[0], view=GgeTrackerLinkView(tracker_url))
+                else:
+                    await interaction.followup.send(embed=embeds[0])
+            else:
+                view = PaginationView(embeds)
+                if tracker_url:
+                    add_ggetracker_button(view, tracker_url)
+                view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
         await prompt_vote_if_lucky(interaction, probability_percent=8, langue=langue)
 
     @app_commands.command(name="link_account", description="Link your Discord account to your GGE username")

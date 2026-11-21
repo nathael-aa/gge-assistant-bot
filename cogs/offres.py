@@ -348,7 +348,10 @@ class OffersCog(commands.Cog):
                 allowed_mentions = discord.AllowedMentions(roles=True)
 
         try:
-            parent_msg = await channel.send(content=msg_text, allowed_mentions=allowed_mentions)
+            parent_msg = await channel.send(
+                content=msg_text,
+                allowed_mentions=allowed_mentions,
+            )
             thread = await parent_msg.create_thread(name=f"{cat_emoji} {cat_name} Offers", auto_archive_duration=1440)
 
             for i in range(0, len(embeds), 10):
