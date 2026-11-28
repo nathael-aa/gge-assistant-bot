@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   schedule:
     - cron: "0 3 * * *"
   pull_request:
@@ -18,17 +18,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools
           pip install -r requirements.txt
           pip install ruff==0.16.3
+
       - name: Ruff check
         run: ruff check --output-format=github .
 
@@ -37,17 +40,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools
           pip install -r requirements.txt
           pip install pip-audit==2.9.0
+
       - name: Audit dependencies
         run: pip-audit
 
@@ -56,26 +62,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-        
+        uses: actions/checkout@v6
+
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
-          
+
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        
+        uses: docker/setup-buildx-action@v4
+
       # 1. On compile l'image en local uniquement pour Trivy
       - name: Build image for scan
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true
           tags: discord-bot:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          
+
       # 2. Trivy scanne l'image locale (Si faille trouvée = Arrêt du workflow)
       - name: Scan image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
@@ -90,7 +96,7 @@ jobs:
       # 3. Si on passe le scan, on se connecte à GHCR (Sauf pour les Pull Requests)
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -99,14 +105,14 @@ jobs:
       - name: Extract metadata
         if: github.event_name != 'pull_request'
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}
 
       # 4. On pousse l'image scannée sur GHCR
       - name: Push image to GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -114,3 +120,69 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  notify:
+    name: Discord Notification
+    runs-on: ubuntu-latest
+    needs: [lint, dependencies, docker]
+    if: always()
+    steps:
+      - name: Send Discord status embed
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_CI_WEBHOOK }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          DEPS_RESULT: ${{ needs.dependencies.result }}
+          DOCKER_RESULT: ${{ needs.docker.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "DISCORD_CI_WEBHOOK non configuré, notification ignorée."
+            exit 0
+          fi
+
+          fmt_status() {
+            case "$1" in
+              success)   echo "✅ success" ;;
+              failure)   echo "❌ failure" ;;
+              cancelled) echo "🚫 cancelled" ;;
+              skipped)   echo "⏭️ skipped" ;;
+              *)         echo "❔ $1" ;;
+            esac
+          }
+
+          if [[ "$LINT_RESULT" == "success" && "$DEPS_RESULT" == "success" && "$DOCKER_RESULT" == "success" ]]; then
+            COLOR=3066993
+            TITLE="✅ CI réussi — $REF_NAME"
+          else
+            COLOR=15158332
+            TITLE="❌ CI en échec — $REF_NAME"
+          fi
+
+          DESC=$(printf "**Dépôt :** \`%s\`\n**Déclencheur :** \`%s\` • **Commit :** \`%.7s\` • **Auteur :** %s\n\n• **Lint :** %s\n• **Dependency audit :** %s\n• **Docker / Trivy :** %s" \
+            "$REPO" "$EVENT_NAME" "$COMMIT_SHA" "$ACTOR" \
+            "$(fmt_status "$LINT_RESULT")" \
+            "$(fmt_status "$DEPS_RESULT")" \
+            "$(fmt_status "$DOCKER_RESULT")")
+
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg url "$RUN_URL" \
+            --arg desc "$DESC" \
+            --argjson color "$COLOR" \
+            '{
+              username: "GitHub",
+              avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+              embeds: [{
+                title: $title,
+                url: $url,
+                description: $desc,
+                color: $color
+              }]
+            }')
+
+          curl -fsSL -H "Content-Type: application/json" -d "$PAYLOAD" "$WEBHOOK_URL"

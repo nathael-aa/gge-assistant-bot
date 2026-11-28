@@ -11,16 +11,19 @@ permissions:
 
 jobs:
   update-tree:
+    name: Update README Tree
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Generate tree and update README
         run: |
-          sudo apt-get install -y tree
+          if ! command -v tree >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y tree
+          fi
           echo '```text' > tree_tmp.txt
           # Profondeur 4, dossiers en premier, nettoyage des ignorés et des fichiers images
           tree -L 4 --dirsfirst -I '.git|.github|__pycache__|.env|logs|data|tmp|tree_tmp.txt|*.png|*.webp|*.gif|*.jpg' >> tree_tmp.txt
@@ -33,5 +36,41 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add README.md
-          git diff --quiet && git diff --staged --quiet || git commit -m "docs: auto-update README tree"
-          git push
+          if ! git diff --staged --quiet; then
+            git commit -m "docs: auto-update README tree"
+            git push
+          fi
+
+      - name: Notify Discord on failure
+        if: failure()
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_CI_WEBHOOK }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            exit 0
+          fi
+
+          DESC=$(printf "**Dépôt :** \`%s\`\n**Branche :** \`%s\` • **Commit :** \`%.7s\` • **Auteur :** %s\n\nLe job \`Update README Tree\` a échoué." \
+            "$REPO" "$REF_NAME" "$COMMIT_SHA" "$ACTOR")
+
+          PAYLOAD=$(jq -n \
+            --arg title "❌ Update README Tree en échec — $REF_NAME" \
+            --arg url "$RUN_URL" \
+            --arg desc "$DESC" \
+            '{
+              username: "GitHub",
+              avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+              embeds: [{
+                title: $title,
+                url: $url,
+                description: $desc,
+                color: 15158332
+              }]
+            }')
+
+          curl -fsSL -H "Content-Type: application/json" -d "$PAYLOAD" "$WEBHOOK_URL"

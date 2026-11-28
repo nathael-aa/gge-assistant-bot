@@ -1,11 +1,8 @@
 FROM python:3.11-slim
 
 # === CORRECTION DES VULNÉRABILITÉS TRIVY ===
-# hadolint ignore=DL3008
-RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade \
-    apt \
-    libapt-pkg7.0 \
-    zlib1g \
+# hadolint ignore=DL3005
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 # ===========================================
